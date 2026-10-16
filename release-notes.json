@@ -68,7 +68,8 @@
     "changes": [
       "Excluding a show from Weekly Releases also disables its background episode, season and planned-release reminders.",
       "The show remains in the Library with episode progress and release metadata intact; re-including it restores reminder eligibility.",
-      "Add regression coverage for excluded and re-enabled shows, and bump reminder/editor asset versions."
+      "Add regression coverage for excluded and re-enabled shows, and bump reminder/editor asset versions.",
+      "Correct the reminder regression test harness so the extracted backend helpers execute as valid JavaScript."
     ]
   },
   "37f6c39e9d0355b1bde705cb3fcb3cda2533119f": {

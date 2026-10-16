@@ -35,7 +35,7 @@ test("server refresh advances to the next true episode and keeps UTC timestamps"
 test("Weekly Releases opt-out disables episode reminders and re-enabling restores them", () => {
   const context = vm.createContext({ Date, Number, Array, Set, String, Object });
   vm.runInContext(
-    ["plannedEvent", "reminderEvents"].map(extract).join("\\n") + "\\nthis.reminderEvents = reminderEvents;",
+    ["plannedEvent", "reminderEvents"].map(extract).join("\n") + "\nthis.reminderEvents = reminderEvents;",
     context,
   );
   const show = {
