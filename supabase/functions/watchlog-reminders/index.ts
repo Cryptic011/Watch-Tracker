@@ -372,6 +372,11 @@ function plannedEvent(item: Record<string, unknown>) {
 }
 
 function reminderEvents(item: Record<string, unknown>) {
+  // Weekly Releases opt-out is also the per-show reminder opt-out. Reminders
+  // are derived from the current library on each scan, so returning no events
+  // cancels pending eligibility without deleting the show or its episode
+  // schedule. Clearing the preference makes its events eligible again.
+  if (item.hideFromWeeklyReleases === true) return [];
   if (!["Series", "Anime"].includes(String(item.type)) || !Array.isArray(item.scheduledEpisodeReleases)) {
     const fallback = plannedEvent(item);
     return fallback ? [fallback] : [];

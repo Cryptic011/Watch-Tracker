@@ -31,3 +31,32 @@ test("server refresh advances to the next true episode and keeps UTC timestamps"
   assert.equal(result.nextEpisodeDate,"2026-09-10T19:00:00.000Z");
   assert.deepEqual(result.watchedEpisodes,{1:[1]});
 });
+
+test("Weekly Releases opt-out disables episode reminders and re-enabling restores them", () => {
+  const context = vm.createContext({ Date, Number, Array, Set, String, Object });
+  vm.runInContext(
+    ["plannedEvent", "reminderEvents"].map(extract).join("\\n") + "\\nthis.reminderEvents = reminderEvents;",
+    context,
+  );
+  const show = {
+    id: "show-1",
+    type: "Series",
+    status: "Watching",
+    hideFromWeeklyReleases: false,
+    nextEpisodeDate: "2026-11-01T20:00:00.000Z",
+    nextEpisodeNum: 4,
+    scheduledEpisodeReleases: [{ season: 2, number: 4, raw: "2026-11-01T20:00:00.000Z" }],
+  };
+
+  assert.equal(context.reminderEvents(show).length, 1, "enabled show has a reminder event");
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(context.reminderEvents({ ...show, hideFromWeeklyReleases: true }))),
+    [],
+    "excluded show has no reminder events, including known scheduled episodes",
+  );
+  assert.equal(
+    context.reminderEvents({ ...show, hideFromWeeklyReleases: false }).length,
+    1,
+    "re-including the show restores reminder eligibility without changing its schedule",
+  );
+});

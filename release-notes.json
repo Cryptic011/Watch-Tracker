@@ -64,17 +64,11 @@
     "number": 224
   },
   "__current": {
-    "title": "Private push-status notifications",
+    "title": "Link Weekly Releases opt-out to background reminders",
     "changes": [
-      "Fix the mobile browser refresh test race by waiting for saved PIN-session restoration before checking persisted library data; keep the persistence and failed-save assertions.",
-      "Repair the Changelog regression test by loading app-core.js directly, while retaining workflow-run-number assertions against the actual implementation.",
-      "Keep History and Watchlist hidden from the bottom navigation with a defensive CSS rule, in addition to the DOM cleanup.",
-      "Invalidate stale client assets by bumping app, dashboard and gallery versions and the navigation service-worker cache namespace.",
-      "Use the overall All workflows run sequence for Changelog labels and display Run N (short commit SHA), not the app commit number or individual workflow run_number.",
-      "Display each Changelog entry with the actual GitHub Actions run_number associated with that commit; keep the app commit number separate.",
-      "Send out-of-app push-status notifications through the existing Web Push backend only to robert17041@icloud.com, with run number, commit and exact outcome.",
-      "Observe completed deployment workflow runs in a separate workflow so success, failure and cancellation statuses are covered; remove duplicate notification calls from deployment.",
-      "Require WATCHLOG_DEPLOYMENT_NOTIFY_SECRET in GitHub Actions and Supabase; report missing configuration visibly instead of silently skipping notifications."
+      "Excluding a show from Weekly Releases also disables its background episode, season and planned-release reminders.",
+      "The show remains in the Library with episode progress and release metadata intact; re-including it restores reminder eligibility.",
+      "Add regression coverage for excluded and re-enabled shows, and bump reminder/editor asset versions."
     ]
   },
   "37f6c39e9d0355b1bde705cb3fcb3cda2533119f": {

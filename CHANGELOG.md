@@ -1,3 +1,10 @@
+## 2026-10-16
+
+### Link Weekly Releases opt-out to background reminders
+- Excluding a show from Weekly Releases now removes its episode, season and planned-release events from the background reminder scan as well.
+- The show remains in the Library and keeps its episode progress and schedule. Re-including it restores reminder eligibility without a separate reminder setting.
+- Add regression coverage for disabling reminders for an excluded show and restoring eligibility when re-enabled; bump reminder/editor asset versions so clients load the updated behaviour.
+
 ## 2026-10-10
 
 ### Fix browser refresh test race blocking deployment
