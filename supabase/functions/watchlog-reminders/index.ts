@@ -9,7 +9,7 @@ import {
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-watchlog-session",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-watchlog-session, x-github-token",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Content-Type": "application/json",
 };
@@ -735,9 +735,21 @@ Deno.serve(async (req: Request) => {
       const commitUrl = String(body.commitUrl || "");
       const allowedStatuses = new Set(["success", "failure", "cancelled", "skipped"]);
       if (!/^\d+$/.test(runId) || !/^\d+$/.test(runNumber) || !/^[a-f0-9]{40}$/.test(sha) || !allowedStatuses.has(status)) return json({ error: "Invalid workflow status payload" }, 400);
-      // Verify against GitHub directly, removing the need for a separately configured secret.
+      // Authenticate the caller against the run's own scoped GitHub Actions token.
+      // The run is still in_progress while its final always() step executes, so
+      // the outcome is supplied by the workflow expression and the run identity
+      // (ID, run number, SHA, workflow) is verified against GitHub.
+      const githubToken = req.headers.get("x-github-token") || "";
+      if (!githubToken) return json({ error: "GitHub run verification token is required" }, 401);
+      const githubHeaders = {
+        "Accept": "application/vnd.github+json",
+        "Authorization": `Bearer ${githubToken}`,
+        "X-GitHub-Api-Version": "2022-11-28",
+        "User-Agent": "WatchLogger-Run-Status",
+      };
       const verification = await fetch(`https://api.github.com/repos/Cryptic011/Watched-Tracker/actions/runs/${runId}`, {
-        headers: { "Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28", "User-Agent": "WatchLogger-Run-Status" },
+        headers: githubHeaders,
+        signal: AbortSignal.timeout(10000),
       });
       if (!verification.ok) {
         console.error("Run-status GitHub verification request failed", verification.status);
@@ -748,8 +760,10 @@ Deno.serve(async (req: Request) => {
         id: String(verifiedRun.id) !== runId,
         runNumber: Number(verifiedRun.run_number) !== Number(runNumber),
         sha: String(verifiedRun.head_sha || "").toLowerCase() !== sha.toLowerCase(),
-        completed: verifiedRun.status !== "completed",
-        conclusion: String(verifiedRun.conclusion || "").toLowerCase() !== status.toLowerCase(),
+        active: verifiedRun.status !== "in_progress",
+        // The workflow is still executing this always() step, so GitHub has
+        // not published its conclusion yet. The scoped token proves run access.
+        conclusion: verifiedRun.conclusion !== null && verifiedRun.conclusion !== undefined,
         workflow: Number(verifiedRun.workflow_id) !== 344533582,
       };
       if (Object.values(mismatch).some(Boolean)) {
@@ -757,7 +771,7 @@ Deno.serve(async (req: Request) => {
         return json({ error: "Workflow status did not match GitHub", mismatch }, 403);
       }
       const countResponse = await fetch("https://api.github.com/repos/Cryptic011/Watched-Tracker/actions/runs?per_page=1", {
-        headers: { "Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28", "User-Agent": "WatchLogger-Run-Status" },
+        headers: githubHeaders,
         signal: AbortSignal.timeout(10000),
       });
       if (!countResponse.ok) {

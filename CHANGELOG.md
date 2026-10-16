@@ -1,5 +1,14 @@
 ## 2026-10-16
 
+### Link Weekly Releases opt-out to background reminders and remove notification-run overhead
+- Excluding a show from Weekly Releases now removes its episode, season and planned-release events from background reminder scans; the show and its episode progress remain in the Library.
+- Re-including the show restores reminder eligibility without needing a separate reminder toggle.
+- Send the private owner-only run-status push from the deployment workflow's own `always()` step, instead of launching a separate notification workflow run for every completed attempt.
+- Verify the current run ID, workflow ID, run number and commit SHA through GitHub's API using the workflow-scoped Actions-read token; notify with the actual overall run count, short SHA and outcome.
+- Notification delivery uses `continue-on-error` so a push-delivery issue cannot overwrite the build/deployment result. Queued runs and runs cancelled before a runner reaches the final step cannot be reported by an in-run step.
+
+## 2026-10-16
+
 ### Link Weekly Releases opt-out to background reminders
 - Excluding a show from Weekly Releases now removes its episode, season and planned-release events from the background reminder scan as well.
 - The show remains in the Library and keeps its episode progress and schedule. Re-including it restores reminder eligibility without a separate reminder setting.

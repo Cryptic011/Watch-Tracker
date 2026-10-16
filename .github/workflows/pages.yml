@@ -74,3 +74,18 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v5
 
+      - name: Notify owner of this workflow result
+        if: always()
+        continue-on-error: true
+        env:
+          WATCHLOG_SOURCE_SHA: ${{ github.sha }}
+          WATCHLOG_SOURCE_RUN_NUMBER: ${{ github.run_number }}
+          WATCHLOG_SOURCE_RUN_ID: ${{ github.run_id }}
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_SERVER_URL: ${{ github.server_url }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_EVENT_NAME: workflow_run
+          WATCHLOG_STATUS: ${{ cancelled() && 'cancelled' || failure() && 'failure' || 'success' }}
+          WATCHLOG_PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+        run: node scripts/notify-deployment.mjs
+
