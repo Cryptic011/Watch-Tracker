@@ -4,7 +4,7 @@
 - Excluding a show from Weekly Releases now removes its episode, season and planned-release events from the background reminder scan as well.
 - The show remains in the Library and keeps its episode progress and schedule. Re-including it restores reminder eligibility without a separate reminder setting.
 - Add regression coverage for disabling reminders for an excluded show and restoring eligibility when re-enabled; bump reminder/editor asset versions so clients load the updated behaviour.
-- Ensure the regression test joins the extracted backend helpers with real newline characters before executing them in the test VM.
+- Ensure the regression test strips TypeScript parameter annotations from extracted backend helpers before evaluating them in Node's test VM.
 
 ## 2026-10-10
 
