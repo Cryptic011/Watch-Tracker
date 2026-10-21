@@ -69,7 +69,8 @@
       "Add a compact Library dashboard summary for total library items, films marked watched, logged episodes, and shows with unwatched released episodes.",
       "Calculate statistics from saved episode progress and released-episode data without mutating saved library records.",
       "Preserve existing Weekly Releases visibility rules and improve small-screen layout with responsive statistics cards.",
-      "Add regression coverage for statistics accuracy and record immutability; version the dashboard assets to avoid stale cached files."
+      "Add regression coverage for statistics accuracy and record immutability; version the dashboard assets to avoid stale cached files.",
+      "Use the overall All workflows run sequence for Changelog labels and display Run N (short commit SHA), not the app commit number or individual workflow run_number."
     ]
   },
   "37f6c39e9d0355b1bde705cb3fcb3cda2533119f": {
