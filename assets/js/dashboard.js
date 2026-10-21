@@ -11,6 +11,24 @@ function nextWatchEpisode(item){
   return null;
 }
 
+function watchStatistics(items){
+  const rows=Array.isArray(items)?items:[];
+  let filmsWatched=0,episodesWatched=0,showsInProgress=0,showsCompleted=0;
+  for(const item of rows){
+    if(item?.type==='Film'){
+      if(String(item.status||'').toLowerCase()==='watched')filmsWatched++;
+      continue;
+    }
+    if(!isEpisodeTrackable(item))continue;
+    const map=watchedEpisodeMap(item,releasedEpisodeMap(item));
+    episodesWatched+=Object.values(map).reduce((sum,episodes)=>sum+(Array.isArray(episodes)?episodes.length:0),0);
+    const next=nextWatchEpisode(item);
+    if(next)showsInProgress++;
+    else if(Object.values(map).some(episodes=>Array.isArray(episodes)&&episodes.length))showsCompleted++;
+  }
+  return{libraryCount:rows.length,filmsWatched,episodesWatched,showsInProgress,showsCompleted};
+}
+
 function calendarEvents(items,now=new Date()){
   const start=new Date(now);start.setHours(0,0,0,0);
   const end=new Date(start);end.setDate(end.getDate()+7);
@@ -71,6 +89,8 @@ function renderDashboard(){
   const root=document.getElementById('library-dashboard');if(!root)return;
   const visible=Boolean(currentUser&&currentTab==='library'&&!categoryControlsVisible()&&!searchQuery.trim());
   root.classList.toggle('hidden',!visible);if(!visible){root.replaceChildren();root._dashboardMarkup=null;return;}
+  const stats=watchStatistics(mediaItems);
+  const statsMarkup=`<section class="dashboard-section watch-statistics" aria-labelledby="watch-statistics-title"><header class="watch-statistics-heading"><div><h2 id="watch-statistics-title">Your watch statistics</h2><p class="dashboard-note">Based on progress saved in your library</p></div></header><div class="watch-statistics-grid"><div class="watch-stat"><strong>${stats.libraryCount}</strong><span>Library items</span></div><div class="watch-stat"><strong>${stats.episodesWatched}</strong><span>Episodes logged</span></div><div class="watch-stat"><strong>${stats.filmsWatched}</strong><span>Films watched</span></div><div class="watch-stat"><strong>${stats.showsInProgress}</strong><span>Shows in progress</span></div></div></section>`;
   const {start,events,unknown}=calendarEvents(mediaItems);
   const eventsByDay=new Map();
   for(const event of events){const key=localISODate(event.date);if(!eventsByDay.has(key))eventsByDay.set(key,[]);eventsByDay.get(key).push(event);}
@@ -105,7 +125,7 @@ function renderDashboard(){
       }).join(''):'<p class="release-empty">Nothing listed for this day</p>'}
     </section>`;
   }
-  updateDashboardMarkup(root,`<section class="dashboard-section weekly-releases" aria-labelledby="weekly-releases-title">
+  updateDashboardMarkup(root,statsMarkup+`<section class="dashboard-section weekly-releases" aria-labelledby="weekly-releases-title">
     <header class="weekly-releases-heading"><div><span class="weekly-eyebrow">YOUR SCHEDULE</span><h2 id="weekly-releases-title">This week’s releases</h2><p class="dashboard-note">Today and the next six days · local times</p></div><span class="weekly-total">${events.length}<small>releases</small></span></header>
     <div class="release-week-list">${days}</div>
     ${unknown.length?`<details class="release-tba" data-dashboard-section="unknown"><summary><span>Dates to be announced</span><span class="release-tba-count">${unknown.length}</span></summary><div class="release-tba-list">${unknown.map(item=>`<button type="button" class="release-tba-item" data-dashboard-open="${esc(item.id)}"><strong>${esc(item.title)}</strong><span>${esc(item.announcement)} · Date TBA</span><span class="release-chevron" aria-hidden="true">›</span></button>`).join('')}</div></details>`:''}

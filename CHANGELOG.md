@@ -1,3 +1,11 @@
+## 2026-10-22
+
+### Watch statistics and reliability follow-up
+- Add a compact Library dashboard summary for total library items, films marked watched, logged episodes, and shows with unwatched released episodes.
+- Calculate statistics from saved episode progress and verified released-episode data without changing or rewriting library records.
+- Keep the weekly calendar and statistics hidden under the existing Library-only dashboard visibility rules.
+- Add regression coverage for statistics accuracy and record immutability; bump dashboard asset cache versions so the updated summary is loaded after deployment.
+
 ## 2026-10-16
 
 ### Link Weekly Releases opt-out to background reminders and remove notification-run overhead

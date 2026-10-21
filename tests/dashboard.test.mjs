@@ -115,3 +115,20 @@ test('Changelog shows the actual workflow run number and explains the Weekly Rel
   assert.match(index,/Exclude this show from Weekly Releases/);
   assert.match(css,/\.weekly-release-preference-copy\{display:flex/);
 });
+
+
+test('Watch statistics count saved films and logged released episodes without mutating progress',()=>{
+ const c=app();
+ const items=[
+  {id:'film-watched',type:'Film',status:'Watched'},
+  {id:'film-planned',type:'Film',status:'Planned'},
+  {id:'series',type:'Series',episodeScheduleVerified:true,releasedEpisodes:{1:[1,2,3],2:[1]},watchedEpisodes:{1:[1,2]},status:'Watching'},
+  {id:'anime',type:'Anime',episodeScheduleVerified:true,releasedEpisodes:{1:[1]},watchedEpisodes:{1:[1]},status:'Watched'},
+  {id:'excluded',type:'Series',hideFromWeeklyReleases:true,episodeScheduleVerified:true,releasedEpisodes:{1:[1]},watchedEpisodes:{1:[1]}}
+ ];
+ const fn=extractFunction(html,'watchStatistics');
+ vm.runInContext(fn,c);
+ const before=JSON.stringify(items);
+ assert.deepEqual(JSON.parse(JSON.stringify(c.watchStatistics(items))),{libraryCount:5,filmsWatched:1,episodesWatched:4,showsInProgress:1,showsCompleted:2});
+ assert.equal(JSON.stringify(items),before,'statistics do not mutate saved records');
+});

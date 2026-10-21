@@ -64,14 +64,12 @@
     "number": 224
   },
   "__current": {
-    "title": "Link Weekly Releases opt-out to reminders and streamline workflow notifications",
+    "title": "Add watch statistics and strengthen dashboard regression coverage",
     "changes": [
-      "Use the overall All workflows run sequence for Changelog labels and display Run N (short commit SHA), not the app commit number or individual workflow run_number.",
-      "Excluding a show from Weekly Releases also disables its background episode, season and planned-release reminders; the show and episode progress remain in the Library.",
-      "Re-including the show restores reminder eligibility without a separate reminder toggle.",
-      "Send private owner-only workflow status notifications from the deployment workflow's own always() step rather than creating a second Actions run per completed attempt.",
-      "Verify the current run identity and commit SHA against GitHub using the workflow-scoped Actions-read token; use the overall Actions run count in the notification.",
-      "Keep notification delivery from masking the deployment result. Queued runs and cancellations before the final step remain a documented limitation."
+      "Add a compact Library dashboard summary for total library items, films marked watched, logged episodes, and shows with unwatched released episodes.",
+      "Calculate statistics from saved episode progress and released-episode data without mutating saved library records.",
+      "Preserve existing Weekly Releases visibility rules and improve small-screen layout with responsive statistics cards.",
+      "Add regression coverage for statistics accuracy and record immutability; version the dashboard assets to avoid stale cached files."
     ]
   },
   "37f6c39e9d0355b1bde705cb3fcb3cda2533119f": {

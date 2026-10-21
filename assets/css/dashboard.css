@@ -48,3 +48,13 @@
 .weekly-footnote{padding:11px 17px 15px;border-top:1px solid var(--border);font-size:.67rem;line-height:1.45;color:var(--muted)}
 .release-card:focus-visible,.release-tba-item:focus-visible{outline:2px solid var(--blue2);outline-offset:2px}
 @media(min-width:620px){.release-week-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:18px}.release-day:nth-child(2){border-top:0}.release-day{min-width:0}}
+
+/* Compact statistics overview; keeps labels readable at narrow phone widths. */
+.watch-statistics-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.watch-statistics-heading h2{margin-bottom:0}
+.watch-statistics-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:12px}
+.watch-stat{display:flex;flex-direction:column;gap:4px;min-width:0;padding:12px;border:1px solid var(--border);border-radius:12px;background:var(--inner)}
+.watch-stat strong{font-size:1.3rem;line-height:1.2;font-variant-numeric:tabular-nums}
+.watch-stat span{color:var(--muted);font-size:.72rem;line-height:1.35;overflow-wrap:anywhere}
+@media(min-width:620px){.watch-statistics-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media(prefers-reduced-motion:reduce){.watch-statistics *{scroll-behavior:auto!important;animation:none!important;transition:none!important}}
