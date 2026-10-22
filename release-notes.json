@@ -64,7 +64,7 @@
     "number": 224
   },
   "__current": {
-    "title": "Grouped Preferences screen",
+    "title": "Episode tracking and title actions fixes",
     "changes": [
       "Update gallery styling and asset versions for the redesigned mobile detail layout.",
       "Fix mobile release-card overflow so episode/date and platform metadata stay readable within the card.",
@@ -84,7 +84,8 @@
       "Added expandable season rows and circular episode watched controls connected to saved progress.",
       "Added a three-dot menu for edit, notes and confirmed delete with persistence rollback.",
       "Added grouped Preferences navigation matching the requested settings layout.",
-      "Rows navigate to existing account, appearance, and reminder controls; unavailable services and destinations are explicitly identified as not configured."
+      "Rows navigate to existing account, appearance, and reminder controls; unavailable services and destinations are explicitly identified as not configured.",
+      "Fix the three-dot title actions menu visibility; preserve expanded seasons after episode toggles; display saved episode-specific artwork when available, with a safe series-art fallback."
     ]
   },
   "37f6c39e9d0355b1bde705cb3fcb3cda2533119f": {

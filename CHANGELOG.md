@@ -1,3 +1,9 @@
+## 2026-10-22 — Episode tracker and title actions repair
+- Fix the three-dot title actions menu so its Edit, Notes, and Delete options can be shown and hidden reliably.
+- Preserve expanded season rows after marking an episode watched or unwatched instead of collapsing the season list.
+- Render episode-specific artwork when an episode image is available in saved catalogue metadata, falling back to series artwork only when episode artwork is unavailable.
+- Bump gallery asset versions so mobile browsers request the updated tracker.
+
 ## 2026-10-22
 
 ### Grouped Preferences screen
