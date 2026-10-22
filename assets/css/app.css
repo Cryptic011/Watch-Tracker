@@ -153,3 +153,35 @@ html,body{touch-action:manipulation}button,.btn,.pill-btn,.tab-btn,select{touch-
 .settings-section #account-sync-card .form-group{margin:4px 0}
 .settings-section #logout-btn{margin-top:14px}
 @media(max-width:380px){.settings-welcome{padding:17px 15px}.settings-section>.profile-card{padding:15px}.settings-section .appearance-card .form-group{grid-template-columns:minmax(0,1fr) minmax(112px,44%);gap:8px}}
+
+/* Match the reference's native iOS grouped Preferences style without promotional content. */
+#settings-view{padding:0 0 calc(30px + env(safe-area-inset-bottom,0px))}
+.preferences-heading{padding:18px 2px 22px}
+.preferences-heading h2{font-size:2.35rem;line-height:1.08;letter-spacing:-.045em;font-weight:850}
+.preferences-heading p{display:none}
+.settings-section{margin:0 0 24px}
+.settings-section>.section-label{margin:0 0 10px 2px;color:var(--text);font-size:1.04rem;line-height:1.3;letter-spacing:-.015em;text-transform:none;font-weight:800}
+.settings-section>.profile-card{padding:8px 16px;border-radius:25px;background:#292929;box-shadow:none}
+.settings-section .appearance-card .form-group{min-height:66px;grid-template-columns:minmax(0,1fr) auto;gap:12px}
+.settings-section .appearance-card .form-group label{font-size:1rem;font-weight:650}
+.settings-section .appearance-card select{min-width:132px;width:auto;max-width:48vw;border:0;background:transparent;text-align:right;font-weight:650}
+.settings-section .appearance-copy{margin:0;padding:12px 0 14px;border-top:1px solid #444;font-size:.8rem}
+.settings-section .background-reminder-card{padding:10px 16px 16px}
+.settings-section .reminder-test-title{padding:8px 0 14px;font-size:1rem}
+.settings-section .notification-status{border-radius:12px;background:#202126}
+.settings-section .notification-rule{padding:13px 0;border-color:#444}
+.settings-section .notification-actions{margin-top:14px}
+.settings-section #account-sync-card{padding:8px 16px}
+.settings-section #account-sync-card>.profile-header{padding:12px 0 17px;border-color:#444}
+.settings-section #account-sync-card .sync-box{padding:15px 0;border-color:#444}
+.settings-section #account-sync-card .sync-title{font-size:1rem;font-weight:700}
+.settings-section #account-sync-card .sync-text,.settings-section #account-sync-card .small-note{font-size:.82rem;line-height:1.45}
+.settings-section #account-sync-card .form-group{margin:12px 0}
+.settings-section #logout-btn{margin:16px 0 8px}
+@media(max-width:390px){.preferences-heading h2{font-size:2.15rem}.settings-section>.profile-card{padding-right:14px;padding-left:14px}.settings-section .appearance-card .form-group{grid-template-columns:minmax(0,1fr) auto}.settings-section .appearance-card select{min-width:112px}}
+/* Prevent release rows from squeezing metadata into a character-wide column on phones. */
+#library-view .prior-release-row,#library-view .prior-release-item,#library-view .release-history-row,#library-view .release-item{display:grid;grid-template-columns:minmax(0,1fr) minmax(120px,auto);align-items:start;column-gap:16px;min-width:0}
+#library-view .prior-release-row>:first-child,#library-view .prior-release-item>:first-child,#library-view .release-history-row>:first-child,#library-view .release-item>:first-child{min-width:0;overflow-wrap:anywhere}
+#library-view .prior-release-row>:last-child,#library-view .prior-release-item>:last-child,#library-view .release-history-row>:last-child,#library-view .release-item>:last-child{min-width:120px;max-width:180px;white-space:normal;overflow-wrap:anywhere;text-align:right}
+#library-view .prior-release-row time,#library-view .prior-release-item time,#library-view .release-history-row time,#library-view .release-item time{display:inline-block;max-width:100%;white-space:normal}
+@media(max-width:520px){#library-view .prior-release-row,#library-view .prior-release-item,#library-view .release-history-row,#library-view .release-item{grid-template-columns:minmax(0,1fr) minmax(145px,44%);column-gap:10px}}

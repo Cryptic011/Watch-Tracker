@@ -64,11 +64,11 @@
     "number": 224
   },
   "__current": {
-    "title": "Retry Preferences redesign and include cancelled deployment work",
+    "title": "Fix prior release layout and finish Preferences styling",
     "changes": [
-      "Retry the latest Watch Logger Preferences redesign together with the PNG app icon and title-detail action fixes after the prior deployment run was cancelled.",
-      "Document the actual run number and attempt for deployment history.",
-      "Preserve library export and merge-based restore behaviour."
+      "Removed the promotional Enhance Your Experience panel from Settings.",
+      "Restyled Watch Logger settings closer to the supplied iOS reference with a large Preferences heading, grouped charcoal panels, bold section labels, and thin row dividers.",
+      "Added mobile release-row layout safeguards so prior-release metadata does not collapse into a narrow vertical column."
     ]
   },
   "37f6c39e9d0355b1bde705cb3fcb3cda2533119f": {

@@ -1,3 +1,9 @@
+## 2026-10-22 — Fix prior releases and refine Preferences
+- Removed the Enhance Your Experience promotional panel from Settings as requested.
+- Refined Preferences to match the supplied iOS reference more closely: large bold heading, rounded grouped charcoal cards, normal-case section titles, and subtle separators while preserving Watch Logger's real controls.
+- Added mobile layout safeguards for prior-release rows so title and episode/date metadata keep usable widths instead of wrapping every few characters.
+- Bumped the app stylesheet cache version.
+
 ## 2026-10-22 — Retry combined pending Watch Logger updates
 - Requeued the latest Preferences redesign together with the existing PNG app icon and title-detail layout/action changes after runs #296 and #297 did not deploy.
 - Fixed release-note regression coverage by restoring the required actual run number/attempt and library export/merge-based restore descriptions.
