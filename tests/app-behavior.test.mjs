@@ -239,6 +239,38 @@ test("Schedule analysis records released episode identities instead of filling g
   assert.equal(result.nextEpisode.number,2);
 });
 
+test("Episode artwork uses each episode image and excludes the series poster",()=>{
+  const api=loadFunctions(["officialEpisodeImageMap"]);
+  const poster="https://static.tvmaze.com/uploads/images/original_untouched/1/poster.jpg";
+  const still="https://static.tvmaze.com/uploads/images/original_untouched/1/episode.jpg";
+  const medium="https://static.tvmaze.com/uploads/images/medium_landscape/1/episode-2.jpg";
+  const images=api.officialEpisodeImageMap([
+    {season:1,number:1,image:{original:still}},
+    {season:1,number:2,image:{medium}},
+    {season:1,number:3,image:null},
+    {season:1,number:4,image:{original:poster}},
+    {season:1,number:6,image:{medium:"https://static.tvmaze.com/uploads/images/medium_landscape/1/poster.jpg"}},
+    {season:0,number:1,image:{original:still}},
+    {season:1,number:5,image:{original:"https://example.com/unverified.jpg"}}
+  ],{original:poster});
+  assert.deepEqual(JSON.parse(JSON.stringify(images)),{1:{1:still,2:medium}});
+});
+
+test("Episode artwork lookup rejects mismatched IDs and ambiguous titles",async()=>{
+  const api=loadFunctions(["officialEpisodeImageMap","fetchOfficialEpisodeArtwork"],`
+    const episodeArtworkCache=new Map();
+    function cachedMetadataRequest(cache,key,task){return task();}
+    function normalizeTitle(value){return String(value||"").toLowerCase();}
+    async function fetchJSONWithTimeout(url){
+      if(url.includes("/search/shows?"))return [{show:{id:12,name:"Twin"}},{show:{id:13,name:"Twin"}}];
+      if(url.endsWith("/episodes"))throw new Error("A mismatched show must not load episodes");
+      return {id:12,name:"Twin",externals:{imdb:"tt1111111"}};
+    }
+  `);
+  assert.deepEqual(JSON.parse(JSON.stringify(await api.fetchOfficialEpisodeArtwork({title:"Twin",tvmazeShowId:"12",imdbId:"tt2222222"}))),{});
+  assert.deepEqual(JSON.parse(JSON.stringify(await api.fetchOfficialEpisodeArtwork({title:"Twin"}))),{});
+});
+
 test("TVMaze release timestamps are stored in UTC", () => {
   const api=loadFunctions(["episodeReleaseTimestamp"]);
   assert.equal(api.episodeReleaseTimestamp({airstamp:"2026-09-06T20:00:00+01:00"}),"2026-09-06T19:00:00.000Z");

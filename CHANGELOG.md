@@ -1,3 +1,8 @@
+## 2026-10-22 — Verify episode artwork and preserve it during saves
+- Load the image attached to each matching TVMaze episode when opening a show, including existing saved shows.
+- Exclude the series poster and use a neutral placeholder when an episode image is unavailable or fails to load.
+- Preserve verified episode images through title saves and metadata refreshes.
+
 ## 2026-10-22 — Official episode-specific artwork
 - Load episode stills from the matching TVMaze show's episode metadata, validating the show identity when an IMDb or TVMaze ID is available.
 - Never substitute the series poster for an episode image; missing official stills retain the episode-number placeholder.

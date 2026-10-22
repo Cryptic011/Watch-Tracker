@@ -28,6 +28,14 @@ const server=http.createServer((req,res)=>{
    const headers={'access-control-allow-origin':requestHeaders.origin||base,'access-control-allow-methods':'POST, GET, OPTIONS','access-control-allow-headers':requestHeaders['access-control-request-headers']||'content-type, x-watchlog-session, authorization, apikey','access-control-max-age':'600'};
    // WebKit applies CORS to fulfilled mocks, including failures and preflights.
    if(req.method()==='OPTIONS')return route.fulfill({status:204,headers,body:''});
+   const url=new URL(req.url());
+   if(url.hostname==='api.tvmaze.com'&&url.pathname==='/shows/12')return route.fulfill({headers,json:{id:12,name:'Test Series',premiered:'2020-01-01',externals:{imdb:'tt1234568'},image:{original:'https://static.tvmaze.com/series-poster.jpg'}}});
+   if(url.hostname==='api.tvmaze.com'&&url.pathname==='/shows/12/episodes')return route.fulfill({headers,json:[
+    {season:1,number:1,image:{original:'https://static.tvmaze.com/episode-one.jpg'}},
+    {season:1,number:2,image:null},
+    {season:1,number:3,image:{original:'https://static.tvmaze.com/series-poster.jpg'}}
+   ]});
+   if(url.hostname==='static.tvmaze.com')return route.fulfill({headers,contentType:'image/png',body:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jf1sAAAAASUVORK5CYII=','base64')});
    if(req.url().includes('/functions/v1/watchlog-pin')){
     const body=req.postDataJSON();let data={ok:true};
     if(['login','load'].includes(body.action)){loads++;data={ok:true,account,items,revision,sessionToken:'test-token'};}
@@ -83,7 +91,7 @@ const server=http.createServer((req,res)=>{
   // Seed a verified schedule through the same persistence code used by imports.
   phase='episode tracking';
   await page.evaluate(async()=>{
-   mediaItems.push({id:'show',title:'Test Series',type:'Series',status:'Planned',episodeScheduleVerified:true,releasedEpisodes:{1:[1,2,3]},airedEpisodeCounts:{1:3},episodeCounts:{1:4},watchedEpisodes:{},metadataUpdatedAt:new Date().toISOString(),seriesReleaseDate:'2020-01-01'});
+   mediaItems.push({id:'show',title:'Test Series',type:'Series',status:'Planned',tvmazeShowId:'12',imdbId:'tt1234568',episodeImages:{1:{1:'https://static.tvmaze.com/series-poster.jpg'}},episodeScheduleVerified:true,releasedEpisodes:{1:[1,2,3]},airedEpisodeCounts:{1:3},episodeCounts:{1:4},watchedEpisodes:{},metadataUpdatedAt:new Date().toISOString(),seriesReleaseDate:'2020-01-01'});
    await persistLibrary(mediaItems);render();openEpisodeTracker('show');
   });
   await page.locator('#episode-watch-next').click();await page.getByRole('button',{name:'Undo',exact:true}).click();
@@ -92,6 +100,21 @@ const server=http.createServer((req,res)=>{
   await page.locator('#episode-tracker-grid [data-season="1"][data-episode="2"]').click();await page.waitForFunction(()=>!episodeLogBusy.size&&!cloudSaveInFlight);
   assert.deepEqual(items.find(x=>x.id==='show').watchedEpisodes,{'1':[2]});assert.equal(await page.locator('#episode-tracker-grid [data-episode="4"]').count(),0);
   await page.locator('#close-episode-tracker').click();
+  phase='episode artwork';
+  await page.locator('[data-gallery-category="Series"]').click();
+  await page.locator('[data-gallery-item="show"]').first().click();
+  await page.locator('.gallery-season summary').first().click();
+  await page.locator('[data-gallery-episode="1:1"] img').waitFor({state:'visible'});
+  assert.equal(await page.locator('[data-gallery-episode="1:1"] img').getAttribute('src'),'https://static.tvmaze.com/episode-one.jpg');
+  for(const episode of [2,3]){
+   assert.equal(await page.locator('[data-gallery-episode="1:'+episode+'"] img').count(),0);
+   assert.equal(await page.locator('[data-gallery-episode="1:'+episode+'"] .gallery-episode-placeholder').isVisible(),true);
+  }
+  await page.locator('[data-gallery-episode="1:1"]').click();
+  await page.waitForFunction(()=>!episodeLogBusy.size&&!cloudSaveInFlight);
+  assert.deepEqual(items.find(x=>x.id==='show').watchedEpisodes,{'1':[1,2]});
+  await page.locator('[data-gallery-close]').click();
+  await page.locator('[data-gallery-back]').click();
   // Delete/Undo restores just the removed title, preserving other progress.
   await page.evaluate(()=>openEdit(mediaItems[0].id));await page.locator('#delete-btn').click();
   await page.getByRole('button',{name:'Undo',exact:true}).click();

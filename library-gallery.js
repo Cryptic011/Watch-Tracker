@@ -91,33 +91,22 @@ window.WatchLogGallery=(()=>{
     return `<button type="button" class="gallery-tile" data-gallery-item="${esc(item.id)}" aria-label="Open ${esc(item.title)}">${art(item)}${stateBadge(item)}<strong>${esc(item.title)}</strong><small>${esc(subtitle)}</small></button>`;
   }
   function section(title,items,carousel=false){return items.length?`<section class="gallery-section"><h3>${esc(title)}<span class="gallery-count">${items.length}</span></h3><div class="${carousel?'gallery-carousel'+(category==='Film'?' gallery-film-carousel':''):'gallery-grid'}">${items.map(item=>tile(item,carousel)).join('')}</div></section>`:'';}
-  const episodeArtCache=new Map();
-  async function fetchEpisodeArtwork(item){
-    if(isFilm(item))return {};
-    const identity=String(item.imdbId||'').trim(),showId=String(item.tvmazeShowId||'').trim(),cacheKey=showId||identity||key(item);
-    if(episodeArtCache.has(cacheKey))return episodeArtCache.get(cacheKey);
-    const task=(async()=>{
-      const signal=AbortSignal.timeout(8000);let show=null;
-      try{
-        if(/^\d+$/.test(showId)){const response=await fetch(`https://api.tvmaze.com/shows/${encodeURIComponent(showId)}`,{signal});if(response.ok)show=await response.json();}
-        else if(/^tt\d+$/.test(identity)){const response=await fetch(`https://api.tvmaze.com/lookup/shows?imdb=${encodeURIComponent(identity)}`,{signal});if(response.ok)show=await response.json();}
-        else{
-          const response=await fetch(`https://api.tvmaze.com/search/shows?q=${encodeURIComponent(String(item.title||''))}`,{signal});
-          if(response.ok){const rows=await response.json(),norm=value=>String(value||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();const matches=(Array.isArray(rows)?rows:[]).map(row=>row.show).filter(candidate=>norm(candidate?.name)===norm(item.title)&&(!item.releaseYear||String(candidate?.premiered||'').slice(0,4)===String(item.releaseYear)));if(matches.length===1)show=matches[0];}
-        }
-        if(!show||(identity&&show.externals?.imdb!==identity)||(showId&&String(show.id)!==showId))return {};
-        const response=await fetch(`https://api.tvmaze.com/shows/${encodeURIComponent(show.id)}/episodes`,{signal});if(!response.ok)return {};
-        const episodes=await response.json(),images={};
-        for(const episode of Array.isArray(episodes)?episodes:[]){const url=safeImage(episode?.image?.original||episode?.image?.medium),season=Number(episode?.season),number=Number(episode?.number);if(url&&Number.isInteger(season)&&season>0&&Number.isInteger(number)&&number>0)images[`${season}:${number}`]=url;}
-        return images;
-      }catch(_){return {};}
-    })();
-    episodeArtCache.set(cacheKey,task);return task;
-  }
-  async function hydrateEpisodeArtwork(item,dialogNode){
-    const images=await fetchEpisodeArtwork(item);
-    if(!dialogNode?.isConnected||String(dialogNode.dataset.item)!==String(item.id))return;
-    for(const [episode,url] of Object.entries(images)){const row=dialogNode.querySelector(`[data-gallery-episode="${episode}"]`);if(!row||row.querySelector('.gallery-episode-art img'))continue;const artBox=row.querySelector('.gallery-episode-art');if(!artBox)continue;const image=document.createElement('img');image.alt='';image.loading='lazy';image.decoding='async';image.src=url;image.onerror=()=>image.remove();artBox.replaceChildren(image);}
+  async function loadEpisodeArtwork(item){
+    const section=dialog.querySelector('.gallery-season-list'),callbacks=api;
+    if(!section)return;
+    const paint=images=>section.querySelectorAll('[data-gallery-episode]').forEach(row=>{
+      const [season,episode]=row.dataset.galleryEpisode.split(':').map(Number),artwork=row.querySelector('.gallery-episode-art');
+      const placeholder=`<span class="gallery-episode-placeholder" aria-label="No episode image available">E${episode}</span>`;
+      const url=images?.[season]?.[episode]||'';
+      artwork.innerHTML=url?`<img src="${esc(url)}" alt="" loading="lazy" decoding="async">`:placeholder;
+      const image=artwork.querySelector('img');if(image)image.onerror=()=>{artwork.innerHTML=placeholder;};
+    });
+    paint(item.episodeImagesSource==='TVMaze'?item.episodeImages:{});
+    if(!callbacks.episodeArtwork)return;
+    try{
+      const images=await callbacks.episodeArtwork(item);
+      if(section===dialog.querySelector('.gallery-season-list')&&dialog.dataset.item===String(item.id))paint(images);
+    }catch(_){}
   }
   function detail(item){
     if(!dialog){dialog=document.createElement('dialog');dialog.className='gallery-detail';dialog.setAttribute('aria-label','Title details');document.body.append(dialog);dialog.addEventListener('click',event=>{if(event.target===dialog||event.target.closest('[data-gallery-close]'))dialog.close();});dialog.addEventListener('close',()=>{host?.querySelector(`[data-gallery-item="${CSS.escape(dialog.dataset.item||'')}"]`)?.focus();});}
@@ -125,7 +114,7 @@ window.WatchLogGallery=(()=>{
     const show=!isFilm(item),last=api.last(item),progress=show?`<strong>Your progress</strong>${last?`Watched through S${esc(last.season)} E${esc(last.episode)}`:'No episodes marked watched'}<br>${esc(item.watchedSeasons||0)} fully watched seasons`:'';
     const releases=show?(api.released?.(item)||item.releasedEpisodes||{}):{},watched=show?(api.watched?.(item)||item.watchedEpisodes||{}):{};
     const seasons=Object.keys(releases).map(Number).filter(n=>Number.isInteger(n)&&n>0).sort((a,b)=>a-b);
-    const seasonMarkup=seasons.map(season=>{const episodes=(releases[season]||releases[String(season)]||[]).map(Number).filter(n=>Number.isInteger(n)&&n>0).sort((a,b)=>a-b),done=new Set((watched[season]||watched[String(season)]||[]).map(Number)),complete=episodes.length>0&&episodes.every(ep=>done.has(ep));return `<details class="gallery-season" data-season="${season}"><summary><span class="gallery-season-poster">${art(item)}</span><span class="gallery-season-label">Season ${season}<small>${done.size} of ${episodes.length} episodes watched</small></span><button type="button" class="gallery-season-state" data-gallery-season="${season}" aria-pressed="${complete}" aria-label="Mark all Season ${season} episodes ${complete?'unwatched':'watched'}">${complete?'✓':'○'}</button></summary><div class="gallery-season-episodes">${episodes.map(ep=>{const isDone=done.has(ep),title=item.episodeTitles?.[season]?.[ep]||item.episodeTitles?.[String(season)]?.[ep]||'',date=item.episodeReleaseDates?.[season]?.[ep]||item.episodeReleaseDates?.[String(season)]?.[ep]||'',dateText=date?api.date(new Date(date+'T12:00:00')):'';const episodeImage=item.episodeImages?.[season]?.[ep]||item.episodeImages?.[String(season)]?.[ep]||item.episodeImages?.[`${season}:${ep}`]||'';return `<button type="button" class="gallery-episode-row ${isDone?'is-watched':''}" data-gallery-episode="${season}:${ep}" aria-pressed="${isDone}"><span class="gallery-episode-art">${episodeImage?`<img src="${esc(episodeImage)}" alt="" loading="lazy">`:`<span class="gallery-episode-placeholder" aria-label="Episode ${ep}">E${ep}</span>`}</span><span class="gallery-episode-copy"><strong>${ep}. ${esc(title||'Episode '+ep)}</strong>${dateText?`<small>${esc(dateText)}</small>`:''}</span><span class="gallery-episode-check">${isDone?'✓':''}</span></button>`;}).join('')}</div></details>`;}).join('');
+    const seasonMarkup=seasons.map(season=>{const episodes=(releases[season]||releases[String(season)]||[]).map(Number).filter(n=>Number.isInteger(n)&&n>0).sort((a,b)=>a-b),done=new Set((watched[season]||watched[String(season)]||[]).map(Number)),complete=episodes.length>0&&episodes.every(ep=>done.has(ep));return `<details class="gallery-season" data-season="${season}"><summary><span class="gallery-season-poster">${art(item)}</span><span class="gallery-season-label">Season ${season}<small>${done.size} of ${episodes.length} episodes watched</small></span><button type="button" class="gallery-season-state" data-gallery-season="${season}" aria-pressed="${complete}" aria-label="Mark all Season ${season} episodes ${complete?'unwatched':'watched'}">${complete?'✓':'○'}</button></summary><div class="gallery-season-episodes">${episodes.map(ep=>{const isDone=done.has(ep),title=item.episodeTitles?.[season]?.[ep]||item.episodeTitles?.[String(season)]?.[ep]||'',date=item.episodeReleaseDates?.[season]?.[ep]||item.episodeReleaseDates?.[String(season)]?.[ep]||'',dateText=date?api.date(new Date(date+'T12:00:00')):'';const episodeImage=item.episodeImagesSource==='TVMaze'?(item.episodeImages?.[season]?.[ep]||''):'';return `<button type="button" class="gallery-episode-row ${isDone?'is-watched':''}" data-gallery-episode="${season}:${ep}" aria-pressed="${isDone}"><span class="gallery-episode-art">${episodeImage?`<img src="${esc(episodeImage)}" alt="" loading="lazy">`:`<span class="gallery-episode-placeholder" aria-label="Episode ${ep}">E${ep}</span>`}</span><span class="gallery-episode-copy"><strong>${ep}. ${esc(title||'Episode '+ep)}</strong>${dateText?`<small>${esc(dateText)}</small>`:''}</span><span class="gallery-episode-check">${isDone?'✓':''}</span></button>`;}).join('')}</div></details>`;}).join('');
     dialog.innerHTML=`<header class="gallery-detail-header"><h2>${esc(item.title)}</h2><div class="gallery-detail-header-actions"><button type="button" class="gallery-menu-button" data-gallery-menu aria-label="Title actions">•••</button><button type="button" class="gallery-back" data-gallery-close aria-label="Close details">×</button></div></header><div class="gallery-detail-body">${art(item)}<div class="gallery-detail-copy"><strong>${esc(item.status||'Planned')}</strong>${progress}${item.platform?`<strong>Where you watched it</strong>${esc(item.platform)}`:''}</div>${api.reminder(item,isFilm(item))}${show?`<section class="gallery-season-list"><h3>All Episodes</h3>${seasonMarkup||'<p class="gallery-empty">No verified released episodes available yet.</p>'}</section>`:''}<div class="gallery-detail-actions"><button class="btn btn-secondary btn-full" type="button" data-gallery-edit>Edit show or film</button></div><div class="gallery-action-menu hidden" data-gallery-action-menu><button type="button" data-gallery-edit-menu>Edit show or film</button><button type="button" data-gallery-notes>Notes</button><button type="button" class="danger" data-gallery-delete>Delete show or film</button></div><textarea class="gallery-notes hidden" data-gallery-notes-field aria-label="Notes" placeholder="Personal notes about this show or film">${esc(item.notes||'')}</textarea><button class="btn btn-secondary btn-full hidden" type="button" data-gallery-save-notes>Save notes</button></div>`;
     const edit=()=>{dialog.close();api.edit(item.id);};dialog.querySelector('[data-gallery-edit]').onclick=edit;dialog.querySelector('[data-gallery-edit-menu]').onclick=edit;
     const menu=dialog.querySelector('[data-gallery-action-menu]'),notes=dialog.querySelector('[data-gallery-notes-field]'),saveNotes=dialog.querySelector('[data-gallery-save-notes]');
@@ -135,7 +124,7 @@ window.WatchLogGallery=(()=>{
     dialog.querySelector('[data-gallery-delete]').onclick=async()=>{if(!confirm(`Delete ${item.title} from your library?`))return;const b=dialog.querySelector('[data-gallery-delete]');b.disabled=true;if(await api.remove?.(item.id))dialog.close();else{b.disabled=false;b.textContent='Delete failed — retry';}};
     dialog.querySelectorAll('[data-gallery-episode]').forEach(b=>b.onclick=async()=>{const [season,episode]=b.dataset.galleryEpisode.split(':').map(Number);const expanded=[...dialog.querySelectorAll('.gallery-season[open]')].map(node=>node.dataset.season).filter(Boolean);b.disabled=true;try{await api.toggleEpisode?.(item.id,season,episode);}finally{const fresh=api.items().find(row=>String(row.id)===String(item.id));if(fresh){detail(fresh);for(const node of dialog.querySelectorAll('.gallery-season'))if(expanded.includes(node.dataset.season))node.open=true;}}});
     dialog.querySelectorAll('[data-gallery-season]').forEach(b=>b.onclick=async event=>{event.preventDefault();event.stopPropagation();const season=Number(b.dataset.gallerySeason),expanded=[...dialog.querySelectorAll('.gallery-season[open]')].map(node=>node.dataset.season).filter(Boolean);b.disabled=true;try{await api.toggleSeason?.(item.id,season);}finally{const fresh=api.items().find(row=>String(row.id)===String(item.id));if(fresh){detail(fresh);for(const node of dialog.querySelectorAll('.gallery-season'))if(expanded.includes(node.dataset.season))node.open=true;}}});
-    observe(dialog,[item]);if(!dialog.open)dialog.showModal();if(show)hydrateEpisodeArtwork(item,dialog);
+    observe(dialog,[item]);if(!dialog.open)dialog.showModal();void loadEpisodeArtwork(item);
   }
   function back(){
     if(dialog?.open){dialog.close();return true;}

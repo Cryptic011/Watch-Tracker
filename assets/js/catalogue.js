@@ -358,6 +358,37 @@
     return {seasons,episodes,known,highest,latestAired,currentEpisode,currentEpisodeRow,nextEpisode,airing,upcomingSeason,episodeCounts,airedEpisodeCounts,releasedEpisodes,completedSeasons};
   }
 
+  function officialEpisodeImageMap(episodes,showImage={}){
+    const images={};
+    const posters=new Set([showImage?.original,showImage?.medium].filter(Boolean).map(url=>url.split("/").at(-1).split("?")[0]));
+    for(const episode of Array.isArray(episodes)?episodes:[]){
+      const season=Number(episode?.season),number=Number(episode?.number);
+      const url=[episode?.image?.original,episode?.image?.medium].find(value=>typeof value==="string"&&/^https:\/\/static\.tvmaze\.com\//.test(value)&&!posters.has(value.split("/").at(-1).split("?")[0]));
+      if(!Number.isInteger(season)||season<=0||!Number.isInteger(number)||number<=0||!url)continue;
+      (images[season]||(images[season]={}))[number]=url;
+    }
+    return images;
+  }
+
+  const episodeArtworkCache=new Map();
+  function fetchOfficialEpisodeArtwork(item){
+    const key=JSON.stringify([item.tvmazeShowId||"",item.imdbId||"",item.title,item.releaseYear||""]);
+    return cachedMetadataRequest(episodeArtworkCache,key,async()=>{
+      const showId=String(item.tvmazeShowId||"").trim(),imdbId=String(item.imdbId||"").trim();
+      let show=null;
+      if(/^\d+$/.test(showId))show=await fetchJSONWithTimeout(`https://api.tvmaze.com/shows/${encodeURIComponent(showId)}`,{credentials:"omit"});
+      else if(/^tt\d+$/.test(imdbId))show=await fetchJSONWithTimeout(`https://api.tvmaze.com/lookup/shows?imdb=${encodeURIComponent(imdbId)}`,{credentials:"omit"});
+      else{
+        const rows=await fetchJSONWithTimeout(`https://api.tvmaze.com/search/shows?q=${encodeURIComponent(item.title||"")}`,{credentials:"omit"});
+        const matches=(Array.isArray(rows)?rows:[]).map(row=>row.show).filter(candidate=>normalizeTitle(candidate?.name)===normalizeTitle(item.title)&&(!item.releaseYear||String(candidate?.premiered||"").slice(0,4)===String(item.releaseYear)));
+        if(matches.length===1)show=matches[0];
+      }
+      if(!show?.id||(showId&&String(show.id)!==showId)||(imdbId&&show.externals?.imdb!==imdbId))return {};
+      const episodes=await fetchJSONWithTimeout(`https://api.tvmaze.com/shows/${encodeURIComponent(show.id)}/episodes`,{credentials:"omit"});
+      return officialEpisodeImageMap(episodes,show.image);
+    });
+  }
+
   function tvMazeShowMatchesSelection(show,title,{imdbId="",year=""}={}){
     if(!show?.name)return false;
     const candidateImdbId=String(show?.externals?.imdb||"");
@@ -395,7 +426,7 @@
     return {
       highest:schedule.highest,latestAired:schedule.latestAired,currentEpisode:schedule.currentEpisode,
       latestEpisodeDate:episodeReleaseTimestamp(schedule.currentEpisodeRow),seriesReleaseDate:show?.premiered||"",
-      completedSeasons:schedule.completedSeasons,upcoming,nextEpisode:schedule.nextEpisode,airing:schedule.airing,
+      completedSeasons:schedule.completedSeasons,upcoming,nextEpisode:schedule.nextEpisode,airing:schedule.airing,episodeImages:officialEpisodeImageMap(schedule.episodes,show?.image),episodeImagesSource:"TVMaze",
       scheduledEpisodeReleases:schedule.episodes.filter(ep=>episodeAirTime(ep)>Date.now()-86400000).map(ep=>({season:ep.season,number:ep.number,raw:episodeReleaseTimestamp(ep)})),
       episodeCounts:schedule.episodeCounts,airedEpisodeCounts:schedule.airedEpisodeCounts,releasedEpisodes:schedule.releasedEpisodes,known:new Set(schedule.known),
       sources:tvAvailable?["TVMaze"]:[],tvAvailable,episodeScheduleAvailable,resolvedShowId,
@@ -468,7 +499,7 @@
     if(wiki.available)sources.push("Wikipedia");
     const resolvedImdbId=imdb?.imdbId||expectedImdbId||"";
     return {
-      highest,latestAired,currentEpisode,latestEpisodeDate:episodeReleaseTimestamp(schedule.currentEpisodeRow),seriesReleaseDate:show?.premiered||"",completedSeasons:schedule.completedSeasons,upcoming,nextEpisode:schedule.nextEpisode,airing:schedule.airing,
+      highest,latestAired,currentEpisode,latestEpisodeDate:episodeReleaseTimestamp(schedule.currentEpisodeRow),seriesReleaseDate:show?.premiered||"",completedSeasons:schedule.completedSeasons,upcoming,nextEpisode:schedule.nextEpisode,airing:schedule.airing,episodeImages:officialEpisodeImageMap(schedule.episodes,show?.image),episodeImagesSource:"TVMaze",
       scheduledEpisodeReleases:schedule.episodes.filter(ep=>episodeAirTime(ep)>Date.now()-86400000).map(ep=>({season:ep.season,number:ep.number,raw:episodeReleaseTimestamp(ep)})),
       episodeCounts:schedule.episodeCounts,airedEpisodeCounts:schedule.airedEpisodeCounts,releasedEpisodes:schedule.releasedEpisodes,known,sources,tvAvailable,episodeScheduleAvailable,
       resolvedShowId,imdbId:resolvedImdbId,imdbConfirmed:imdb?.confirmed===true,show,ended:tvEnded,provisional:false

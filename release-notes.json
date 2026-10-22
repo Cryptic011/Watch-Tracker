@@ -64,13 +64,15 @@
     "number": 224
   },
   "__current": {
-    "title": "Fix episode and season watch controls",
+    "title": "Verify and preserve episode artwork",
     "changes": [
       "Load official episode-specific stills for each episode; never substitute the series poster when episode artwork is missing.",
       "Moved reminder history under Release Reminders and renamed it Reminders.",
       "Reduced season poster size, season row height, episode thumbnails, and text size to match the supplied reference.",
       "Fixed malformed episode-row markup that hid episode titles and watch controls inside the thumbnail.",
       "Added a working, accessible season button to mark every released episode watched or unwatched with one save.",
+      "Reject series poster duplicates in episode artwork and preserve verified images through edits and metadata refreshes.",
+      "Use a neutral placeholder when an episode has no image or the image cannot load.",
       "Applied the supplied Watch Logger artwork as the 512px PWA icon and dedicated 180px iOS home-screen icon.",
       "Updated icon cache versions and disabled adaptive masking that could crop the artwork.",
       "Moved owner-only Maintenance controls into their own Settings category and drill-in page.",
