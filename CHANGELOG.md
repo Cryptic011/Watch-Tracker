@@ -1,3 +1,8 @@
+## 2026-10-22 — Official episode-specific artwork
+- Load episode stills from the matching TVMaze show's episode metadata, validating the show identity when an IMDb or TVMaze ID is available.
+- Never substitute the series poster for an episode image; missing official stills retain the episode-number placeholder.
+- Fetch artwork asynchronously without rebuilding the episode tracker, preserving expanded seasons and watched controls.
+
 ## 2026-10-22 — Restore episode and season marking
 - Fixed the expanded episode-row markup so episode names, dates, and watch controls render outside the artwork thumbnail.
 - Made the season watch indicator an accessible button that marks every released episode in that season watched or unwatched in one save.

@@ -66,6 +66,7 @@
   "__current": {
     "title": "Fix episode and season watch controls",
     "changes": [
+      "Load official episode-specific stills for each episode; never substitute the series poster when episode artwork is missing.",
       "Moved reminder history under Release Reminders and renamed it Reminders.",
       "Reduced season poster size, season row height, episode thumbnails, and text size to match the supplied reference.",
       "Fixed malformed episode-row markup that hid episode titles and watch controls inside the thumbnail.",
