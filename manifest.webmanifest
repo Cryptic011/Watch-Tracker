@@ -10,10 +10,10 @@
   "theme_color": "#000000",
   "icons": [
     {
-      "src": "/Watched-Tracker/assets/img/app-icon.png?v=2",
+      "src": "/Watched-Tracker/assets/img/app-icon.png?v=3",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     }
   ]
 }

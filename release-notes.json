@@ -64,8 +64,10 @@
     "number": 224
   },
   "__current": {
-    "title": "Separate owner Maintenance settings",
+    "title": "Set the new Watch Logger app icon",
     "changes": [
+      "Applied the supplied Watch Logger artwork as the 512px PWA icon and dedicated 180px iOS home-screen icon.",
+      "Updated icon cache versions and disabled adaptive masking that could crop the artwork.",
       "Moved owner-only Maintenance controls into their own Settings category and drill-in page.",
       "Matched Maintenance controls and Settings surfaces to the selected light or dark colour theme.",
       "Added distinct iOS-style colors to Settings category and Track Sync icons.",

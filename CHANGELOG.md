@@ -1,3 +1,7 @@
+## 2026-10-22 — Apply the new Watch Logger app icon
+- Replaced the PWA icon with the supplied artwork and added a dedicated 180px iOS home-screen icon.
+- Updated icon URLs and kept the non-maskable artwork from being cropped by adaptive masks.
+
 ## 2026-10-22 — Isolate owner maintenance controls
 - Moved Maintenance into its own Settings drill-in, visible only to authorized owners.
 - Styled its controls against the selected light/dark theme so the panel no longer blends into unrelated Settings pages.
