@@ -64,8 +64,9 @@
     "number": 224
   },
   "__current": {
-    "title": "Automatically mark earlier episodes watched in the same season",
+    "title": "Match Settings panels to the Changelog colour",
     "changes": [
+      "Match Settings categories, Track Sync, and detail panels to the same grey as Changelog, with consistent separators and theme-aware light-mode colours.",
       "Marking any episode watched also marks earlier released episodes in that season only, across every season; other seasons and later episodes stay unchanged.",
       "Keep unmarking individual and let Undo restore the exact previous season selection, preserving existing progress and gaps.",
       "Replace the floating management toolbar with one stationary pencil beside the total Series or Movies count, never beside individual list counts or overlapping Add show or film.",

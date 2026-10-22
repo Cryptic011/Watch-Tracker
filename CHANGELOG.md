@@ -1,3 +1,8 @@
+## 2026-10-23 — Match Settings panels to the Changelog colour
+- Use the same theme-aware card colour for Settings categories, Track Sync, and category detail panels as Changelog.
+- Remove lighter hard-coded grey surfaces and make detail separators follow the theme, retaining coloured category icons.
+- Verify matching panel backgrounds in dark and light modes in both browsers.
+
 ## 2026-10-22 — Mark earlier episodes watched within the selected season
 - Marking any released episode watched also marks earlier released episodes in that season, for every series and anime season.
 - Leave other seasons and later episodes unchanged, preserve existing watched progress, and keep unreleased episodes excluded.

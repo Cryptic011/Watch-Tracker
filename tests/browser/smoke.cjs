@@ -288,6 +288,16 @@ const server=http.createServer((req,res)=>{
   await page.waitForFunction(()=>!document.querySelector('#settings-view').classList.contains('hidden')&&document.querySelector('#library-view').classList.contains('hidden'));
   assert.equal(await page.locator('#settings-category-menu').isVisible(),true,'Settings category menu is visible');
   assert.equal(await page.locator('.settings-quick-actions').isVisible(),true,'Track Sync shortcut is visible');
+  for(const theme of ['dark','light']){
+   await page.evaluate(value=>document.documentElement.dataset.theme=value,theme);
+   const colours=await page.evaluate(()=>{
+    const reference=getComputedStyle(document.querySelector('.whats-new-button')).backgroundColor;
+    return {reference,panels:[...document.querySelectorAll('.settings-category-menu,.settings-quick-actions,.settings-detail-panel>.profile-card')].map(panel=>getComputedStyle(panel).backgroundColor)};
+   });
+   assert.ok(colours.panels.length>=5);
+   assert.ok(colours.panels.every(colour=>colour===colours.reference),'all Settings panels match Changelog in '+theme+' mode');
+  }
+  await page.evaluate(()=>document.documentElement.dataset.theme='dark');
   await page.locator('[data-settings-open="general"]').click();
   assert.equal(await page.locator('#appearance-mode').isVisible(),true,'General opens appearance controls');
   await page.locator('[data-settings-panel="general"] [data-settings-back]').click();

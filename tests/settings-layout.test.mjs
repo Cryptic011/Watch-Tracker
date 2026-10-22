@@ -36,6 +36,13 @@ test('Settings categories use scalable icons and Prior Releases reserves readabl
  assert.match(read('assets/js/reminders.js'),/maintenanceAdminSection\.dataset\.authorized="true"[\s\S]*maintenance-settings-button/);
 });
 
+test('Settings surfaces share the Changelog theme colour rather than fixed lighter greys',()=>{
+ const css=read('assets/css/app.css');
+ assert.ok(css.includes('.settings-category-menu,.settings-quick-actions{background:var(--card)'));
+ assert.ok(css.includes('.settings-detail-panel>.profile-card{border-radius:25px;background:var(--card)'));
+ assert.ok(!css.includes('background:#292929')&&!css.includes('background:#2b2b2d'));
+});
+
 test('Floating Add button is only visible on the Library tab and only under its allowed filters',()=>{
  const library=read('assets/js/library.js');
  assert.match(library,/addBtn\.classList\.toggle\("hidden",!\(currentUser&&currentTab==="library"&&\(!categoryControlsVisible\(\)\|\|activeFilter==="All"\)\)\)/);
