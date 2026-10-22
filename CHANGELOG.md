@@ -1,3 +1,8 @@
+## 2026-10-22 — PNG app icon compatibility
+- Added a real PNG app icon for iOS Home Screen, browser favicon, and installed-app manifest support.
+- Updated the Apple touch icon and favicon references with a cache-busting version so devices can pick up the PNG.
+- Kept the existing Watch Logger icon artwork and updated the web app manifest to use PNG.
+
 ## 2026-10-22
 - Disable double-tap-to-zoom across the app using `touch-action: manipulation`, while retaining pinch-to-zoom and normal panning. No viewport scaling restrictions added.
 
