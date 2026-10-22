@@ -40,7 +40,7 @@ function memoryDB(initial){
   };
 }
 
-const persistenceFunctions=["toMillis","canonicalRecordJSON","sameSyncValue","mergeEpisodeSetChanges","mergeEpisodeHistory","mergeRecordChanges","activePersistenceContext","setCloudBaseline","saveCache","cachePut","cacheGet","cloneLibrarySnapshot","createLibrarySnapshot","replayLocalChanges","acknowledgeCloudSnapshot","acknowledgeCachedSnapshot","uploadCloudLibrary","queueLocalLibrarySave","queueCloudLibrarySave","persistLibrary","mergePendingCache"];
+const persistenceFunctions=["toMillis","canonicalRecordJSON","sameSyncValue","mergeEpisodeSetChanges","mergeEpisodeHistory","mergeRecordChanges","detectSyncConflicts","activePersistenceContext","setCloudBaseline","saveCache","cachePut","cacheGet","cloneLibrarySnapshot","createLibrarySnapshot","replayLocalChanges","acknowledgeCloudSnapshot","acknowledgeCachedSnapshot","uploadCloudLibrary","queueLocalLibrarySave","queueCloudLibrarySave","persistLibrary","mergePendingCache"];
 function harness(extra={}){
   const pending=new Set();
   const context=vm.createContext({
@@ -95,6 +95,19 @@ test("An old acknowledgement preserves newer edits and rebases the next request"
   assert.equal(calls,2);
   assert.equal(db.records.get("library").dirty,false);
   assert.equal(app.mediaItems.find(row=>row.id==="a").title,"A changed on other device");
+});
+
+test("Concurrent edits to the same show field are detected without flagging mergeable progress",()=>{
+ const c=harness(),base=[{id:"show",title:"Original",platform:"A",watchedEpisodes:{1:[1]}}],local=[{id:"show",title:"Local",platform:"Local service",watchedEpisodes:{1:[1,2]}}],remote=[{id:"show",title:"Remote",platform:"Other service",watchedEpisodes:{1:[1,3]}}];
+ const conflicts=c.detectSyncConflicts(base,local,remote);
+ assert.deepEqual(copy(conflicts),[{id:"show",key:"title"},{id:"show",key:"platform"}]);
+});
+
+test("An offline edit survives when another device deletes the same title",()=>{
+ const c=harness(),base=[{id:"shared-show",title:"Shared",platform:"Before"}],local=[{id:"shared-show",title:"Shared",platform:"Edited offline"}],remote=[];
+ const merged=c.replayLocalChanges(base,local,remote);
+ assert.equal(merged.length,1);assert.equal(merged[0].platform,"Edited offline");
+ assert.deepEqual(copy(c.detectSyncConflicts(base,local,remote)),[{id:"shared-show",key:"record"}]);
 });
 
 test("A cache acknowledgement cannot overwrite a later device write",async()=>{

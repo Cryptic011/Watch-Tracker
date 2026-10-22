@@ -38,12 +38,12 @@ async function requestHistory({session=true,owner=false}={}){
  vm.runInContext(`getSession=async()=>${session?"({accountId:'session-owner'})":"null"};sha256=async()=>${owner?'PRIVATE_TEST_ACCOUNT_HASH':"'other-account'"};`,c);
  const response=await handler(new Request('https://example.test',{method:'POST',body:JSON.stringify({action:'private_history',accountId:'victim'})}));return {response,reads,filters};
 }
-test('Private reminder history rejects signed-out and other accounts before reading activity',async()=>{
+test('Reminder history rejects signed-out sessions and permits any signed-in account',async()=>{
  const anon=await requestHistory({session:false});assert.equal(anon.response.status,401);assert.equal(anon.reads.length,0);
- const other=await requestHistory();assert.equal(other.response.status,403);assert.deepEqual(other.reads,['watchlog_pin_accounts']);
+ const other=await requestHistory();assert.equal(other.response.status,200);assert.ok(other.reads.includes('watchlog_push_deliveries'));
 });
 test('Private reminder history scopes every data query to the verified session, ignoring supplied account ID',async()=>{
- const result=await requestHistory({owner:true});assert.equal(result.response.status,200);
+ const result=await requestHistory();assert.equal(result.response.status,200);
  for(const table of ['watchlog_push_deliveries','watchlog_pin_library','watchlog_push_subscriptions'])assert.ok(result.filters.some(([t,k,v])=>t===table&&k==='account_id'&&v==='session-owner'));
  assert.equal((await result.response.json()).enabledDevices,0);
 });
@@ -58,6 +58,20 @@ test('Dashboard keeps unchanged DOM and preserves expanded sections after change
  c.updateDashboardMarkup(root,'changed');assert.equal(writes,2);assert.equal(details[0].open,true);
  details[0].open=false;details[1].open=true;
  c.updateDashboardMarkup(root,'changed again');assert.equal(details[0].open,false);assert.equal(details[1].open,true);
+});
+test('Watch statistics render in Account and Sync, not above the release calendar',()=>{
+ const dashboard=fs.readFileSync(new URL('../assets/js/dashboard.js',import.meta.url),'utf8');
+ assert.match(dashboard,/settings-watch-statistics/);
+ assert.match(dashboard,/querySelector\('\.profile-card'\)/);
+ assert.doesNotMatch(dashboard,/updateDashboardMarkup\(root,statsMarkup/);
+});
+test('Header provides a profile shortcut and compact sync/reminder status chips',()=>{
+ const index=fs.readFileSync(new URL('../index.html',import.meta.url),'utf8');
+ assert.match(index,/id="user-pill" class="user-pill" type="button" aria-label="Open Account and Sync"/);
+ assert.match(index,/id="quick-sync-status"/);assert.match(index,/id="quick-reminder-status"/);
+ const sync=fs.readFileSync(new URL('../assets/js/sync.js',import.meta.url),'utf8');
+ const reminders=fs.readFileSync(new URL('../assets/js/reminders.js',import.meta.url),'utf8');
+ assert.match(sync,/quick-sync-status/);assert.match(reminders,/quick-reminder-status/);
 });
 test('Next to watch handles long histories and nonsequential input without changing release data',()=>{
  const c=app(),episodes=Array.from({length:2000},(_,i)=>i+1),item={type:'Series',episodeScheduleVerified:true,releasedEpisodes:{1:[...episodes].reverse(),2:[1]},watchedEpisodes:{1:episodes.filter(n=>n!==1999)}};
@@ -104,16 +118,21 @@ test('Changelog shows the actual workflow run number and explains the Weekly Rel
   const app=readAppSource()+fs.readFileSync(new URL('../assets/js/app-core.js',import.meta.url),'utf8');
   const notes=JSON.parse(fs.readFileSync(new URL('../release-notes.json',import.meta.url),'utf8'));
   assert.ok(app.includes('Number.isInteger(entry.workflowRunNumber)'));
-  assert.ok(app.includes('workflowRunNumber:Number.isInteger(data.total_count)?data.total_count-((page-1)*100+runIndex):null'));
+  assert.ok(app.includes('workflowRunNumber:Number.isInteger(run.run_number)?run.run_number:null'));
+  assert.ok(app.includes('workflowRunAttempt:Number.isInteger(run.run_attempt)?run.run_attempt:null'));
   assert.ok(app.includes('summary.textContent=(Number.isInteger(entry.workflowRunNumber)?"Run "+entry.workflowRunNumber+" ("+String(entry.commit||"").slice(0,7)+")":"Run unavailable ("+String(entry.commit||"").slice(0,7)+")")'));
   assert.ok(app.includes('actions/runs?per_page=100&page="+page'));
   
-  assert.ok(notes.__current.changes.some(change=>/overall All workflows run sequence/i.test(change)));
+  assert.ok(notes.__current.changes.some(change=>/actual run number and attempt/i.test(change)));
+  assert.ok(notes.__current.changes.some(change=>/library export and merge-based restore/i.test(change)));
   assert.ok(notes['737498912c0ad423cc4de25468de8bc2a79b80a0'].changes.some(change=>/build failed/i.test(change)));
   const index=fs.readFileSync(new URL('../index.html',import.meta.url),'utf8');
   const css=fs.readFileSync(new URL('../assets/css/app.css',import.meta.url),'utf8');
+  const dashboard=fs.readFileSync(new URL('../assets/js/dashboard.js',import.meta.url),'utf8');
   assert.match(index,/Exclude this show from Weekly Releases/);
   assert.match(css,/\.weekly-release-preference-copy\{display:flex/);
+  assert.match(dashboard,/data-calendar-range/);
+  assert.match(dashboard,/data-calendar-include/);
 });
 
 

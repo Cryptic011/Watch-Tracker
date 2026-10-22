@@ -182,7 +182,8 @@ test("Local search ranks exact, prefix, and typo matches", () => {
   const prefix = api.librarySearchScore({ title: "Reacher: Origins", platform: "" }, query, tokens);
   const platform = api.librarySearchScore({ title: "Other", platform: "Reacher" }, query, tokens);
   const typo = api.librarySearchScore({ title: "Reacher", platform: "" }, api.normalizeTitle("Reacer"), ["reacer"]);
-  assert.ok(exact > prefix && prefix > platform && typo > 0);
+  const alias = api.librarySearchScore({ title: "Other", alternateTitles: ["The Reacher"], platform: "" }, query, tokens);
+  assert.ok(exact > prefix && prefix > platform && typo > 0 && alias > 0);
 });
 
 test("Conflict replay preserves remote work while applying local edits and deletes", () => {

@@ -19,7 +19,6 @@
   const PIN_SESSION_KEY = "watchlog_pin_session_v1";
   const LEGACY_LOCAL_ACCOUNTS_KEY = "watchlog_local_accounts_v1";
   const LEGACY_LOCAL_SESSION_KEY = "watchlog_local_session_v1";
-  const NOTIFICATION_TEST_ACCOUNT_HASH = "ea67160ff90d5a1b54a6b7fe8522c1573ec9dea8fb18fff38969f42b09c27f0b";
 
   let currentUser = null;
   let currentProfile = null;
@@ -167,6 +166,9 @@
     $("library-maintenance-message").textContent=visible?publicMaintenance.message:"";
   }
   const backgroundReminderStatus=$("background-reminder-status"),enableBackgroundReminders=$("enable-background-reminders"),disableBackgroundReminders=$("disable-background-reminders");
+  const reminderActions=document.querySelector(".background-reminder-card .notification-actions");
+  if(reminderActions&&!$("test-background-reminder")){const testButton=document.createElement("button");testButton.id="test-background-reminder";testButton.type="button";testButton.className="btn btn-secondary btn-full";testButton.textContent="Send Test Reminder";reminderActions.appendChild(testButton);}
+  backgroundReminderStatus?.setAttribute("aria-live","polite");
   const notificationTestSettings=$("notification-test-settings"),notificationTestStatus=$("notification-test-status"),sendPlannedTest=$("send-planned-test");
   const maintenanceAdminSection=document.createElement("section");
   maintenanceAdminSection.id="maintenance-admin-section";maintenanceAdminSection.className="maintenance-admin hidden";
@@ -174,6 +176,8 @@
   settingsView.appendChild(maintenanceAdminSection);
   const reminderActivitySection=document.getElementById("private-reminder-history");
   if(reminderActivitySection)settingsView.appendChild(reminderActivitySection);
+  const backupSection=document.createElement("section");backupSection.className="sync-box library-backup";backupSection.innerHTML='<h3>Library backup</h3><p class="small-note">Export a recoverable copy of titles, watch progress, and reminder preferences. Restore merges by title ID.</p><div class="notification-actions"><button id="export-library-backup" class="btn btn-secondary btn-full" type="button">Export Backup</button><label class="btn btn-secondary btn-full backup-import-label" for="import-library-backup">Restore Backup<input id="import-library-backup" type="file" accept="application/json,.json" hidden /></label></div><div id="library-backup-status" role="status" aria-live="polite"></div>';
+  settingsView.querySelector(".profile-card")?.appendChild(backupSection);
   const whatsNewButton=document.createElement("button");
   whatsNewButton.id="whats-new-button";whatsNewButton.type="button";whatsNewButton.className="whats-new-button";
   whatsNewButton.setAttribute("aria-haspopup","dialog");whatsNewButton.setAttribute("aria-controls","changelog-dialog");
@@ -220,6 +224,7 @@
       const status=statusBySha.get(entry.commit)||entry.status||"unknown";
       const statusLine=document.createElement("div");statusLine.className="changelog-status";statusLine.textContent=formatPushStatus(entry,status);
       details.appendChild(statusLine);
+      for(const attempt of entry.workflowRuns||[]){const line=document.createElement("div");line.className="changelog-status changelog-attempt";line.textContent=`Workflow run #${attempt.workflowRunNumber??"?"} · attempt ${attempt.workflowRunAttempt??"?"} · ${statusLabels[attempt.status]||attempt.status}`;details.appendChild(line);}
       const date=document.createElement("div");date.className="changelog-date";date.textContent=entry.date||"";
       details.appendChild(date);
       const changes=document.createElement("ul");changes.className="changelog-changes";
@@ -240,20 +245,15 @@
           if(!run.head_sha||run.head_branch!=="main")continue;
           const title=String(run.head_commit?.message||run.display_title||"Repository push").split("\n")[0];
           const matchingCommit=(currentBuild.commits||[]).find(commit=>commit.commit===run.head_sha);
-          const entry={appCommit:Number.isInteger(matchingCommit?.number)?matchingCommit.number:null,workflowRunNumber:Number.isInteger(data.total_count)?data.total_count-((page-1)*100+runIndex):null,workflowRunId:Number.isInteger(run.id)?run.id:null,commit:run.head_sha,date:String(run.created_at||"").slice(0,10),title,changes:[title],status:run.conclusion||run.status||"unknown"};
+          const entry={appCommit:Number.isInteger(matchingCommit?.number)?matchingCommit.number:null,workflowRunNumber:Number.isInteger(run.run_number)?run.run_number:null,workflowRunAttempt:Number.isInteger(run.run_attempt)?run.run_attempt:null,workflowRunId:Number.isInteger(run.id)?run.id:null,commit:run.head_sha,date:String(run.created_at||"").slice(0,10),title,changes:[title],status:run.conclusion||run.status||"unknown"};
           runs.push(entry);
-          if(run.head_sha)statusBySha.set(run.head_sha,entry.status);
+          if(run.head_sha&&!statusBySha.has(run.head_sha))statusBySha.set(run.head_sha,entry.status);
         }
         if((data.workflow_runs||[]).length<100)break;
       }
-      const seen=new Set();
-      const workflowEntries=runs.filter(entry=>{
-        const key=entry.commit;
-        if(seen.has(key))return false;
-        seen.add(key);return true;
-      });
-      const workflowByCommit=new Map(workflowEntries.map(entry=>[entry.commit,entry]));
-      APP_CHANGELOG_FULL=(currentBuild.commits||APP_CHANGELOG_FULL).map(entry=>{const run=workflowByCommit.get(entry.commit);return {...entry,workflowRunNumber:run?.workflowRunNumber??entry.workflowRunNumber??null,status:run?.status||statusBySha.get(entry.commit)||entry.status};});
+      const workflowByCommit=new Map();
+      for(const run of runs){const list=workflowByCommit.get(run.commit)||[];list.push(run);workflowByCommit.set(run.commit,list);}
+      APP_CHANGELOG_FULL=(currentBuild.commits||APP_CHANGELOG_FULL).map(entry=>{const matching=workflowByCommit.get(entry.commit)||[];const run=matching[0];return {...entry,workflowRuns:matching,workflowRunNumber:run?.workflowRunNumber??entry.workflowRunNumber??null,status:run?.status||statusBySha.get(entry.commit)||entry.status};});
       renderChangelogEntries();
     }catch(_){
       renderChangelogEntries();

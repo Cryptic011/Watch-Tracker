@@ -270,16 +270,19 @@
   let renderFrame=0;
   function mediaSearchInfo(item){
     let value=mediaSearchTextCache.get(item);
-    if(value===undefined){const title=normalizeTitle(item?.title),platform=normalizeTitle(item?.platform);value={title,platform,text:`${title} ${platform}`.trim()};mediaSearchTextCache.set(item,value);}
+    if(value===undefined){const title=normalizeTitle(item?.title),platform=normalizeTitle(item?.platform),aliases=[item?.alternateTitles,item?.alternate_titles,item?.titleAliases,item?.otherTitles,item?.metadata?.alternateTitles,item?.aliases,item?.originalTitle,item?.original_title,item?.aka].flatMap(value=>Array.isArray(value)?value:[value]).filter(value=>typeof value==="string").map(normalizeTitle);value={title,platform,aliases,text:[title,platform,...aliases].join(" ").trim()};mediaSearchTextCache.set(item,value);}
     return value;
   }
   function librarySearchScore(item,query,queryTokens){
     if(!query)return 1;
-    const {title,platform,text}=mediaSearchInfo(item);
+    const {title,platform,aliases,text}=mediaSearchInfo(item);
     if(title===query)return 1200;
     if(title.startsWith(query))return 1000-Math.min(100,title.length-query.length);
     if(title.includes(query))return 820;
     if(queryTokens.length&&queryTokens.every(token=>title.includes(token)))return 700;
+    if(aliases.some(alias=>alias===query))return 680;
+    if(aliases.some(alias=>alias.startsWith(query)))return 640;
+    if(aliases.some(alias=>alias.includes(query)))return 580;
     if(platform===query)return 620;
     if(platform.includes(query))return 520;
     if(queryTokens.length&&queryTokens.every(token=>text.includes(token)))return 440;
@@ -358,6 +361,22 @@
     }
     mediaList.innerHTML=html;updateEpisodeTracker();
   }
+  const bulkToolbar=document.createElement("div");bulkToolbar.className="bulk-toolbar";bulkToolbar.innerHTML='<button id="bulk-manage-open" class="btn btn-secondary" type="button">Select titles</button><span id="bulk-manage-status" role="status" aria-live="polite"></span>';
+  document.querySelector("#list-toolbar .filter-pills")?.after(bulkToolbar);
+  const bulkDialog=document.createElement("dialog");bulkDialog.className="changelog-dialog bulk-dialog";bulkDialog.setAttribute("aria-labelledby","bulk-manage-title");bulkDialog.innerHTML='<header class="changelog-heading"><h2 id="bulk-manage-title">Manage titles</h2><button class="close-btn" type="button" aria-label="Close bulk actions">×</button></header><p>Select one or more titles. Existing watch progress is retained unless you mark a show watched.</p><div id="bulk-title-options" class="bulk-title-options"></div><div class="notification-actions"><button type="button" data-bulk-action="watched" class="btn btn-secondary">Mark watched</button><button type="button" data-bulk-action="planned" class="btn btn-secondary">Plan</button><button type="button" data-bulk-action="hide" class="btn btn-secondary">Hide from Weekly Releases</button><button type="button" data-bulk-action="include" class="btn btn-secondary">Re-enable Weekly Releases</button><button type="button" data-bulk-action="remove" class="btn btn-danger">Remove selected</button></div>';
+  document.body.appendChild(bulkDialog);
+  const openBulk=document.getElementById("bulk-manage-open"),bulkOptions=bulkDialog.querySelector("#bulk-title-options");
+  openBulk?.addEventListener("click",()=>{bulkOptions.innerHTML=mediaItems.map(item=>`<label><input type="checkbox" value="${esc(item.id)}"><span>${esc(item.title)}</span></label>`).join("");bulkDialog.showModal();});
+  bulkDialog.querySelector(".close-btn").addEventListener("click",()=>bulkDialog.close());
+  bulkDialog.addEventListener("click",event=>{
+    const action=event.target.closest("[data-bulk-action]")?.dataset.bulkAction;if(!action)return;
+    const ids=[...bulkOptions.querySelectorAll("input:checked")].map(input=>input.value);if(!ids.length){document.getElementById("bulk-manage-status").textContent="Select at least one title.";return;}
+    if(action==="remove"&&!confirm(`Remove ${ids.length} selected title(s)? This cannot be undone.`))return;
+    const selected=new Set(ids);
+    if(action==="remove")mediaItems=mediaItems.filter(item=>!selected.has(String(item.id)));
+    else for(const item of mediaItems){if(!selected.has(String(item.id)))continue;if(action==="planned")item.status="Planned";if(action==="hide")item.hideFromWeeklyReleases=true;if(action==="include")item.hideFromWeeklyReleases=false;if(action==="watched"){item.status="Watched";if(isEpisodeTrackable(item)){const released=releasedEpisodeMap(item);item.watchedEpisodes=Object.fromEntries(Object.entries(released).map(([season,episodes])=>[season,[...episodes]]));const latest=Object.entries(item.watchedEpisodes).flatMap(([season,episodes])=>episodes.map(episode=>[Number(season),Number(episode)])).sort((a,b)=>b[0]-a[0]||b[1]-a[1])[0];item.curSeason=latest?.[0]||null;item.curEp=latest?.[1]||null;item.lastWatchedSeason=item.curSeason;item.lastWatchedEpisode=item.curEp;item.watchedSeasons=Object.keys(released).length;item.updatedAt=nowISO();}}}
+    render();void persistLibrary(mediaItems,{background:true,precleaned:true});document.getElementById("bulk-manage-status").textContent=`Updated ${ids.length} title(s).`;bulkDialog.close();
+  });
   function scheduleRender(){if(renderFrame)return;renderFrame=requestAnimationFrame(()=>{renderFrame=0;render();});}
   searchInput.oninput=e=>{
     searchQuery=e.target.value;clearTimeout(librarySearchTimer);

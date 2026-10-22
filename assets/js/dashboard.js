@@ -29,9 +29,10 @@ function watchStatistics(items){
   return{libraryCount:rows.length,filmsWatched,episodesWatched,showsInProgress,showsCompleted};
 }
 
-function calendarEvents(items,now=new Date()){
+let selectedCalendarRange='week';
+function calendarEvents(items,now=new Date(),days=7){
   const start=new Date(now);start.setHours(0,0,0,0);
-  const end=new Date(start);end.setDate(end.getDate()+7);
+  const end=new Date(start);end.setDate(end.getDate()+days);
   const events=[],unknown=[],seen=new Set();
   for(const item of items){
     if(item.hideFromWeeklyReleases===true)continue;
@@ -87,15 +88,21 @@ function updateDashboardMarkup(root,markup){
 
 function renderDashboard(){
   const root=document.getElementById('library-dashboard');if(!root)return;
+  const stats=watchStatistics(mediaItems);
+  let statsTarget=document.getElementById('settings-watch-statistics');
+  if(!statsTarget){const settings=document.getElementById('settings-view'),accountCard=settings?.querySelector('.profile-card');if(settings&&accountCard){statsTarget=document.createElement('div');statsTarget.id='settings-watch-statistics';accountCard.before(statsTarget);}}
+  if(statsTarget)statsTarget.innerHTML=`<section class="dashboard-section watch-statistics" aria-labelledby="watch-statistics-title"><header class="watch-statistics-heading"><div><h2 id="watch-statistics-title">Your watch statistics</h2><p class="dashboard-note">Based on progress saved in your library</p></div></header><div class="watch-statistics-grid"><div class="watch-stat"><strong>${stats.libraryCount}</strong><span>Library items</span></div><div class="watch-stat"><strong>${stats.episodesWatched}</strong><span>Episodes logged</span></div><div class="watch-stat"><strong>${stats.filmsWatched}</strong><span>Films watched</span></div><div class="watch-stat"><strong>${stats.showsInProgress}</strong><span>Shows in progress</span></div><div class="watch-stat"><strong>${stats.showsCompleted}</strong><span>Shows completed</span></div></div></section>`;
   const visible=Boolean(currentUser&&currentTab==='library'&&!categoryControlsVisible()&&!searchQuery.trim());
   root.classList.toggle('hidden',!visible);if(!visible){root.replaceChildren();root._dashboardMarkup=null;return;}
-  const stats=watchStatistics(mediaItems);
-  const statsMarkup=`<section class="dashboard-section watch-statistics" aria-labelledby="watch-statistics-title"><header class="watch-statistics-heading"><div><h2 id="watch-statistics-title">Your watch statistics</h2><p class="dashboard-note">Based on progress saved in your library</p></div></header><div class="watch-statistics-grid"><div class="watch-stat"><strong>${stats.libraryCount}</strong><span>Library items</span></div><div class="watch-stat"><strong>${stats.episodesWatched}</strong><span>Episodes logged</span></div><div class="watch-stat"><strong>${stats.filmsWatched}</strong><span>Films watched</span></div><div class="watch-stat"><strong>${stats.showsInProgress}</strong><span>Shows in progress</span></div></div></section>`;
-  const {start,events,unknown}=calendarEvents(mediaItems);
+  const daysToShow=selectedCalendarRange==='today'?1:selectedCalendarRange==='upcoming'?30:7;
+  const {start,events,unknown}=calendarEvents(mediaItems,new Date(),daysToShow);
+  const weekEnd=new Date(start);weekEnd.setDate(weekEnd.getDate()+7);
+  const upcomingBeyondWeek=selectedCalendarRange==='week'?calendarEvents(mediaItems,new Date(),30).events.filter(event=>event.date>=weekEnd):[];
+  const upcomingMarkup=selectedCalendarRange==='week'?`<section class="dashboard-section upcoming-release-list"><h2>Upcoming releases</h2><p class="dashboard-note">After this week · next 30 days</p>${upcomingBeyondWeek.length?upcomingBeyondWeek.map(event=>`<button type="button" class="release-tba-item" data-dashboard-open="${esc(event.item.id)}"><strong>${esc(event.item.title)}</strong><span>${esc(event.label)} · ${esc(event.date.toLocaleDateString(USER_LOCALE,{weekday:'short',day:'numeric',month:'short'}))}${event.dateOnly?' · Date only':' · '+esc(event.date.toLocaleTimeString(USER_LOCALE,{hour:'2-digit',minute:'2-digit'}))}</span></button>`).join(''):'<p class="release-empty">No upcoming releases listed beyond this week.</p>'}</section>`:'';
   const eventsByDay=new Map();
   for(const event of events){const key=localISODate(event.date);if(!eventsByDay.has(key))eventsByDay.set(key,[]);eventsByDay.get(key).push(event);}
   let days='';
-  for(let offset=0;offset<7;offset++){
+  for(let offset=0;offset<daysToShow;offset++){
     const date=new Date(start);date.setDate(date.getDate()+offset);
     const key=localISODate(date),rows=eventsByDay.get(key)||[];
     const dayLabel=offset===0?'Today':offset===1?'Tomorrow':date.toLocaleDateString(USER_LOCALE,{weekday:'long'});
@@ -109,30 +116,37 @@ function renderDashboard(){
       if(!group){group={key:groupKey,item:event.item,time,dateOnly:event.dateOnly,events:[]};grouped.push(group);}
       if(!group.events.some(existing=>existing.label===event.label))group.events.push(event);
     }
-    days+=`<section class="release-day${rows.length?' has-releases':' is-empty'}" aria-label="${esc(dayLabel)}, ${esc(dateLabel)}">
-      <header class="release-day-heading"><div><span class="release-day-name">${esc(dayLabel)}</span><span class="release-day-date">${esc(dateLabel)}</span></div><span class="release-day-count">${rows.length} ${rows.length===1?'release':'releases'}</span></header>
+    days+=`<section class="release-day${rows.length?' has-releases':' is-empty'}${offset===0?' is-today':''}" aria-label="${esc(dayLabel)}, ${esc(dateLabel)}">
+      <header class="release-day-heading"><div><span class="release-day-name">${esc(dayLabel)}${offset===0?'<span class="today-marker">TODAY</span>':''}</span><span class="release-day-date">${esc(dateLabel)}</span></div><span class="release-day-count">${rows.length} ${rows.length===1?'release':'releases'}</span></header>
       ${grouped.length?grouped.map(group=>{
         const labels=group.events.map(event=>event.label);
         const episodeLabel=labels.length>1&&labels.every(label=>/^S\d+ E\d+$/.test(label))
           ?labels[0].match(/^S(\d+) E/)[0].replace(' E','')+' E'+labels.map(label=>Number(label.match(/E(\d+)/)[1])).join(', ')
           :labels.join(' · ');
         const platform=group.item.platform?esc(group.item.platform):'Platform not saved';
+        const releaseState=group.events.some(event=>event.date.toDateString()===new Date().toDateString())?'Today':group.events.some(event=>event.date>new Date())?'Upcoming':'Released';
         return `<button type="button" class="release-card" data-dashboard-open="${esc(group.item.id)}">
           <span class="release-time">${esc(group.time)}</span>
-          <span class="release-card-copy"><strong>${esc(group.item.title)}</strong><span class="release-episode">${esc(episodeLabel)}</span><span class="release-platform"><span class="release-platform-dot" aria-hidden="true"></span>${platform}</span></span>
+          <span class="release-card-copy"><strong>${esc(group.item.title)}</strong><span class="release-episode">${esc(episodeLabel)} · ${group.dateOnly?'Date only':'Scheduled'}</span><span class="release-state-badge" data-release-state="${releaseState.toLowerCase()}">${releaseState}</span><span class="release-platform"><span class="release-platform-dot" aria-hidden="true"></span>${platform}</span></span>
           <span class="release-chevron" aria-hidden="true">›</span>
         </button>`;
       }).join(''):'<p class="release-empty">Nothing listed for this day</p>'}
     </section>`;
   }
-  updateDashboardMarkup(root,statsMarkup+`<section class="dashboard-section weekly-releases" aria-labelledby="weekly-releases-title">
-    <header class="weekly-releases-heading"><div><span class="weekly-eyebrow">YOUR SCHEDULE</span><h2 id="weekly-releases-title">This week’s releases</h2><p class="dashboard-note">Today and the next six days · local times</p></div><span class="weekly-total">${events.length}<small>releases</small></span></header>
+  const excluded=mediaItems.filter(item=>item.hideFromWeeklyReleases===true);
+  const controls=`<div class="filter-pills calendar-range" role="group" aria-label="Filter release calendar">${[['today','Today'],['week','This week'],['upcoming','Upcoming']].map(([key,label])=>`<button type="button" class="pill-btn${selectedCalendarRange===key?' active':''}" data-calendar-range="${key}" aria-pressed="${selectedCalendarRange===key}">${label}</button>`).join('')}</div>`;
+  updateDashboardMarkup(root,`<section class="dashboard-section weekly-releases" aria-labelledby="weekly-releases-title">
+    <header class="weekly-releases-heading"><div><span class="weekly-eyebrow">YOUR SCHEDULE</span><h2 id="weekly-releases-title">${selectedCalendarRange==='upcoming'?'Upcoming releases':selectedCalendarRange==='today'?"Today’s releases":"This week’s releases"}</h2><p class="dashboard-note">${selectedCalendarRange==='upcoming'?'Next 30 days':selectedCalendarRange==='today'?'Local calendar day':'Today and the next six days'} · device timezone (${esc(DEVICE_TIME_ZONE||Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC')})</p></div><span class="weekly-total">${events.length}<small>releases</small></span></header>
+    ${controls}
     <div class="release-week-list">${days}</div>
     ${unknown.length?`<details class="release-tba" data-dashboard-section="unknown"><summary><span>Dates to be announced</span><span class="release-tba-count">${unknown.length}</span></summary><div class="release-tba-list">${unknown.map(item=>`<button type="button" class="release-tba-item" data-dashboard-open="${esc(item.id)}"><strong>${esc(item.title)}</strong><span>${esc(item.announcement)} · Date TBA</span><span class="release-chevron" aria-hidden="true">›</span></button>`).join('')}</div></details>`:''}
-    <p class="weekly-footnote">Broadcast and listed film dates may differ from UK streaming availability.</p>
-  </section>`);
+    ${excluded.length?`<details class="release-tba" data-dashboard-section="excluded"><summary><span>Excluded from Weekly Releases</span><span class="release-tba-count">${excluded.length}</span></summary><div class="release-tba-list">${excluded.map(item=>`<div class="dashboard-row excluded-release-row"><div><strong>${esc(item.title)}</strong><span class="release-state-badge" data-release-state="excluded">Excluded</span></div><button type="button" class="btn btn-secondary" data-calendar-include="${esc(item.id)}">Re-enable</button></div>`).join('')}</div></details>`:''}
+    <p class="weekly-footnote">Broadcast and listed film dates may differ from UK streaming availability. Date-only releases use noon in the device timezone.</p>
+  </section>`+upcomingMarkup);
 }
 document.getElementById('library-dashboard').addEventListener('click',event=>{
+  const range=event.target.closest('[data-calendar-range]');if(range){selectedCalendarRange=range.dataset.calendarRange;document.getElementById('library-dashboard')._dashboardMarkup=null;renderDashboard();return;}
+  const include=event.target.closest('[data-calendar-include]');if(include){const item=mediaItems.find(row=>String(row.id)===include.dataset.calendarInclude);if(item){item.hideFromWeeklyReleases=false;render();void persistLibrary(mediaItems,{background:true,precleaned:true});}return;}
   const watch=event.target.closest('[data-dashboard-watch]');
   if(watch){
     const item=mediaItems.find(row=>String(row.id)===watch.dataset.dashboardWatch),next=item&&nextWatchEpisode(item);
@@ -146,8 +160,7 @@ async function refreshPrivateReminderHistory(){
   const panel=document.getElementById('private-reminder-history'),body=document.getElementById('reminder-history-body');
   const token=cloudSessionToken,accountId=currentUser?.id;
   if(!token||!accountId){panel.classList.add('hidden');return;}
-  const hash=await sha256(`watchlog-notification-test:${normalizeEmail(currentProfile?.email||'')}`);
-  if(token!==cloudSessionToken||accountId!==currentUser?.id||hash!==NOTIFICATION_TEST_ACCOUNT_HASH){panel.classList.add('hidden');return;}
+  if(token!==cloudSessionToken||accountId!==currentUser?.id){panel.classList.add('hidden');return;}
   panel.classList.remove('hidden');
   try{
     const result=await reminderApi('private_history',{},token);
@@ -155,7 +168,8 @@ async function refreshPrivateReminderHistory(){
     const status=row=>row.status==='sent'?'Accepted by push service':['retry','expired'].includes(row.status)&&row.attempts>=5?'Failed — retries exhausted':({retry:'Retry pending',pending:'Pending',expired:'Expired',failed:'Failed'}[row.status]||row.status);
     const history=(result.history||[]).map(row=>`<div class="dashboard-row"><div><strong>${esc(row.title||'Removed title')}</strong><small>${esc(row.label||'Reminder')} · ${esc(status(row))}</small><small>${esc(formatLocalDateTime(row.sent_at||row.scheduled_for))} · ${Number(row.attempts)||0} attempt(s)</small>${row.last_error?`<small>${esc(row.last_error)}</small>`:''}</div></div>`).join('');
     const upcoming=(result.upcoming||[]).map(row=>`<div class="dashboard-row"><div><strong>${esc(row.title)}</strong><small>${esc(row.label)} · ${esc(formatLocalDateTime(row.scheduled_for))}</small></div></div>`).join('');
-    body.innerHTML=`<p class="dashboard-note">${result.enabledDevices} enabled device(s). A successful send means the push service accepted it; phone delivery is not confirmed.</p><h3>Upcoming reminders</h3>${upcoming||'<p>No scheduled reminders for enabled devices in the next seven days.</p>'}<h3>Recent activity</h3>${history||'<p>No reminder attempts recorded yet.</p>'}`;
+    const suppressed=(result.suppressed||[]).map(row=>`<div class="dashboard-row"><div><strong>${esc(row.title)}</strong><small>${esc(row.label)} · Suppressed</small></div></div>`).join('');
+    body.innerHTML=`<p class="dashboard-note">${result.enabledDevices} enabled device(s). A successful send means the push service accepted it; phone delivery is not confirmed.</p><h3>Upcoming reminders · Scheduled</h3>${upcoming||'<p>No scheduled reminders for enabled devices in the next seven days.</p>'}<h3>Suppressed</h3>${suppressed||'<p>No reminders suppressed.</p>'}<h3>Recent activity</h3>${history||'<p>No reminder attempts recorded yet.</p>'}`;
   }catch(error){if(token===cloudSessionToken&&accountId===currentUser?.id)body.textContent=error.message||'Could not load reminder history.';}
 }
 document.getElementById('refresh-reminder-history').onclick=async()=>{const dialog=document.getElementById('reminder-history-dialog'),body=document.getElementById('reminder-history-body');body.textContent='Loading reminder activity…';dialog.showModal();await refreshPrivateReminderHistory();};

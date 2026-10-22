@@ -30,10 +30,14 @@
   let librarySaveStatusTimer=null;
   function setSync(text,state="ok"){
     clearTimeout(librarySaveStatusTimer);librarySaveStatusTimer=null;
-    syncStatus.textContent=text;syncDot.className=`sync-dot ${state==="ok"?"ok":state==="warn"?"warn":""}`;
+    const visibleText=/^(Syncing|Saving)/i.test(text)?`Syncing · ${text}`:state==="warn"?`Needs attention · ${text}`:`Synced · ${text}`;
+    syncStatus.textContent=visibleText;syncDot.className=`sync-dot ${state==="ok"?"ok":state==="warn"?"warn":""}`;
+    const quick=document.getElementById("quick-sync-status");
+    const quickLabel=quick?.querySelector?.("span");
+    if(quick&&quickLabel){const pending=/^(Syncing|Saving)/i.test(text),attention=state==="warn"&&!pending;quick.dataset.state=pending?"syncing":attention?"attention":"ok";quickLabel.textContent=pending?"Syncing":attention?"Needs attention":"Synced";}
     const visible=document.getElementById("library-save-status");
     if(visible){
-      visible.textContent=text;visible.dataset.state=state;visible.classList.toggle("hidden",!currentUser);
+      visible.textContent=visibleText;visible.dataset.state=state;visible.classList.toggle("hidden",!currentUser);
       if(currentUser&&state==="ok")librarySaveStatusTimer=setTimeout(()=>{visible.classList.add("hidden");librarySaveStatusTimer=null;},3000);
     }
   }
@@ -172,6 +176,12 @@
     return merged;
   }
 
+  function detectSyncConflicts(baseItems,localItems,remoteItems){
+    const base=new Map((baseItems||[]).map(item=>[String(item.id),item])),local=new Map((localItems||[]).map(item=>[String(item.id),item])),remote=new Map((remoteItems||[]).map(item=>[String(item.id),item])),conflicts=[];
+    for(const [id,before] of base){const left=local.get(id),right=remote.get(id);if(!left||!right){if((!left&&right&&!sameSyncValue(right,before))||(!right&&left&&!sameSyncValue(left,before)))conflicts.push({id,key:"record"});continue;}for(const key of new Set([...Object.keys(before||{}),...Object.keys(left||{}),...Object.keys(right||{})])){if(key==="id"||key==="watchedEpisodes"||key==="episodeHistory")continue;const localChanged=!sameSyncValue(left[key],before[key]),remoteChanged=!sameSyncValue(right[key],before[key]);if(localChanged&&remoteChanged&&!sameSyncValue(left[key],right[key]))conflicts.push({id,key});}}
+    return conflicts;
+  }
+
   function replayLocalChanges(baseItems,localItems,remoteItems){
     const base=new Map((Array.isArray(baseItems)?baseItems:[]).filter(item=>item?.id).map(item=>[String(item.id),item]));
     const local=new Map((Array.isArray(localItems)?localItems:[]).filter(item=>item?.id).map(item=>[String(item.id),item]));
@@ -179,6 +189,7 @@
     for(const [id,baseItem] of base){
       if(!local.has(id)){remote.delete(id);continue;}
       const localItem=local.get(id);
+      if(!remote.has(id)){if(!sameSyncValue(localItem,baseItem))remote.set(id,localItem);continue;}
       if(remote.has(id)&&!sameSyncValue(localItem,baseItem))remote.set(id,mergeRecordChanges(baseItem,localItem,remote.get(id)));
     }
     for(const [id,localItem] of local)if(!base.has(id))remote.set(id,localItem);
@@ -243,6 +254,7 @@
     });
   }
 
+  let detectedSyncConflictCount=0;
   async function uploadCloudLibrary(snapshot){
     let outgoing=snapshot;
     for(let attempt=0;attempt<3;attempt++){
@@ -253,6 +265,7 @@
         return result;
       }catch(error){
         if(error?.code!=="revision_conflict"||!Array.isArray(error.items)||!Number.isSafeInteger(Number(error.revision))||attempt===2)throw error;
+        detectedSyncConflictCount+=detectSyncConflicts(outgoing.baseItems,outgoing.items,error.items).length;
         const merged=replayLocalChanges(outgoing.baseItems,outgoing.items,error.items);
         outgoing=createLibrarySnapshot(merged,{...outgoing,sequence:snapshot.sequence,baseItems:error.items,expectedRevision:Number(error.revision)});
       }
@@ -315,7 +328,7 @@
           return false;
         }
       }
-      markPending(false,processedAccountId);if(String(currentUser?.id||"")===processedAccountId)setSync("Synced. This library is available on your other devices.","ok");
+      markPending(false,processedAccountId);if(String(currentUser?.id||"")===processedAccountId){const conflicts=detectedSyncConflictCount;detectedSyncConflictCount=0;setSync(conflicts?`Synced with ${conflicts} conflicting edit(s); local values were kept. Review the affected titles.`:"Synced. This library is available on your other devices.","ok");}
       return true;
     })().finally(()=>{
       cloudSaveInFlight=null;
@@ -645,6 +658,7 @@
          edits at response time, and ignore a load older than an acknowledged save. */
       const revision=Math.max(cloudRevision,Number(result.revision)||0);
       const original=Number(result.revision)>=cloudRevision?result.items:cloudBaseItems;
+      const conflicts=detectSyncConflicts(cloudBaseItems,mediaItems,original);
       const merged=replayLocalChanges(cloudBaseItems,mediaItems,original);
       const migration=migratePlannedStatuses(merged),cleanup=cleanLibraryRecords(migration.rows);
       applyAccount(result.account);setCloudBaseline(original,revision,currentUser.id);
@@ -652,12 +666,30 @@
       const saved=await persistLibrary(mediaItems,{precleaned:true});
       if(!activePersistenceContext(context))return;
       await saveProfile(currentProfile);
-      setSync(saved?"Synced. This library is available on your other devices.":"Saved on this device. Cloud sync is still pending.",saved?"ok":"warn");
+      setSync(saved?(conflicts.length?`Synced. ${conflicts.length} simultaneous edit conflict(s) were detected; your local values were kept. Review the affected titles.`:"Synced. This library is available on your other devices."):"Saved on this device. Cloud sync is still pending.",saved?"ok":"warn");
       const cleanupMessage=duplicateCleanupMessage(cleanup);if(cleanupMessage)showAppToast(cleanupMessage,"success",6000);
       void refreshLibraryEpisodeMetadata({force:true});
     }catch(e){console.error(e);setSync(e.message||"Sync failed.","warn");}
     finally{syncNowBtn.disabled=false;}
   };
+
+  document.getElementById("export-library-backup")?.addEventListener("click",()=>{
+    const backup={format:"watchlog-library-backup",version:1,exportedAt:new Date().toISOString(),items:cloneLibrarySnapshot(mediaItems)};
+    const url=URL.createObjectURL(new Blob([JSON.stringify(backup,null,2)],{type:"application/json"}));
+    const link=document.createElement("a");link.href=url;link.download=`watched-logger-backup-${new Date().toISOString().slice(0,10)}.json`;link.click();URL.revokeObjectURL(url);
+    const status=document.getElementById("library-backup-status");if(status)status.textContent=`Backup exported with ${backup.items.length} library item(s).`;
+  });
+  document.getElementById("import-library-backup")?.addEventListener("change",async event=>{
+    const input=event.currentTarget,status=document.getElementById("library-backup-status"),file=input.files?.[0];input.value="";if(!file)return;
+    try{
+      if(file.size>10*1024*1024)throw new Error("Backup file is larger than 10 MB.");
+      const backup=JSON.parse(await file.text());
+      if(backup?.format!=="watchlog-library-backup"||backup.version!==1||!Array.isArray(backup.items)||backup.items.some(item=>!item||typeof item.title!=="string"||!item.title.trim()))throw new Error("This is not a supported Watched Logger backup.");
+      const before=mediaItems.length;mediaItems=mergeLibraries(mediaItems,backup.items);render();
+      await persistLibrary(mediaItems,{background:true,precleaned:true});
+      if(status)status.textContent=`Restored backup by merging ${backup.items.length} item(s) with your existing ${before}; saved on this device and queued to sync.`;
+    }catch(error){if(status)status.textContent=error.message||"Could not restore this backup.";}
+  });
 
   changePinBtn.onclick=async()=>{
     const pin=newPinInput.value;if(!validPin(pin)){setSync("New PIN must be exactly 4 digits.","warn");return;}

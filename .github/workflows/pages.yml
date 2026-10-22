@@ -44,17 +44,37 @@ jobs:
           npx playwright install --with-deps chromium webkit
 
       - name: Generate version from Git history
-        env:
-          WATCHLOG_GITHUB_TOKEN: ${{ github.token }}
         run: node scripts/build-info.mjs
 
       - name: Check application behavior
-        run: node --test tests/*.test.mjs
+        id: application_tests
+        continue-on-error: true
+        run: |
+          set +e
+          node --test tests/*.test.mjs 2>&1 | tee /tmp/watchlog-tests.log
+          result=${PIPESTATUS[0]}
+          if [ "$result" -ne 0 ]; then
+            { echo 'failure_summary<<WATCHLOG_FAILURE'; tail -n 35 /tmp/watchlog-tests.log; echo WATCHLOG_FAILURE; } >> "$GITHUB_OUTPUT"
+          fi
+          exit "$result"
 
       - name: Check mobile browser flows
+        id: browser_tests
+        continue-on-error: true
         env:
           BROWSER_ENGINES: all
-        run: npm run test:browser
+        run: |
+          set +e
+          npm run test:browser 2>&1 | tee /tmp/watchlog-browser-tests.log
+          result=${PIPESTATUS[0]}
+          if [ "$result" -ne 0 ]; then
+            { echo 'failure_summary<<WATCHLOG_FAILURE'; tail -n 35 /tmp/watchlog-browser-tests.log; echo WATCHLOG_FAILURE; } >> "$GITHUB_OUTPUT"
+          fi
+          exit "$result"
+
+      - name: Stop before deployment when checks fail
+        if: steps.application_tests.outcome == 'failure' || steps.browser_tests.outcome == 'failure'
+        run: exit 1
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v6
@@ -76,16 +96,15 @@ jobs:
 
       - name: Notify owner of this workflow result
         if: always()
-        continue-on-error: true
         env:
           WATCHLOG_SOURCE_SHA: ${{ github.sha }}
           WATCHLOG_SOURCE_RUN_NUMBER: ${{ github.run_number }}
+          WATCHLOG_SOURCE_RUN_ATTEMPT: ${{ github.run_attempt }}
+          WATCHLOG_FAILURE_SUMMARY: ${{ steps.application_tests.outputs.failure_summary || steps.browser_tests.outputs.failure_summary }}
           WATCHLOG_SOURCE_RUN_ID: ${{ github.run_id }}
-          GITHUB_TOKEN: ${{ github.token }}
           GITHUB_SERVER_URL: ${{ github.server_url }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           GITHUB_EVENT_NAME: workflow_run
           WATCHLOG_STATUS: ${{ job.status }}
           WATCHLOG_PAGE_URL: ${{ steps.deployment.outputs.page_url }}
         run: node scripts/notify-deployment.mjs
-

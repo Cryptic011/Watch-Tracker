@@ -64,13 +64,15 @@
     "number": 224
   },
   "__current": {
-    "title": "Add watch statistics and strengthen dashboard regression coverage",
+    "title": "Coordinated Watch Logger reliability and library improvements",
     "changes": [
-      "Add a compact Library dashboard summary for total library items, films marked watched, logged episodes, and shows with unwatched released episodes.",
-      "Calculate statistics from saved episode progress and released-episode data without mutating saved library records.",
-      "Preserve existing Weekly Releases visibility rules and improve small-screen layout with responsive statistics cards.",
-      "Add regression coverage for statistics accuracy and record immutability; version the dashboard assets to avoid stale cached files.",
-      "Use the overall All workflows run sequence for Changelog labels and display Run N (short commit SHA), not the app commit number or individual workflow run_number."
+      "Run application and browser checks before deployment, prevent overlapping runs from cancelling each other, and include failed-check output plus post-deployment recovery guidance in owner notifications.",
+      "Identify each GitHub Actions attempt by its actual run number and attempt, including separate retries for the same commit.",
+      "Add per-device test reminders and signed-in reminder activity with scheduled, sent, and Weekly Releases-suppressed states; test sends are deduplicated.",
+      "Add versioned JSON library export and merge-based restore, explicit sync-state labels, and detection/reporting for conflicting edits while retaining offline-first saves.",
+      "Add Today, This week, and Upcoming calendar filters, an excluded-title re-enable list, local timezone disclosure, and consistent episode/date/release labels.",
+      "Search alternate titles, sort by upcoming release, and apply bulk watched/planned/hide/include/remove actions while preserving unrelated progress.",
+      "Expand watch statistics, add visible accessible status messaging and focus indicators, use 44px calendar and backup controls, and respect reduced-motion preferences."
     ]
   },
   "37f6c39e9d0355b1bde705cb3fcb3cda2533119f": {

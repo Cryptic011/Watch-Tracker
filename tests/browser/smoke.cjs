@@ -13,7 +13,7 @@ const server=http.createServer((req,res)=>{
 (async()=>{
  await new Promise(r=>server.listen(0,'127.0.0.1',r));
  const base=`http://127.0.0.1:${server.address().port}`;
- for(const engine of process.env.BROWSER_ENGINES==='all'?[chromium,webkit]:[chromium]){
+ for(const engine of process.env.BROWSER_ENGINES==='all'?[chromium,webkit]:process.env.BROWSER_ENGINES==='webkit'?[webkit]:[chromium]){
  const browser=await engine.launch({headless:true});
  try{
   const context=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true,serviceWorkers:'block'});
@@ -79,7 +79,7 @@ const server=http.createServer((req,res)=>{
   await page.locator('.gallery-tile').first().click();await page.locator('[data-gallery-close]').click();
   await page.locator('[data-filter="All"]').click();await page.locator('[data-gallery-back]').click();
   await page.evaluate(()=>openEdit(mediaItems[0].id));await page.locator('#platform').fill('Cinema');await page.locator('#save-btn').click();
-  await page.waitForFunction(()=>!cloudSaveInFlight&&!localSaveInFlight);assert.equal(items[0].platform,'Cinema');
+  await page.waitForFunction(()=>mediaItems[0]?.platform==='Cinema'&&!cloudSaveInFlight&&!localSaveInFlight&&!queuedCloudSnapshot&&!queuedLocalSnapshot,null,{timeout:10000});assert.equal(items[0].platform,'Cinema');
   // Seed a verified schedule through the same persistence code used by imports.
   phase='episode tracking';
   await page.evaluate(async()=>{

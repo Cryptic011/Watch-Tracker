@@ -344,6 +344,7 @@
     setTimeout(()=>applyPendingAppUpdate(),0);
   }
   addBtn.onclick=()=>openTitleSearch();closeModal.onclick=closeEditor;modal.addEventListener("click",e=>{if(e.target===modal)closeEditor();});
+  saveBtn.addEventListener("click",event=>{event.preventDefault();mediaForm.dispatchEvent(new Event("submit",{bubbles:true,cancelable:true}));});
 
   mediaForm.onsubmit=async e=>{
     e.preventDefault();if(!currentUser)return;saveBtn.disabled=true;saveBtn.textContent="Saving…";

@@ -9,7 +9,7 @@ import {
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-watchlog-session, x-github-token",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-watchlog-session",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Content-Type": "application/json",
 };
@@ -22,7 +22,6 @@ const db = createClient(supabaseUrl, serviceKey, {
 // Deployment-status requests authenticate by verifying the completed run against GitHub Actions below.
 // Deploy this function with platform JWT verification disabled; other actions enforce their own session/cron checks.
 const enc = new TextEncoder();
-const PRIVATE_TEST_ACCOUNT_HASH = "ea67160ff90d5a1b54a6b7fe8522c1573ec9dea8fb18fff38969f42b09c27f0b";
 const VAPID_SUBJECT = "mailto:push@watched-logger.app";
 const MAX_PUSH_ATTEMPTS = 5;
 const EPISODE_SCHEDULE_REFRESH_MS = 6 * 60 * 60 * 1000;
@@ -728,19 +727,17 @@ Deno.serve(async (req: Request) => {
     if (action === "deployment_status") {
       const runId = String(body.runId || "").slice(0, 24);
       const runNumber = String(body.runNumber || "").slice(0, 24);
-      // Never trust the caller for the displayed all-workflows count: derive
-      // it from GitHub just as we independently verify the source run below.
+      const runAttempt = String(body.runAttempt || "1").slice(0, 12);
+      const failureSummary = String(body.failureSummary || "").replace(/[\r\n]+/g, " ").slice(0, 600);
+      // Verify the displayed run identity and attempt against GitHub below.
       const sha = String(body.sha || "");
       const status = String(body.status || "");
       const commitUrl = String(body.commitUrl || "");
       const allowedStatuses = new Set(["success", "failure", "cancelled", "skipped"]);
-      if (!/^\d+$/.test(runId) || !/^\d+$/.test(runNumber) || !/^[a-f0-9]{40}$/.test(sha) || !allowedStatuses.has(status)) return json({ error: "Invalid workflow status payload" }, 400);
-      // Authenticate the caller against the run's own scoped GitHub Actions token.
-      // The run is still in_progress while its final always() step executes, so
-      // the outcome is supplied by the workflow expression and the run identity
-      // (ID, run number, SHA, workflow) is verified against GitHub.
-      const githubToken = req.headers.get("x-github-token") || "";
-      if (!githubToken) return json({ error: "GitHub run verification token is required" }, 401);
+      if (!/^\d+$/.test(runId) || !/^\d+$/.test(runNumber) || !/^\d+$/.test(runAttempt) || !/^[a-f0-9]{40}$/.test(sha) || !allowedStatuses.has(status)) return json({ error: "Invalid workflow status payload" }, 400);
+      // Keep the GitHub credential server-side; never forward the workflow token.
+      const githubToken = Deno.env.get("WATCHLOG_GITHUB_TOKEN") || "";
+      if (!githubToken) return json({ error: "Run verification is not configured" }, 503);
       const githubHeaders = {
         "Accept": "application/vnd.github+json",
         "Authorization": `Bearer ${githubToken}`,
@@ -759,6 +756,7 @@ Deno.serve(async (req: Request) => {
       const mismatch = {
         id: String(verifiedRun.id) !== runId,
         runNumber: Number(verifiedRun.run_number) !== Number(runNumber),
+        runAttempt: Number(verifiedRun.run_attempt) !== Number(runAttempt),
         sha: String(verifiedRun.head_sha || "").toLowerCase() !== sha.toLowerCase(),
         active: verifiedRun.status !== "in_progress",
         // The workflow is still executing this always() step, so GitHub has
@@ -770,33 +768,26 @@ Deno.serve(async (req: Request) => {
         console.error("Run-status verification mismatch", JSON.stringify({ mismatch, runId, runNumber, sha, status, verified: { id: verifiedRun.id, run_number: verifiedRun.run_number, head_sha: verifiedRun.head_sha, status: verifiedRun.status, conclusion: verifiedRun.conclusion, workflow_id: verifiedRun.workflow_id } }));
         return json({ error: "Workflow status did not match GitHub", mismatch }, 403);
       }
-      const countResponse = await fetch("https://api.github.com/repos/Cryptic011/Watched-Tracker/actions/runs?per_page=1", {
-        headers: githubHeaders,
-        signal: AbortSignal.timeout(10000),
-      });
-      if (!countResponse.ok) {
-        console.error("Run-status count request failed", countResponse.status);
-        return json({ error: "Workflow run count could not be verified" }, 502);
-      }
-      const overallRunCount = Number((await countResponse.json()).total_count);
-      if (!Number.isSafeInteger(overallRunCount) || overallRunCount < 1) return json({ error: "Invalid GitHub workflow run count" }, 502);
-      const { data: account, error: accountError } = await db.from("watchlog_pin_accounts").select("id,email").ilike("email", "robert17041@icloud.com").maybeSingle();
+      const ownerEmail = normalizeEmail(Deno.env.get("WATCHLOG_OWNER_EMAIL") || "");
+      if (!ownerEmail) return json({ ok: true, delivered: 0, reason: "owner_account_not_configured" });
+      const { data: account, error: accountError } = await db.from("watchlog_pin_accounts").select("id,email").ilike("email", ownerEmail).maybeSingle();
       if (accountError) throw accountError;
-      if (!account || normalizeEmail(account.email) !== "robert17041@icloud.com") return json({ ok: true, delivered: 0, reason: "owner_account_not_found" });
+      if (!account || normalizeEmail(account.email) !== ownerEmail) return json({ ok: true, delivered: 0, reason: "owner_account_not_found" });
       const config = await readConfig(false);
       if (!config.vapid_public_key || !config.vapid_private_key) return json({ ok: true, delivered: 0, reason: "push_not_configured" });
       const { data: subscriptions, error: subscriptionError } = await db.from("watchlog_push_subscriptions").select("id,account_id,endpoint,p256dh,auth,expiration_time,time_zone,locale,enabled").eq("account_id", account.id).eq("enabled", true);
       if (subscriptionError) throw subscriptionError;
       const outcome = status === "success" ? "has passed" : status === "failure" ? "has failed" : status === "cancelled" ? "was cancelled" : status === "skipped" ? "was skipped" : status === "queued" ? "is queued" : "is in progress";
       const title = String(verifiedRun.head_commit?.message || verifiedRun.display_title || "Watch Logger Change").split("\n")[0].trim().slice(0, 120) || "Watch Logger Change";
-      const bodyText = `Run #${overallRunCount} (${sha.slice(0, 7)}) ${outcome}.`;
+      const detail = status === "failure" ? ` ${failureSummary || "Review the failed workflow check logs and rerun after fixing the issue."}` : "";
+      const bodyText = `Run #${runNumber}, attempt ${runAttempt} (${sha.slice(0, 7)}) ${outcome}.${detail}`.slice(0, 900);
       let delivered = 0, failed = 0;
       for (const row of (subscriptions || []) as PushRow[]) {
-        const eventKey = `workflow-status:${runId}:${sha}:${status}`;
+        const eventKey = `workflow-status:${runId}:${runAttempt}:${sha}:${status}`;
         const delivery = await claimDelivery(row, account.id, `workflow-run-${runId}`, eventKey, new Date().toISOString());
         if (!delivery) continue;
         try {
-          await sendPush(row, config, { title, body: bodyText, tag: `watchlog-change-${runId}`, data: { url: "./", workflowRunNumber: overallRunCount, sourceWorkflowRunNumber: runNumber, sha, status, commitUrl } });
+          await sendPush(row, config, { title, body: bodyText, tag: `watchlog-change-${runId}-${runAttempt}`, data: { url: "./", workflowRunNumber: runNumber, runAttempt, failureSummary, sha, status, commitUrl } });
           await finishDelivery(delivery, row);
           delivered++;
         } catch (pushError) {
@@ -889,19 +880,6 @@ Deno.serve(async (req: Request) => {
     }
 
     if (action === "private_history") {
-      const { data: account, error: accountError } = await db
-        .from("watchlog_pin_accounts")
-        .select("email")
-        .eq("id", session.accountId)
-        .single();
-      if (accountError) throw accountError;
-      const accountHash = await sha256(
-        `watchlog-notification-test:${normalizeEmail(account.email)}`,
-      );
-      if (!safeEqual(accountHash, PRIVATE_TEST_ACCOUNT_HASH)) {
-        return json({ error: "Reminder activity is not enabled for this account." }, 403);
-      }
-
       // Authorize the session's account before reading any activity. Never
       // accept an account ID from the request body or expose push credentials.
       const [deliveries, library, subscriptions] = await Promise.all([
@@ -928,7 +906,29 @@ Deno.serve(async (req: Request) => {
         }
       }
       upcoming.sort((a,b) => Date.parse(a.scheduled_for) - Date.parse(b.scheduled_for));
-      return json({ok: true, history, upcoming: upcoming.slice(0, 100), enabledDevices: subscriptions.data?.length || 0});
+      const suppressed = items.filter(item => item.hideFromWeeklyReleases === true).map(item => ({title:String(item.title||"Tracked title"),status:"suppressed",label:"Weekly Releases exclusion"}));
+      return json({ok: true, history, upcoming: upcoming.slice(0, 100), suppressed, enabledDevices: subscriptions.data?.length || 0});
+    }
+
+    if (action === "test_reminder") {
+      const endpoint = String(body.endpoint || "");
+      const requestId = String(body.requestId || "");
+      if (!/^https:\/\//.test(endpoint) || !/^[a-f0-9-]{36}$/i.test(requestId)) return json({ error: "Invalid reminder test request." }, 400);
+      const { data: row, error } = await db.from("watchlog_push_subscriptions").select("id,account_id,endpoint,p256dh,auth,expiration_time,time_zone,locale,enabled").eq("account_id", session.accountId).eq("endpoint", endpoint).eq("enabled", true).maybeSingle();
+      if (error) throw error;
+      if (!row) return json({ error: "Enable reminders on this device before sending a test." }, 409);
+      const config = await readConfig(false);
+      const eventKey = `test-reminder:${requestId}`;
+      const delivery = await claimDelivery(row as PushRow, session.accountId, "test-reminder", eventKey, new Date().toISOString());
+      if (!delivery) return json({ ok: true, duplicate: true, status: "already_sent" });
+      try {
+        await sendPush(row as PushRow, config, { title: "Watched Logger test", body: "Background reminders are connected on this device.", tag: `watchlog-test-${requestId}`, data: { url: "./", test: true } });
+        await finishDelivery(delivery, row as PushRow);
+        return json({ ok: true, status: "sent" });
+      } catch (error) {
+        await finishDelivery(delivery, row as PushRow, error);
+        throw error;
+      }
     }
 
     return json({ error: "Unknown action." }, 400);

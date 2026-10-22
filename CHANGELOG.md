@@ -250,7 +250,7 @@
 
 ### Repair run-status notification and Changelog numbering
 - Make the workflow-run test assert the exact source expressions without brittle regular-expression parsing.
-- Send out-of-app run-status notifications through the private reminder backend only to the account registered as robert17041@icloud.com; no in-app/public status broadcast is used.
+- Send out-of-app run-status notifications through the private reminder backend only to the recipient configured in the private function environment; no in-app/public status broadcast is used.
 - Require a strong WATCHLOG_DEPLOYMENT_NOTIFY_SECRET on both GitHub Actions and the Supabase Edge Function; include the workflow run number, commit and outcome in the notification.
 - Keep the release-note regression contract for showing the workflow run number beside each Changelog commit.
 - Correct the notification payload to use `runNumber` consistently and fix numeric validation so legitimate run numbers are accepted.

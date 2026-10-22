@@ -30,7 +30,7 @@ test("Metadata-only sync preserves remote ticks and merged progress follows both
   const combined=app.replayLocalChanges([base],[edited],[remote])[0];
   assert.deepEqual(copy(combined.watchedEpisodes),{1:[1,2,3,4,6]});
   assert.equal(combined.curEp,6);
-  assert.deepEqual(copy(app.replayLocalChanges([base],[edited],[])),[]);
+  assert.deepEqual(copy(app.replayLocalChanges([base],[edited],[])),[edited]);
 });
 
 test("Actual editor save keeps legacy ticks and stored UTC while updating progress",async()=>{

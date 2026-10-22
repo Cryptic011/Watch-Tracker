@@ -20,8 +20,8 @@
 .weekly-total{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:54px;min-height:54px;padding:7px;border-radius:16px;background:rgba(96,165,250,.12);color:var(--blue2);font-size:1.15rem;font-weight:850}
 .weekly-total small{font-size:.6rem;font-weight:700;letter-spacing:.02em}
 .release-week-list{padding:0 15px}
-.release-day{padding:15px 0 9px}
-.release-day+.release-day{border-top:1px solid var(--border)}
+.release-day{margin:9px 0;padding:12px 10px 9px;border:1px solid #ffffff0d;border-radius:17px;background:rgba(255,255,255,.018)}
+.release-day+.release-day{border-top:1px solid #ffffff0d}
 .release-day-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
 .release-day-heading>div{display:flex;align-items:baseline;gap:8px;min-width:0}
 .release-day-name{font-size:.9rem;font-weight:800}
@@ -31,11 +31,13 @@
 .release-card:active{background:rgba(96,165,250,.1);border-color:rgba(96,165,250,.5)}
 .release-time{align-self:start;display:flex;align-items:center;justify-content:center;min-height:30px;padding:5px 4px;border-radius:9px;background:#242d40;color:#9dc3ff;font-size:.72rem;font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
 .release-card-copy{display:flex;flex-direction:column;gap:3px;min-width:0}
+.release-state-badge{display:inline-flex;align-self:flex-start;align-items:center;min-height:20px;margin-top:3px;padding:3px 7px;border:1px solid #60a5fa3b;border-radius:999px;background:#1a2c46;color:#b9d7ff;font-size:.61rem;font-weight:850;line-height:1}.release-state-badge[data-release-state="today"]{border-color:#3b82f677;background:#244775;color:#d5e8ff}.release-state-badge[data-release-state="released"]{border-color:#34d39955;background:#14392f;color:#a7f3d0}.release-state-badge[data-release-state="excluded"]{border-color:#fbbf2455;background:#3a2e16;color:#fcd985}.excluded-release-row>div{display:grid;justify-items:start;gap:5px}
 .release-card-copy strong{font-size:.88rem;font-weight:800;line-height:1.25;overflow-wrap:anywhere}
 .release-episode{font-size:.75rem;color:#b5bdca;line-height:1.35}
 .release-platform{display:flex;align-items:center;gap:5px;min-width:0;margin-top:2px;color:var(--muted);font-size:.7rem;line-height:1.35;overflow-wrap:anywhere}
 .release-platform-dot{width:6px;height:6px;flex:0 0 6px;border-radius:50%;background:var(--blue2)}
 .release-chevron{justify-self:end;color:#778296;font-size:1.35rem;line-height:1}
+.release-day.is-today{margin:0 -7px;padding:14px 7px 9px;border-radius:15px;background:linear-gradient(90deg,rgba(96,165,250,.09),transparent 88%)}.today-marker{display:inline-flex;align-items:center;margin-left:7px;padding:3px 6px;border-radius:6px;background:#244775;color:#b9d7ff;font-size:.55rem;line-height:1;font-weight:900;letter-spacing:.08em;vertical-align:middle}.release-day.has-releases .release-day-count{color:var(--blue2)}
 .release-empty{padding:11px 2px 14px;color:var(--muted);font-size:.78rem}
 .release-tba{margin:0 15px 10px;border-top:1px solid var(--border)}
 .release-tba summary{display:flex;align-items:center;gap:8px;padding:14px 0;list-style:none;cursor:pointer;color:var(--text);font-size:.82rem;font-weight:750}

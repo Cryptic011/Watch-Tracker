@@ -12,6 +12,9 @@
     if(!backgroundReminderStatus)return;
     backgroundReminderStatus.textContent=message;
     backgroundReminderStatus.style.color=state==="error"?"#fca5a5":state==="ok"?"var(--green)":"var(--muted)";
+    const quick=document.getElementById("quick-reminder-status");
+    const quickLabel=quick?.querySelector?.("span");
+    if(quick&&quickLabel){const enabled=state==="ok"&&!/not enabled|off|unsupported|blocked/i.test(message),attention=state==="error";quick.dataset.state=attention?"attention":enabled?"ok":"idle";quickLabel.textContent=attention?"Reminder issue":enabled?"Reminders on":"Reminders off";}
   }
   function pushSupportError(){
     if(!("Notification" in window)||!("serviceWorker" in navigator)||!("PushManager" in window))return"Background notifications are not supported in this browser.";
@@ -140,6 +143,16 @@
     try{await removeBackgroundPush();}
     finally{disableBackgroundReminders.disabled=false;}
   };
+  document.getElementById("test-background-reminder")?.addEventListener("click",async event=>{
+    const button=event.currentTarget;button.disabled=true;
+    try{
+      if(currentUser&&cloudSessionToken){const saved=await persistLibrary(mediaItems,{precleaned:true});if(!saved)throw new Error("Sync your library before testing reminders.");}
+      const subscription=await currentPushSubscription();if(!subscription)throw new Error("Enable background reminders on this device first.");
+      const result=await reminderApi("test_reminder",{endpoint:subscription.endpoint,requestId:crypto.randomUUID()});
+      setBackgroundReminderStatus(result.duplicate?"Test reminder was already sent.":"Test reminder accepted by the push service.","ok");
+    }catch(error){setBackgroundReminderStatus(error.message||"Could not send a test reminder.","error");}
+    finally{button.disabled=false;}
+  });
 
   async function pinApi(action,payload={},token=cloudSessionToken,preparedBody="",externalSignal=null){
     const headers={"Content-Type":"application/json"};
