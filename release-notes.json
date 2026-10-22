@@ -64,28 +64,13 @@
     "number": 224
   },
   "__current": {
-    "title": "Episode tracking and title actions fixes",
+    "title": "Consolidated Settings and episode tracker fixes",
     "changes": [
-      "Update gallery styling and asset versions for the redesigned mobile detail layout.",
-      "Fix mobile release-card overflow so episode/date and platform metadata stay readable within the card.",
-      "Add a compact narrow-screen layout and bump the dashboard stylesheet cache version.",
-      "Replace the placeholder app icon with a custom SVG Watch Logger mark and register it in the web app manifest.",
-      "Make Upcoming show the inclusive rolling range from today through seven days later (October 22–29 for this release), and show only today through Sunday in This week; move earlier releases from that Monday–Sunday week into Prior Releases.",
-      "Keep Chicago Fire’s active Season 15 episode labels in Season 15 and do not surface a misleading Season 16 TBA entry while Season 15 is still airing.",
-      "Run the complete app and browser test suites before publishing; prevent overlapping deploys from cancelling one another; record the actual run number and attempt for every workflow attempt; and report the failed check plus recovery guidance.",
-      "Add a post-deploy health check. Run 281's Pages deployment and health check succeeded, but its owner-notification step failed with HTTP 401 because the deployed reminder endpoint required a GitHub verification token.",
-      "Make a notification-service outage a visible warning rather than falsely marking a successful deployment as failed; actual deployment and health-check failures still fail the workflow. Never forward the Actions token to the notification service.",
-      "Add reminder enabled/scheduled/sent/suppressed status, suppress reminders for Weekly Releases exclusions, deduplicate repeated and cross-device sends, provide a test-reminder action, and keep reminder delivery history.",
-      "Add conflict-aware sync, retain progress/watch/reminder settings during merges, support offline edits and reconnect, show Synced/Syncing/Needs attention, and add library export and merge-based restore with versioned backups.",
-      "Separate this week's broadcasts from upcoming releases; add Today, This week, and Upcoming filters; make excluded shows identifiable and easy to re-enable; consistently show episode, date, and release status; and disclose the local timezone.",
-      "Search alternate titles across the library, add recently watched and upcoming-release sorting, provide bulk watched/planned/hide/include/remove actions, and preserve filters when returning from an item.",
-      "Move Watch Statistics into Settings > Account & Sync and add a dedicated profile button that opens Account & Sync. Improve mobile poster framing, release badges, Today highlighting, and bulk-action access; use larger touch targets, keyboard focus cues, visible non-intrusive sync/reminder status, and reduced-motion support.",
-      "The production reminder function still needs the secure source update deployed before push notifications can resume; deployment is pending approval for its existing platform-JWT-disabled configuration.",
-      "Added expandable season rows and circular episode watched controls connected to saved progress.",
-      "Added a three-dot menu for edit, notes and confirmed delete with persistence rollback.",
-      "Added grouped Preferences navigation matching the requested settings layout.",
-      "Rows navigate to existing account, appearance, and reminder controls; unavailable services and destinations are explicitly identified as not configured.",
-      "Fix the three-dot title actions menu visibility; preserve expanded seasons after episode toggles; display saved episode-specific artwork when available, with a safe series-art fallback."
+      "Merged Settings into one page with working General, Release Reminders, and Account & Sync sections.",
+      "Removed placeholder options that do not exist as working features in this build.",
+      "Fixed the title actions menu and preserved expanded seasons after episode updates.",
+      "Use episode-specific artwork when available and an episode placeholder instead of the series poster.",
+      "Preserved the overall All workflows run sequence release-note entry."
     ]
   },
   "37f6c39e9d0355b1bde705cb3fcb3cda2533119f": {

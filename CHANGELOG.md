@@ -1,3 +1,10 @@
+## 2026-10-22 — Consolidated Settings and episode tracker fixes
+- Replaced duplicate Preferences shortcuts and separate controls with one Settings page containing only working General, Release Reminders, and Account & Sync sections.
+- Removed placeholder entries for App Icon, Your Services, backups, reviews, support and feedback that do not have working destinations in this build.
+- Fixed the title three-dot menu interaction and kept expanded seasons open after episode progress saves.
+- Use episode-specific artwork when available and episode-specific placeholders rather than reusing the series poster when unavailable.
+- Bumped gallery assets to version 28.
+
 ## 2026-10-22 — Episode tracker and title actions repair
 - Fix the three-dot title actions menu so its Edit, Notes, and Delete options can be shown and hidden reliably.
 - Preserve expanded season rows after marking an episode watched or unwatched instead of collapsing the season list.

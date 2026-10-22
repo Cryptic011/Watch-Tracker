@@ -86,3 +86,6 @@
 /* Keep the title-action menu truly hidden; .gallery-action-menu uses display:grid. */
 .gallery-action-menu.hidden{display:none!important}
 .gallery-episode-art img{display:block;width:100%;height:100%;object-fit:cover;border-radius:9px}
+
+/* Consolidated real Settings sections and episode-specific fallback artwork. */
+.settings-section{margin:0 0 24px}.settings-section>.section-label{margin:24px 0 12px}.preferences-heading{padding-top:8px}.gallery-episode-placeholder{display:grid;place-items:center;width:100%;height:100%;font-size:.85rem;font-weight:800;color:var(--muted);background:linear-gradient(135deg,var(--inner),var(--card))}.gallery-season[open] .gallery-season-episodes{display:block}.gallery-menu-button{position:relative;z-index:5;cursor:pointer;touch-action:manipulation}
