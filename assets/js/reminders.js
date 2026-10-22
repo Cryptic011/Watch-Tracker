@@ -232,6 +232,9 @@
   }
   async function refreshMaintenanceAdmin(){
     maintenanceAdminSection.classList.add("hidden");
+    maintenanceAdminSection.dataset.authorized="false";
+    $("maintenance-settings-button")?.classList.add("hidden");
+    if(document.querySelector('#settings-view [data-settings-panel="maintenance"]:not(.hidden)'))showSettingsMenu();
     if(!cloudSessionToken)return false;
     try{
       const result=await pinApi("maintenance_admin_status");
@@ -241,7 +244,8 @@
       publicMaintenance={enabled:result.maintenance===true,message:maintenanceMessage.value};
       renderLibraryMaintenance();
       maintenanceAdminStatus.textContent=result.maintenance?"Maintenance is ON. New logins are blocked.":"Maintenance is OFF. Logins are open.";
-      maintenanceAdminSection.classList.remove("hidden");
+      maintenanceAdminSection.dataset.authorized="true";
+      $("maintenance-settings-button")?.classList.remove("hidden");
       return true;
     }catch(error){
       if(error.status!==403)console.warn("Maintenance controls unavailable",error);

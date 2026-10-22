@@ -1,3 +1,11 @@
+## 2026-10-22 — Isolate owner maintenance controls
+- Moved Maintenance into its own Settings drill-in, visible only to authorized owners.
+- Styled its controls against the selected light/dark theme so the panel no longer blends into unrelated Settings pages.
+
+## 2026-10-22 — Refine Settings and Prior Releases visuals
+- Added distinct iOS-style color treatments for General, Release Reminders, Account & Sync, and Track Sync icons.
+- Reserved a narrower but readable metadata column for Prior Releases and adjusted it for small phones.
+
 ## 2026-10-22 — Use Bash explicitly for pipeline checks and match sync status
 - Fixed run #308's workflow-shell error: the Playwright container defaults to `sh`, but failure-reporting scripts use Bash's `PIPESTATUS`.
 - Explicitly selected Bash for both test steps and corrected the Track Sync completion assertion to match the rendered status text.

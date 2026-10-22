@@ -64,8 +64,12 @@
     "number": 224
   },
   "__current": {
-    "title": "Fix test shell and Track Sync status checks",
+    "title": "Separate owner Maintenance settings",
     "changes": [
+      "Moved owner-only Maintenance controls into their own Settings category and drill-in page.",
+      "Matched Maintenance controls and Settings surfaces to the selected light or dark colour theme.",
+      "Added distinct iOS-style colors to Settings category and Track Sync icons.",
+      "Adjusted Prior Releases columns for readable metadata at narrow phone widths.",
       "Fixed run #308's Bash PIPESTATUS failure by selecting Bash explicitly for test steps inside the Playwright container.",
       "Matched the Track Sync completion assertion to its rendered status label.",
       "Fixed run #307's Git dubious-ownership error by marking only the checked-out workspace safe before build metadata generation.",

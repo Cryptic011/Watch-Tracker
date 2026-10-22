@@ -171,8 +171,8 @@
   backgroundReminderStatus?.setAttribute("aria-live","polite");
   const notificationTestSettings=$("notification-test-settings"),notificationTestStatus=$("notification-test-status"),sendPlannedTest=$("send-planned-test");
   const maintenanceAdminSection=document.createElement("section");
-  maintenanceAdminSection.id="maintenance-admin-section";maintenanceAdminSection.className="maintenance-admin hidden";
-  maintenanceAdminSection.innerHTML='<div class="section-label">Maintenance</div><div class="profile-card"><div class="maintenance-toggle-row"><div class="maintenance-toggle-copy"><strong>Maintenance mode</strong><span>Blocks new logins and account creation</span></div><input id="maintenance-enabled" class="maintenance-switch" type="checkbox" aria-label="Enable maintenance mode" /></div><div class="form-group"><label for="maintenance-message">Login screen message</label><textarea id="maintenance-message" class="maintenance-message" maxlength="240"></textarea></div><button id="save-maintenance" class="btn btn-secondary btn-full" type="button">Save Maintenance Setting</button><div id="maintenance-admin-status" class="maintenance-admin-status" aria-live="polite"></div></div>';
+  maintenanceAdminSection.id="maintenance-admin-section";maintenanceAdminSection.className="settings-section settings-detail-panel maintenance-admin hidden";maintenanceAdminSection.dataset.settingsPanel="maintenance";maintenanceAdminSection.dataset.authorized="false";
+  maintenanceAdminSection.innerHTML='<button type="button" class="settings-back" data-settings-back>‹ <span>Settings</span></button><h3 class="section-label">Maintenance</h3><div class="profile-card"><div class="maintenance-toggle-row"><div class="maintenance-toggle-copy"><strong>Maintenance mode</strong><span>Blocks new logins and account creation</span></div><input id="maintenance-enabled" class="maintenance-switch" type="checkbox" aria-label="Enable maintenance mode" /></div><div class="form-group"><label for="maintenance-message">Login screen message</label><textarea id="maintenance-message" class="maintenance-message" maxlength="240"></textarea></div><button id="save-maintenance" class="btn btn-secondary btn-full" type="button">Save Maintenance Setting</button><div id="maintenance-admin-status" class="maintenance-admin-status" aria-live="polite"></div></div>';
   settingsView.appendChild(maintenanceAdminSection);
   const reminderActivitySection=document.getElementById("private-reminder-history");
   if(reminderActivitySection)settingsView.appendChild(reminderActivitySection);
@@ -501,6 +501,7 @@
     const panels=[...document.querySelectorAll("#settings-view [data-settings-panel]")];
     const selected=panels.find(panel=>panel.dataset.settingsPanel===category);
     if(!selected)return;
+    if(category==="maintenance"&&selected.dataset.authorized!=="true")return;
     menu?.classList.add("hidden");quick?.classList.add("hidden");heading?.classList.add("hidden");
     panels.forEach(panel=>panel.classList.toggle("hidden",panel!==selected));
     window.scrollTo?.({top:0,behavior:"auto"});

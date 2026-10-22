@@ -196,6 +196,11 @@ html,body{touch-action:manipulation}button,.btn,.pill-btn,.tab-btn,select{touch-
 .settings-category-row+.settings-category-row{border-top:1px solid #454548}
 .settings-category-icon{width:48px;height:48px;display:grid;place-items:center;border:1px solid #48484c;border-radius:14px;background:linear-gradient(145deg,#38383b,#111113);color:#fff;font-size:1.55rem;font-weight:700;box-shadow:0 2px 3px #0003}
 .settings-category-icon svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.settings-category-row[data-settings-open="general"] .settings-category-icon{background:linear-gradient(145deg,#65a9ff,#2467d8);border-color:#76b7ff;color:#fff}
+.settings-category-row[data-settings-open="reminders"] .settings-category-icon{background:linear-gradient(145deg,#ff8274,#d93548);border-color:#ff9588;color:#fff}
+.settings-category-row[data-settings-open="account"] .settings-category-icon{background:linear-gradient(145deg,#55d7ea,#1388b7);border-color:#6be3ef;color:#fff}
+.settings-category-row[data-settings-open="maintenance"] .settings-category-icon{background:linear-gradient(145deg,#ffca62,#d88518);border-color:#ffda83;color:#fff}
+.settings-quick-actions .settings-category-icon{background:linear-gradient(145deg,#63d78c,#168348);border-color:#78e69d;color:#fff}
 .settings-chevron{justify-self:end;color:#737378;font-size:2rem;line-height:1;font-weight:400}
 .settings-quick-actions{padding-top:0;padding-bottom:0}
 .settings-quick-actions .settings-category-row{min-height:78px}
@@ -210,4 +215,11 @@ html,body{touch-action:manipulation}button,.btn,.pill-btn,.tab-btn,select{touch-
 .settings-detail-panel .appearance-copy{border-top:1px solid #444}
 .settings-detail-panel .background-reminder-card{padding:14px 17px}
 .settings-detail-panel #account-sync-card .sync-box{padding:15px 0;border-color:#444}
+.maintenance-admin>.section-label{color:#d99a31}
+.maintenance-admin>.profile-card{background:var(--card);border-color:var(--border)}
+.maintenance-admin .maintenance-message{background:var(--inner);border-color:var(--border);color:var(--text)}
+.maintenance-admin .maintenance-admin-status{padding:8px 10px;border-radius:10px;background:var(--inner)}
+html[data-theme="light"] .settings-category-menu,html[data-theme="light"] .settings-quick-actions{background:#fff}
+html[data-theme="light"] .settings-category-row+.settings-category-row{border-color:#e1e5eb}
+html[data-theme="light"] .settings-detail-panel>.profile-card{background:#fff}
 @media(max-width:390px){.preferences-heading h2{font-size:2.2rem}.settings-category-menu,.settings-quick-actions{padding-left:14px;padding-right:14px}.settings-category-row{grid-template-columns:48px minmax(0,1fr) 18px;gap:11px}.settings-category-icon{width:44px;height:44px}}

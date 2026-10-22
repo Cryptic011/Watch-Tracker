@@ -23,11 +23,17 @@ test('Settings is consolidated into General, Release Reminders, and Account & Sy
 });
 
 test('Settings categories use scalable icons and Prior Releases reserves readable metadata width',()=>{
- const html=read('index.html'),dashboard=read('assets/js/dashboard.js'),css=read('assets/css/dashboard.css'),appCss=read('assets/css/app.css');
+ const html=read('index.html'),dashboard=read('assets/js/dashboard.js'),css=read('assets/css/dashboard.css'),appCss=read('assets/css/app.css'),core=read('assets/js/app-core.js');
  assert.match(html,/settings-category-icon[^>]*aria-hidden="true"><svg viewBox=/);
  assert.match(dashboard,/class="release-tba-item"[^>]*><strong>\$\{esc\(event\.item\.title\)\}<\/strong><span>\$\{esc\(event\.label\)/);
- assert.match(css,/\.prior-releases \.release-tba-item\{grid-template-columns:minmax\(0,1fr\) minmax\(145px,44%\)/);
+ assert.match(css,/\.prior-releases \.release-tba-item\{grid-template-columns:minmax\(0,1fr\) minmax\(145px,40%\)/);
  assert.match(appCss,/\.settings-category-icon svg\{width:24px;height:24px;fill:none;stroke:currentColor/);
+ assert.match(appCss,/\.settings-category-row\[data-settings-open="general"\] \.settings-category-icon\{background:linear-gradient/);
+ assert.match(css,/@media\(max-width:390px\)\{\.prior-releases \.release-tba-item\{grid-template-columns:minmax\(0,1fr\) minmax\(132px,42%\)/);
+ assert.match(html,/id="maintenance-settings-button"[^>]*data-settings-open="maintenance"/);
+ assert.match(core,/selected\.dataset\.authorized!=="true"/);
+ assert.match(core,/maintenanceAdminSection\.dataset\.settingsPanel="maintenance"/);
+ assert.match(read('assets/js/reminders.js'),/maintenanceAdminSection\.dataset\.authorized="true"[\s\S]*maintenance-settings-button/);
 });
 
 test('Floating Add button is only visible on the Library tab and only under its allowed filters',()=>{
