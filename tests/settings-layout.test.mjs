@@ -4,7 +4,7 @@ import fs from 'node:fs';
 const read=name=>fs.readFileSync(new URL('../'+name,import.meta.url),'utf8');
 
 test('Account & Sync belongs to Settings, never the Library view',()=>{
- const html=read('index.html');
+ const html=read('index.html').replaceAll('&amp;','&');
  const library=html.slice(html.indexOf('<div id="library-view"'),html.indexOf('<div id="settings-view"'));
  const settings=html.slice(html.indexOf('<div id="settings-view"'),html.indexOf('<section id="discovery-view"'));
  assert.doesNotMatch(library,/Account & Sync|id="profile-card"|id="sync-now"|id="logout-btn"/);
@@ -12,7 +12,7 @@ test('Account & Sync belongs to Settings, never the Library view',()=>{
 });
 
 test('Settings is consolidated into General, Release Reminders, and Account & Sync sections',()=>{
- const html=read('index.html'),core=read('assets/js/app-core.js');
+ const html=read('index.html').replaceAll('&amp;','&'),core=read('assets/js/app-core.js');
  const settings=html.slice(html.indexOf('<div id="settings-view"'),html.indexOf('<section id="discovery-view"'));
  const positions=['General','Release Reminders','Account & Sync'].map(label=>settings.indexOf(label));
  assert.ok(positions.every(p=>p>=0),'all static settings sections exist');

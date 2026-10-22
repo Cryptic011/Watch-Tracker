@@ -1,3 +1,7 @@
+## 2026-10-22 — Repair settings layout test entity handling
+- Fixed the regression test to compare decoded HTML text, so the valid `Account &amp; Sync` markup is correctly recognised as the visible “Account & Sync” label.
+- Kept the consolidated Settings sections and account controls unchanged.
+
 ## 2026-10-22 — PNG app icon compatibility
 - Added a real PNG app icon for iOS Home Screen, browser favicon, and installed-app manifest support.
 - Updated the Apple touch icon and favicon references with a cache-busting version so devices can pick up the PNG.

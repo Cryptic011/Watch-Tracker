@@ -64,10 +64,10 @@
     "number": 224
   },
   "__current": {
-    "title": "PNG app icon compatibility",
+    "title": "Repair settings layout test entity handling",
     "changes": [
-      "Converted the Watch Logger app icon artwork into a real PNG asset for improved iOS Home Screen and installed-app compatibility.",
-      "Updated Apple touch icon, favicon, and web app manifest references to use the PNG with cache busting."
+      "Fixed settings regression tests to decode HTML entities before checking visible labels.",
+      "Kept General, Release Reminders, and Account & Sync consolidated in the requested Settings page."
     ]
   },
   "37f6c39e9d0355b1bde705cb3fcb3cda2533119f": {
