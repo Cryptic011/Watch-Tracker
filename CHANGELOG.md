@@ -1,3 +1,6 @@
+## 2026-10-22 — Use Settings as the screen title
+- Renamed the Preferences heading and navigation accessibility label to Settings, including each category's back-to-Settings action.
+
 ## 2026-10-22 — iOS-style Preferences menu and settings drill-in
 - Replaced the flat settings screen with a rounded, grouped Preferences menu inspired by the supplied reference, adapted to Watch Logger's implemented features.
 - Added General, Release Reminders, and Account & Sync category rows that open their real settings panels, with a back-to-Preferences action.

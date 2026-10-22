@@ -64,12 +64,9 @@
     "number": 224
   },
   "__current": {
-    "title": "Build iOS-style Watch Logger Preferences navigation",
+    "title": "Rename Preferences heading to Settings",
     "changes": [
-      "Replaced the flat settings list with an iOS-style Preferences menu containing General, Release Reminders, Account & Sync, and a Track Sync shortcut.",
-      "Selecting a category opens its existing controls in a dedicated panel with a Preferences back action.",
-      "Track Sync invokes the existing Sync Now handler; unimplemented promotional, review, support, and app-icon settings are not shown.",
-      "Kept existing settings control IDs and refreshed the app stylesheet cache key."
+      "Renamed the Settings screen heading and category navigation labels from Preferences to Settings, including the back-to-Settings actions."
     ]
   },
   "37f6c39e9d0355b1bde705cb3fcb3cda2533119f": {
