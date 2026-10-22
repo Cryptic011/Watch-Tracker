@@ -64,11 +64,11 @@
     "number": 224
   },
   "__current": {
-    "title": "Repair title detail layout and three-dot menu",
+    "title": "Restyle Watch Logger Preferences",
     "changes": [
-      "Fixed mobile title-detail sizing so poster art and season cards render at readable dimensions.",
-      "Moved the three-dot Edit, Notes, and Delete menu into a fixed, reachable overlay near the header so it is not hidden below the long episode list.",
-      "Kept note editing and deletion connected to existing save/rollback handlers and bumped the gallery stylesheet cache key."
+      "Restyled Settings to follow the supplied iOS Preferences reference with a clear heading, gradient overview panel, rounded groups, and separators.",
+      "Kept the screen grounded in existing Watch Logger operations: appearance, release reminders, cloud sync, PIN change, and sign-out; no inactive placeholder rows added.",
+      "Preserved existing setting controls and handlers and refreshed the stylesheet cache version."
     ]
   },
   "37f6c39e9d0355b1bde705cb3fcb3cda2533119f": {

@@ -1,3 +1,8 @@
+## 2026-10-22 — Screenshot-inspired Watch Logger Preferences
+- Restyled the existing Settings screen with a bold Preferences heading, a restrained gradient overview card, rounded grouped panels, and subtle row dividers inspired by the reference screenshot.
+- Adapted the layout to Watch Logger's real operations only: appearance, background release reminders, account/cloud sync, PIN changes, and sign-out. No fake App Icon, review, support, or other placeholder destinations added.
+- Preserved existing control IDs and handlers, and bumped the app stylesheet cache version.
+
 ## 2026-10-22 — Repair title detail layout and three-dot menu
 - Corrected the mobile detail header and poster sizing, and restored readable season-card proportions.
 - Positioned the existing Edit, Notes, and Delete actions as a fixed menu near the three-dot button so it stays visible above the long episode list.

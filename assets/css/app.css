@@ -121,3 +121,35 @@ html,body{touch-action:manipulation}button,.btn,.pill-btn,.tab-btn,select{touch-
 
 /* Preferences layout inspired by the grouped settings reference */
 .preferences-heading{padding:18px 0 22px}.preferences-heading h2{margin:0;font-size:2rem;letter-spacing:-.04em}.preferences-heading p{margin:8px 0 0;color:var(--muted)}.preferences-group{margin:0 0 18px;padding:4px 16px;border-radius:24px;background:#292929}.preferences-row{display:flex;align-items:center;gap:14px;width:100%;min-height:74px;padding:12px 0;border:0;border-bottom:1px solid #444;background:transparent;color:var(--text);text-align:left;font:inherit;font-weight:650}.preferences-row:last-child{border-bottom:0}.preferences-icon{display:grid;place-items:center;flex:0 0 42px;width:42px;height:42px;border:1px solid #454545;border-radius:13px;background:linear-gradient(#343434,#151515);color:#fff;font-size:1.25rem;font-weight:850}.preferences-chevron{margin-left:auto;color:var(--muted);font-size:1.7rem}.preferences-highlight{outline:2px solid var(--blue2);outline-offset:4px;border-radius:14px;scroll-margin-top:20px}
+
+/* Screenshot-inspired Preferences styling, adapted to Watch Logger's live settings. */
+#settings-view{padding:0 0 calc(28px + env(safe-area-inset-bottom,0px));}
+.preferences-heading{padding:22px 2px 18px}
+.preferences-heading h2{font-size:clamp(2rem,8vw,2.5rem);line-height:1.05;letter-spacing:-.045em;font-weight:850;margin:0 0 10px}
+.preferences-heading p{font-size:.96rem;line-height:1.45;color:var(--muted);margin:0}
+.settings-welcome{position:relative;isolation:isolate;display:flex;flex-direction:column;gap:7px;padding:20px 18px;margin:0 0 28px;border-radius:25px;background:linear-gradient(var(--card),var(--card)) padding-box,linear-gradient(115deg,#d946ef,#3b82f6,#f43f5e) border-box;border:2px solid transparent;box-shadow:0 10px 26px #0002}
+.settings-welcome strong{font-size:1.12rem;font-weight:850}
+.settings-welcome span{font-size:.9rem;line-height:1.45;color:var(--text)}
+.settings-section{margin:0 0 24px}
+.settings-section>.section-label{font-size:.82rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:800;margin:0 0 10px 5px}
+.settings-section>.profile-card{border:0;border-radius:25px;background:var(--card);padding:18px;gap:0;box-shadow:0 3px 14px #0001}
+.settings-section .appearance-card .form-group{display:grid;grid-template-columns:minmax(0,1fr) minmax(125px,42%);align-items:center;gap:14px;margin:0}
+.settings-section .appearance-card .form-group label{font-size:1rem;font-weight:700}
+.settings-section .appearance-card select{width:100%;min-height:44px;border:1px solid var(--border);border-radius:12px;padding:0 12px;background:var(--inner);color:var(--text);font:inherit}
+.settings-section .appearance-copy{margin-top:14px;padding-top:14px;border-top:1px solid var(--border);font-size:.82rem;line-height:1.5;color:var(--muted)}
+.settings-section .background-reminder-card{gap:13px}
+.settings-section .reminder-test-title{font-size:1rem;font-weight:800;line-height:1.4}
+.settings-section .notification-status{padding:10px 12px;border-radius:12px;background:var(--inner);font-size:.86rem;line-height:1.45}
+.settings-section .notification-rule{display:flex;align-items:flex-start;gap:10px;padding:11px 0;border-bottom:1px solid var(--border);font-size:.86rem;line-height:1.45}
+.settings-section .notification-rule:last-of-type{border-bottom:0}
+.settings-section .notification-rule-dot{flex:0 0 9px;width:9px;height:9px;margin-top:6px;border-radius:50%;background:var(--blue2)}
+.settings-section .notification-actions{display:grid;gap:10px;margin-top:8px}
+.settings-section #account-sync-card{gap:0}
+.settings-section #account-sync-card>.profile-header{padding:2px 0 18px;border-bottom:1px solid var(--border);margin-bottom:16px}
+.settings-section #account-sync-card .sync-box{background:transparent;border:0;border-radius:0;padding:14px 0;border-bottom:1px solid var(--border);gap:10px}
+.settings-section #account-sync-card .sync-box:last-of-type{border-bottom:0}
+.settings-section #account-sync-card .sync-title{font-size:.96rem}
+.settings-section #account-sync-card .sync-text,.settings-section #account-sync-card .small-note{font-size:.82rem;line-height:1.5}
+.settings-section #account-sync-card .form-group{margin:4px 0}
+.settings-section #logout-btn{margin-top:14px}
+@media(max-width:380px){.settings-welcome{padding:17px 15px}.settings-section>.profile-card{padding:15px}.settings-section .appearance-card .form-group{grid-template-columns:minmax(0,1fr) minmax(112px,44%);gap:8px}}
