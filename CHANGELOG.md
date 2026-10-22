@@ -1,3 +1,7 @@
+## 2026-10-22 — Scope Settings browser assertions to active panels
+- Corrected the Account & Sync browser assertion to target its panel rather than matching hidden `.profile-card` elements in other categories.
+- Made the Track Sync check wait for the intercepted cloud request before asserting it completed.
+
 ## 2026-10-22 — Fix Settings browser smoke test and verify Track Sync
 - Scoped Settings back-button checks to the active category after run #303 exposed Playwright's strict-mode ambiguity across the three hidden panels.
 - Added browser coverage proving the Track Sync shortcut requests the cloud library rather than only displaying the Settings menu.

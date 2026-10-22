@@ -64,8 +64,10 @@
     "number": 224
   },
   "__current": {
-    "title": "Fix Settings browser checks and verify Track Sync",
+    "title": "Scope Settings browser assertions and verify Track Sync",
     "changes": [
+      "Scoped Account & Sync browser assertions to its active panel after run #304 exposed a hidden-panel selector ambiguity.",
+      "Wait for the Track Sync cloud request before asserting shortcut behavior.",
       "Fixed the run #303 mobile browser test by targeting the Settings back button within its active category panel.",
       "Verified the Track Sync shortcut performs a cloud library load in the mobile browser test.",
       "Increased GitHub Actions job limits from 10 to 30 minutes after runs #302 attempts 1 and 2 timed out while Ubuntu downloaded Playwright's 142 MB system dependency set.",
