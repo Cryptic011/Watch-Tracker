@@ -64,8 +64,9 @@
     "number": 224
   },
   "__current": {
-    "title": "Add a permanent Monday–Sunday recurring schedule",
+    "title": "Show recurring weekly shows in a Library-home dropdown",
     "changes": [
+      "Move Recurring weekly shows to a collapsed dropdown at the top of Library home, with keyboard-accessible expansion and preserved open state during updates.",
       "Add Recurring weekly shows as a separate Monday–Sunday section unaffected by Library filters, search, sorting, or the release-calendar range.",
       "Keep each show listed, hold its aired episode for 24 hours, then advance to the next confirmed episode; retain Next episode TBA when no date is announced.",
       "Save verified recurring patterns across edits, metadata refreshes and reloads, respecting explicit Weekly Releases exclusions and showing device-local dates.",

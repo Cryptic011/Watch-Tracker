@@ -130,15 +130,15 @@ function renderRecurringWeeklySchedule(){
   clearTimeout(recurringWeeklyTimer);recurringWeeklyTimer=null;
   let root=document.getElementById("recurring-weekly-dashboard");
   if(!root){
-    const calendar=document.getElementById("library-dashboard");if(!calendar)return;
-    root=document.createElement("div");root.id="recurring-weekly-dashboard";calendar.after(root);
+    const library=document.getElementById("library-view");if(!library)return;
+    root=document.createElement("div");root.id="recurring-weekly-dashboard";library.prepend(root);
     root.addEventListener("click",event=>{
       const button=event.target.closest("[data-recurring-open]");if(button)openMediaRow(button.dataset.recurringOpen);
     });
   }
-  const visible=Boolean(currentUser&&currentTab==="library");
+  const visible=Boolean(currentUser&&currentTab==="library"&&!categoryControlsVisible());
   root.classList.toggle("hidden",!visible);
-  if(!visible){root.replaceChildren();root._dashboardMarkup=null;return;}
+  if(!visible){if(!currentUser){root.replaceChildren();root._dashboardMarkup=null;}return;}
   const now=new Date(),rows=recurringWeeklyShows(mediaItems,now),total=new Set(rows.map(row=>String(row.item.id))).size;
   const days=Array.from({length:7},(_,index)=>{
     const day=(index+1)%7,label=new Date(2026,0,5+index).toLocaleDateString(USER_LOCALE,{weekday:"long"}),shows=rows.filter(row=>row.day===day);
@@ -149,7 +149,7 @@ function renderRecurringWeeklySchedule(){
       return `<button type="button" class="release-card recurring-release-card" data-recurring-open="${esc(row.item.id)}"><span class="release-time">${esc(time)}</span><span class="release-card-copy"><strong>${esc(row.item.title)}</strong><span class="release-episode">${esc(episode)} · ${esc(date)}</span><span class="release-state-badge" data-release-state="${row.state}">${row.state==="released"?"Released · last 24 hours":row.state==="upcoming"?"Upcoming":"Awaiting next episode"}</span><span class="release-platform">${esc(row.item.platform||"Platform not saved")}</span></span><span class="release-chevron" aria-hidden="true">›</span></button>`;
     }).join(""):'<p class="release-empty">No recurring shows</p>'}</section>`;
   }).join("");
-  updateDashboardMarkup(root,`<section class="dashboard-section weekly-releases recurring-weekly-releases" aria-labelledby="recurring-weekly-title"><header class="weekly-releases-heading"><div><span class="weekly-eyebrow">MONDAY–SUNDAY</span><h2 id="recurring-weekly-title">Recurring weekly shows</h2><p class="dashboard-note">Independent of Library filters · device timezone (${esc(DEVICE_TIME_ZONE||Intl.DateTimeFormat().resolvedOptions().timeZone||"UTC")})</p></div><span class="weekly-total">${total}<small>shows</small></span></header><div class="release-week-list">${days}</div><p class="weekly-footnote">Shows stay listed. Episodes remain for 24 hours after airing, then advance to the next confirmed episode. Unannounced dates stay TBA; no dates or episode numbers are guessed.</p></section>`);
+  updateDashboardMarkup(root,`<details class="dashboard-section weekly-releases recurring-weekly-releases" data-dashboard-section="recurring" aria-labelledby="recurring-weekly-title"><summary class="weekly-releases-heading"><div class="recurring-summary-copy"><span class="weekly-eyebrow">MONDAY–SUNDAY</span><h2 id="recurring-weekly-title">Recurring weekly shows</h2><p class="dashboard-note">Tap to expand · device timezone (${esc(DEVICE_TIME_ZONE||Intl.DateTimeFormat().resolvedOptions().timeZone||"UTC")})</p></div><span class="weekly-total">${total}<small>shows</small></span><span class="recurring-dropdown-chevron" aria-hidden="true">⌄</span></summary><div class="release-week-list">${days}</div><p class="weekly-footnote">Shows stay listed. Episodes remain for 24 hours after airing, then advance to the next confirmed episode. Unannounced dates stay TBA; no dates or episode numbers are guessed.</p></details>`);
   if(document.visibilityState==="visible"){
     const deadlines=rows.filter(row=>row.date).map(row=>row.date.getTime()+86400000-now.getTime()).filter(delay=>delay>0);
     recurringWeeklyTimer=setTimeout(renderRecurringWeeklySchedule,Math.max(1,Math.min(60000,...deadlines)));

@@ -331,6 +331,11 @@ const server=http.createServer((req,res)=>{
   });
   const recurring=page.locator('#recurring-weekly-dashboard');
   assert.equal(await recurring.isVisible(),true);
+  assert.equal(await recurring.evaluate(root=>root.parentElement.id==='library-view'&&!root.previousElementSibling),true,'dropdown is first on Library home');
+  assert.equal(await recurring.locator('details').getAttribute('open'),null,'schedule starts collapsed');
+  assert.equal(await recurring.locator('[data-recurring-open="show"]').isVisible(),false);
+  await recurring.locator('summary').focus();await page.keyboard.press('Enter');
+  assert.equal(await recurring.locator('[data-recurring-open="show"]').isVisible(),true,'schedule supports keyboard expansion');
   assert.deepEqual(await recurring.locator('[data-recurring-day]').evaluateAll(nodes=>nodes.map(node=>Number(node.dataset.recurringDay))),[1,2,3,4,5,6,0]);
   assert.equal(await recurring.locator('[data-recurring-open="show"]').count(),1);
   assert.match(await recurring.textContent(),/S2 E2/);
@@ -342,12 +347,19 @@ const server=http.createServer((req,res)=>{
   await page.locator('#sort-mode').selectOption('platform');
   await page.locator('#search-input').fill('No matching title at all');
   await page.waitForFunction(()=>searchQuery==='No matching title at all'&&document.querySelector('.gallery-empty'));
-  assert.equal(await recurring.isVisible(),true);
+  assert.equal(await recurring.isVisible(),false,'dropdown is only shown on Library home');
   assert.equal(await recurring.textContent(),scheduleText,'Library status, search and sorting cannot remove recurring shows');
   await page.locator('#search-input').fill('');
   await page.waitForFunction(()=>searchQuery==='');
   await page.locator('[data-filter="All"]').click();await page.locator('#sort-mode').selectOption('current');
   await page.locator('[data-gallery-back]').click();
+  assert.equal(await recurring.isVisible(),true);
+  assert.equal(await recurring.locator('[data-recurring-open="show"]').isVisible(),true,'returning home preserves the expanded dropdown');
+  await page.evaluate(()=>{const item=mediaItems.find(row=>row.id==='show');item.platform+=' test';render();item.platform=item.platform.slice(0,-5);render();});
+  assert.equal(await recurring.locator('[data-recurring-open="show"]').isVisible(),true,'schedule updates preserve expansion');
+  await recurring.locator('summary').click();
+  assert.equal(await recurring.locator('[data-recurring-open="show"]').isVisible(),false);
+  await recurring.locator('summary').click();
   for(const width of [320,390,768]){
    await page.setViewportSize({width,height:844});
    assert.equal(await recurring.evaluate(root=>root.scrollWidth<=root.clientWidth),true,'recurring schedule fits the viewport');
@@ -367,6 +379,7 @@ const server=http.createServer((req,res)=>{
   await page.waitForFunction(id=>mediaItems.find(item=>item.id===id)?.platform==='Saved before refresh',refreshItemId,{timeout:10000});
   assert.equal(items.find(item=>item.id===refreshItemId)?.platform,'Saved before refresh');
   assert.equal(await page.locator('#recurring-weekly-dashboard [data-recurring-open="show"]').count(),1,'recurring membership survives reload');
+  assert.equal(await page.locator('#recurring-weekly-dashboard details').getAttribute('open'),null,'reload starts with a compact dropdown');
   assert.ok(loads>before);
   // A failed cloud save must leave the current page and edit intact.
   phase='failed save';

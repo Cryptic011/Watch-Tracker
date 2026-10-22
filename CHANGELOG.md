@@ -1,3 +1,8 @@
+## 2026-10-23 — Move recurring shows into a Library-home dropdown
+- Put Recurring weekly shows at the top of Library home, collapsed by default with an accessible expand/collapse control.
+- Hide the dropdown inside Series and Movies lists, preserving its expanded state when returning home and during schedule updates.
+- Retain the full Monday–Sunday schedule, saved membership, and 24-hour episode rollover.
+
 ## 2026-10-23 — Add a permanent Monday–Sunday recurring schedule
 - Add Recurring weekly shows as its own section, independent of Library search, status filters, sorting, and calendar ranges.
 - Always show Monday through Sunday in device-local time, retaining each recurring show between episodes.
