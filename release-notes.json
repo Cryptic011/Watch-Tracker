@@ -64,10 +64,8 @@
     "number": 224
   },
   "__current": {
-    "title": "Redesign title details and episode tracking",
+    "title": "Season rows and title action menu",
     "changes": [
-      "Add expandable season rows and circular per-episode watched controls with available episode titles and dates.",
-      "Add a three-dot title menu for editing, notes, and deletion; persist notes safely and roll back failed saves/deletes.",
       "Update gallery styling and asset versions for the redesigned mobile detail layout.",
       "Fix mobile release-card overflow so episode/date and platform metadata stay readable within the card.",
       "Add a compact narrow-screen layout and bump the dashboard stylesheet cache version.",
@@ -82,7 +80,9 @@
       "Separate this week's broadcasts from upcoming releases; add Today, This week, and Upcoming filters; make excluded shows identifiable and easy to re-enable; consistently show episode, date, and release status; and disclose the local timezone.",
       "Search alternate titles across the library, add recently watched and upcoming-release sorting, provide bulk watched/planned/hide/include/remove actions, and preserve filters when returning from an item.",
       "Move Watch Statistics into Settings > Account & Sync and add a dedicated profile button that opens Account & Sync. Improve mobile poster framing, release badges, Today highlighting, and bulk-action access; use larger touch targets, keyboard focus cues, visible non-intrusive sync/reminder status, and reduced-motion support.",
-      "The production reminder function still needs the secure source update deployed before push notifications can resume; deployment is pending approval for its existing platform-JWT-disabled configuration."
+      "The production reminder function still needs the secure source update deployed before push notifications can resume; deployment is pending approval for its existing platform-JWT-disabled configuration.",
+      "Added expandable season rows and circular episode watched controls connected to saved progress.",
+      "Added a three-dot menu for edit, notes and confirmed delete with persistence rollback."
     ]
   },
   "37f6c39e9d0355b1bde705cb3fcb3cda2533119f": {

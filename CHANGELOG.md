@@ -1,5 +1,12 @@
 ## 2026-10-22
 
+### Season rows and title action menu
+- Replace the episode-tracker shortcut with expandable season rows and circular watched toggles for each released episode.
+- Add a three-dot title menu for editing, notes, and confirmed deletion; notes and deletion use existing persistence with rollback if saving fails.
+- Refresh gallery cache versions so the redesigned tracker loads on mobile clients.
+
+## 2026-10-22
+
 ### Redesign title details and season/episode tracking
 - Expandable season rows reveal individual released episodes with episode artwork, titles, release dates, and circular watched toggles.
 - Season rows display poster artwork and a completion indicator; episode toggles use the existing save-and-undo progress flow.
