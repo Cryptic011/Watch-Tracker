@@ -103,9 +103,10 @@
     }
     return total;
   }
-  function applyEpisodeToggle(item,season,episode,markWatched,event){
+  function applyEpisodeToggle(item,season,episode,markWatched,event,includeEarlier=true){
     const releases=releasedEpisodeMap(item),counts=releasedEpisodeCounts(item),map=watchedEpisodeMap(item,releases),episodes=new Set(map[season]||[]);
-    if(markWatched)episodes.add(episode);else episodes.delete(episode);
+    if(!releases[season]?.includes(episode))return item;
+    if(markWatched){for(const number of releases[season])if(number===episode||(includeEarlier&&number<episode))episodes.add(number);}else episodes.delete(episode);
     if(episodes.size)map[season]=[...episodes].sort((a,b)=>a-b);else delete map[season];
     const watchedEpisodes=normalizeWatchedEpisodeMap(map,releases),highest=highestWatchedEpisode(watchedEpisodes);
     let curSeason=Math.max(0,Number(item.curSeason||0)),curEp=Math.max(0,Number(item.curEp||0));
@@ -123,14 +124,17 @@
     };
     return updated;
   }
-  async function toggleEpisodeWatched(id,season,episode,{offerUndo=true}={}){
+  async function toggleEpisodeWatched(id,season,episode,{offerUndo=true,restoreSeasonEpisodes=null}={}){
     const key=String(id);if(episodeLogBusy.has(key))return;
     const index=mediaItems.findIndex(item=>String(item.id)===key),item=mediaItems[index];if(index<0||!item)return;
     const releases=releasedEpisodeMap(item),available=releases[season]||[];if(!available.includes(episode))return;
     const wasWatched=(watchedEpisodeMap(item,releases)[season]||[]).includes(episode),markWatched=!wasWatched,event={id:uuid(),kind:markWatched?"mark":"unmark",season,episode,watchedAt:nowISO()};
     const generation=persistenceGeneration;
     const original=item;episodeLogBusy.add(key);episodeLogFeedback={itemId:key,eventId:event.id,season,episode,label:`Saving S${season} E${episode}…`,saving:true};
-    mediaItems[index]=applyEpisodeToggle(item,season,episode,markWatched,event);render();
+    mediaItems[index]=Array.isArray(restoreSeasonEpisodes)?available.reduce((current,number)=>{
+      const restoreWatched=restoreSeasonEpisodes.includes(number),isWatched=(watchedEpisodeMap(item,releases)[season]||[]).includes(number);
+      return restoreWatched===isWatched?current:applyEpisodeToggle(current,season,number,restoreWatched,{...event,id:uuid(),episode:number,kind:restoreWatched?"mark":"unmark"},false);
+    },item):applyEpisodeToggle(item,season,episode,markWatched,event);render();
     let saved=false;
     try{
       await persistLibrary(mediaItems,{background:true,precleaned:true});
@@ -143,13 +147,13 @@
       if(saved&&offerUndo)showAppToast(markWatched?`S${season} E${episode} watched`:`S${season} E${episode} unwatched`,"success",6000,async()=>{
         if(generation!==persistenceGeneration)return;
         const current=mediaItems.find(row=>String(row.id)===key);
-        const latest=current?.episodeHistory?.filter(row=>row.season===season&&row.episode===episode).at(-1);
+        const latest=current?.episodeHistory?.filter(row=>row.season===season).at(-1);
         if(!current||latest?.id!==event.id){showAppToast("This episode has changed since. Open it to update its progress.","warn");return;}
-        await toggleEpisodeWatched(id,season,episode,{offerUndo:false});
-        showAppToast("Episode change undone.");
+        if(await toggleEpisodeWatched(id,season,episode,{offerUndo:false,restoreSeasonEpisodes:watchedEpisodeMap(original,releases)[season]||[]}))showAppToast("Episode change undone.");
       });
       if(saved)setTimeout(()=>{if(episodeLogFeedback?.eventId===event.id){episodeLogFeedback=null;render();}},1500);
     }
+    return saved;
   }
   async function toggleSeasonWatched(id,season){
     const key=String(id);if(episodeLogBusy.has(key))return;

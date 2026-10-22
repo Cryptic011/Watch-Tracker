@@ -227,6 +227,38 @@ test("Only explicitly released episode numbers are trackable", () => {
   assert.deepEqual(JSON.parse(JSON.stringify(api.progressWatchedEpisodeMap(api.releasedEpisodeMap(item),0,1,3))),{1:[1,3]});
 });
 
+const episodeToggleFunctions=["isEpisodeTrackable","positiveEpisodeMap","toMillis","normalizeReleasedEpisodeMap","releasedEpisodeMap","releasedEpisodeCounts","normalizeWatchedEpisodeMap","legacyWatchedEpisodeMap","watchedEpisodeMap","highestWatchedEpisode","fullyWatchedSeasonCount","applyEpisodeToggle"];
+
+test("Marking any episode includes earlier released episodes in that season only", () => {
+  const api=loadFunctions(episodeToggleFunctions,'function localISODate(){return "2026-10-22";}');
+  const released=Array.from({length:20},(_,index)=>index+1);
+  for(const type of ["Series","Anime"])for(const season of [1,2,9])for(const episode of [1,3,15,20]){
+    const item={type,status:"Planned",episodeScheduleVerified:true,releasedEpisodes:{1:released,2:released,9:released},episodeCounts:{1:20,2:20,9:20},watchedEpisodes:{1:[20],2:[20],9:[20]}};
+    const result=api.applyEpisodeToggle(item,season,episode,true,{id:"mark",kind:"mark",season,episode,watchedAt:"2026-10-22T12:00:00Z"});
+    for(const number of [1,2,9])assert.deepEqual(JSON.parse(JSON.stringify(result.watchedEpisodes[number])),number===season?[...new Set([...released.filter(value=>value<=episode),20])]:[20]);
+    assert.deepEqual(item.watchedEpisodes,{1:[20],2:[20],9:[20]},"original watch map is not mutated");
+    assert.equal(result.status,"Watching");
+  }
+});
+
+test("Episode catch-up skips unreleased numbers and rejects unavailable targets", () => {
+  const api=loadFunctions(episodeToggleFunctions,'function localISODate(){return "2026-10-22";}');
+  const item={type:"Series",status:"Watching",episodeScheduleVerified:true,releasedEpisodes:{4:[1,3,5,6],5:[1,2]},watchedEpisodes:{5:[2]}};
+  const result=api.applyEpisodeToggle(item,4,5,true,{kind:"mark",watchedAt:"2026-10-22T12:00:00Z"});
+  assert.deepEqual(JSON.parse(JSON.stringify(result.watchedEpisodes)),{4:[1,3,5],5:[2]});
+  assert.equal(result.curSeason,4);assert.equal(result.curEp,5);
+  assert.equal(api.applyEpisodeToggle(item,4,7,true,{}),item);
+});
+
+test("Unmarking remains individual and Undo can restore a watched episode without filling gaps", () => {
+  const api=loadFunctions(episodeToggleFunctions,'function localISODate(){return "2026-10-22";}');
+  const item={type:"Series",status:"Watching",episodeScheduleVerified:true,releasedEpisodes:{3:[1,2,3,4],4:[1]},watchedEpisodes:{3:[1,2,3],4:[1]}};
+  const unmarked=api.applyEpisodeToggle(item,3,2,false,{kind:"unmark",watchedAt:"2026-10-22T12:00:00Z"});
+  assert.deepEqual(JSON.parse(JSON.stringify(unmarked.watchedEpisodes)),{3:[1,3],4:[1]});
+  const restored=api.applyEpisodeToggle({...item,watchedEpisodes:{}},3,3,true,{kind:"mark",watchedAt:"2026-10-22T12:00:00Z"},false);
+  assert.deepEqual(JSON.parse(JSON.stringify(restored.watchedEpisodes)),{3:[3]});
+});
+
 test("Schedule analysis records released episode identities instead of filling gaps", () => {
   const api=loadFunctions(["episodeAirTime","analyzeTVSchedule"]);
   const episodes=[

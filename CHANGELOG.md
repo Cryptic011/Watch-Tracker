@@ -1,3 +1,9 @@
+## 2026-10-22 — Mark earlier episodes watched within the selected season
+- Marking any released episode watched also marks earlier released episodes in that season, for every series and anime season.
+- Leave other seasons and later episodes unchanged, preserve existing watched progress, and keep unreleased episodes excluded.
+- Keep unmarking individual; Undo restores the exact previous season selection, including any gaps, without overwriting newer changes in that season.
+- Cover different season and episode numbers, missing release numbers, persistence, and Undo in automated and browser tests.
+
 ## 2026-10-22 — Keep title management beside the total tracked count
 - Replace the floating title-management toolbar with one stationary pencil beside the total Series or Movies count, not individual release-list counts.
 - Keep the total and management list scoped to all tracked titles in that category, even when a search or status filter hides some titles.
