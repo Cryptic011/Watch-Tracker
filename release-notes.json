@@ -64,11 +64,11 @@
     "number": 224
   },
   "__current": {
-    "title": "Fix double-tap zoom rollout and release notes checks",
+    "title": "Repair title detail layout and three-dot menu",
     "changes": [
-      "Disable double-tap-to-zoom across the app with touch-action: manipulation while retaining pinch-to-zoom and normal panning; bump the stylesheet cache key so devices fetch the updated rule.",
-      "Ensure the release notes document the actual run number and attempt.",
-      "Keep the existing library export and merge-based restore release-note coverage."
+      "Fixed mobile title-detail sizing so poster art and season cards render at readable dimensions.",
+      "Moved the three-dot Edit, Notes, and Delete menu into a fixed, reachable overlay near the header so it is not hidden below the long episode list.",
+      "Kept note editing and deletion connected to existing save/rollback handlers and bumped the gallery stylesheet cache key."
     ]
   },
   "37f6c39e9d0355b1bde705cb3fcb3cda2533119f": {

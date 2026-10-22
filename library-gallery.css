@@ -89,3 +89,31 @@
 
 /* Consolidated real Settings sections and episode-specific fallback artwork. */
 .settings-section{margin:0 0 24px}.settings-section>.section-label{margin:24px 0 12px}.preferences-heading{padding-top:8px}.gallery-episode-placeholder{display:grid;place-items:center;width:100%;height:100%;font-size:.85rem;font-weight:800;color:var(--muted);background:linear-gradient(135deg,var(--inner),var(--card))}.gallery-season[open] .gallery-season-episodes{display:block}.gallery-menu-button{position:relative;z-index:5;cursor:pointer;touch-action:manipulation}
+
+/* Mobile title detail layout and reachable title actions. */
+.gallery-detail-header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:calc(env(safe-area-inset-top) + 12px) 16px 12px}
+.gallery-detail-header h2{flex:1;min-width:0;text-align:left;font-size:1rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gallery-detail-header-actions{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.gallery-detail-header .gallery-menu-button,.gallery-detail-header .gallery-back{display:grid;place-items:center;flex:0 0 44px;width:44px;height:44px;border-radius:50%;background:#202020;border:1px solid #ffffff24;color:#fff;cursor:pointer}
+.gallery-detail-body>.gallery-art{display:block;width:min(58vw,250px);height:auto;max-height:340px;aspect-ratio:2/3;object-fit:cover;margin:0 auto;padding:0;border-radius:18px;border:1px solid #ffffff28;overflow:hidden}
+.gallery-detail-body>.gallery-art img{display:block;width:100%;height:100%;object-fit:cover;border-radius:inherit}
+.gallery-detail-copy{padding:20px 18px}
+.gallery-detail-copy strong{margin:0 0 6px}
+.gallery-detail-copy{line-height:1.55;overflow-wrap:anywhere}
+.gallery-detail-copy br{display:block;content:"";margin:5px 0}
+.gallery-season-list{padding:0 0 12px;margin:12px 0}
+.gallery-season-list>h3{padding:0 18px;font-size:1.35rem;margin:20px 0}
+.gallery-season{margin:0 0 14px;border-radius:22px}
+.gallery-season>summary{min-height:120px;gap:14px;padding:12px 14px}
+.gallery-season-poster{flex:0 0 94px;width:94px;height:130px}
+.gallery-season-poster .gallery-art{width:100%;height:100%;padding:0}
+.gallery-season-poster .gallery-art img{width:100%;height:100%;object-fit:cover}
+.gallery-action-menu{position:fixed;z-index:200;top:calc(env(safe-area-inset-top) + 72px);right:12px;width:min(260px,calc(100vw - 24px));margin:0;padding:7px;border:1px solid #ffffff24;border-radius:18px;background:#262626;box-shadow:0 18px 60px #000b}
+.gallery-action-menu button{min-height:48px;padding:12px;border-radius:10px;color:#fff}
+.gallery-action-menu .danger{color:#ff7777}
+.gallery-action-menu.hidden{display:none!important}
+.gallery-detail-body>.gallery-notes{display:block;margin:0 18px;width:calc(100% - 36px)}
+.gallery-detail-body>.gallery-notes.hidden{display:none!important}
+.gallery-detail-body>[data-gallery-save-notes]{display:block;width:calc(100% - 36px);margin:10px 18px 24px}
+.gallery-detail-body>[data-gallery-save-notes].hidden{display:none!important}
+@media(max-width:380px){.gallery-season-poster{flex-basis:76px;width:76px;height:100px}.gallery-season>summary{min-height:96px}}

@@ -1,3 +1,8 @@
+## 2026-10-22 — Repair title detail layout and three-dot menu
+- Corrected the mobile detail header and poster sizing, and restored readable season-card proportions.
+- Positioned the existing Edit, Notes, and Delete actions as a fixed menu near the three-dot button so it stays visible above the long episode list.
+- Kept notes and deletion wired to the existing persistence/rollback handlers, and bumped the gallery stylesheet cache key.
+
 ## 2026-10-22 — Double-tap zoom and deployment-check repair
 - Bumped the app stylesheet cache key so the global `touch-action: manipulation` rule disabling double-tap zoom is fetched instead of reused from cache.
 - Kept pinch-to-zoom and normal panning available; no viewport scaling restrictions added.
