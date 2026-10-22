@@ -64,8 +64,9 @@
     "number": 224
   },
   "__current": {
-    "title": "Scope Settings browser assertions and verify Track Sync",
+    "title": "Wait for Track Sync before continuing browser checks",
     "changes": [
+      "Wait for the Track Sync action to finish before the subsequent refresh test, after run #305 exposed a race between sync and refresh.",
       "Scoped Account & Sync browser assertions to its active panel after run #304 exposed a hidden-panel selector ambiguity.",
       "Wait for the Track Sync cloud request before asserting shortcut behavior.",
       "Fixed the run #303 mobile browser test by targeting the Settings back button within its active category panel.",

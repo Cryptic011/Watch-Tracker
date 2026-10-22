@@ -1,3 +1,7 @@
+## 2026-10-22 — Wait for Track Sync to finish in browser checks
+- Run #305 confirmed the Settings navigation tests pass but exposed a race between the Track Sync request and the following refresh scenario.
+- The smoke test now waits for the real sync action to finish before continuing.
+
 ## 2026-10-22 — Scope Settings browser assertions to active panels
 - Corrected the Account & Sync browser assertion to target its panel rather than matching hidden `.profile-card` elements in other categories.
 - Made the Track Sync check wait for the intercepted cloud request before asserting it completed.
