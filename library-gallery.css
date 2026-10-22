@@ -36,3 +36,47 @@
 .dashboard-section>summary{font-size:1rem;font-weight:700;cursor:pointer;padding:6px 0}
 @media(min-width:700px){.gallery-home{grid-template-columns:1fr 1fr}.gallery-category{min-height:230px}.gallery-grid{gap:28px 16px}}
 @media(max-width:350px){.gallery-category{min-height:175px}.gallery-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.gallery-tile strong{font-size:.75rem}.gallery-tile small{font-size:.68rem}}
+
+/* Mobile title detail and expandable season/episode tracker. */
+.gallery-detail{position:fixed;inset:0;width:100%;height:100%;max-width:none;max-height:none;margin:0;padding:0;border:0;border-radius:0;background:#090909;color:#fff;overflow:auto;overscroll-behavior:contain}
+.gallery-detail::backdrop{background:#000}
+.gallery-detail-header{position:sticky;top:0;z-index:4;display:grid;grid-template-columns:44px minmax(0,1fr) 44px;align-items:center;gap:10px;padding:calc(env(safe-area-inset-top) + 12px) 18px 12px;background:#080808d9;backdrop-filter:blur(18px);border-bottom:1px solid #ffffff12}
+.gallery-detail-header h2{font-size:1.12rem;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gallery-detail-header .gallery-back,.gallery-more{display:grid;place-items:center;width:44px;height:44px;border-radius:50%;background:#202020;border:1px solid #ffffff1a;color:#fff;font-size:1.8rem}
+.gallery-more{font-size:1.1rem;letter-spacing:1px}
+.gallery-detail-body{padding:0 0 calc(110px + env(safe-area-inset-bottom))}
+.gallery-detail-hero{position:relative;min-height:240px;padding:36px 22px 24px;display:flex;flex-direction:column;justify-content:flex-end;gap:18px;overflow:hidden;background:linear-gradient(0deg,#090909 0%,#090909c9 35%,#09090922 100%),radial-gradient(ellipse at top,#62442b,#090909 70%)}
+.gallery-detail-hero>.gallery-art{position:absolute;inset:0;width:100%;height:100%;aspect-ratio:auto;border:0;border-radius:0;opacity:.35;filter:blur(2px);pointer-events:none}
+.gallery-detail-hero .gallery-art img{width:100%;height:100%;object-fit:cover}
+.gallery-detail-meta{position:relative;z-index:1;display:grid;gap:7px;color:#e3e3e3;font-size:.88rem}
+.gallery-detail-title{font-size:clamp(1.7rem,7vw,2.5rem);font-weight:850;letter-spacing:.13em;text-align:center;text-transform:uppercase;overflow-wrap:anywhere}
+.gallery-detail-status{font-weight:700}
+.gallery-detail-copy{padding:20px 18px}
+.gallery-progress-summary{display:grid;gap:7px;padding:16px 18px;border:1px solid #ffffff12;border-radius:20px;background:#202020}
+.gallery-progress-summary strong,.gallery-notes-preview strong{font-size:1.05rem}
+.gallery-notes-preview{margin-top:12px;padding:16px;border-radius:18px;background:#202020;overflow-wrap:anywhere}
+.gallery-notes-preview p{margin-top:10px;white-space:pre-wrap;color:#ddd}
+.gallery-episode-tracker{padding:8px 18px 28px}
+.gallery-episode-tracker>h3{display:flex;justify-content:space-between;align-items:center;font-size:1.35rem;margin:0 0 18px}
+.gallery-season{margin:0 0 12px;border:1px solid #ffffff12;border-radius:22px;background:#1d1d1d;overflow:visible}
+.gallery-season-toggle{display:grid;grid-template-columns:94px minmax(0,1fr) 40px;gap:18px;align-items:center;width:100%;min-height:108px;padding:0 14px 0 0;border:0;border-radius:22px;background:#1d1d1d;color:#fff;text-align:left}
+.gallery-season-toggle>img,.gallery-season-poster{width:94px;height:108px;object-fit:cover;border-radius:14px;transform:translateY(-1px);border:1px solid #ffffff16}
+.gallery-season-poster{display:grid;place-items:center;background:#292929;color:#aaa;font-weight:800}
+.gallery-season-toggle strong{font-size:1.05rem}
+.gallery-season-chevron{color:#999;font-size:1.5rem}
+.gallery-season-check,.gallery-episode-check{width:32px;height:32px;border:3px solid #646464;border-radius:50%;display:grid;place-items:center;color:#fff;font-weight:800;font-size:1rem;background:transparent;justify-self:center}
+.gallery-season-check.complete,.gallery-episode-check.watched{background:#747474;border-color:#747474}
+.gallery-episode-row{display:grid;grid-template-columns:minmax(88px,34%) minmax(0,1fr) 36px;gap:12px;align-items:center;padding:12px 0;border-top:1px solid #ffffff12}
+.gallery-episode-row>img,.gallery-episode-placeholder{width:100%;height:80px;object-fit:cover;border-radius:10px;background:#292929}
+.gallery-episode-placeholder{display:grid;place-items:center;color:#999}
+.gallery-episode-copy{min-width:0;display:grid;gap:5px}
+.gallery-episode-copy strong{font-size:.9rem;overflow-wrap:anywhere}
+.gallery-episode-copy small{font-size:.78rem;color:#aaa}
+.gallery-episode-check{width:28px;height:28px;cursor:pointer}
+.gallery-episode-check:disabled{opacity:.5}
+.gallery-more-menu{position:fixed;z-index:8;top:calc(env(safe-area-inset-top) + 70px);right:16px;width:min(260px,calc(100vw - 32px));padding:7px;border:1px solid #ffffff20;border-radius:18px;background:#262626;box-shadow:0 18px 60px #000b}
+.gallery-more-menu[hidden]{display:none}
+.gallery-more-menu button{display:block;width:100%;padding:14px 12px;border:0;border-radius:12px;text-align:left;background:transparent;color:#fff;font-weight:650}
+.gallery-more-menu button:active{background:#ffffff12}
+.gallery-more-menu button.danger{color:#ff7777}
+@media(max-width:380px){.gallery-season-toggle{grid-template-columns:76px minmax(0,1fr) 34px;gap:12px;min-height:92px}.gallery-season-toggle>img,.gallery-season-poster{width:76px;height:92px}.gallery-episode-row{grid-template-columns:minmax(76px,31%) minmax(0,1fr) 32px;gap:9px}.gallery-episode-row>img,.gallery-episode-placeholder{height:68px}.gallery-episode-copy strong{font-size:.82rem}}

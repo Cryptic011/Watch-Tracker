@@ -64,8 +64,11 @@
     "number": 224
   },
   "__current": {
-    "title": "Schedule windows, Prior Releases, and Chicago Fire correction",
+    "title": "Redesign title details and episode tracking",
     "changes": [
+      "Add expandable season rows and circular per-episode watched controls with available episode titles and dates.",
+      "Add a three-dot title menu for editing, notes, and deletion; persist notes safely and roll back failed saves/deletes.",
+      "Update gallery styling and asset versions for the redesigned mobile detail layout.",
       "Fix mobile release-card overflow so episode/date and platform metadata stay readable within the card.",
       "Add a compact narrow-screen layout and bump the dashboard stylesheet cache version.",
       "Replace the placeholder app icon with a custom SVG Watch Logger mark and register it in the web app manifest.",

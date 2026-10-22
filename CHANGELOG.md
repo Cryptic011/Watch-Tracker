@@ -1,5 +1,14 @@
 ## 2026-10-22
 
+### Redesign title details and season/episode tracking
+- Expandable season rows reveal individual released episodes with episode artwork, titles, release dates, and circular watched toggles.
+- Season rows display poster artwork and a completion indicator; episode toggles use the existing save-and-undo progress flow.
+- The title detail header now has a three-dot menu for Edit show or film, Notes, and Delete show or film.
+- Notes save through the existing library persistence flow with rollback if saving fails; deletion is confirmed and restores the prior library state if persistence fails.
+- Update gallery and library asset versions so clients request the redesigned UI.
+
+## 2026-10-22
+
 ### Fix mobile Upcoming Releases layout and add app icon
 - Keep release title, episode/date, and platform metadata within a responsive card grid instead of allowing the metadata column to collapse on narrow iPhone screens.
 - Add a compact breakpoint for very narrow phones and bump the dashboard stylesheet cache version.
