@@ -1,5 +1,12 @@
 ## 2026-10-22
 
+### Grouped Preferences screen
+- Add screenshot-inspired Preferences groups for General, Release Reminders, Your Services, App Icon, account/sync, import/export, backups, review, support, feedback and About.
+- Existing account, appearance and background reminder controls remain in the page; shortcut rows navigate to the relevant live controls where available.
+- Clearly indicate categories whose underlying feature or destination is not yet configured rather than implying those actions are live.
+
+## 2026-10-22
+
 ### Season rows and title action menu
 - Replace the episode-tracker shortcut with expandable season rows and circular watched toggles for each released episode.
 - Add a three-dot title menu for editing, notes, and confirmed deletion; notes and deletion use existing persistence with rollback if saving fails.

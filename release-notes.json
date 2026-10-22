@@ -64,7 +64,7 @@
     "number": 224
   },
   "__current": {
-    "title": "Season rows and title action menu",
+    "title": "Grouped Preferences screen",
     "changes": [
       "Update gallery styling and asset versions for the redesigned mobile detail layout.",
       "Fix mobile release-card overflow so episode/date and platform metadata stay readable within the card.",
@@ -82,7 +82,9 @@
       "Move Watch Statistics into Settings > Account & Sync and add a dedicated profile button that opens Account & Sync. Improve mobile poster framing, release badges, Today highlighting, and bulk-action access; use larger touch targets, keyboard focus cues, visible non-intrusive sync/reminder status, and reduced-motion support.",
       "The production reminder function still needs the secure source update deployed before push notifications can resume; deployment is pending approval for its existing platform-JWT-disabled configuration.",
       "Added expandable season rows and circular episode watched controls connected to saved progress.",
-      "Added a three-dot menu for edit, notes and confirmed delete with persistence rollback."
+      "Added a three-dot menu for edit, notes and confirmed delete with persistence rollback.",
+      "Added grouped Preferences navigation matching the requested settings layout.",
+      "Rows navigate to existing account, appearance, and reminder controls; unavailable services and destinations are explicitly identified as not configured."
     ]
   },
   "37f6c39e9d0355b1bde705cb3fcb3cda2533119f": {
