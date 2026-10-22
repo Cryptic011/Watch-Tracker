@@ -11,10 +11,10 @@ test('Account & Sync belongs to Settings, never the Library view',()=>{
  assert.match(settings,/Account & Sync/);assert.match(settings,/id="sync-now"/);assert.match(settings,/id="logout-btn"/);
 });
 
-test('Settings section order is Account & Sync, Appearance, Background Reminders, Maintenance, then Changelog',()=>{
+test('Settings is consolidated into General, Release Reminders, and Account & Sync sections',()=>{
  const html=read('index.html'),core=read('assets/js/app-core.js');
  const settings=html.slice(html.indexOf('<div id="settings-view"'),html.indexOf('<section id="discovery-view"'));
- const positions=['Account & Sync','Appearance','Background Reminders'].map(label=>settings.indexOf(label));
+ const positions=['General','Release Reminders','Account & Sync'].map(label=>settings.indexOf(label));
  assert.ok(positions.every(p=>p>=0),'all static settings sections exist');
  assert.deepEqual([...positions].sort((a,b)=>a-b),positions,'static sections retain requested order');
  assert.match(core,/settingsView\.appendChild\(maintenanceAdminSection\)/);

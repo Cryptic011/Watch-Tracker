@@ -64,13 +64,10 @@
     "number": 224
   },
   "__current": {
-    "title": "Consolidated Settings and episode tracker fixes",
+    "title": "Settings layout regression repair",
     "changes": [
-      "Merged Settings into one page with working General, Release Reminders, and Account & Sync sections.",
-      "Removed placeholder options that do not exist as working features in this build.",
-      "Fixed the title actions menu and preserved expanded seasons after episode updates.",
-      "Use episode-specific artwork when available and an episode placeholder instead of the series poster.",
-      "Preserved the overall All workflows run sequence release-note entry."
+      "Updated Settings layout regression coverage for the consolidated General, Release Reminders, and Account & Sync sections.",
+      "Preserved checks for account controls, maintenance, and changelog placement."
     ]
   },
   "37f6c39e9d0355b1bde705cb3fcb3cda2533119f": {

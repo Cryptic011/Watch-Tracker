@@ -1,3 +1,7 @@
+## 2026-10-22 — Settings layout regression repair
+- Updated the Settings layout regression test to assert the consolidated General, Release Reminders, and Account & Sync sections rather than the superseded multi-section Preferences layout.
+- Kept the test coverage for maintenance and changelog placement and verified the account controls remain inside Settings.
+
 ## 2026-10-22 — Consolidated Settings and episode tracker fixes
 - Replaced duplicate Preferences shortcuts and separate controls with one Settings page containing only working General, Release Reminders, and Account & Sync sections.
 - Removed placeholder entries for App Icon, Your Services, backups, reviews, support and feedback that do not have working destinations in this build.
