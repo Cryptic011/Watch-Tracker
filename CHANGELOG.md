@@ -1,3 +1,6 @@
+## 2026-10-22
+- Disable double-tap-to-zoom across the app using `touch-action: manipulation`, while retaining pinch-to-zoom and normal panning. No viewport scaling restrictions added.
+
 ## 2026-10-22 — Settings layout regression repair
 - Updated the Settings layout regression test to assert the consolidated General, Release Reminders, and Account & Sync sections rather than the superseded multi-section Preferences layout.
 - Kept the test coverage for maintenance and changelog placement and verified the account controls remain inside Settings.

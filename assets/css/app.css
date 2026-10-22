@@ -111,7 +111,7 @@
 .bottom-tabs [data-tab="history"],
 .bottom-tabs [data-tab="watchlist"] { display: none !important; }
 :focus-visible{outline:3px solid var(--blue2);outline-offset:3px}
-button,.btn,.pill-btn,.tab-btn,select{touch-action:manipulation}
+html,body{touch-action:manipulation}button,.btn,.pill-btn,.tab-btn,select{touch-action:manipulation}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
 .library-backup{margin-top:14px}.backup-import-label{display:flex;align-items:center;justify-content:center;cursor:pointer;min-height:44px}
 .calendar-range .pill-btn{min-height:44px}
