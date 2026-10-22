@@ -60,3 +60,23 @@
 .watch-stat span{color:var(--muted);font-size:.72rem;line-height:1.35;overflow-wrap:anywhere}
 @media(min-width:620px){.watch-statistics-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
 @media(prefers-reduced-motion:reduce){.watch-statistics *{scroll-behavior:auto!important;animation:none!important;transition:none!important}}
+
+
+/* Mobile release cards: keep title and release metadata inside a readable grid. */
+.weekly-releases,.release-week-list,.release-day,.release-card,.release-card-copy{min-width:0;max-width:100%;box-sizing:border-box}
+.release-week-list{width:100%;overflow:hidden}
+.release-card{grid-template-columns:minmax(60px,76px) minmax(0,1fr) 12px;column-gap:10px}
+.release-time{max-width:100%;white-space:normal;text-align:center;overflow-wrap:anywhere}
+.release-card-copy{width:100%;overflow:hidden}
+.release-card-copy strong,.release-episode,.release-platform{min-width:0;max-width:100%;overflow-wrap:anywhere;word-break:normal}
+.release-platform{display:flex;align-items:flex-start}
+.release-platform-dot{margin-top:.35em}
+@media(max-width:380px){
+ .weekly-releases-heading{padding:17px 13px 14px;gap:8px}
+ .release-week-list{padding:0 10px}
+ .release-day{padding:10px 8px 8px}
+ .release-card{grid-template-columns:56px minmax(0,1fr) 8px;gap:8px;padding:9px 7px}
+ .release-time{font-size:.68rem}
+ .release-card-copy strong{font-size:.82rem}
+ .release-episode,.release-platform{font-size:.7rem}
+}

@@ -1,5 +1,12 @@
 ## 2026-10-22
 
+### Fix mobile Upcoming Releases layout and add app icon
+- Keep release title, episode/date, and platform metadata within a responsive card grid instead of allowing the metadata column to collapse on narrow iPhone screens.
+- Add a compact breakpoint for very narrow phones and bump the dashboard stylesheet cache version.
+- Replace the placeholder play-triangle icon with a custom Watch Logger mark and register it for PWA installation.
+
+## 2026-10-22
+
 ### Schedule filters and release season correction
 - Make This week show exactly Monday through Sunday, and Upcoming show the following seven calendar days (the next Monday through Sunday). Today remains the local calendar day.
 - Show only the selected date window instead of appending another long upcoming list. Keep Dates to be announced and Excluded from Weekly Releases available beneath the selected window.

@@ -7,5 +7,13 @@
   "scope": "/Watched-Tracker/",
   "display": "standalone",
   "background_color": "#000000",
-  "theme_color": "#000000"
+  "theme_color": "#000000",
+  "icons": [
+    {
+      "src": "/Watched-Tracker/assets/img/app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
 }
