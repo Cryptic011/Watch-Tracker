@@ -1,3 +1,9 @@
+## 2026-10-22 — iOS-style Preferences menu and settings drill-in
+- Replaced the flat settings screen with a rounded, grouped Preferences menu inspired by the supplied reference, adapted to Watch Logger's implemented features.
+- Added General, Release Reminders, and Account & Sync category rows that open their real settings panels, with a back-to-Preferences action.
+- Added a Track Sync shortcut wired to the existing Sync Now handler. Unimplemented promotional and placeholder entries are omitted.
+- Bumped the app stylesheet cache key; existing setting IDs and handlers are preserved.
+
 ## 2026-10-22 — Fix prior releases and refine Preferences
 - Removed the Enhance Your Experience promotional panel from Settings as requested.
 - Refined Preferences to match the supplied iOS reference more closely: large bold heading, rounded grouped charcoal cards, normal-case section titles, and subtle separators while preserving Watch Logger's real controls.

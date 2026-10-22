@@ -185,3 +185,28 @@ html,body{touch-action:manipulation}button,.btn,.pill-btn,.tab-btn,select{touch-
 #library-view .prior-release-row>:last-child,#library-view .prior-release-item>:last-child,#library-view .release-history-row>:last-child,#library-view .release-item>:last-child{min-width:120px;max-width:180px;white-space:normal;overflow-wrap:anywhere;text-align:right}
 #library-view .prior-release-row time,#library-view .prior-release-item time,#library-view .release-history-row time,#library-view .release-item time{display:inline-block;max-width:100%;white-space:normal}
 @media(max-width:520px){#library-view .prior-release-row,#library-view .prior-release-item,#library-view .release-history-row,#library-view .release-item{grid-template-columns:minmax(0,1fr) minmax(145px,44%);column-gap:10px}}
+
+/* iOS-style Preferences category menu with drill-in panels. */
+#settings-view{padding:0 0 calc(28px + env(safe-area-inset-bottom,0px))}
+.preferences-heading{padding:22px 2px 28px}
+.preferences-heading h2{font-size:2.35rem;line-height:1.08;letter-spacing:-.045em;font-weight:850;margin:0}
+.preferences-heading p{display:none}
+.settings-category-menu,.settings-quick-actions{background:#2b2b2d;border-radius:27px;padding:4px 18px;margin:0 0 22px;overflow:hidden}
+.settings-category-row{display:grid;grid-template-columns:54px minmax(0,1fr) 22px;align-items:center;gap:14px;width:100%;min-height:73px;padding:11px 0;border:0;border-radius:0;background:transparent;color:var(--text);text-align:left;font:inherit;font-size:1rem;font-weight:650;cursor:pointer}
+.settings-category-row+.settings-category-row{border-top:1px solid #454548}
+.settings-category-icon{width:48px;height:48px;display:grid;place-items:center;border:1px solid #48484c;border-radius:14px;background:linear-gradient(145deg,#38383b,#111113);color:#fff;font-size:1.55rem;font-weight:700;box-shadow:0 2px 3px #0003}
+.settings-chevron{justify-self:end;color:#737378;font-size:2rem;line-height:1;font-weight:400}
+.settings-quick-actions{padding-top:0;padding-bottom:0}
+.settings-quick-actions .settings-category-row{min-height:78px}
+.settings-category-row small{display:block;margin-top:4px;font-size:.8rem;line-height:1.35;color:var(--muted);font-weight:450}
+.settings-category-row:active{opacity:.75}
+.settings-detail-panel{margin:0 0 24px}
+.settings-back{display:flex;align-items:center;gap:7px;margin:0 0 18px;padding:8px 0;border:0;background:transparent;color:var(--blue2);font:inherit;font-size:.96rem;font-weight:650;cursor:pointer}
+.settings-detail-panel>.section-label{margin:0 0 12px 2px;font-size:1.8rem;letter-spacing:-.03em;text-transform:none;color:var(--text)}
+.settings-detail-panel>.profile-card{border-radius:25px;background:#292929;padding:12px 17px;box-shadow:none}
+.settings-detail-panel .appearance-card .form-group{min-height:62px;grid-template-columns:minmax(0,1fr) auto;gap:12px}
+.settings-detail-panel .appearance-card select{min-width:130px;width:auto;max-width:45vw;border:0;background:transparent;text-align:right}
+.settings-detail-panel .appearance-copy{border-top:1px solid #444}
+.settings-detail-panel .background-reminder-card{padding:14px 17px}
+.settings-detail-panel #account-sync-card .sync-box{padding:15px 0;border-color:#444}
+@media(max-width:390px){.preferences-heading h2{font-size:2.2rem}.settings-category-menu,.settings-quick-actions{padding-left:14px;padding-right:14px}.settings-category-row{grid-template-columns:48px minmax(0,1fr) 18px;gap:11px}.settings-category-icon{width:44px;height:44px}}

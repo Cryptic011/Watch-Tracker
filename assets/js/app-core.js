@@ -493,4 +493,27 @@
     const statusMeta=document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');if(statusMeta)statusMeta.content="black-translucent";
   }
   appearanceQuery.addEventListener?.("change",()=>{if(savedAppearance()==="system")applyAppearance("system");});
+  // Preferences category drill-in navigation; existing controls remain authoritative.
+  function showSettingsCategory(category){
+    const menu=document.getElementById("settings-category-menu");
+    const quick=document.querySelector(".settings-quick-actions");
+    const heading=document.querySelector("#settings-view .preferences-heading");
+    const panels=[...document.querySelectorAll("#settings-view [data-settings-panel]")];
+    const selected=panels.find(panel=>panel.dataset.settingsPanel===category);
+    if(!selected)return;
+    menu?.classList.add("hidden");quick?.classList.add("hidden");heading?.classList.add("hidden");
+    panels.forEach(panel=>panel.classList.toggle("hidden",panel!==selected));
+    window.scrollTo?.({top:0,behavior:"auto"});
+  }
+  function showSettingsMenu(){
+    document.querySelectorAll("#settings-view [data-settings-panel]").forEach(panel=>panel.classList.add("hidden"));
+    document.getElementById("settings-category-menu")?.classList.remove("hidden");
+    document.querySelector(".settings-quick-actions")?.classList.remove("hidden");
+    document.querySelector("#settings-view .preferences-heading")?.classList.remove("hidden");
+    window.scrollTo?.({top:0,behavior:"auto"});
+  }
+  document.querySelectorAll("#settings-view [data-settings-open]").forEach(button=>button.addEventListener("click",()=>showSettingsCategory(button.dataset.settingsOpen)));
+  document.querySelectorAll("#settings-view [data-settings-back]").forEach(button=>button.addEventListener("click",showSettingsMenu));
+  document.getElementById("settings-sync-shortcut")?.addEventListener("click",()=>{document.getElementById("sync-now")?.click();});
+
   async function sha256(value){const bytes=new TextEncoder().encode(String(value));const digest=await crypto.subtle.digest("SHA-256",bytes);return Array.from(new Uint8Array(digest)).map(b=>b.toString(16).padStart(2,"0")).join("");}
