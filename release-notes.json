@@ -64,8 +64,10 @@
     "number": 224
   },
   "__current": {
-    "title": "Fix Notes and add Episodes/Details navigation",
+    "title": "Move title management beside the total tracked count",
     "changes": [
+      "Replace the floating management toolbar with one stationary pencil beside the total Series or Movies count, never beside individual list counts or overlapping Add show or film.",
+      "Manage all tracked titles in the selected category regardless of the active filter, with selection feedback inside the management dialog.",
       "Open Notes visibly from the title menu and save changes with an updated timestamp for sync.",
       "Show saved Notes below the poster only when notes exist, with the watch summary at the bottom using Watched to - and Watched on:.",
       "Open series on Episodes and films on Overview, with verified catalogue information under Details to the right.",

@@ -20,11 +20,18 @@
 .gallery-art img[hidden]{display:none}
 .gallery-tile-status{display:inline-flex;align-items:center;width:max-content;max-width:100%;margin-top:8px;padding:5px 9px;border:1px solid #ffffff30;border-radius:999px;background:#141b28;color:#d6deec;font-size:.62rem;line-height:1.1;font-weight:850;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-shadow:0 2px 10px #0004}
 .gallery-tile-status.done{border-color:#2f9f7b88;background:#123d35;color:#a7f3d0}
-.gallery-nav{position:relative;display:flex;align-items:center;gap:14px;min-height:48px;margin:4px 0 28px}
-.gallery-nav h2{position:absolute;left:54px;right:54px;text-align:center;font-size:1.35rem;pointer-events:none}
+.gallery-nav{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:12px;min-height:48px;margin:4px 0 28px}
+.gallery-nav h2{min-width:0;text-align:center;font-size:1.35rem;pointer-events:none}
+.gallery-nav>.gallery-back{justify-self:start}
+.gallery-nav>.gallery-heading-actions{justify-self:end}
 .gallery-back{display:grid;place-items:center;width:44px;height:44px;border:1px solid var(--border);border-radius:50%;background:var(--card);color:var(--text);font-size:2rem;cursor:pointer}
 .gallery-section{margin-bottom:38px}
-.gallery-section h3{display:flex;align-items:center;justify-content:space-between;font-size:1.4rem;font-weight:800;letter-spacing:-.25px;margin:0 0 16px}
+.gallery-section h3{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:1.4rem;font-weight:800;letter-spacing:-.25px;margin:0 0 16px}
+.gallery-heading-actions{display:inline-flex;align-items:center;flex-shrink:0;gap:8px}
+.gallery-manage-button{display:inline-grid;place-items:center;flex:0 0 44px;width:44px;height:44px;padding:10px;border:1px solid var(--border);border-radius:50%;background:var(--inner);color:var(--muted);cursor:pointer;touch-action:manipulation}
+.gallery-manage-button svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.gallery-manage-button:disabled{opacity:.4;cursor:default}
+.gallery-manage-button:focus-visible{outline:2px solid var(--blue2);outline-offset:3px}
 .gallery-count{display:grid;place-items:center;min-width:25px;height:25px;padding:0 7px;border-radius:20px;background:var(--inner);color:var(--muted);font-size:.75rem}
 .gallery-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:28px 10px}
 .gallery-grid .gallery-tile-status{display:none}

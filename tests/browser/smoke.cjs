@@ -87,6 +87,15 @@ const server=http.createServer((req,res)=>{
   await page.evaluate(()=>{mediaItems[0].status='Watched';mediaItems[0].filmReleaseDate='2020-02-14';mediaItems[0].date='2026-09-21';render();});
   await page.locator('[data-gallery-category="Film"]').click();await page.locator('[data-filter="Watched"]').click();
   assert.match(await page.locator('.gallery-section h3').first().textContent(),/^2020/);
+  assert.equal(await page.locator('[data-gallery-manage]').count(),1);
+  assert.equal(await page.locator('.gallery-section [data-gallery-manage]').count(),0);
+  assert.equal(await page.locator('[data-gallery-total-count]').textContent(),'1');
+  await page.getByRole('button',{name:'Manage movies titles',exact:true}).click();
+  assert.equal(await page.locator('#bulk-title-options label').count(),1);
+  assert.match(await page.locator('#bulk-title-options').textContent(),/Browser Test Film/);
+  await page.getByRole('button',{name:'Mark watched',exact:true}).click();
+  assert.equal(await page.locator('#bulk-manage-status').textContent(),'Select at least one title.');
+  await page.getByRole('button',{name:'Close bulk actions',exact:true}).click();
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),true);
   await page.locator('.gallery-tile').first().click();
   assert.equal(await page.getByRole('tab',{name:'Overview',exact:true}).getAttribute('aria-selected'),'true');
@@ -115,6 +124,34 @@ const server=http.createServer((req,res)=>{
    item.episodeTitles={1:{1:'A Longer Episode Title That Wraps Without Squeezing the Artwork'}};render();
   });
   await page.locator('[data-gallery-category="Series"]').click();
+  phase='category management';
+  assert.equal(await page.locator('[data-gallery-manage]').count(),1);
+  assert.equal(await page.locator('.gallery-section [data-gallery-manage]').count(),0);
+  assert.equal(await page.locator('.bulk-toolbar').count(),0);
+  assert.equal(await page.locator('[data-gallery-total-count]').textContent(),'1');
+  assert.equal(await page.locator('[data-gallery-total-count]').evaluate(count=>count.nextElementSibling.matches('[data-gallery-manage]')),true);
+  for(const width of [320,390,768,1280]){
+   await page.setViewportSize({width,height:844});
+   await page.locator('[data-gallery-manage]').scrollIntoViewIfNeeded();
+   const layout=await page.locator('[data-gallery-manage]').evaluate(button=>{
+    const bounds=button.getBoundingClientRect(),add=document.querySelector('#add-btn')?.getBoundingClientRect();
+    return {position:getComputedStyle(button).position,width:bounds.width,height:bounds.height,right:bounds.right,overflow:document.documentElement.scrollWidth>innerWidth,overlap:add&&bounds.left<add.right&&bounds.right>add.left&&bounds.top<add.bottom&&bounds.bottom>add.top};
+   });
+   assert.ok(!['fixed','sticky'].includes(layout.position));
+   assert.ok(layout.width>=44&&layout.height>=44&&layout.right<=width);
+   assert.equal(layout.overflow,false);assert.ok(!layout.overlap);
+  }
+  await page.setViewportSize({width:390,height:844});
+  await page.locator('[data-filter="Watched"]').click();
+  assert.equal(await page.locator('.gallery-tile').count(),0);
+  assert.equal(await page.locator('[data-gallery-total-count]').textContent(),'1','total includes tracked titles outside the active filter');
+  await page.getByRole('button',{name:'Manage series titles',exact:true}).click();
+  assert.equal(await page.locator('#bulk-title-options label').count(),1);
+  assert.equal(await page.locator('#bulk-title-options input').inputValue(),'show');
+  assert.doesNotMatch(await page.locator('#bulk-title-options').textContent(),/Browser Test Film/);
+  await page.getByRole('button',{name:'Close bulk actions',exact:true}).click();
+  await page.locator('[data-filter="All"]').click();
+  phase='episode artwork';
   await page.locator('[data-gallery-item="show"]').first().click();
   assert.equal(await page.getByRole('tab',{name:'Episodes',exact:true}).getAttribute('aria-selected'),'true');
   assert.equal(await page.locator('[data-gallery-notes-preview]').isVisible(),false);

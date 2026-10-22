@@ -364,7 +364,7 @@
     const {rows,groups}=currentVisibleMediaRows();emptyState.classList.toggle("hidden",rows.length>0);
     if(currentTab==="library"&&window.WatchLogGallery){
       $("list-label").textContent="Library";
-      window.WatchLogGallery.mount(mediaList,rows,{filter:activeFilter,upcoming:upcomingSortInfo,last:item=>isEpisodeTrackable(item)?lastLoggedEpisode(item):null,released:item=>releasedEpisodeMap(item),watched:item=>watchedEpisodeMap(item),toggleEpisode:toggleEpisodeWatched,toggleSeason:toggleSeasonWatched,trackerArtwork:fetchOfficialTrackerArtwork,saveNotes:saveTitleNotes,titleDetails:fetchOfficialTitleDetails,remove:async(id)=>{const i=mediaItems.findIndex(row=>String(row.id)===String(id));if(i<0)return false;const old=mediaItems[i];mediaItems.splice(i,1);try{await persistLibrary(mediaItems,{background:true,precleaned:true});render();return true;}catch(error){mediaItems.splice(i,0,old);return false;}},date:formatLocalDate,dateTime:formatLocalDateTime,reminder:reminderMarkup,edit:openEdit,track:openEpisodeTracker,render,back:()=>{if(currentTab!=="library"){currentTab="library";render();}},artwork:async item=>(await pinApi("catalog_search",{query:item.imdbId||item.title,country:"gb"})).results,items:()=>mediaItems});
+      window.WatchLogGallery.mount(mediaList,rows,{filter:activeFilter,manage:openBulkManage,upcoming:upcomingSortInfo,last:item=>isEpisodeTrackable(item)?lastLoggedEpisode(item):null,released:item=>releasedEpisodeMap(item),watched:item=>watchedEpisodeMap(item),toggleEpisode:toggleEpisodeWatched,toggleSeason:toggleSeasonWatched,trackerArtwork:fetchOfficialTrackerArtwork,saveNotes:saveTitleNotes,titleDetails:fetchOfficialTitleDetails,remove:async(id)=>{const i=mediaItems.findIndex(row=>String(row.id)===String(id));if(i<0)return false;const old=mediaItems[i];mediaItems.splice(i,1);try{await persistLibrary(mediaItems,{background:true,precleaned:true});render();return true;}catch(error){mediaItems.splice(i,0,old);return false;}},date:formatLocalDate,dateTime:formatLocalDateTime,reminder:reminderMarkup,edit:openEdit,track:openEpisodeTracker,render,back:()=>{if(currentTab!=="library"){currentTab="library";render();}},artwork:async item=>(await pinApi("catalog_search",{query:item.imdbId||item.title,country:"gb"})).results,items:()=>mediaItems});
       updateEpisodeTracker();return;
     }
     mediaList.classList.remove("gallery-active");
@@ -381,12 +381,17 @@
     }
     mediaList.innerHTML=html;updateEpisodeTracker();
   }
-  const bulkToolbar=document.createElement("div");bulkToolbar.className="bulk-toolbar";bulkToolbar.innerHTML='<button id="bulk-manage-open" class="btn btn-secondary" type="button">Select titles</button><span id="bulk-manage-status" role="status" aria-live="polite"></span>';
-  document.querySelector("#list-toolbar .filter-pills")?.after(bulkToolbar);
   const bulkDialog=document.createElement("dialog");bulkDialog.className="changelog-dialog bulk-dialog";bulkDialog.setAttribute("aria-labelledby","bulk-manage-title");bulkDialog.innerHTML='<header class="changelog-heading"><h2 id="bulk-manage-title">Manage titles</h2><button class="close-btn" type="button" aria-label="Close bulk actions">×</button></header><p>Select one or more titles. Existing watch progress is retained unless you mark a show watched.</p><div id="bulk-title-options" class="bulk-title-options"></div><div class="notification-actions"><button type="button" data-bulk-action="watched" class="btn btn-secondary">Mark watched</button><button type="button" data-bulk-action="planned" class="btn btn-secondary">Plan</button><button type="button" data-bulk-action="hide" class="btn btn-secondary">Hide from Weekly Releases</button><button type="button" data-bulk-action="include" class="btn btn-secondary">Re-enable Weekly Releases</button><button type="button" data-bulk-action="remove" class="btn btn-danger">Remove selected</button></div>';
   document.body.appendChild(bulkDialog);
-  const openBulk=document.getElementById("bulk-manage-open"),bulkOptions=bulkDialog.querySelector("#bulk-title-options");
-  openBulk?.addEventListener("click",()=>{bulkOptions.innerHTML=mediaItems.map(item=>`<label><input type="checkbox" value="${esc(item.id)}"><span>${esc(item.title)}</span></label>`).join("");bulkDialog.showModal();});
+  const bulkOptions=bulkDialog.querySelector("#bulk-title-options"),bulkStatus=document.createElement("p");
+  bulkStatus.id="bulk-manage-status";bulkStatus.setAttribute("role","status");bulkStatus.setAttribute("aria-live","polite");bulkOptions.after(bulkStatus);
+  function openBulkManage(ids,label="Library"){
+    const scope=new Set(ids.map(String)),rows=mediaItems.filter(item=>scope.has(String(item.id)));
+    if(!rows.length)return;
+    bulkDialog.querySelector("#bulk-manage-title").textContent=`Manage ${label.toLowerCase()} titles`;
+    bulkOptions.innerHTML=rows.map(item=>`<label><input type="checkbox" value="${esc(item.id)}"><span>${esc(item.title)}</span></label>`).join("");
+    bulkStatus.textContent="";bulkDialog.showModal();
+  }
   bulkDialog.querySelector(".close-btn").addEventListener("click",()=>bulkDialog.close());
   bulkDialog.addEventListener("click",event=>{
     const action=event.target.closest("[data-bulk-action]")?.dataset.bulkAction;if(!action)return;
@@ -395,7 +400,7 @@
     const selected=new Set(ids);
     if(action==="remove")mediaItems=mediaItems.filter(item=>!selected.has(String(item.id)));
     else for(const item of mediaItems){if(!selected.has(String(item.id)))continue;if(action==="planned")item.status="Planned";if(action==="hide")item.hideFromWeeklyReleases=true;if(action==="include")item.hideFromWeeklyReleases=false;if(action==="watched"){item.status="Watched";if(isEpisodeTrackable(item)){const released=releasedEpisodeMap(item);item.watchedEpisodes=Object.fromEntries(Object.entries(released).map(([season,episodes])=>[season,[...episodes]]));const latest=Object.entries(item.watchedEpisodes).flatMap(([season,episodes])=>episodes.map(episode=>[Number(season),Number(episode)])).sort((a,b)=>b[0]-a[0]||b[1]-a[1])[0];item.curSeason=latest?.[0]||null;item.curEp=latest?.[1]||null;item.lastWatchedSeason=item.curSeason;item.lastWatchedEpisode=item.curEp;item.watchedSeasons=Object.keys(released).length;item.updatedAt=nowISO();}}}
-    render();void persistLibrary(mediaItems,{background:true,precleaned:true});document.getElementById("bulk-manage-status").textContent=`Updated ${ids.length} title(s).`;bulkDialog.close();
+    render();void persistLibrary(mediaItems,{background:true,precleaned:true});bulkDialog.close();showAppToast(`Updated ${ids.length} title(s).`,"success");
   });
   function scheduleRender(){if(renderFrame)return;renderFrame=requestAnimationFrame(()=>{renderFrame=0;render();});}
   searchInput.oninput=e=>{

@@ -1,3 +1,9 @@
+## 2026-10-22 — Keep title management beside the total tracked count
+- Replace the floating title-management toolbar with one stationary pencil beside the total Series or Movies count, not individual release-list counts.
+- Keep the total and management list scoped to all tracked titles in that category, even when a search or status filter hides some titles.
+- Preserve existing bulk actions and show selection feedback inside their dialog without overlapping Add show or film.
+- Verify placement, category scoping, filtering, and narrow-screen spacing in Chromium and WebKit.
+
 ## 2026-10-22 — Make Notes visible and add Episodes/Details navigation
 - Open the Notes editor in view from the three-dot menu, preserve drafts on save failure, and timestamp saved notes for reliable sync.
 - Show a saved Notes card below the poster only when notes exist; hide it when cleared.
