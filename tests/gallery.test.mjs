@@ -12,6 +12,12 @@ test('Expanded season rows use compact poster and episode dimensions',()=>{
   assert.match(css,/\.gallery-episode-row\{grid-template-columns:minmax\(92px,31%\) minmax\(0,1fr\) 28px/);
   assert.match(css,/\.gallery-episode-copy strong\{font-size:\.83rem/);
 });
+test('Season episode rows keep artwork separate from clickable episode details',()=>{
+  const source=fs.readFileSync(new URL('../library-gallery.js',import.meta.url),'utf8');
+  assert.match(source,/<span class="gallery-episode-art">\$\{episodeImage\?[\s\S]*?<\/span><span class="gallery-episode-copy">/);
+  assert.match(source,/<button type="button" class="gallery-season-state" data-gallery-season=/);
+  assert.match(source,/api\.toggleSeason\?\.\(item\.id,season\)/);
+});
 test('Watched groups use original release years, never added or watched dates',()=>{
   const rows=[{id:'old',type:'Series',seriesReleaseDate:'2003-09-23',date:'2026-09-21',releaseYear:2026},{id:'new',type:'Film',filmReleaseDate:'2024-07-25',date:'2020-01-01'},{id:'year',type:'Series',releaseYear:2022},{id:'unknown',type:'Film',date:'2026-01-01'}];
   const groups=context.window.WatchLogGallery.releaseGroups(rows);

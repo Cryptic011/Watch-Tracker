@@ -151,6 +151,19 @@
       if(saved)setTimeout(()=>{if(episodeLogFeedback?.eventId===event.id){episodeLogFeedback=null;render();}},1500);
     }
   }
+  async function toggleSeasonWatched(id,season){
+    const key=String(id);if(episodeLogBusy.has(key))return;
+    const index=mediaItems.findIndex(item=>String(item.id)===key),item=mediaItems[index];if(index<0||!item)return;
+    const releases=releasedEpisodeMap(item),episodes=releases[season]||[];if(!episodes.length)return;
+    const watched=watchedEpisodeMap(item,releases)[season]||[],markWatched=!episodes.every(episode=>watched.includes(episode));
+    const original=item;episodeLogBusy.add(key);mediaItems[index]=episodes.reduce((current,episode)=>{
+      const event={id:uuid(),kind:markWatched?"mark":"unmark",season,episode,watchedAt:nowISO()};
+      return applyEpisodeToggle(current,season,episode,markWatched,event);
+    },item);render();
+    try{await persistLibrary(mediaItems,{background:true,precleaned:true});}
+    catch(error){console.error(error);const currentIndex=mediaItems.findIndex(row=>String(row.id)===key);if(currentIndex>=0)mediaItems[currentIndex]=original;alert("That season could not be saved. Please try again.");}
+    finally{episodeLogBusy.delete(key);render();}
+  }
   function closeEpisodeTrackerSheet(){activeEpisodeTrackerId="";activeEpisodeTrackerSeason=0;episodeTrackerModal.classList.add("hidden");setTimeout(applyPendingAppUpdate,0);}
   function openEpisodeTracker(id){
     const item=mediaItems.find(row=>String(row.id)===String(id));if(!isEpisodeTrackable(item))return;
@@ -344,7 +357,7 @@
     const {rows,groups}=currentVisibleMediaRows();emptyState.classList.toggle("hidden",rows.length>0);
     if(currentTab==="library"&&window.WatchLogGallery){
       $("list-label").textContent="Library";
-      window.WatchLogGallery.mount(mediaList,rows,{filter:activeFilter,upcoming:upcomingSortInfo,last:item=>isEpisodeTrackable(item)?lastLoggedEpisode(item):null,released:item=>releasedEpisodeMap(item),watched:item=>watchedEpisodeMap(item),toggleEpisode:toggleEpisodeWatched,saveNotes:async(id,notes)=>{const i=mediaItems.findIndex(row=>String(row.id)===String(id));if(i<0)return false;const old=mediaItems[i];mediaItems[i]={...old,notes};try{await persistLibrary(mediaItems,{background:true,precleaned:true});render();return true;}catch(error){mediaItems[i]=old;return false;}},remove:async(id)=>{const i=mediaItems.findIndex(row=>String(row.id)===String(id));if(i<0)return false;const old=mediaItems[i];mediaItems.splice(i,1);try{await persistLibrary(mediaItems,{background:true,precleaned:true});render();return true;}catch(error){mediaItems.splice(i,0,old);return false;}},date:formatLocalDate,dateTime:formatLocalDateTime,reminder:reminderMarkup,edit:openEdit,track:openEpisodeTracker,render,back:()=>{if(currentTab!=="library"){currentTab="library";render();}},artwork:async item=>(await pinApi("catalog_search",{query:item.imdbId||item.title,country:"gb"})).results,items:()=>mediaItems});
+      window.WatchLogGallery.mount(mediaList,rows,{filter:activeFilter,upcoming:upcomingSortInfo,last:item=>isEpisodeTrackable(item)?lastLoggedEpisode(item):null,released:item=>releasedEpisodeMap(item),watched:item=>watchedEpisodeMap(item),toggleEpisode:toggleEpisodeWatched,toggleSeason:toggleSeasonWatched,saveNotes:async(id,notes)=>{const i=mediaItems.findIndex(row=>String(row.id)===String(id));if(i<0)return false;const old=mediaItems[i];mediaItems[i]={...old,notes};try{await persistLibrary(mediaItems,{background:true,precleaned:true});render();return true;}catch(error){mediaItems[i]=old;return false;}},remove:async(id)=>{const i=mediaItems.findIndex(row=>String(row.id)===String(id));if(i<0)return false;const old=mediaItems[i];mediaItems.splice(i,1);try{await persistLibrary(mediaItems,{background:true,precleaned:true});render();return true;}catch(error){mediaItems.splice(i,0,old);return false;}},date:formatLocalDate,dateTime:formatLocalDateTime,reminder:reminderMarkup,edit:openEdit,track:openEpisodeTracker,render,back:()=>{if(currentTab!=="library"){currentTab="library";render();}},artwork:async item=>(await pinApi("catalog_search",{query:item.imdbId||item.title,country:"gb"})).results,items:()=>mediaItems});
       updateEpisodeTracker();return;
     }
     mediaList.classList.remove("gallery-active");

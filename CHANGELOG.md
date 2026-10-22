@@ -1,3 +1,7 @@
+## 2026-10-22 — Restore episode and season marking
+- Fixed the expanded episode-row markup so episode names, dates, and watch controls render outside the artwork thumbnail.
+- Made the season watch indicator an accessible button that marks every released episode in that season watched or unwatched in one save.
+
 ## 2026-10-22 — Move Reminders into Release Reminders and compact season details
 - Moved the private reminder history into the Release Reminders settings page and renamed its entry to Reminders.
 - Reduced expanded season artwork, row heights, episode thumbnails, and episode typography to match the supplied reference.
