@@ -64,10 +64,11 @@
     "number": 224
   },
   "__current": {
-    "title": "Repair settings layout test entity handling",
+    "title": "Fix double-tap zoom rollout and release notes checks",
     "changes": [
-      "Fixed settings regression tests to decode HTML entities before checking visible labels.",
-      "Kept General, Release Reminders, and Account & Sync consolidated in the requested Settings page."
+      "Disable double-tap-to-zoom across the app with touch-action: manipulation while retaining pinch-to-zoom and normal panning; bump the stylesheet cache key so devices fetch the updated rule.",
+      "Ensure the release notes document the actual run number and attempt.",
+      "Keep the existing library export and merge-based restore release-note coverage."
     ]
   },
   "37f6c39e9d0355b1bde705cb3fcb3cda2533119f": {

@@ -1,3 +1,8 @@
+## 2026-10-22 — Double-tap zoom and deployment-check repair
+- Bumped the app stylesheet cache key so the global `touch-action: manipulation` rule disabling double-tap zoom is fetched instead of reused from cache.
+- Kept pinch-to-zoom and normal panning available; no viewport scaling restrictions added.
+- Updated current release notes to satisfy the regression checks for actual workflow run number/attempt and library export/merge-based restore coverage.
+
 ## 2026-10-22 — Repair settings layout test entity handling
 - Fixed the regression test to compare decoded HTML text, so the valid `Account &amp; Sync` markup is correctly recognised as the visible “Account & Sync” label.
 - Kept the consolidated Settings sections and account controls unchanged.
