@@ -474,7 +474,7 @@
     if(duplicate)showDuplicateWarning(duplicate);else hideDuplicateWarning();
     return duplicate;
   }
-  openDuplicateBtn.onclick=()=>{const id=duplicateWarningItemId;hideDuplicateWarning();if(id)void openEdit(id);};
+  openDuplicateBtn.onclick=()=>{const id=duplicateWarningItemId;hideDuplicateWarning();if(id){closeEditor();openMediaRow(id);}};
   function uuid(){return crypto.randomUUID?crypto.randomUUID():`item_${Date.now()}_${Math.random().toString(36).slice(2)}`;}
   function toMillis(v){const n=new Date(v||0).getTime();return Number.isFinite(n)?n:0;}
   function isEmail(v){return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v||"").trim());}

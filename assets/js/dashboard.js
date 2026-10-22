@@ -133,7 +133,7 @@ function renderRecurringWeeklySchedule(){
     const library=document.getElementById("library-view");if(!library)return;
     root=document.createElement("div");root.id="recurring-weekly-dashboard";library.prepend(root);
     root.addEventListener("click",event=>{
-      const button=event.target.closest("[data-recurring-open]");if(button)openMediaRow(button.dataset.recurringOpen);
+      const button=event.target.closest("[data-recurring-open]");if(button)openMediaRow(button.dataset.recurringOpen,button);
     });
   }
   const visible=Boolean(currentUser&&currentTab==="library"&&!categoryControlsVisible());
@@ -226,7 +226,7 @@ document.getElementById('library-dashboard').addEventListener('click',event=>{
     if(next&&next.season===Number(watch.dataset.season)&&next.episode===Number(watch.dataset.episode))void toggleEpisodeWatched(item.id,next.season,next.episode);
     return;
   }
-  const open=event.target.closest('[data-dashboard-open]');if(open)openMediaRow(open.dataset.dashboardOpen);
+  const open=event.target.closest('[data-dashboard-open]');if(open)openMediaRow(open.dataset.dashboardOpen,open);
 });
 
 async function refreshPrivateReminderHistory(){

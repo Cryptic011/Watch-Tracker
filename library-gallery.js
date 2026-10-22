@@ -1,6 +1,6 @@
 /* Library presentation only. All progress, edits and reminders use the existing app. */
 window.WatchLogGallery=(()=>{
-  let category='',api=null,host=null,observer=null,dialog=null,active=0;
+  let category='',api=null,host=null,observer=null,dialog=null,returnFocus=null,active=0;
   const cache=new Map(),pending=new Set(),queue=[];
   const ARTWORK_CACHE_MS=6*60*60*1000;
   const freshArt=id=>{const entry=cache.get(id);return entry&&Date.now()-entry.checkedAt<ARTWORK_CACHE_MS?entry.url:'';};
@@ -183,7 +183,7 @@ window.WatchLogGallery=(()=>{
     if(!dialog){
       dialog=document.createElement('dialog');dialog.className='gallery-detail';dialog.setAttribute('aria-label','Title details');document.body.append(dialog);
       dialog.addEventListener('click',event=>{if(event.target===dialog||event.target.closest('[data-gallery-close]'))dialog.close();});
-      dialog.addEventListener('close',()=>{host?.querySelector(`[data-gallery-item="${CSS.escape(dialog.dataset.item||'')}"]`)?.focus();});
+      dialog.addEventListener('close',()=>{const target=returnFocus?.isConnected?returnFocus:host?.querySelector(`[data-gallery-item="${CSS.escape(dialog.dataset.item||'')}"]`);target?.focus({preventScroll:true});});
     }
     dialog.dataset.item=String(item.id);
     const show=!isFilm(item),last=api.last(item);
@@ -259,6 +259,11 @@ window.WatchLogGallery=(()=>{
     };});
     observe(dialog,[item]);if(!dialog.open)dialog.showModal();void loadTrackerArtwork(item);void loadTitleDetails(item);
   }
+  function open(id,trigger=document.activeElement){
+    const item=api?.items?.().find(row=>String(row.id)===String(id));
+    if(!item)return false;
+    returnFocus=trigger;detail(item);return true;
+  }
   function back(){
     if(dialog?.open){dialog.close();return true;}
     if(category){category='';api?.render?.();return true;}
@@ -271,7 +276,7 @@ window.WatchLogGallery=(()=>{
       if(manage){api.manage?.(JSON.parse(manage.dataset.galleryManageIds||'[]'),manage.dataset.galleryManage);return;}
       const cat=event.target.closest('[data-gallery-category]');if(cat){category=cat.dataset.galleryCategory;api.render();host.querySelector('.gallery-back')?.focus();return;}
       if(event.target.closest('[data-gallery-back]')){category='';api.render();host.querySelector('.gallery-category')?.focus();return;}
-      const target=event.target.closest('[data-gallery-item]');if(target){const item=api.items().find(row=>String(row.id)===target.dataset.galleryItem);if(item)detail(item);}
+      const target=event.target.closest('[data-gallery-item]');if(target)open(target.dataset.galleryItem,target);
     });}
     if(!category){host.innerHTML=`<div class="gallery-home">${[['Film','Movies','▤'],['Series','Series','▣']].map(([type,label,icon])=>{
       const items=rows.filter(item=>type==='Film'?isFilm(item):!isFilm(item));return `<button type="button" class="gallery-category" data-gallery-category="${type}"><span class="gallery-category-icon" aria-hidden="true">${icon}</span><span><strong>${label}</strong><small>${items.length} title${items.length===1?'':'s'}</small></span><span class="gallery-fan" aria-hidden="true">${items.slice(0,3).map(item=>art(item)).join('')}</span></button>`;
@@ -281,5 +286,5 @@ window.WatchLogGallery=(()=>{
       host.innerHTML=`<div class="gallery-nav"><button type="button" class="gallery-back" data-gallery-back aria-label="Back to Library">‹</button><h2>${category==='Film'?'Movies':'Series'}</h2><span class="gallery-heading-actions"><span class="gallery-count" data-gallery-total-count aria-label="${tracked.length} tracked ${category==='Film'?'films':'series'}">${tracked.length}</span>${manageButton(tracked,category==='Film'?'Movies':'Series')}</span></div>${content}${items.length?'':'<p class="gallery-empty">No titles match your search or filter.</p>'}`;}
     observe(host,rows);
   }
-  return {mount,sections,releaseGroups,back,hasCategory:()=>Boolean(category)};
+  return {mount,open,sections,releaseGroups,back,hasCategory:()=>Boolean(category)};
 })();

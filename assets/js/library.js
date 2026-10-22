@@ -412,13 +412,17 @@
     if(normalizeTitle(searchQuery)===renderedLibrarySearch)return;
     librarySearchTimer=setTimeout(()=>{if(normalizeTitle(searchQuery)!==renderedLibrarySearch)scheduleRender();},70);
   };
-  function openMediaRow(id){const item=mediaItems.find(row=>String(row.id)===String(id));if(!item)return;if(isEpisodeTrackable(item))openEpisodeTracker(item.id);else openEdit(item.id);}
+  function openMediaRow(id,trigger=document.activeElement){
+    const item=mediaItems.find(row=>String(row.id)===String(id));if(!item)return;
+    if(currentTab!=="library"){currentTab="library";render();}
+    if(!window.WatchLogGallery?.open?.(item.id,trigger))void openEdit(item.id);
+  }
   mediaList.addEventListener("click",event=>{
     const edit=event.target.closest("[data-edit-item]");if(edit){event.stopPropagation();openEdit(edit.dataset.editItem);return;}
-    const row=event.target.closest(".title-item[data-item-id]");if(row)openMediaRow(row.dataset.itemId);
+    const row=event.target.closest(".title-item[data-item-id]");if(row)openMediaRow(row.dataset.itemId,row);
   });
   mediaList.addEventListener("keydown",event=>{
     if(event.target.closest("[data-edit-item]"))return;
     const row=event.target.closest(".title-item[data-item-id]");
-    if(row&&(event.key==="Enter"||event.key===" ")){event.preventDefault();openMediaRow(row.dataset.itemId);}
+    if(row&&(event.key==="Enter"||event.key===" ")){event.preventDefault();openMediaRow(row.dataset.itemId,row);}
   });

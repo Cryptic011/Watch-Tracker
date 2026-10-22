@@ -131,7 +131,7 @@
     if(!item||!currentUser)return;
     if(discoveryDialog.open)discoveryDialog.close();
     const duplicate=discoveryDuplicate(item);
-    if(duplicate){void openEdit(duplicate.id);return;}
+    if(duplicate){openMediaRow(duplicate.id);return;}
     openAdd();void selectSuggestion(item);
   }
   function showDiscoveryDetail(item,trigger){

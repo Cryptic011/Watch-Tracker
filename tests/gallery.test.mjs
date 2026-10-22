@@ -5,6 +5,10 @@ import vm from 'node:vm';
 const context={window:{}};
 vm.runInNewContext(fs.readFileSync(new URL('../library-gallery.js',import.meta.url),'utf8'),context);
 const {sections}=context.window.WatchLogGallery;
+test('Shared title-detail navigation safely ignores unknown or uninitialised titles',()=>{
+ assert.equal(typeof context.window.WatchLogGallery.open,'function');
+ assert.equal(context.window.WatchLogGallery.open('missing',null),false);
+});
 test('Watched groups use original release years, never added or watched dates',()=>{
   const rows=[{id:'old',type:'Series',seriesReleaseDate:'2003-09-23',date:'2026-09-21',releaseYear:2026},{id:'new',type:'Film',filmReleaseDate:'2024-07-25',date:'2020-01-01'},{id:'year',type:'Series',releaseYear:2022},{id:'unknown',type:'Film',date:'2026-01-01'}];
   const groups=context.window.WatchLogGallery.releaseGroups(rows);

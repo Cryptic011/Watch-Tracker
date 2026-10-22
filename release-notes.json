@@ -64,8 +64,10 @@
     "number": 224
   },
   "__current": {
-    "title": "Show recurring weekly shows in a Library-home dropdown",
+    "title": "Open the new Episodes and Details page from release links",
     "changes": [
+      "Open the new title page from upcoming releases, Prior Releases, TBA entries, recurring shows and saved search results instead of the old episode tracker or editor.",
+      "Keep series on Episodes by default, with Details to the right, and restore focus to the clicked link on close.",
       "Move Recurring weekly shows to a collapsed dropdown at the top of Library home, with keyboard-accessible expansion and preserved open state during updates.",
       "Add Recurring weekly shows as a separate Monday–Sunday section unaffected by Library filters, search, sorting, or the release-calendar range.",
       "Keep each show listed, hold its aired episode for 24 hours, then advance to the next confirmed episode; retain Next episode TBA when no date is announced.",

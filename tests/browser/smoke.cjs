@@ -76,6 +76,10 @@ const server=http.createServer((req,res)=>{
   assert.equal(items[0].title,'Browser Test Film');
   await page.waitForFunction(()=>document.querySelector('[data-discovery-badge]')?.textContent.includes('Already added'));
   assert.equal(await page.locator('#discovery-results [data-discovery-add]').first().textContent(),'View in library');
+  await page.locator('#discovery-results [data-discovery-add]').first().click();
+  assert.equal(await page.getByRole('tab',{name:'Overview',exact:true}).getAttribute('aria-selected'),'true','saved search results open the new film page');
+  assert.equal(await page.locator('#modal').isVisible(),false,'viewing a saved search result is not editing it');
+  await page.locator('[data-gallery-close]').click();
   await page.locator('[data-tab="library"]').click();await page.locator('[data-tab="search"]').click();assert.equal(await page.locator('#discovery-query').inputValue(),'Browser Test Film');
   await page.locator('#discovery-manual').click();await page.locator('#modal').waitFor({state:'visible'});await page.locator('#close-modal').click();
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),true);
@@ -367,8 +371,18 @@ const server=http.createServer((req,res)=>{
   }
   await page.setViewportSize({width:390,height:844});
   if(process.env.BROWSER_SCREENSHOT_DIR)await recurring.screenshot({path:path.join(process.env.BROWSER_SCREENSHOT_DIR,engine.name()+'-recurring.png')});
-  await recurring.locator('[data-recurring-open="show"]').click();await page.locator('#episode-tracker-modal').waitFor({state:'visible'});
-  await page.locator('#close-episode-tracker').click();
+  await recurring.locator('[data-recurring-open="show"]').click();
+  assert.equal(await page.getByRole('tab',{name:'Episodes',exact:true}).getAttribute('aria-selected'),'true','recurring shows open the new Episodes page');
+  assert.equal(await page.locator('#episode-tracker-modal').isVisible(),false,'old tracker stays closed');
+  await page.getByRole('tab',{name:'Details',exact:true}).click();
+  await page.waitForFunction(()=>document.querySelector('[data-gallery-details]').textContent.includes('official series description'));
+  await page.locator('[data-gallery-close]').click();
+  await page.waitForFunction(()=>document.activeElement?.matches('#recurring-weekly-dashboard [data-recurring-open="show"]'));
+  await page.locator('[data-calendar-range="upcoming"]').click();
+  await page.locator('#library-dashboard [data-dashboard-open="show"]').first().click();
+  assert.equal(await page.getByRole('tab',{name:'Episodes',exact:true}).getAttribute('aria-selected'),'true','upcoming releases open the new Episodes page');
+  assert.equal(await page.locator('#episode-tracker-modal').isVisible(),false);
+  await page.locator('[data-gallery-close]').click();
   phase='refresh';
   const refreshItemId=await page.evaluate(()=>{mediaItems[0].platform='Saved before refresh';return mediaItems[0].id;});
   const before=loads;const reload=page.waitForEvent('load');await page.locator('#refresh-app').click();await reload;

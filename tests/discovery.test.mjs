@@ -14,7 +14,7 @@ function harness(){
   const filters=['All','Film','Series'].map(type=>Object.assign(element(),{dataset:{discoveryFilter:type}}));
   const c=vm.createContext({URL,AbortController,setTimeout,clearTimeout,console,$,currentUser:{id:'a'},currentTab:'search',
     document:{querySelectorAll:()=>filters},esc:value=>String(value).replace(/[&<>"']/g,x=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[x])),
-    findTrackedDuplicate:()=>null,searchAllTitles:async()=>[],openAdd:()=>calls.push('new'),selectSuggestion:item=>calls.push(item.title),openEdit:id=>calls.push(id),
+    findTrackedDuplicate:()=>null,searchAllTitles:async()=>[],openAdd:()=>calls.push('new'),selectSuggestion:item=>calls.push(item.title),openEdit:id=>calls.push('edit:'+id),openMediaRow:id=>calls.push('details:'+id),
     switchTab:tab=>calls.push(tab),titleInput:element()});
   vm.runInContext(source,c);c.activateTitleSearch();
   return {c,$,calls,filters};
@@ -42,9 +42,10 @@ test('Provider text is escaped and only allowed HTTPS artwork is rendered',()=>{
   assert.equal(c.discoveryImage('https://static.tvmaze.com.evil.test/poster.jpg'),'');
   assert.equal(c.discoveryImage('https://is1-ssl.mzstatic.com/poster.jpg'),'https://is1-ssl.mzstatic.com/poster.jpg');
 });
-test('Adding opens the existing editor; duplicates open their saved record instead',()=>{
-  const {c,calls}=harness();c.addDiscoveryTitle({title:'Reacher',format:'Series'});assert.deepEqual(calls,['new','Reacher']);
-  calls.length=0;c.findTrackedDuplicate=()=>({id:'existing'});c.addDiscoveryTitle({title:'Reacher',format:'Series'});assert.deepEqual(calls,['existing']);
+test('Adding opens the editor; saved titles close the search preview and open their title page instead',()=>{
+  const {c,calls,$}=harness();c.addDiscoveryTitle({title:'Reacher',format:'Series'});assert.deepEqual(calls,['new','Reacher']);
+  calls.length=0;$('discovery-detail').open=true;c.findTrackedDuplicate=()=>({id:'existing'});c.addDiscoveryTitle({title:'Reacher',format:'Series'});assert.deepEqual(calls,['details:existing']);
+  assert.equal($('discovery-detail').open,false);
   assert.match(c.discoveryCard({title:'Reacher',format:'Series'},0),/Already added/);
 });
 test('Leaving search cancels pending results and changing account clears the previous query',async()=>{

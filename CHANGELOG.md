@@ -1,3 +1,9 @@
+## 2026-10-23 — Open the new title page from every viewing shortcut
+- Route upcoming releases, Prior Releases, TBA entries, recurring weekly shows, and saved-title search shortcuts to the same new title page as Library cards.
+- Open series on Episodes with Details beside it, and films on Overview; keep Edit as a separate explicit action.
+- Return focus to the clicked schedule or Library link when closing details, without jumping the page.
+- Verify recurring and upcoming show links, saved search results, and keyboard focus in both browsers.
+
 ## 2026-10-23 — Move recurring shows into a Library-home dropdown
 - Put Recurring weekly shows at the top of Library home, collapsed by default with an accessible expand/collapse control.
 - Hide the dropdown inside Series and Movies lists, preserving its expanded state when returning home and during schedule updates.
