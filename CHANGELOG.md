@@ -1,3 +1,8 @@
+## 2026-10-22 — Retry combined pending Watch Logger updates
+- Requeued the latest Preferences redesign together with the existing PNG app icon and title-detail layout/action changes after runs #296 and #297 did not deploy.
+- Fixed release-note regression coverage by restoring the required actual run number/attempt and library export/merge-based restore descriptions.
+- This commit changes release metadata only; it does not bypass any tests.
+
 ## 2026-10-22 — Screenshot-inspired Watch Logger Preferences
 - Restyled the existing Settings screen with a bold Preferences heading, a restrained gradient overview card, rounded grouped panels, and subtle row dividers inspired by the reference screenshot.
 - Adapted the layout to Watch Logger's real operations only: appearance, background release reminders, account/cloud sync, PIN changes, and sign-out. No fake App Icon, review, support, or other placeholder destinations added.

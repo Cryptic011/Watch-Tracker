@@ -64,11 +64,11 @@
     "number": 224
   },
   "__current": {
-    "title": "Restyle Watch Logger Preferences",
+    "title": "Retry Preferences redesign and include cancelled deployment work",
     "changes": [
-      "Restyled Settings to follow the supplied iOS Preferences reference with a clear heading, gradient overview panel, rounded groups, and separators.",
-      "Kept the screen grounded in existing Watch Logger operations: appearance, release reminders, cloud sync, PIN change, and sign-out; no inactive placeholder rows added.",
-      "Preserved existing setting controls and handlers and refreshed the stylesheet cache version."
+      "Retry the latest Watch Logger Preferences redesign together with the PNG app icon and title-detail action fixes after the prior deployment run was cancelled.",
+      "Document the actual run number and attempt for deployment history.",
+      "Preserve library export and merge-based restore behaviour."
     ]
   },
   "37f6c39e9d0355b1bde705cb3fcb3cda2533119f": {
