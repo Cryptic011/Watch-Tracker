@@ -64,8 +64,10 @@
     "number": 224
   },
   "__current": {
-    "title": "Fix Git safe-directory setup in browser container",
+    "title": "Fix test shell and Track Sync status checks",
     "changes": [
+      "Fixed run #308's Bash PIPESTATUS failure by selecting Bash explicitly for test steps inside the Playwright container.",
+      "Matched the Track Sync completion assertion to its rendered status label.",
       "Fixed run #307's Git dubious-ownership error by marking only the checked-out workspace safe before build metadata generation.",
       "Polished Settings category icons while retaining General, Release Reminders, Account & Sync, and the working Track Sync shortcut.",
       "Fixed Prior Releases title and release metadata layout on narrow screens by targeting the actual rendered row class.",

@@ -1,3 +1,7 @@
+## 2026-10-22 — Use Bash explicitly for pipeline checks and match sync status
+- Fixed run #308's workflow-shell error: the Playwright container defaults to `sh`, but failure-reporting scripts use Bash's `PIPESTATUS`.
+- Explicitly selected Bash for both test steps and corrected the Track Sync completion assertion to match the rendered status text.
+
 ## 2026-10-22 — Trust the checked-out repo in the Playwright container
 - Fixed run #307's exact startup failure: Git rejected repository metadata as dubious ownership inside the container before tests started.
 - Both workflows now mark only `$GITHUB_WORKSPACE` as safe before reading Git history for version metadata.

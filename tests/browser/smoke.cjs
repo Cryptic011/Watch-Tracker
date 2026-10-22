@@ -120,7 +120,7 @@ const server=http.createServer((req,res)=>{
   await page.waitForFunction(()=>document.querySelector('#sync-now').disabled,'',{timeout:5000});
   for(let attempt=0;attempt<100&&loads===loadsBeforeTrackSync;attempt++)await new Promise(resolve=>setTimeout(resolve,50));
   assert.ok(loads>loadsBeforeTrackSync,'Track Sync performs a cloud library load');
-  await page.waitForFunction(()=>!document.querySelector('#sync-now').disabled&&document.querySelector('#sync-status').textContent.startsWith('Synced.'),null,{timeout:10000});
+  await page.waitForFunction(()=>!document.querySelector('#sync-now').disabled&&document.querySelector('#sync-status').textContent.includes('Synced.'),null,{timeout:10000});
   await page.locator('[data-tab="library"]').click();
   await page.waitForFunction(()=>document.querySelector('#settings-view').classList.contains('hidden')&&!document.querySelector('#library-view').classList.contains('hidden'));
   for(const selector of ['.profile-card','#sync-now','#logout-btn','#appearance-mode','#background-reminder-status','#enable-background-reminders']){

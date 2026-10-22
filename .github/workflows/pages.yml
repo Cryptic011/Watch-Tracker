@@ -52,6 +52,7 @@ jobs:
       - name: Check application behavior
         id: application_tests
         continue-on-error: true
+        shell: bash
         run: |
           set +e
           node --test tests/*.test.mjs 2>&1 | tee /tmp/watchlog-tests.log
@@ -64,6 +65,7 @@ jobs:
       - name: Check mobile browser flows
         id: browser_tests
         continue-on-error: true
+        shell: bash
         env:
           BROWSER_ENGINES: all
         run: |

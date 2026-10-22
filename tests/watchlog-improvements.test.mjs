@@ -9,6 +9,8 @@ test('Deployment checks gate publishing and workflow concurrency never cancels a
   assert.match(workflow,/cancel-in-progress:\s*false/);
   assert.match(workflow,/node --test tests\/\*\.test\.mjs/);
   assert.match(workflow,/git config --global --add safe\.directory "\$GITHUB_WORKSPACE"/);
+  assert.match(workflow,/id: application_tests[\s\S]*?shell: bash/);
+  assert.match(workflow,/id: browser_tests[\s\S]*?shell: bash/);
   assert.ok(workflow.indexOf('Stop before deployment when checks fail')<workflow.indexOf('Deploy to GitHub Pages'));
   assert.match(workflow,/WATCHLOG_SOURCE_RUN_ATTEMPT:\s*\$\{\{ github\.run_attempt \}\}/);
   assert.match(read('../scripts/notify-deployment.mjs'),/Post-deployment health check failed/);
