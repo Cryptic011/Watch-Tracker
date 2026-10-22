@@ -64,9 +64,13 @@
     "number": 224
   },
   "__current": {
-    "title": "Rename Preferences heading to Settings",
+    "title": "Repair Settings navigation and reminder activity regression",
     "changes": [
-      "Renamed the Settings screen heading and category navigation labels from Preferences to Settings, including the back-to-Settings actions."
+      "Renamed the settings landing page to Settings and added iOS-style category navigation with General, Release Reminders, Account & Sync, and a Track Sync shortcut.",
+      "Preserved the actual workflow run number and attempt in deployment history.",
+      "Preserved library export and merge-based restore behavior.",
+      "Restored Reminder activity and its View activity dialog so existing handlers no longer reference missing elements.",
+      "Updated mobile browser smoke coverage to open each Settings category and verify the controls in the relevant panel."
     ]
   },
   "37f6c39e9d0355b1bde705cb3fcb3cda2533119f": {

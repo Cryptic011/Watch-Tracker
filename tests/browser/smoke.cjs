@@ -97,14 +97,24 @@ const server=http.createServer((req,res)=>{
   await page.getByRole('button',{name:'Undo',exact:true}).click();
   await page.waitForFunction(()=>!cloudSaveInFlight&&!localSaveInFlight&&mediaItems.length===2);
   assert.equal(items.length,2);
-  // Exercise the actual Settings/Library tab transition in a mobile browser.
+  // Exercise the Settings menu and each drill-in panel in a mobile browser.
   phase='settings visibility';
   await page.locator('[data-tab="settings"]').click();
   await page.waitForFunction(()=>!document.querySelector('#settings-view').classList.contains('hidden')&&document.querySelector('#library-view').classList.contains('hidden'));
-  for(const selector of ['.profile-card','#sync-now','#logout-btn','#appearance-mode','#background-reminder-status','#enable-background-reminders']){
+  assert.equal(await page.locator('#settings-category-menu').isVisible(),true,'Settings category menu is visible');
+  assert.equal(await page.locator('.settings-quick-actions').isVisible(),true,'Track Sync shortcut is visible');
+  await page.locator('[data-settings-open="general"]').click();
+  assert.equal(await page.locator('#appearance-mode').isVisible(),true,'General opens appearance controls');
+  await page.locator('[data-settings-back]').click();
+  await page.locator('[data-settings-open="reminders"]').click();
+  assert.equal(await page.locator('#background-reminder-status').isVisible(),true,'Release Reminders opens reminder controls');
+  await page.locator('[data-settings-back]').click();
+  await page.locator('[data-settings-open="account"]').click();
+  for(const selector of ['.profile-card','#sync-now','#logout-btn']){
     assert.ok(await page.locator(selector).count()>=1,selector+' exists in the document');
-    assert.equal(await page.locator(selector).first().isVisible(),true,selector+' visible in Settings');
+    assert.equal(await page.locator(selector).first().isVisible(),true,selector+' visible in Account & Sync');
   }
+  await page.locator('[data-settings-back]').click();
   await page.locator('[data-tab="library"]').click();
   await page.waitForFunction(()=>document.querySelector('#settings-view').classList.contains('hidden')&&!document.querySelector('#library-view').classList.contains('hidden'));
   for(const selector of ['.profile-card','#sync-now','#logout-btn','#appearance-mode','#background-reminder-status','#enable-background-reminders']){

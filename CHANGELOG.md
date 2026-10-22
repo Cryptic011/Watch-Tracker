@@ -1,3 +1,9 @@
+## 2026-10-22 — Repair Settings navigation and reminder activity regression
+- Restored Reminder activity and its View activity dialog inside Settings so existing event handlers do not target missing DOM elements.
+- Preserved required release-note history for the actual workflow run number/attempt and library export plus merge-based restore.
+- Updated mobile browser smoke tests to navigate General, Release Reminders, and Account & Sync individually and verify their actual controls.
+- Kept the iOS-style Settings landing page and Track Sync shortcut.
+
 ## 2026-10-22 — Use Settings as the screen title
 - Renamed the Preferences heading and navigation accessibility label to Settings, including each category's back-to-Settings action.
 
