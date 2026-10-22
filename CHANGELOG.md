@@ -1,3 +1,7 @@
+## 2026-10-22 — Move Reminders into Release Reminders and compact season details
+- Moved the private reminder history into the Release Reminders settings page and renamed its entry to Reminders.
+- Reduced expanded season artwork, row heights, episode thumbnails, and episode typography to match the supplied reference.
+
 ## 2026-10-22 — Apply the new Watch Logger app icon
 - Replaced the PWA icon with the supplied artwork and added a dedicated 180px iOS home-screen icon.
 - Updated icon URLs and kept the non-maskable artwork from being cropped by adaptive masks.

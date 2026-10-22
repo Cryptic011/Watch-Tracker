@@ -313,12 +313,14 @@ test("App update checks are event-driven and preserve active edits", () => {
   assert.match(source, /saveBeforeAppRefresh\(\)/);
 });
 
-test("Reminder activity stays compact and opens in a dialog below maintenance", () => {
+test("Reminders belong to Release Reminders and open in a dialog", () => {
   const index = fs.readFileSync(path.join(root, "index.html"), "utf8");
   const core = fs.readFileSync(path.join(root, "assets/js/app-core.js"), "utf8");
   const dashboard = fs.readFileSync(path.join(root, "assets/js/dashboard.js"), "utf8");
-  assert.match(index, /id="refresh-reminder-history"[^>]*>View activity<\/button>/);
+  assert.match(index, /id="private-reminder-history"[^>]*>[\s\S]*<h3>Reminders<\/h3>[\s\S]*id="refresh-reminder-history"[^>]*>View reminders<\/button>/);
+  assert.match(index, /<h2>Reminders<\/h2>/);
   assert.match(index, /id="reminder-history-dialog"/);
   assert.match(dashboard, /reminder-history-dialog[\s\S]*showModal\(\)/);
-  assert.match(core, /settingsView\.appendChild\(maintenanceAdminSection\);[\s\S]*settingsView\.appendChild\(reminderActivitySection\)/);
+  assert.match(core, /document\.querySelector\('#settings-view \[data-settings-panel="reminders"\]'\)\?\.appendChild\(reminderActivitySection\)/);
+  assert.doesNotMatch(core, /settingsView\.appendChild\(reminderActivitySection\)/);
 });

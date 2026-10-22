@@ -64,8 +64,10 @@
     "number": 224
   },
   "__current": {
-    "title": "Set the new Watch Logger app icon",
+    "title": "Refine Reminders and expanded season layout",
     "changes": [
+      "Moved reminder history under Release Reminders and renamed it Reminders.",
+      "Reduced season poster size, season row height, episode thumbnails, and text size to match the supplied reference.",
       "Applied the supplied Watch Logger artwork as the 512px PWA icon and dedicated 180px iOS home-screen icon.",
       "Updated icon cache versions and disabled adaptive masking that could crop the artwork.",
       "Moved owner-only Maintenance controls into their own Settings category and drill-in page.",
