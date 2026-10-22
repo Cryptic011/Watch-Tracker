@@ -21,7 +21,9 @@ jobs:
   deploy:
     name: Build and deploy
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 10
+    container:
+      image: mcr.microsoft.com/playwright:v1.62.1-noble
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -38,10 +40,8 @@ jobs:
           node-version: '24'
           cache: npm
 
-      - name: Install browser checks
-        run: |
-          npm ci
-          npx playwright install --with-deps chromium webkit
+      - name: Install application dependencies
+        run: npm ci
 
       - name: Generate version from Git history
         run: node scripts/build-info.mjs

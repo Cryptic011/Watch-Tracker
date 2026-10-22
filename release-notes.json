@@ -64,8 +64,11 @@
     "number": 224
   },
   "__current": {
-    "title": "Wait for Track Sync before continuing browser checks",
+    "title": "Polish Settings and release display; speed up CI setup",
     "changes": [
+      "Polished Settings category icons while retaining General, Release Reminders, Account & Sync, and the working Track Sync shortcut.",
+      "Fixed Prior Releases title and release metadata layout on narrow screens by targeting the actual rendered row class.",
+      "Use the Playwright 1.62.1 Noble image with browsers and system dependencies preinstalled, avoiding the slow apt setup that cancelled runs #302; keep a 10-minute job limit.",
       "Wait for the Track Sync action to finish before the subsequent refresh test, after run #305 exposed a race between sync and refresh.",
       "Scoped Account & Sync browser assertions to its active panel after run #304 exposed a hidden-panel selector ambiguity.",
       "Wait for the Track Sync cloud request before asserting shortcut behavior.",

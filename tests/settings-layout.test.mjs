@@ -22,6 +22,14 @@ test('Settings is consolidated into General, Release Reminders, and Account & Sy
  assert.doesNotMatch(core,/maintenanceAdminSection\.before\(whatsNewButton\)/);
 });
 
+test('Settings categories use scalable icons and Prior Releases reserves readable metadata width',()=>{
+ const html=read('index.html'),dashboard=read('assets/js/dashboard.js'),css=read('assets/css/dashboard.css'),appCss=read('assets/css/app.css');
+ assert.match(html,/settings-category-icon[^>]*aria-hidden="true"><svg viewBox=/);
+ assert.match(dashboard,/class="release-tba-item"[^>]*><strong>\$\{esc\(event\.item\.title\)\}<\/strong><span>\$\{esc\(event\.label\)/);
+ assert.match(css,/\.prior-releases \.release-tba-item\{grid-template-columns:minmax\(0,1fr\) minmax\(145px,44%\)/);
+ assert.match(appCss,/\.settings-category-icon svg\{width:24px;height:24px;fill:none;stroke:currentColor/);
+});
+
 test('Floating Add button is only visible on the Library tab and only under its allowed filters',()=>{
  const library=read('assets/js/library.js');
  assert.match(library,/addBtn\.classList\.toggle\("hidden",!\(currentUser&&currentTab==="library"&&\(!categoryControlsVisible\(\)\|\|activeFilter==="All"\)\)\)/);

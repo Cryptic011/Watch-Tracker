@@ -1,3 +1,9 @@
+## 2026-10-22 — Refine Settings and release display; remove slow CI setup
+- Replaced placeholder Settings glyphs with compact inline icons and retained the requested grouped menu and category drill-ins.
+- Fixed Prior Releases metadata collapsing into a narrow column by styling the actual `.release-tba-item` markup.
+- Run browser checks in the Playwright 1.62.1 Noble image with preinstalled browser dependencies, avoiding the slow apt downloads that cancelled runs #302; cap each workflow at 10 minutes.
+- Wait for Track Sync to finish before continuing browser smoke coverage.
+
 ## 2026-10-22 — Wait for Track Sync to finish in browser checks
 - Run #305 confirmed the Settings navigation tests pass but exposed a race between the Track Sync request and the following refresh scenario.
 - The smoke test now waits for the real sync action to finish before continuing.

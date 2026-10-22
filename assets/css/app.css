@@ -195,6 +195,7 @@ html,body{touch-action:manipulation}button,.btn,.pill-btn,.tab-btn,select{touch-
 .settings-category-row{display:grid;grid-template-columns:54px minmax(0,1fr) 22px;align-items:center;gap:14px;width:100%;min-height:73px;padding:11px 0;border:0;border-radius:0;background:transparent;color:var(--text);text-align:left;font:inherit;font-size:1rem;font-weight:650;cursor:pointer}
 .settings-category-row+.settings-category-row{border-top:1px solid #454548}
 .settings-category-icon{width:48px;height:48px;display:grid;place-items:center;border:1px solid #48484c;border-radius:14px;background:linear-gradient(145deg,#38383b,#111113);color:#fff;font-size:1.55rem;font-weight:700;box-shadow:0 2px 3px #0003}
+.settings-category-icon svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .settings-chevron{justify-self:end;color:#737378;font-size:2rem;line-height:1;font-weight:400}
 .settings-quick-actions{padding-top:0;padding-bottom:0}
 .settings-quick-actions .settings-category-row{min-height:78px}
