@@ -1,3 +1,7 @@
+## 2026-10-22 — Trust the checked-out repo in the Playwright container
+- Fixed run #307's exact startup failure: Git rejected repository metadata as dubious ownership inside the container before tests started.
+- Both workflows now mark only `$GITHUB_WORKSPACE` as safe before reading Git history for version metadata.
+
 ## 2026-10-22 — Refine Settings and release display; remove slow CI setup
 - Replaced placeholder Settings glyphs with compact inline icons and retained the requested grouped menu and category drill-ins.
 - Fixed Prior Releases metadata collapsing into a narrow column by styling the actual `.release-tba-item` markup.

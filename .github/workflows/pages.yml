@@ -34,6 +34,9 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Allow Git metadata reads in the browser container
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
       - name: Set up Node.js
         uses: actions/setup-node@v6
         with:
