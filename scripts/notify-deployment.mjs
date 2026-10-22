@@ -46,12 +46,13 @@ const response=await fetch(`${config.url}/functions/v1/watchlog-reminders`,{
 });
 if(!response.ok){
   const detail=(await response.text()).slice(0,1000);
-  throw Error(`Private run-status notification returned ${response.status}: ${detail}`);
+  console.warn(`Private run-status notification unavailable (${response.status}): ${detail}`);
+}else{
+  const delivery=await response.json();
+  const delivered=Number(delivery.delivered||0), failed=Number(delivery.failed||0);
+  console.log(`Private run-status notification processed: ${status}; delivered ${delivered}; failed ${failed}`);
+  if(!delivery.ok||(!delivery.duplicate&&delivered<1)||failed>0)console.warn(`Private run-status notification was not fully delivered: ${JSON.stringify({ok:delivery.ok,delivered,failed,reason:delivery.reason||null})}`);
 }
-const delivery=await response.json();
-const delivered=Number(delivery.delivered||0), failed=Number(delivery.failed||0);
-console.log(`Private run-status notification processed: ${status}; delivered ${delivered}; failed ${failed}`);
-if(!delivery.ok||(!delivery.duplicate&&delivered<1)||failed>0)throw Error(`Private run-status notification was not fully delivered: ${JSON.stringify({ok:delivery.ok,delivered,failed,reason:delivery.reason||null})}`);
 
 if(status!=='success'||!page){console.log(`Deployment status sent: ${status} for ${sha}`);if(healthCheckFailed)process.exit(1);process.exit(0);}
 await broadcast(config.event,{sha});

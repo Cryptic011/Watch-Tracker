@@ -325,6 +325,17 @@
 - Group episodes of the same title airing on the same day/time into a single tappable card to avoid long repeated-title lists.
 - Improve empty-day states, dates-to-be-announced grouping, mobile spacing and keyboard focus visibility.
 
+# 2026-10-22
+
+### Coordinated Watch Logger improvements
+- Run the complete application and browser test suites before deployment, prevent overlapping deploys from cancelling one another, track the actual GitHub run and retry numbers, and include failed-check details plus recovery guidance in owner notifications.
+- Add a post-deployment health check. The first deployment's Pages publish and health check succeeded, but the owner-notification step failed with HTTP 401 because the already-deployed notification endpoint required a GitHub verification token. Notification endpoint outages now produce a visible warning instead of falsely failing a successful publish; deploy and health-check failures still fail the workflow. The Actions token is not sent to Supabase.
+- Add reminder states, test sends, delivery history, and deduplication; Weekly Releases exclusions now suppress related reminders.
+- Add conflict-aware sync, offline/reconnect preservation, clear sync states, and versioned library export/merge restore.
+- Improve the weekly calendar with separate weekly and upcoming-release views, Today/This week/Upcoming filters, re-enable controls for excluded shows, consistent episode/date/status details, and explicit local-timezone labeling.
+- Improve library search, sorting, bulk actions, and filter preservation when opening and returning from an item.
+- Move Watch Statistics to Settings > Account & Sync and add a profile button to open that section. Improve mobile layout and bulk-action access, touch targets, keyboard focus, visible sync/reminder status, and reduced-motion behavior.
+
 # Changelog
 
 ## 2026-10-06
