@@ -257,8 +257,8 @@ test("Episode artwork uses each episode image and excludes the series poster",()
 });
 
 test("Episode artwork lookup rejects mismatched IDs and ambiguous titles",async()=>{
-  const api=loadFunctions(["officialEpisodeImageMap","fetchOfficialEpisodeArtwork"],`
-    const episodeArtworkCache=new Map();
+  const api=loadFunctions(["officialEpisodeImageMap","officialSeasonImageMap","fetchOfficialTrackerArtwork"],`
+    const trackerArtworkCache=new Map();
     function cachedMetadataRequest(cache,key,task){return task();}
     function normalizeTitle(value){return String(value||"").toLowerCase();}
     async function fetchJSONWithTimeout(url){
@@ -267,8 +267,34 @@ test("Episode artwork lookup rejects mismatched IDs and ambiguous titles",async(
       return {id:12,name:"Twin",externals:{imdb:"tt1111111"}};
     }
   `);
-  assert.deepEqual(JSON.parse(JSON.stringify(await api.fetchOfficialEpisodeArtwork({title:"Twin",tvmazeShowId:"12",imdbId:"tt2222222"}))),{});
-  assert.deepEqual(JSON.parse(JSON.stringify(await api.fetchOfficialEpisodeArtwork({title:"Twin"}))),{});
+  assert.deepEqual(JSON.parse(JSON.stringify(await api.fetchOfficialTrackerArtwork({title:"Twin",tvmazeShowId:"12",imdbId:"tt2222222"}))),{});
+  assert.deepEqual(JSON.parse(JSON.stringify(await api.fetchOfficialTrackerArtwork({title:"Twin"}))),{});
+});
+
+test("Season artwork comes only from the matching season record",()=>{
+  const api=loadFunctions(["officialSeasonImageMap"]);
+  const images=api.officialSeasonImageMap([
+    {number:1,image:{original:"https://static.tvmaze.com/season-one.jpg"}},
+    {number:2,image:null},
+    {number:3,image:{medium:"https://static.tvmaze.com/season-three.jpg"}},
+    {number:0,image:{original:"https://static.tvmaze.com/specials.jpg"}},
+    {number:4,image:{original:"https://example.com/unverified.jpg"}}
+  ]);
+  assert.deepEqual(JSON.parse(JSON.stringify(images)),{1:"https://static.tvmaze.com/season-one.jpg",3:"https://static.tvmaze.com/season-three.jpg"});
+});
+
+test("Season artwork remains available when the episode endpoint fails",async()=>{
+  const api=loadFunctions(["officialEpisodeImageMap","officialSeasonImageMap","fetchOfficialTrackerArtwork"],`
+    const trackerArtworkCache=new Map();
+    function cachedMetadataRequest(cache,key,task){return task();}
+    async function fetchJSONWithTimeout(url){
+      if(url.endsWith("/episodes"))throw new Error("Episode endpoint unavailable");
+      if(url.endsWith("/seasons"))return [{number:1,image:{original:"https://static.tvmaze.com/season-one.jpg"}}];
+      return {id:12,externals:{imdb:"tt1111111"}};
+    }
+  `);
+  const artwork=await api.fetchOfficialTrackerArtwork({title:"Twin",tvmazeShowId:"12",imdbId:"tt1111111"});
+  assert.deepEqual(JSON.parse(JSON.stringify(artwork)),{seasonImages:{1:"https://static.tvmaze.com/season-one.jpg"}});
 });
 
 test("TVMaze release timestamps are stored in UTC", () => {

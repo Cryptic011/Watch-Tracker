@@ -35,7 +35,11 @@ const server=http.createServer((req,res)=>{
     {season:1,number:2,image:null},
     {season:1,number:3,image:{original:'https://static.tvmaze.com/series-poster.jpg'}}
    ]});
-   if(url.hostname==='static.tvmaze.com')return route.fulfill({headers,contentType:'image/png',body:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jf1sAAAAASUVORK5CYII=','base64')});
+   if(url.hostname==='api.tvmaze.com'&&url.pathname==='/shows/12/seasons')return route.fulfill({headers,json:[
+    {number:1,image:{original:'https://static.tvmaze.com/season-one.jpg'}},
+    {number:2,image:null}
+   ]});
+   if(url.hostname==='static.tvmaze.com')return route.fulfill({headers,contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="320" height="180"><rect width="320" height="180" fill="#334b68"/><path d="M0 150L110 40L210 120L270 70L320 140V180H0Z" fill="#87a5c5"/><circle cx="245" cy="40" r="18" fill="#e5bf7e"/></svg>'});
    if(req.url().includes('/functions/v1/watchlog-pin')){
     const body=req.postDataJSON();let data={ok:true};
     if(['login','load'].includes(body.action)){loads++;data={ok:true,account,items,revision,sessionToken:'test-token'};}
@@ -101,16 +105,62 @@ const server=http.createServer((req,res)=>{
   assert.deepEqual(items.find(x=>x.id==='show').watchedEpisodes,{'1':[2]});assert.equal(await page.locator('#episode-tracker-grid [data-episode="4"]').count(),0);
   await page.locator('#close-episode-tracker').click();
   phase='episode artwork';
+  await page.evaluate(()=>{
+   const item=mediaItems.find(row=>row.id==='show');
+   item.releasedEpisodes={1:Array.from({length:18},(_,index)=>index+1),2:[1]};item.airedEpisodeCounts={1:18,2:1};item.episodeCounts={1:18,2:2};
+   item.episodeTitles={1:{1:'A Longer Episode Title That Wraps Without Squeezing the Artwork'}};render();
+  });
   await page.locator('[data-gallery-category="Series"]').click();
   await page.locator('[data-gallery-item="show"]').first().click();
   await page.locator('.gallery-season summary').first().click();
   await page.locator('[data-gallery-episode="1:1"] img').waitFor({state:'visible'});
   assert.equal(await page.locator('[data-gallery-episode="1:1"] img').getAttribute('src'),'https://static.tvmaze.com/episode-one.jpg');
+  await page.locator('[data-gallery-season-art="1"] img').waitFor({state:'visible'});
+  assert.equal(await page.locator('[data-gallery-season-art="1"] img').getAttribute('src'),'https://static.tvmaze.com/season-one.jpg');
+  assert.equal(await page.locator('[data-gallery-season-art="2"] img').count(),0);
   for(const episode of [2,3]){
    assert.equal(await page.locator('[data-gallery-episode="1:'+episode+'"] img').count(),0);
-   assert.equal(await page.locator('[data-gallery-episode="1:'+episode+'"] .gallery-episode-placeholder').isVisible(),true);
+   assert.equal(await page.locator('[data-gallery-episode="1:'+episode+'"] .gallery-artwork-placeholder').isVisible(),true);
   }
-  await page.locator('[data-gallery-episode="1:1"]').click();
+  for(const width of [320,390,768,1280]){
+   await page.setViewportSize({width,height:844});
+   const layout=await page.locator('[data-gallery-episode="1:1"]').evaluate(row=>{
+    const bounds=node=>{const rect=node.getBoundingClientRect();return {width:rect.width,height:rect.height,right:rect.right};};
+    const dialog=row.closest('dialog');
+    return {display:getComputedStyle(row).display,art:bounds(row.querySelector('.gallery-episode-art')),text:bounds(row.querySelector('.gallery-episode-copy')),button:bounds(row.querySelector('button')),overflow:dialog.scrollWidth>dialog.clientWidth};
+   });
+   assert.equal(layout.display,'grid');assert.equal(layout.overflow,false);
+   assert.ok(layout.button.width>=44&&layout.button.height>=44);
+   assert.ok(layout.button.right<=width-24,'watch control leaves a right-hand scroll gutter');
+   assert.ok(layout.text.width>=80,'episode title retains readable space');
+   assert.ok(Math.abs(layout.art.width/layout.art.height-16/9)<.04,'episode artwork keeps its natural landscape ratio');
+  }
+  await page.setViewportSize({width:390,height:844});
+  await page.locator('[data-gallery-episode="1:1"] .gallery-episode-art').click();
+  assert.equal(await page.locator('[data-gallery-toggle-episode="1:1"]').getAttribute('aria-pressed'),'false','tapping the row does not accidentally mark progress');
+  const gutterRow=await page.locator('[data-gallery-episode="1:1"]').boundingBox();
+  await page.touchscreen.tap(382,gutterRow.y+gutterRow.height/2);
+  assert.equal(await page.locator('[data-gallery-toggle-episode="1:1"]').getAttribute('aria-pressed'),'false');
+  if(process.env.BROWSER_SCREENSHOT_DIR){
+   fs.mkdirSync(process.env.BROWSER_SCREENSHOT_DIR,{recursive:true});
+   await page.locator('.gallery-detail').evaluate(dialog=>{dialog.scrollTop+=dialog.querySelector('.gallery-season-list').getBoundingClientRect().top-dialog.querySelector('header').getBoundingClientRect().bottom-12;});
+   await page.evaluate(()=>document.documentElement.dataset.theme='dark');
+   await page.screenshot({path:path.join(process.env.BROWSER_SCREENSHOT_DIR,engine.name()+'-tracker-dark.png')});
+   await page.evaluate(()=>document.documentElement.dataset.theme='light');
+   await page.screenshot({path:path.join(process.env.BROWSER_SCREENSHOT_DIR,engine.name()+'-tracker-light.png')});
+   await page.evaluate(()=>document.documentElement.dataset.theme='dark');
+  }
+  await page.locator('[data-gallery-toggle-episode="1:1"]').click();
+  await page.waitForFunction(()=>!episodeLogBusy.size&&!cloudSaveInFlight);
+  assert.deepEqual(items.find(x=>x.id==='show').watchedEpisodes,{'1':[1,2]});
+  await page.locator('[data-gallery-season="2"]').scrollIntoViewIfNeeded();
+  const trackerScroll=await page.locator('.gallery-detail').evaluate(dialog=>dialog.scrollTop);
+  await page.locator('[data-gallery-season="2"]').click();
+  await page.waitForFunction(()=>!episodeLogBusy.size&&!cloudSaveInFlight);
+  assert.deepEqual(items.find(x=>x.id==='show').watchedEpisodes,{'1':[1,2],'2':[1]});
+  assert.equal(await page.locator('.gallery-season[data-season="2"]').getAttribute('open'),null);
+  assert.ok(Math.abs(await page.locator('.gallery-detail').evaluate(dialog=>dialog.scrollTop)-trackerScroll)<=2,'saving season progress preserves the scroll position');
+  await page.locator('[data-gallery-season="2"]').click();
   await page.waitForFunction(()=>!episodeLogBusy.size&&!cloudSaveInFlight);
   assert.deepEqual(items.find(x=>x.id==='show').watchedEpisodes,{'1':[1,2]});
   await page.locator('[data-gallery-close]').click();

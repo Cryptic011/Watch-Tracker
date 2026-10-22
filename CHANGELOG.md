@@ -1,3 +1,10 @@
+## 2026-10-22 — Refine season layouts and consolidate today's UI changes
+- Replaced conflicting gallery styles with one responsive layout, natural episode thumbnails, readable text, and a clear right-hand scroll gutter.
+- Limited progress changes to dedicated 44px watch buttons, preserving expanded seasons, focus, and scroll position after saves.
+- Added posters from the matching TVMaze season records, preserving them through edits and metadata refreshes, with neutral placeholders when unavailable.
+- Consolidated season and episode artwork loading, removed unused Settings and duplicate detail styles, and kept the title actions in the three-dot menu.
+- Rewrote the current release summary around the final implemented features while retaining historical workflow details in this changelog.
+
 ## 2026-10-22 — Verify episode artwork and preserve it during saves
 - Load the image attached to each matching TVMaze episode when opening a show, including existing saved shows.
 - Exclude the series poster and use a neutral placeholder when an episode image is unavailable or fails to load.

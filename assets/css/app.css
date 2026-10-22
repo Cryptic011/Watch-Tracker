@@ -119,19 +119,16 @@ html,body{touch-action:manipulation}button,.btn,.pill-btn,.tab-btn,select{touch-
 .user-pill{min-height:42px;padding:5px 12px 5px 6px;border-radius:24px}.profile-nav-icon{display:grid;place-items:center;width:30px;height:30px;border-radius:50%;background:#29354a;color:var(--blue2)}.profile-nav-icon svg{width:17px;height:17px;fill:currentColor}.quick-status{display:flex;gap:7px;margin:-5px 0 10px}.quick-status-chip{display:inline-flex;align-items:center;gap:6px;min-height:25px;padding:4px 9px;border:1px solid var(--border);border-radius:999px;background:var(--card);color:var(--muted);font-size:.68rem;font-weight:750;line-height:1}.quick-status-chip i{width:7px;height:7px;border-radius:50%;background:#6b7280}.quick-status-chip[data-state="ok"] i{background:var(--green)}.quick-status-chip[data-state="syncing"] i{background:var(--blue2)}.quick-status-chip[data-state="attention"] i{background:var(--amber)}.quick-status-chip[data-state="syncing"]{color:var(--blue2)}.quick-status-chip[data-state="attention"]{color:var(--amber)}
 @media(max-width:600px){.bulk-toolbar{position:fixed;z-index:55;left:12px;right:12px;bottom:calc(76px + env(safe-area-inset-bottom,0px));margin:0;padding:8px 10px;border:1px solid var(--border);border-radius:16px;background:rgba(23,26,33,.96);box-shadow:0 8px 26px #0008;backdrop-filter:blur(16px)}.bulk-toolbar .btn{flex:0 0 auto}.bulk-toolbar [role="status"]{min-width:0;overflow:hidden;text-overflow:ellipsis;font-size:.72rem;color:var(--muted)}}
 
-/* Preferences layout inspired by the grouped settings reference */
-.preferences-heading{padding:18px 0 22px}.preferences-heading h2{margin:0;font-size:2rem;letter-spacing:-.04em}.preferences-heading p{margin:8px 0 0;color:var(--muted)}.preferences-group{margin:0 0 18px;padding:4px 16px;border-radius:24px;background:#292929}.preferences-row{display:flex;align-items:center;gap:14px;width:100%;min-height:74px;padding:12px 0;border:0;border-bottom:1px solid #444;background:transparent;color:var(--text);text-align:left;font:inherit;font-weight:650}.preferences-row:last-child{border-bottom:0}.preferences-icon{display:grid;place-items:center;flex:0 0 42px;width:42px;height:42px;border:1px solid #454545;border-radius:13px;background:linear-gradient(#343434,#151515);color:#fff;font-size:1.25rem;font-weight:850}.preferences-chevron{margin-left:auto;color:var(--muted);font-size:1.7rem}.preferences-highlight{outline:2px solid var(--blue2);outline-offset:4px;border-radius:14px;scroll-margin-top:20px}
 
-/* Screenshot-inspired Preferences styling, adapted to Watch Logger's live settings. */
 #settings-view{padding:0 0 calc(28px + env(safe-area-inset-bottom,0px));}
-.preferences-heading{padding:22px 2px 18px}
+.preferences-heading{padding:8px 2px 18px}
 .preferences-heading h2{font-size:clamp(2rem,8vw,2.5rem);line-height:1.05;letter-spacing:-.045em;font-weight:850;margin:0 0 10px}
 .preferences-heading p{font-size:.96rem;line-height:1.45;color:var(--muted);margin:0}
 .settings-welcome{position:relative;isolation:isolate;display:flex;flex-direction:column;gap:7px;padding:20px 18px;margin:0 0 28px;border-radius:25px;background:linear-gradient(var(--card),var(--card)) padding-box,linear-gradient(115deg,#d946ef,#3b82f6,#f43f5e) border-box;border:2px solid transparent;box-shadow:0 10px 26px #0002}
 .settings-welcome strong{font-size:1.12rem;font-weight:850}
 .settings-welcome span{font-size:.9rem;line-height:1.45;color:var(--text)}
 .settings-section{margin:0 0 24px}
-.settings-section>.section-label{font-size:.82rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:800;margin:0 0 10px 5px}
+.settings-section>.section-label{font-size:.82rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:800;margin:24px 0 12px}
 .settings-section>.profile-card{border:0;border-radius:25px;background:var(--card);padding:18px;gap:0;box-shadow:0 3px 14px #0001}
 .settings-section .appearance-card .form-group{display:grid;grid-template-columns:minmax(0,1fr) minmax(125px,42%);align-items:center;gap:14px;margin:0}
 .settings-section .appearance-card .form-group label{font-size:1rem;font-weight:700}
@@ -223,3 +220,6 @@ html[data-theme="light"] .settings-category-menu,html[data-theme="light"] .setti
 html[data-theme="light"] .settings-category-row+.settings-category-row{border-color:#e1e5eb}
 html[data-theme="light"] .settings-detail-panel>.profile-card{background:#fff}
 @media(max-width:390px){.preferences-heading h2{font-size:2.2rem}.settings-category-menu,.settings-quick-actions{padding-left:14px;padding-right:14px}.settings-category-row{grid-template-columns:48px minmax(0,1fr) 18px;gap:11px}.settings-category-icon{width:44px;height:44px}}
+#private-reminder-history{margin:16px 0 0;padding:14px;border:1px solid var(--border);border-radius:16px;background:var(--inner)}
+#private-reminder-history h3{margin:0 0 6px;font-size:.96rem}
+#private-reminder-history .small-note{margin:0 0 12px}
