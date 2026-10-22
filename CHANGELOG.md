@@ -1,3 +1,8 @@
+## 2026-10-22 — Fix Settings browser smoke test and verify Track Sync
+- Scoped Settings back-button checks to the active category after run #303 exposed Playwright's strict-mode ambiguity across the three hidden panels.
+- Added browser coverage proving the Track Sync shortcut requests the cloud library rather than only displaying the Settings menu.
+- Preserved the separate browser-engine checks and deployment gate.
+
 ## 2026-10-22 — Allow slow Playwright dependency setup to complete
 - Increased both Actions job limits from 10 to 30 minutes after runs #302 attempts 1 and 2 timed out while Ubuntu's package mirror downloaded Playwright's 142 MB dependency set.
 - The cancellation happened during browser setup before application tests or deployment; no source-test failure was reported for those attempts.

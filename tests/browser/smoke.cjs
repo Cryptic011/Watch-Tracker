@@ -105,16 +105,20 @@ const server=http.createServer((req,res)=>{
   assert.equal(await page.locator('.settings-quick-actions').isVisible(),true,'Track Sync shortcut is visible');
   await page.locator('[data-settings-open="general"]').click();
   assert.equal(await page.locator('#appearance-mode').isVisible(),true,'General opens appearance controls');
-  await page.locator('[data-settings-back]').click();
+  await page.locator('[data-settings-panel="general"] [data-settings-back]').click();
   await page.locator('[data-settings-open="reminders"]').click();
   assert.equal(await page.locator('#background-reminder-status').isVisible(),true,'Release Reminders opens reminder controls');
-  await page.locator('[data-settings-back]').click();
+  await page.locator('[data-settings-panel="reminders"] [data-settings-back]').click();
   await page.locator('[data-settings-open="account"]').click();
   for(const selector of ['.profile-card','#sync-now','#logout-btn']){
     assert.ok(await page.locator(selector).count()>=1,selector+' exists in the document');
     assert.equal(await page.locator(selector).first().isVisible(),true,selector+' visible in Account & Sync');
   }
-  await page.locator('[data-settings-back]').click();
+  await page.locator('[data-settings-panel="account"] [data-settings-back]').click();
+  const loadsBeforeTrackSync=loads;
+  await page.locator('#settings-sync-shortcut').click();
+  await page.waitForFunction(()=>document.querySelector('#sync-status').textContent.startsWith('Synced.'));
+  assert.ok(loads>loadsBeforeTrackSync,'Track Sync performs a cloud library load');
   await page.locator('[data-tab="library"]').click();
   await page.waitForFunction(()=>document.querySelector('#settings-view').classList.contains('hidden')&&!document.querySelector('#library-view').classList.contains('hidden'));
   for(const selector of ['.profile-card','#sync-now','#logout-btn','#appearance-mode','#background-reminder-status','#enable-background-reminders']){
