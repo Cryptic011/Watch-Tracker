@@ -29,7 +29,7 @@ const server=http.createServer((req,res)=>{
    // WebKit applies CORS to fulfilled mocks, including failures and preflights.
    if(req.method()==='OPTIONS')return route.fulfill({status:204,headers,body:''});
    const url=new URL(req.url());
-   if(url.hostname==='api.tvmaze.com'&&url.pathname==='/shows/12')return route.fulfill({headers,json:{id:12,name:'Test Series',premiered:'2020-01-01',externals:{imdb:'tt1234568'},image:{original:'https://static.tvmaze.com/series-poster.jpg'}}});
+   if(url.hostname==='api.tvmaze.com'&&url.pathname==='/shows/12')return route.fulfill({headers,json:{id:12,name:'Test Series',premiered:'2020-01-01',externals:{imdb:'tt1234568'},image:{original:'https://static.tvmaze.com/series-poster.jpg'},summary:'<p>An official series description &amp; a second detail.</p>',genres:['Drama','Action'],status:'Running',rating:{average:8.4},runtime:42,language:'English'}});
    if(url.hostname==='api.tvmaze.com'&&url.pathname==='/shows/12/episodes')return route.fulfill({headers,json:[
     {season:1,number:1,image:{original:'https://static.tvmaze.com/episode-one.jpg'}},
     {season:1,number:2,image:null},
@@ -88,14 +88,18 @@ const server=http.createServer((req,res)=>{
   await page.locator('[data-gallery-category="Film"]').click();await page.locator('[data-filter="Watched"]').click();
   assert.match(await page.locator('.gallery-section h3').first().textContent(),/^2020/);
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),true);
-  await page.locator('.gallery-tile').first().click();await page.locator('[data-gallery-close]').click();
+  await page.locator('.gallery-tile').first().click();
+  assert.equal(await page.getByRole('tab',{name:'Overview',exact:true}).getAttribute('aria-selected'),'true');
+  await page.getByRole('tab',{name:'Details',exact:true}).click();
+  await page.waitForFunction(()=>document.querySelector('[data-gallery-details]').textContent.includes('coastal town'));
+  await page.locator('[data-gallery-close]').click();
   await page.locator('[data-filter="All"]').click();await page.locator('[data-gallery-back]').click();
   await page.evaluate(()=>openEdit(mediaItems[0].id));await page.locator('#platform').fill('Cinema');await page.locator('#save-btn').click();
   await page.waitForFunction(()=>mediaItems[0]?.platform==='Cinema'&&!cloudSaveInFlight&&!localSaveInFlight&&!queuedCloudSnapshot&&!queuedLocalSnapshot,null,{timeout:10000});assert.equal(items[0].platform,'Cinema');
   // Seed a verified schedule through the same persistence code used by imports.
   phase='episode tracking';
   await page.evaluate(async()=>{
-   mediaItems.push({id:'show',title:'Test Series',type:'Series',status:'Planned',tvmazeShowId:'12',imdbId:'tt1234568',episodeImages:{1:{1:'https://static.tvmaze.com/series-poster.jpg'}},episodeScheduleVerified:true,releasedEpisodes:{1:[1,2,3]},airedEpisodeCounts:{1:3},episodeCounts:{1:4},watchedEpisodes:{},metadataUpdatedAt:new Date().toISOString(),seriesReleaseDate:'2020-01-01'});
+   mediaItems.push({id:'show',title:'Test Series',type:'Series',status:'Planned',platform:'Netflix',tvmazeShowId:'12',imdbId:'tt1234568',episodeImages:{1:{1:'https://static.tvmaze.com/series-poster.jpg'}},episodeScheduleVerified:true,releasedEpisodes:{1:[1,2,3]},airedEpisodeCounts:{1:3},episodeCounts:{1:4},watchedEpisodes:{},metadataUpdatedAt:new Date().toISOString(),seriesReleaseDate:'2020-01-01'});
    await persistLibrary(mediaItems);render();openEpisodeTracker('show');
   });
   await page.locator('#episode-watch-next').click();await page.getByRole('button',{name:'Undo',exact:true}).click();
@@ -112,6 +116,19 @@ const server=http.createServer((req,res)=>{
   });
   await page.locator('[data-gallery-category="Series"]').click();
   await page.locator('[data-gallery-item="show"]').first().click();
+  assert.equal(await page.getByRole('tab',{name:'Episodes',exact:true}).getAttribute('aria-selected'),'true');
+  assert.equal(await page.locator('[data-gallery-notes-preview]').isVisible(),false);
+  assert.equal(await page.locator('[data-gallery-watch-summary]').evaluate(summary=>summary.previousElementSibling.classList.contains('gallery-season-list')),true,'watch summary is below seasons');
+  await page.getByRole('tab',{name:'Details',exact:true}).click();
+  await page.waitForFunction(()=>document.querySelector('[data-gallery-details]').textContent.includes('official series description'));
+  assert.match(await page.locator('[data-gallery-details]').textContent(),/Drama · Action/);
+  assert.match(await page.locator('[data-gallery-details]').textContent(),/8\.4\/10/);
+  if(process.env.BROWSER_SCREENSHOT_DIR){
+   fs.mkdirSync(process.env.BROWSER_SCREENSHOT_DIR,{recursive:true});
+   await page.screenshot({path:path.join(process.env.BROWSER_SCREENSHOT_DIR,engine.name()+'-details.png')});
+  }
+  assert.equal(await page.locator('.gallery-season-list').isVisible(),false);
+  await page.getByRole('tab',{name:'Episodes',exact:true}).click();
   await page.locator('.gallery-season summary').first().click();
   await page.locator('[data-gallery-episode="1:1"] img').waitFor({state:'visible'});
   assert.equal(await page.locator('[data-gallery-episode="1:1"] img').getAttribute('src'),'https://static.tvmaze.com/episode-one.jpg');
@@ -163,6 +180,38 @@ const server=http.createServer((req,res)=>{
   await page.locator('[data-gallery-season="2"]').click();
   await page.waitForFunction(()=>!episodeLogBusy.size&&!cloudSaveInFlight);
   assert.deepEqual(items.find(x=>x.id==='show').watchedEpisodes,{'1':[1,2]});
+  phase='title notes';
+  assert.match(await page.locator('[data-gallery-watch-summary]').textContent(),/Watched to - S1 E2/);
+  assert.match(await page.locator('[data-gallery-watch-summary]').textContent(),/Watched on: Netflix/);
+  const notesUpdatedBefore=await page.evaluate(()=>mediaItems.find(row=>row.id==='show').updatedAt);
+  const savedTitleNotes='A note about this series.\nWatch again with family.';
+  await page.locator('[data-gallery-menu]').click();
+  await page.locator('[data-gallery-notes]').click();
+  assert.equal(await page.locator('[data-gallery-notes-field]').evaluate(field=>document.activeElement===field),true);
+  const notesPosition=await page.locator('[data-gallery-notes-field]').boundingBox();
+  assert.ok(notesPosition.y>=0&&notesPosition.y+notesPosition.height<=844,'Notes opens in the visible viewport');
+  await page.locator('[data-gallery-notes-field]').fill(savedTitleNotes);
+  await page.locator('[data-gallery-save-notes]').click();
+  await page.waitForFunction(()=>!cloudSaveInFlight&&!localSaveInFlight&&document.querySelector('[data-gallery-notes-editor]').classList.contains('hidden'));
+  assert.equal(items.find(row=>row.id==='show').notes,savedTitleNotes);
+  assert.notEqual(items.find(row=>row.id==='show').updatedAt,notesUpdatedBefore);
+  assert.equal(await page.locator('[data-gallery-notes-preview] p').textContent(),savedTitleNotes);
+  if(process.env.BROWSER_SCREENSHOT_DIR)await page.screenshot({path:path.join(process.env.BROWSER_SCREENSHOT_DIR,engine.name()+'-notes.png')});
+  assert.equal(await page.locator('[data-gallery-notes-preview]').evaluate(preview=>Boolean(preview.compareDocumentPosition(document.querySelector('.gallery-detail-tabs'))&Node.DOCUMENT_POSITION_FOLLOWING)),true);
+  await page.locator('[data-gallery-close]').click();
+  await page.locator('[data-gallery-item="show"]').first().click();
+  assert.equal(await page.locator('[data-gallery-notes-preview] p').textContent(),savedTitleNotes);
+  assert.equal(await page.getByRole('tab',{name:'Episodes',exact:true}).getAttribute('aria-selected'),'true');
+  await page.locator('[data-gallery-menu]').click();await page.locator('[data-gallery-notes]').click();
+  await page.locator('[data-gallery-notes-field]').fill('Unsaved change');
+  await page.locator('[data-gallery-cancel-notes]').click();
+  assert.equal(await page.locator('[data-gallery-notes-preview] p').textContent(),savedTitleNotes);
+  await page.locator('[data-gallery-menu]').click();await page.locator('[data-gallery-notes]').click();
+  await page.locator('[data-gallery-notes-field]').fill('');
+  await page.locator('[data-gallery-save-notes]').click();
+  await page.waitForFunction(()=>!cloudSaveInFlight&&!localSaveInFlight&&document.querySelector('[data-gallery-notes-editor]').classList.contains('hidden'));
+  assert.equal(await page.locator('[data-gallery-notes-preview]').isVisible(),false);
+  assert.equal(items.find(row=>row.id==='show').notes,'');
   await page.locator('[data-gallery-close]').click();
   await page.locator('[data-gallery-back]').click();
   // Delete/Undo restores just the removed title, preserving other progress.

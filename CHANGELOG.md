@@ -1,3 +1,10 @@
+## 2026-10-22 — Make Notes visible and add Episodes/Details navigation
+- Open the Notes editor in view from the three-dot menu, preserve drafts on save failure, and timestamp saved notes for reliable sync.
+- Show a saved Notes card below the poster only when notes exist; hide it when cleared.
+- Move watch status to the bottom of the main view using “Watched to -” and “Watched on:” labels.
+- Open series on Episodes and films on Overview, with Details to the right and verified descriptions and available metadata from the matching catalogue record.
+- Add browser coverage for Notes save/cancel/clear, persistence after reopening, summary placement, film descriptions, and series metadata.
+
 ## 2026-10-22 — Refine season layouts and consolidate today's UI changes
 - Replaced conflicting gallery styles with one responsive layout, natural episode thumbnails, readable text, and a clear right-hand scroll gutter.
 - Limited progress changes to dedicated 44px watch buttons, preserving expanded seasons, focus, and scroll position after saves.

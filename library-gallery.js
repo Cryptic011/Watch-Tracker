@@ -153,6 +153,29 @@ window.WatchLogGallery=(()=>{
       }
     }
   }
+  async function loadTitleDetails(item){
+    const target=dialog.querySelector('[data-gallery-details]');
+    target.textContent='Loading details…';
+    try{
+      const details=await api.titleDetails?.(item)||{};
+      if(target!==dialog.querySelector('[data-gallery-details]'))return;
+      const decoder=document.createElement('textarea');
+      decoder.innerHTML=String(details.description||'').replace(/<[^>]*>/g,' ');
+      const description=decoder.value.replace(/\s+/g,' ').trim();
+      const facts=[
+        ['Release date',details.premiered?api.date(new Date(details.premiered+'T12:00:00')):details.year||''],
+        ['Genres',Array.isArray(details.genres)?details.genres.join(' · '):''],
+        ['Seasons',details.seasons||''],['Status',details.status||''],
+        ['Rating',Number.isFinite(details.rating)?details.rating+'/10':''],
+        ['Runtime',details.runtime?details.runtime+' min':''],['Language',details.language||'']
+      ].filter(([,value])=>value!=='');
+      target.innerHTML=`<h3>About ${esc(item.title)}</h3><p>${esc(description||'A description isn’t available for this title yet.')}</p>${facts.length?`<dl>${facts.map(([label,value])=>`<div><dt>${esc(label)}</dt><dd>${esc(value)}</dd></div>`).join('')}</dl>`:''}${details.source?`<small>Source: ${esc(details.source)}</small>`:''}`;
+    }catch(_){
+      if(target!==dialog.querySelector('[data-gallery-details]'))return;
+      target.innerHTML='<p>Details are temporarily unavailable.</p><button type="button" class="btn btn-secondary" data-gallery-retry-details>Retry</button>';
+      target.querySelector('button').onclick=()=>loadTitleDetails(item);
+    }
+  }
   function detail(item){
     if(!dialog){
       dialog=document.createElement('dialog');dialog.className='gallery-detail';dialog.setAttribute('aria-label','Title details');document.body.append(dialog);
@@ -161,24 +184,63 @@ window.WatchLogGallery=(()=>{
     }
     dialog.dataset.item=String(item.id);
     const show=!isFilm(item),last=api.last(item);
-    const progress=show?`<strong>Your progress</strong>${last?`Watched through S${esc(last.season)} E${esc(last.episode)}`:'No episodes marked watched'}<br>${esc(item.watchedSeasons||0)} fully watched seasons`:'';
+    const watchedTo=show?(last?`S${last.season} E${last.episode}`:'Not started'):(item.status==='Watched'?'Complete':'Not started');
+    let savedNotes=String(item.notes||'').trim();
     const releases=show?(api.released?.(item)||item.releasedEpisodes||{}):{},watched=show?(api.watched?.(item)||item.watchedEpisodes||{}):{};
     const seasons=Object.keys(releases).map(Number).filter(number=>Number.isInteger(number)&&number>0).sort((left,right)=>left-right);
     dialog.innerHTML=`<header class="gallery-detail-header"><h2>${esc(item.title)}</h2><div class="gallery-detail-header-actions">
       <button type="button" class="gallery-menu-button" data-gallery-menu aria-label="Title actions" aria-expanded="false">•••</button>
       <button type="button" class="gallery-back" data-gallery-close aria-label="Close details">×</button></div></header>
-      <div class="gallery-detail-body">${art(item)}<div class="gallery-detail-copy"><strong>${esc(item.status||'Planned')}</strong>${progress}${item.platform?`<strong>Where you watched it</strong>${esc(item.platform)}`:''}</div>
-      ${api.reminder(item,isFilm(item))}
-      ${show?`<section class="gallery-season-list"><h3>All Episodes</h3>${seasons.map(season=>seasonRow(item,season,releases,watched)).join('')||'<p class="gallery-empty">No verified released episodes available yet.</p>'}</section>`:''}
+      <div class="gallery-detail-body">${art(item)}
+      <section class="gallery-notes-preview${savedNotes?'':' hidden'}" data-gallery-notes-preview><h3>Notes</h3><p>${esc(savedNotes)}</p></section>
+      <section class="gallery-notes-editor hidden" data-gallery-notes-editor aria-labelledby="gallery-notes-label">
+        <h3 id="gallery-notes-label">Notes</h3><textarea class="gallery-notes" data-gallery-notes-field aria-label="Notes" placeholder="Personal notes about this show or film">${esc(savedNotes)}</textarea>
+        <div class="gallery-notes-actions"><button class="btn btn-primary" type="button" data-gallery-save-notes>Save notes</button><button class="btn btn-secondary" type="button" data-gallery-cancel-notes>Cancel</button></div>
+        <p data-gallery-notes-status role="status" aria-live="polite"></p>
+      </section>
+      <div class="gallery-detail-tabs" role="tablist" aria-label="Title view"><button id="gallery-watch-tab" type="button" role="tab" aria-selected="true" aria-controls="gallery-watch-panel" data-gallery-view="watch">${show?'Episodes':'Overview'}</button><button id="gallery-info-tab" type="button" role="tab" tabindex="-1" aria-selected="false" aria-controls="gallery-info-panel" data-gallery-view="details">Details</button></div>
+      <section id="gallery-watch-panel" class="gallery-watch-panel" role="tabpanel" aria-labelledby="gallery-watch-tab" data-gallery-panel="watch">
+        ${api.reminder(item,isFilm(item))}
+        ${show?`<section class="gallery-season-list"><h3>All Episodes</h3>${seasons.map(season=>seasonRow(item,season,releases,watched)).join('')||'<p class="gallery-empty">No verified released episodes available yet.</p>'}</section>`:''}
+        <div class="gallery-detail-copy" data-gallery-watch-summary><strong>${esc(item.status||'Planned')}</strong><p>Watched to - ${esc(watchedTo)}</p><p>Watched on: ${esc(item.platform||'Not specified')}</p></div>
+      </section>
+      <section id="gallery-info-panel" class="gallery-info-panel hidden" role="tabpanel" aria-labelledby="gallery-info-tab" data-gallery-panel="details"><div data-gallery-details aria-live="polite">Loading details…</div></section>
       <div class="gallery-action-menu hidden" data-gallery-action-menu><button type="button" data-gallery-edit-menu>Edit show or film</button><button type="button" data-gallery-notes>Notes</button><button type="button" class="danger" data-gallery-delete>Delete show or film</button></div>
-      <textarea class="gallery-notes hidden" data-gallery-notes-field aria-label="Notes" placeholder="Personal notes about this show or film">${esc(item.notes||'')}</textarea>
-      <button class="btn btn-secondary btn-full hidden" type="button" data-gallery-save-notes>Save notes</button></div>`;
+      </div>`;
     dialog.querySelector('[data-gallery-edit-menu]').onclick=()=>{dialog.close();api.edit(item.id);};
     const menu=dialog.querySelector('[data-gallery-action-menu]'),notes=dialog.querySelector('[data-gallery-notes-field]'),saveNotes=dialog.querySelector('[data-gallery-save-notes]');
+    const editor=dialog.querySelector('[data-gallery-notes-editor]'),preview=dialog.querySelector('[data-gallery-notes-preview]'),notesStatus=dialog.querySelector('[data-gallery-notes-status]'),cancelNotes=dialog.querySelector('[data-gallery-cancel-notes]');
     const menuButton=dialog.querySelector('[data-gallery-menu]');
     menuButton.onclick=event=>{event.preventDefault();event.stopPropagation();menu.classList.toggle('hidden');menuButton.setAttribute('aria-expanded',String(!menu.classList.contains('hidden')));};
-    dialog.querySelector('[data-gallery-notes]').onclick=()=>{menu.classList.add('hidden');menuButton.setAttribute('aria-expanded','false');notes.classList.toggle('hidden');saveNotes.classList.toggle('hidden');};
-    saveNotes.onclick=async()=>{saveNotes.textContent=await api.saveNotes?.(item.id,notes.value.trim())?'Saved':'Save failed — retry';};
+    dialog.querySelector('[data-gallery-notes]').onclick=()=>{
+      menu.classList.add('hidden');menuButton.setAttribute('aria-expanded','false');
+      notes.value=savedNotes;notesStatus.textContent='';preview.classList.add('hidden');editor.classList.remove('hidden');
+      editor.scrollIntoView({block:'start'});notes.focus({preventScroll:true});
+    };
+    cancelNotes.onclick=()=>{editor.classList.add('hidden');preview.classList.toggle('hidden',!savedNotes);menuButton.focus({preventScroll:true});};
+    saveNotes.onclick=async()=>{
+      saveNotes.disabled=true;cancelNotes.disabled=true;saveNotes.textContent='Saving…';notesStatus.textContent='';
+      try{
+        const value=notes.value.trim();
+        if(!await api.saveNotes?.(item.id,value))throw new Error('Save failed');
+        savedNotes=value;preview.querySelector('p').textContent=value;preview.classList.toggle('hidden',!value);editor.classList.add('hidden');
+        if(value)preview.scrollIntoView({block:'start'});menuButton.focus({preventScroll:true});
+      }catch(_){notesStatus.textContent='Notes could not be saved. Your text is still here; please retry.';}
+      finally{saveNotes.disabled=false;cancelNotes.disabled=false;saveNotes.textContent='Save notes';}
+    };
+    const tabs=[...dialog.querySelectorAll('[data-gallery-view]')];
+    const selectView=(name,focus=false)=>{
+      for(const tab of tabs){const selected=tab.dataset.galleryView===name;tab.setAttribute('aria-selected',String(selected));tab.tabIndex=selected?0:-1;if(selected&&focus)tab.focus();}
+      for(const panel of dialog.querySelectorAll('[data-gallery-panel]'))panel.classList.toggle('hidden',panel.dataset.galleryPanel!==name);
+    };
+    tabs.forEach((tab,index)=>{
+      tab.onclick=()=>selectView(tab.dataset.galleryView);
+      tab.onkeydown=event=>{
+        if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;
+        event.preventDefault();const next=event.key==='Home'?0:event.key==='End'?tabs.length-1:(index+(event.key==='ArrowRight'?1:-1)+tabs.length)%tabs.length;
+        selectView(tabs[next].dataset.galleryView,true);
+      };
+    });
     dialog.querySelector('[data-gallery-delete]').onclick=async()=>{
       if(!confirm(`Delete ${item.title} from your library?`))return;
       const button=dialog.querySelector('[data-gallery-delete]');button.disabled=true;
@@ -192,7 +254,7 @@ window.WatchLogGallery=(()=>{
       event.preventDefault();event.stopPropagation();
       return changeProgress(item,button,()=>api.toggleSeason?.(item.id,Number(button.dataset.gallerySeason)));
     };});
-    observe(dialog,[item]);if(!dialog.open)dialog.showModal();void loadTrackerArtwork(item);
+    observe(dialog,[item]);if(!dialog.open)dialog.showModal();void loadTrackerArtwork(item);void loadTitleDetails(item);
   }
   function back(){
     if(dialog?.open){dialog.close();return true;}

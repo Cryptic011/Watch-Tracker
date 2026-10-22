@@ -57,9 +57,29 @@
 .gallery-detail-body{display:grid;gap:20px;width:100%;max-width:780px;min-width:0;margin:0 auto;padding:24px 0 calc(36px + env(safe-area-inset-bottom))}
 .gallery-detail-body>.gallery-art{width:min(48vw,200px);margin:0 auto;padding:0;border-radius:18px}
 .gallery-detail-copy{margin:0 18px;padding:16px;border:1px solid var(--border);border-radius:16px;background:var(--card);font-size:.88rem;line-height:1.55;overflow-wrap:anywhere}
-.gallery-detail-copy strong{display:block;margin:8px 0 6px}
-.gallery-detail-copy strong:first-child{margin-top:0}
-.gallery-detail-body>.reminder{margin:0 18px;flex-wrap:wrap}
+.gallery-detail-copy strong{display:block;margin:0 0 6px}
+.gallery-detail-copy p+p{margin-top:4px}
+.gallery-watch-panel{display:grid;gap:20px;min-width:0}
+.gallery-watch-panel>.reminder{margin:0 18px;flex-wrap:wrap}
+.gallery-detail-tabs{display:flex;gap:4px;margin:0 18px;padding:4px;border-radius:999px;background:var(--inner)}
+.gallery-detail-tabs button{flex:1;min-height:44px;padding:8px 12px;border:0;border-radius:999px;background:transparent;color:var(--muted);font-size:.88rem;font-weight:750;cursor:pointer}
+.gallery-detail-tabs button[aria-selected="true"]{background:var(--card);color:var(--text);box-shadow:0 1px 4px #0002}
+.gallery-detail-tabs button:focus-visible{outline:2px solid var(--blue2);outline-offset:2px}
+.gallery-notes-preview,.gallery-notes-editor{margin:0 18px;border:1px solid var(--border);border-radius:18px;background:var(--card);overflow:hidden;scroll-margin-top:calc(env(safe-area-inset-top) + 96px)}
+.gallery-notes-preview h3{padding:14px 16px;border-bottom:1px solid var(--border);background:var(--inner);font-size:1rem}
+.gallery-notes-preview p{padding:16px;white-space:pre-wrap;overflow-wrap:anywhere;font-size:.9rem;line-height:1.5}
+.gallery-notes-editor{display:grid;gap:12px;padding:16px}
+.gallery-notes-editor h3{font-size:1rem}
+.gallery-notes-actions{display:flex;flex-wrap:wrap;gap:10px}
+.gallery-notes-actions button{min-height:44px}
+.gallery-notes-editor [role="status"]{font-size:.85rem;color:var(--muted);line-height:1.4}
+.gallery-notes-editor [role="status"]:empty{display:none}
+.gallery-info-panel{margin:0 18px;padding:18px;border:1px solid var(--border);border-radius:18px;background:var(--card);font-size:.9rem;line-height:1.6;overflow-wrap:anywhere}
+.gallery-info-panel h3{margin:0 0 12px;font-size:1.1rem;line-height:1.4}
+.gallery-info-panel dl{display:grid;gap:12px;margin-top:20px}
+.gallery-info-panel dl>div{display:grid;grid-template-columns:minmax(90px,30%) minmax(0,1fr);gap:12px;padding-top:12px;border-top:1px solid var(--border)}
+.gallery-info-panel dt,.gallery-info-panel small{color:var(--muted)}
+.gallery-info-panel small{display:block;margin-top:18px}
 .gallery-season-list{min-width:0;padding:0 max(16px,env(safe-area-inset-right)) 0 max(16px,env(safe-area-inset-left))}
 .gallery-season-list>h3{font-size:1.15rem;line-height:1.4;margin:8px 0 18px}
 .gallery-season{margin:0 0 18px;border:1px solid var(--border);border-radius:20px;background:var(--card);overflow:hidden}
@@ -86,9 +106,8 @@
 .gallery-action-menu{position:fixed;z-index:5;top:calc(env(safe-area-inset-top) + 72px);right:max(24px,env(safe-area-inset-right));display:grid;gap:4px;width:min(260px,calc(100vw - 48px));padding:7px;border:1px solid var(--border);border-radius:18px;background:var(--card);box-shadow:0 18px 60px #0006}
 .gallery-action-menu button{min-height:48px;padding:12px;border:0;border-radius:10px;background:transparent;color:var(--text);text-align:left;font:inherit;font-weight:700;cursor:pointer}
 .gallery-action-menu .danger{color:var(--red)}
-.gallery-action-menu.hidden,.gallery-notes.hidden,[data-gallery-save-notes].hidden{display:none!important}
-.gallery-notes{display:block;width:calc(100% - 36px);min-height:110px;margin:0 18px;padding:12px;border:1px solid var(--border);border-radius:12px;background:var(--inner);color:var(--text);font:inherit}
-.gallery-detail-body>[data-gallery-save-notes]{width:calc(100% - 36px);margin:0 18px}
+.gallery-action-menu.hidden{display:none!important}
+.gallery-notes{display:block;width:100%;min-height:150px;padding:12px;border:1px solid var(--border);border-radius:12px;background:var(--inner);color:var(--text);font:inherit;line-height:1.5;resize:vertical}
 .gallery-tile:focus-visible,.gallery-category:focus-visible,.gallery-back:focus-visible,.gallery-menu-button:focus-visible,.gallery-season>summary:focus-visible,.gallery-season-state:focus-visible,.gallery-episode-toggle:focus-visible{outline:2px solid var(--blue2);outline-offset:3px}
 
 @media(min-width:700px){.gallery-home{grid-template-columns:1fr 1fr}.gallery-category{min-height:230px}.gallery-grid{grid-template-columns:repeat(5,minmax(0,1fr));gap:28px 16px}}

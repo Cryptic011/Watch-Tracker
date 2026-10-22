@@ -397,12 +397,29 @@
         fetchJSONWithTimeout(`https://api.tvmaze.com/shows/${encodeURIComponent(show.id)}/episodes`,{credentials:"omit"}),
         fetchJSONWithTimeout(`https://api.tvmaze.com/shows/${encodeURIComponent(show.id)}/seasons`,{credentials:"omit"})
       ]);
-      const artwork={};
+      const artwork={details:{
+        description:String(show.summary||""),premiered:show.premiered||"",genres:Array.isArray(show.genres)?show.genres:[],
+        status:show.status||"",rating:Number.isFinite(show.rating?.average)?show.rating.average:null,
+        runtime:show.averageRuntime||show.runtime||null,language:show.language||"",source:"TVMaze"
+      }};
       if(results[0].status==="fulfilled"&&Array.isArray(results[0].value))artwork.episodeImages=officialEpisodeImageMap(results[0].value,show.image);
-      if(results[1].status==="fulfilled"&&Array.isArray(results[1].value))artwork.seasonImages=officialSeasonImageMap(results[1].value);
+      if(results[1].status==="fulfilled"&&Array.isArray(results[1].value)){
+        artwork.seasonImages=officialSeasonImageMap(results[1].value);
+        artwork.details.seasons=results[1].value.filter(season=>Number(season.number)>0).length;
+      }
       if(results.some(result=>result.status==="rejected"))trackerArtworkCache.delete(key);
       return artwork;
     });
+  }
+
+  async function fetchOfficialTitleDetails(item){
+    if(item.type!=="Film")return (await fetchOfficialTrackerArtwork(item)).details||{};
+    const rows=await searchCatalogBatch(item.imdbId||item.title);
+    const matches=(Array.isArray(rows)?rows:[]).filter(row=>row.format==="Film"&&(item.imdbId?row.imdbId===item.imdbId:normalizeTitle(row.title)===normalizeTitle(item.title)&&(!item.releaseYear||String(row.year)===String(item.releaseYear))));
+    const identities=new Set(matches.map(row=>row.imdbId||row.externalId||row.title));
+    if(identities.size!==1)return {};
+    const match=matches.find(row=>row.description)||matches[0];
+    return {description:match.description||"",year:match.year||"",source:match.source==="imdb"?"IMDb":match.source==="apple"?"Apple TV":""};
   }
 
   function tvMazeShowMatchesSelection(show,title,{imdbId="",year=""}={}){

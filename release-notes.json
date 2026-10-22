@@ -64,8 +64,11 @@
     "number": 224
   },
   "__current": {
-    "title": "Polish season and episode layouts; consolidate Settings and artwork",
+    "title": "Fix Notes and add Episodes/Details navigation",
     "changes": [
+      "Open Notes visibly from the title menu and save changes with an updated timestamp for sync.",
+      "Show saved Notes below the poster only when notes exist, with the watch summary at the bottom using Watched to - and Watched on:.",
+      "Open series on Episodes and films on Overview, with verified catalogue information under Details to the right.",
       "Use responsive episode rows with natural thumbnail proportions, readable text, and a right-hand scroll gutter.",
       "Keep progress changes on dedicated accessible watch buttons, preserving expanded seasons and scroll position after saves.",
       "Show only artwork attached to the matching episode or season record, with neutral placeholders when artwork is missing.",

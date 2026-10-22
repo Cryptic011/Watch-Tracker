@@ -294,7 +294,8 @@ test("Season artwork remains available when the episode endpoint fails",async()=
     }
   `);
   const artwork=await api.fetchOfficialTrackerArtwork({title:"Twin",tvmazeShowId:"12",imdbId:"tt1111111"});
-  assert.deepEqual(JSON.parse(JSON.stringify(artwork)),{seasonImages:{1:"https://static.tvmaze.com/season-one.jpg"}});
+  assert.deepEqual(JSON.parse(JSON.stringify(artwork.seasonImages)),{1:"https://static.tvmaze.com/season-one.jpg"});
+  assert.equal(artwork.details.source,"TVMaze");
 });
 
 test("TVMaze release timestamps are stored in UTC", () => {
