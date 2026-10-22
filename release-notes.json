@@ -64,8 +64,10 @@
     "number": 224
   },
   "__current": {
-    "title": "Coordinated Watch Logger reliability and library improvements",
+    "title": "Schedule range and release-season fixes",
     "changes": [
+      "Make This week show only Monday through Sunday and Upcoming show only the following Monday-through-Sunday seven-day window. Today shows only the local calendar day; each filter displays only its selected range, with Dates to be announced and Excluded sections retained.",
+      "Keep Chicago Fire’s active Season 15 episode labels in Season 15 and do not surface a misleading Season 16 TBA entry while Season 15 is still airing.",
       "Run the complete app and browser test suites before publishing; prevent overlapping deploys from cancelling one another; record the actual run number and attempt for every workflow attempt; and report the failed check plus recovery guidance.",
       "Add a post-deploy health check. Run 281's Pages deployment and health check succeeded, but its owner-notification step failed with HTTP 401 because the deployed reminder endpoint required a GitHub verification token.",
       "Make a notification-service outage a visible warning rather than falsely marking a successful deployment as failed; actual deployment and health-check failures still fail the workflow. Never forward the Actions token to the notification service.",
@@ -73,7 +75,8 @@
       "Add conflict-aware sync, retain progress/watch/reminder settings during merges, support offline edits and reconnect, show Synced/Syncing/Needs attention, and add library export and merge-based restore with versioned backups.",
       "Separate this week's broadcasts from upcoming releases; add Today, This week, and Upcoming filters; make excluded shows identifiable and easy to re-enable; consistently show episode, date, and release status; and disclose the local timezone.",
       "Search alternate titles across the library, add recently watched and upcoming-release sorting, provide bulk watched/planned/hide/include/remove actions, and preserve filters when returning from an item.",
-      "Move Watch Statistics into Settings > Account & Sync and add a dedicated profile button that opens Account & Sync. Improve mobile poster framing, release badges, Today highlighting, and bulk-action access; use larger touch targets, keyboard focus cues, visible non-intrusive sync/reminder status, and reduced-motion support."
+      "Move Watch Statistics into Settings > Account & Sync and add a dedicated profile button that opens Account & Sync. Improve mobile poster framing, release badges, Today highlighting, and bulk-action access; use larger touch targets, keyboard focus cues, visible non-intrusive sync/reminder status, and reduced-motion support.",
+      "The production reminder function still needs the secure source update deployed before push notifications can resume; deployment is pending approval for its existing platform-JWT-disabled configuration."
     ]
   },
   "37f6c39e9d0355b1bde705cb3fcb3cda2533119f": {

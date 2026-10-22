@@ -1,5 +1,13 @@
 ## 2026-10-22
 
+### Schedule filters and release season correction
+- Make This week show exactly Monday through Sunday, and Upcoming show the following seven calendar days (the next Monday through Sunday). Today remains the local calendar day.
+- Show only the selected date window instead of appending another long upcoming list. Keep Dates to be announced and Excluded from Weekly Releases available beneath the selected window.
+- Keep Chicago Fire's currently airing episodes in Season 15 and suppress the inaccurate Season 16 TBA label while Season 15 continues airing.
+- Push-status notifications remain unavailable until the production `watchlog-reminders` Edge Function is updated to the secure server-side verification code. Deployment is waiting on approval for the function's existing platform-JWT-disabled configuration; no notification delivery is claimed yet.
+
+## 2026-10-22
+
 ### Watch statistics and reliability follow-up
 - Add a compact Library dashboard summary for total library items, films marked watched, logged episodes, and shows with unwatched released episodes.
 - Calculate statistics from saved episode progress and verified released-episode data without changing or rewriting library records.

@@ -30,6 +30,13 @@ function watchStatistics(items){
 }
 
 let selectedCalendarRange='week';
+function calendarRange(range,now=new Date()){
+  const today=new Date(now);today.setHours(0,0,0,0);
+  const weekStart=new Date(today);weekStart.setDate(weekStart.getDate()-(weekStart.getDay()+6)%7);
+  if(range==='today')return{start:today,days:1,label:'Local calendar day'};
+  if(range==='upcoming'){const start=new Date(weekStart);start.setDate(start.getDate()+7);return{start,days:7,label:'Following Monday–Sunday'};}
+  return{start:weekStart,days:7,label:'Monday–Sunday'};
+}
 function calendarEvents(items,now=new Date(),days=7){
   const start=new Date(now);start.setHours(0,0,0,0);
   const end=new Date(start);end.setDate(end.getDate()+days);
@@ -41,13 +48,15 @@ function calendarEvents(items,now=new Date(),days=7){
     else if(isEpisodeTrackable(item)){
       candidates=(Array.isArray(item.scheduledEpisodeReleases)?item.scheduledEpisodeReleases:[]).map(ep=>({raw:ep.raw,label:`S${ep.season} E${ep.number}`,season:Number(ep.season),episode:Number(ep.number)}));
       if(item.nextEpisodeNum){
-        // nextEpisodeNum belongs to nextSeasonNum when a season transition is pending;
-        // airingSeason is the season that has already aired and must not label the new episode.
         const scheduled=(Array.isArray(item.scheduledEpisodeReleases)?item.scheduledEpisodeReleases:[]).find(ep=>Number(ep.number)===Number(item.nextEpisodeNum)&&String(ep.raw||"")===String(item.nextEpisodeDate||""));
-        const nextEpisodeSeason=Number(scheduled?.season||item.nextSeasonNum||item.airingSeason||item.curSeason||0);
+        const activeSeason=Number(item.airingSeason||item.curSeason||0);
+        const episodeSeason=Number(item.nextEpisodeNum)>1&&activeSeason?activeSeason:(item.nextSeasonNum||activeSeason||item.curSeason||0);
+        const nextEpisodeSeason=Number(scheduled?.season||episodeSeason);
         candidates.push({raw:item.nextEpisodeDate,label:`S${nextEpisodeSeason||'?'} E${item.nextEpisodeNum}`,season:nextEpisodeSeason,episode:Number(item.nextEpisodeNum)});
       }
-      if(item.nextSeasonNum&&!candidates.some(e=>e.season===Number(item.nextSeasonNum)&&e.episode===1))candidates.push({raw:item.nextSeasonDate,label:`Season ${item.nextSeasonNum}`});
+      const activeSeason=Number(item.airingSeason||item.curSeason||0);
+      const activeSeasonContinues=activeSeason>0&&Number(item.nextSeasonNum)>activeSeason&&Number(item.nextEpisodeNum)>1&&(Boolean(item.nextEpisodeDate)||Boolean((releasedEpisodeMap(item)||{})[activeSeason]?.length));
+      if(item.nextSeasonNum&&!activeSeasonContinues&&!candidates.some(e=>e.season===Number(item.nextSeasonNum)&&e.episode===1))candidates.push({raw:item.nextSeasonDate,label:`Season ${item.nextSeasonNum}`});
     }
     const undated=[];
     for(const candidate of candidates){
@@ -94,18 +103,16 @@ function renderDashboard(){
   if(statsTarget)statsTarget.innerHTML=`<section class="dashboard-section watch-statistics" aria-labelledby="watch-statistics-title"><header class="watch-statistics-heading"><div><h2 id="watch-statistics-title">Your watch statistics</h2><p class="dashboard-note">Based on progress saved in your library</p></div></header><div class="watch-statistics-grid"><div class="watch-stat"><strong>${stats.libraryCount}</strong><span>Library items</span></div><div class="watch-stat"><strong>${stats.episodesWatched}</strong><span>Episodes logged</span></div><div class="watch-stat"><strong>${stats.filmsWatched}</strong><span>Films watched</span></div><div class="watch-stat"><strong>${stats.showsInProgress}</strong><span>Shows in progress</span></div><div class="watch-stat"><strong>${stats.showsCompleted}</strong><span>Shows completed</span></div></div></section>`;
   const visible=Boolean(currentUser&&currentTab==='library'&&!categoryControlsVisible()&&!searchQuery.trim());
   root.classList.toggle('hidden',!visible);if(!visible){root.replaceChildren();root._dashboardMarkup=null;return;}
-  const daysToShow=selectedCalendarRange==='today'?1:selectedCalendarRange==='upcoming'?30:7;
-  const {start,events,unknown}=calendarEvents(mediaItems,new Date(),daysToShow);
-  const weekEnd=new Date(start);weekEnd.setDate(weekEnd.getDate()+7);
-  const upcomingBeyondWeek=selectedCalendarRange==='week'?calendarEvents(mediaItems,new Date(),30).events.filter(event=>event.date>=weekEnd):[];
-  const upcomingMarkup=selectedCalendarRange==='week'?`<section class="dashboard-section upcoming-release-list"><h2>Upcoming releases</h2><p class="dashboard-note">After this week · next 30 days</p>${upcomingBeyondWeek.length?upcomingBeyondWeek.map(event=>`<button type="button" class="release-tba-item" data-dashboard-open="${esc(event.item.id)}"><strong>${esc(event.item.title)}</strong><span>${esc(event.label)} · ${esc(event.date.toLocaleDateString(USER_LOCALE,{weekday:'short',day:'numeric',month:'short'}))}${event.dateOnly?' · Date only':' · '+esc(event.date.toLocaleTimeString(USER_LOCALE,{hour:'2-digit',minute:'2-digit'}))}</span></button>`).join(''):'<p class="release-empty">No upcoming releases listed beyond this week.</p>'}</section>`:'';
+  const {start,days:daysToShow,label:rangeLabel}=calendarRange(selectedCalendarRange,new Date());
+  const {events,unknown}=calendarEvents(mediaItems,start,daysToShow);
   const eventsByDay=new Map();
   for(const event of events){const key=localISODate(event.date);if(!eventsByDay.has(key))eventsByDay.set(key,[]);eventsByDay.get(key).push(event);}
   let days='';
   for(let offset=0;offset<daysToShow;offset++){
     const date=new Date(start);date.setDate(date.getDate()+offset);
     const key=localISODate(date),rows=eventsByDay.get(key)||[];
-    const dayLabel=offset===0?'Today':offset===1?'Tomorrow':date.toLocaleDateString(USER_LOCALE,{weekday:'long'});
+    const isToday=localISODate(date)===localISODate(new Date());
+    const dayLabel=selectedCalendarRange==='today'?'Today':date.toLocaleDateString(USER_LOCALE,{weekday:'long'});
     const dateLabel=date.toLocaleDateString(USER_LOCALE,{day:'numeric',month:'short'});
     // Group episodes of the same title airing at the same time into one compact card.
     const grouped=[];
@@ -116,8 +123,8 @@ function renderDashboard(){
       if(!group){group={key:groupKey,item:event.item,time,dateOnly:event.dateOnly,events:[]};grouped.push(group);}
       if(!group.events.some(existing=>existing.label===event.label))group.events.push(event);
     }
-    days+=`<section class="release-day${rows.length?' has-releases':' is-empty'}${offset===0?' is-today':''}" aria-label="${esc(dayLabel)}, ${esc(dateLabel)}">
-      <header class="release-day-heading"><div><span class="release-day-name">${esc(dayLabel)}${offset===0?'<span class="today-marker">TODAY</span>':''}</span><span class="release-day-date">${esc(dateLabel)}</span></div><span class="release-day-count">${rows.length} ${rows.length===1?'release':'releases'}</span></header>
+    days+=`<section class="release-day${rows.length?' has-releases':' is-empty'}${isToday?' is-today':''}" aria-label="${esc(dayLabel)}, ${esc(dateLabel)}">
+      <header class="release-day-heading"><div><span class="release-day-name">${esc(dayLabel)}${isToday?'<span class="today-marker">TODAY</span>':''}</span><span class="release-day-date">${esc(dateLabel)}</span></div><span class="release-day-count">${rows.length} ${rows.length===1?'release':'releases'}</span></header>
       ${grouped.length?grouped.map(group=>{
         const labels=group.events.map(event=>event.label);
         const episodeLabel=labels.length>1&&labels.every(label=>/^S\d+ E\d+$/.test(label))
@@ -136,13 +143,13 @@ function renderDashboard(){
   const excluded=mediaItems.filter(item=>item.hideFromWeeklyReleases===true);
   const controls=`<div class="filter-pills calendar-range" role="group" aria-label="Filter release calendar">${[['today','Today'],['week','This week'],['upcoming','Upcoming']].map(([key,label])=>`<button type="button" class="pill-btn${selectedCalendarRange===key?' active':''}" data-calendar-range="${key}" aria-pressed="${selectedCalendarRange===key}">${label}</button>`).join('')}</div>`;
   updateDashboardMarkup(root,`<section class="dashboard-section weekly-releases" aria-labelledby="weekly-releases-title">
-    <header class="weekly-releases-heading"><div><span class="weekly-eyebrow">YOUR SCHEDULE</span><h2 id="weekly-releases-title">${selectedCalendarRange==='upcoming'?'Upcoming releases':selectedCalendarRange==='today'?"Today’s releases":"This week’s releases"}</h2><p class="dashboard-note">${selectedCalendarRange==='upcoming'?'Next 30 days':selectedCalendarRange==='today'?'Local calendar day':'Today and the next six days'} · device timezone (${esc(DEVICE_TIME_ZONE||Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC')})</p></div><span class="weekly-total">${events.length}<small>releases</small></span></header>
+    <header class="weekly-releases-heading"><div><span class="weekly-eyebrow">YOUR SCHEDULE</span><h2 id="weekly-releases-title">${selectedCalendarRange==='upcoming'?'Upcoming releases':selectedCalendarRange==='today'?"Today’s releases":"This week’s releases"}</h2><p class="dashboard-note">${rangeLabel} · device timezone (${esc(DEVICE_TIME_ZONE||Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC')})</p></div><span class="weekly-total">${events.length}<small>releases</small></span></header>
     ${controls}
     <div class="release-week-list">${days}</div>
     ${unknown.length?`<details class="release-tba" data-dashboard-section="unknown"><summary><span>Dates to be announced</span><span class="release-tba-count">${unknown.length}</span></summary><div class="release-tba-list">${unknown.map(item=>`<button type="button" class="release-tba-item" data-dashboard-open="${esc(item.id)}"><strong>${esc(item.title)}</strong><span>${esc(item.announcement)} · Date TBA</span><span class="release-chevron" aria-hidden="true">›</span></button>`).join('')}</div></details>`:''}
     ${excluded.length?`<details class="release-tba" data-dashboard-section="excluded"><summary><span>Excluded from Weekly Releases</span><span class="release-tba-count">${excluded.length}</span></summary><div class="release-tba-list">${excluded.map(item=>`<div class="dashboard-row excluded-release-row"><div><strong>${esc(item.title)}</strong><span class="release-state-badge" data-release-state="excluded">Excluded</span></div><button type="button" class="btn btn-secondary" data-calendar-include="${esc(item.id)}">Re-enable</button></div>`).join('')}</div></details>`:''}
     <p class="weekly-footnote">Broadcast and listed film dates may differ from UK streaming availability. Date-only releases use noon in the device timezone.</p>
-  </section>`+upcomingMarkup);
+  </section>`);
 }
 document.getElementById('library-dashboard').addEventListener('click',event=>{
   const range=event.target.closest('[data-calendar-range]');if(range){selectedCalendarRange=range.dataset.calendarRange;document.getElementById('library-dashboard')._dashboardMarkup=null;renderDashboard();return;}

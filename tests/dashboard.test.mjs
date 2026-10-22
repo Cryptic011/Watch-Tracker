@@ -10,8 +10,26 @@ const helper=suite.slice(suite.indexOf('function extractFunction'),suite.indexOf
 const {extractFunction}=new Function('html','assert','vm',helper+'\nreturn {extractFunction};')(html,assert,vm);
 function app(){
  const c=vm.createContext({Date,console});
- vm.runInContext(['toMillis','isEpisodeTrackable','normalizeReleasedEpisodeMap','positiveEpisodeMap','releasedEpisodeMap','normalizeWatchedEpisodeMap','legacyWatchedEpisodeMap','watchedEpisodeMap','nextWatchEpisode','calendarEvents','localISODate'].map(n=>extractFunction(html,n)).join('\n'),c);return c;
+ vm.runInContext(['toMillis','isEpisodeTrackable','normalizeReleasedEpisodeMap','positiveEpisodeMap','releasedEpisodeMap','normalizeWatchedEpisodeMap','legacyWatchedEpisodeMap','watchedEpisodeMap','nextWatchEpisode','calendarRange','calendarEvents','localISODate'].map(n=>extractFunction(html,n)).join('\n'),c);return c;
 }
+test('Calendar filters show Monday to Sunday and the following seven-day window only',()=>{
+ const c=app(),now=new Date(2026,9,22,18),week=c.calendarRange('week',now),upcoming=c.calendarRange('upcoming',now),today=c.calendarRange('today',now);
+ assert.equal(c.localISODate(week.start),'2026-10-19');
+ assert.equal(week.days,7);
+ assert.equal(c.localISODate(upcoming.start),'2026-10-26');
+ assert.equal(upcoming.days,7);
+ assert.equal(c.localISODate(today.start),'2026-10-22');
+ assert.equal(today.days,1);
+ const items=['2026-10-18','2026-10-19','2026-10-25','2026-10-26','2026-11-01','2026-11-02'].map((date,index)=>({id:String(index),title:date,type:'Film',filmReleaseDate:date}));
+ assert.equal(JSON.stringify(c.calendarEvents(items,week.start,week.days).events.map(event=>event.item.title)),JSON.stringify(['2026-10-19','2026-10-25']));
+ assert.equal(JSON.stringify(c.calendarEvents(items,upcoming.start,upcoming.days).events.map(event=>event.item.title)),JSON.stringify(['2026-10-26','2026-11-01']));
+});
+test('Calendar shows only the selected window while retaining TBA and excluded sections',()=>{
+ const dashboard=fs.readFileSync(new URL('../assets/js/dashboard.js',import.meta.url),'utf8');
+ assert.doesNotMatch(dashboard,/upcomingBeyondWeek|upcomingMarkup|next 30 days/i);
+ assert.match(dashboard,/data-dashboard-section="unknown"/);
+ assert.match(dashboard,/data-dashboard-section="excluded"/);
+});
 test('Next to watch selects released gaps before later seasons and ignores announced totals',()=>{
  const c=app(),item={type:'Series',episodeScheduleVerified:true,releasedEpisodes:{1:[1,2,4],2:[1]},watchedEpisodes:{1:[1,4]},episodeCounts:{1:20}};
  assert.equal(JSON.stringify(c.nextWatchEpisode(item)),JSON.stringify({season:1,episode:2}));
@@ -99,6 +117,13 @@ test('Calendar names actual undated upcoming episodes and seasons regardless of 
  ];
  const result=c.calendarEvents(items,now);
  assert.equal(JSON.stringify(result.unknown.map(item=>[item.id,item.announcement])),JSON.stringify([['season','Season 2'],['episode','S1 E3'],['future','Film release']]));
+});
+
+test('Chicago Fire stays in its airing season and is not falsely shown as season 16 TBA',()=>{
+ const c=app(),now=new Date(2026,9,22),item={id:'chicago-fire',title:'Chicago Fire',type:'Series',airingSeason:15,curSeason:15,nextEpisodeNum:4,nextEpisodeDate:'2026-10-28T21:00:00',nextSeasonNum:16,episodeScheduleVerified:true,releasedEpisodes:{15:[1,2,3]},scheduledEpisodeReleases:[{season:15,number:4,raw:'2026-10-28T21:00:00'}]};
+ const result=c.calendarEvents([item],now,30);
+ assert.equal(result.events.find(event=>event.item.id==='chicago-fire')?.label,'S15 E4');
+ assert.equal(result.unknown.some(row=>row.id==='chicago-fire'),false);
 });
 
 
