@@ -33,9 +33,14 @@ let selectedCalendarRange='week';
 function calendarRange(range,now=new Date()){
   const today=new Date(now);today.setHours(0,0,0,0);
   const weekStart=new Date(today);weekStart.setDate(weekStart.getDate()-(weekStart.getDay()+6)%7);
-  if(range==='today')return{start:today,days:1,label:'Local calendar day'};
-  if(range==='upcoming'){const start=new Date(weekStart);start.setDate(start.getDate()+7);return{start,days:7,label:'Following Monday–Sunday'};}
-  return{start:weekStart,days:7,label:'Monday–Sunday'};
+  const priorDays=(today.getDay()+6)%7;
+  const throughSunday=7-priorDays;
+  if(range==='today')return{start:today,days:1,label:'Local calendar day',priorStart:weekStart,priorDays:0};
+  if(range==='upcoming'){
+    const end=new Date(today);end.setDate(end.getDate()+7);
+    return{start:today,days:8,label:`${today.getDate()}–${end.getDate()} ${end.toLocaleDateString(undefined,{month:'short'})}`,priorStart:weekStart,priorDays:0};
+  }
+  return{start:today,days:throughSunday,label:`Today through Sunday`,priorStart:weekStart,priorDays};
 }
 function calendarEvents(items,now=new Date(),days=7){
   const start=new Date(now);start.setHours(0,0,0,0);
@@ -103,8 +108,9 @@ function renderDashboard(){
   if(statsTarget)statsTarget.innerHTML=`<section class="dashboard-section watch-statistics" aria-labelledby="watch-statistics-title"><header class="watch-statistics-heading"><div><h2 id="watch-statistics-title">Your watch statistics</h2><p class="dashboard-note">Based on progress saved in your library</p></div></header><div class="watch-statistics-grid"><div class="watch-stat"><strong>${stats.libraryCount}</strong><span>Library items</span></div><div class="watch-stat"><strong>${stats.episodesWatched}</strong><span>Episodes logged</span></div><div class="watch-stat"><strong>${stats.filmsWatched}</strong><span>Films watched</span></div><div class="watch-stat"><strong>${stats.showsInProgress}</strong><span>Shows in progress</span></div><div class="watch-stat"><strong>${stats.showsCompleted}</strong><span>Shows completed</span></div></div></section>`;
   const visible=Boolean(currentUser&&currentTab==='library'&&!categoryControlsVisible()&&!searchQuery.trim());
   root.classList.toggle('hidden',!visible);if(!visible){root.replaceChildren();root._dashboardMarkup=null;return;}
-  const {start,days:daysToShow,label:rangeLabel}=calendarRange(selectedCalendarRange,new Date());
+  const {start,days:daysToShow,label:rangeLabel,priorStart,priorDays}=calendarRange(selectedCalendarRange,new Date());
   const {events,unknown}=calendarEvents(mediaItems,start,daysToShow);
+  const priorEvents=selectedCalendarRange==='week'&&priorDays?calendarEvents(mediaItems,priorStart,priorDays).events:[];
   const eventsByDay=new Map();
   for(const event of events){const key=localISODate(event.date);if(!eventsByDay.has(key))eventsByDay.set(key,[]);eventsByDay.get(key).push(event);}
   let days='';
@@ -141,11 +147,13 @@ function renderDashboard(){
     </section>`;
   }
   const excluded=mediaItems.filter(item=>item.hideFromWeeklyReleases===true);
+  const priorMarkup=priorEvents.length?`<details class="release-tba prior-releases" data-dashboard-section="prior"><summary><span>Prior Releases</span><span class="release-tba-count">${priorEvents.length}</span></summary><div class="release-tba-list">${priorEvents.map(event=>`<button type="button" class="release-tba-item" data-dashboard-open="${esc(event.item.id)}"><strong>${esc(event.item.title)}</strong><span>${esc(event.label)} · ${esc(event.date.toLocaleDateString(USER_LOCALE,{weekday:'short',day:'numeric',month:'short'}))}${event.dateOnly?' · Date only':' · '+esc(event.date.toLocaleTimeString(USER_LOCALE,{hour:'2-digit',minute:'2-digit'}))}</span></button>`).join('')}</div></details>`:'';
   const controls=`<div class="filter-pills calendar-range" role="group" aria-label="Filter release calendar">${[['today','Today'],['week','This week'],['upcoming','Upcoming']].map(([key,label])=>`<button type="button" class="pill-btn${selectedCalendarRange===key?' active':''}" data-calendar-range="${key}" aria-pressed="${selectedCalendarRange===key}">${label}</button>`).join('')}</div>`;
   updateDashboardMarkup(root,`<section class="dashboard-section weekly-releases" aria-labelledby="weekly-releases-title">
     <header class="weekly-releases-heading"><div><span class="weekly-eyebrow">YOUR SCHEDULE</span><h2 id="weekly-releases-title">${selectedCalendarRange==='upcoming'?'Upcoming releases':selectedCalendarRange==='today'?"Today’s releases":"This week’s releases"}</h2><p class="dashboard-note">${rangeLabel} · device timezone (${esc(DEVICE_TIME_ZONE||Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC')})</p></div><span class="weekly-total">${events.length}<small>releases</small></span></header>
     ${controls}
     <div class="release-week-list">${days}</div>
+    ${priorMarkup}
     ${unknown.length?`<details class="release-tba" data-dashboard-section="unknown"><summary><span>Dates to be announced</span><span class="release-tba-count">${unknown.length}</span></summary><div class="release-tba-list">${unknown.map(item=>`<button type="button" class="release-tba-item" data-dashboard-open="${esc(item.id)}"><strong>${esc(item.title)}</strong><span>${esc(item.announcement)} · Date TBA</span><span class="release-chevron" aria-hidden="true">›</span></button>`).join('')}</div></details>`:''}
     ${excluded.length?`<details class="release-tba" data-dashboard-section="excluded"><summary><span>Excluded from Weekly Releases</span><span class="release-tba-count">${excluded.length}</span></summary><div class="release-tba-list">${excluded.map(item=>`<div class="dashboard-row excluded-release-row"><div><strong>${esc(item.title)}</strong><span class="release-state-badge" data-release-state="excluded">Excluded</span></div><button type="button" class="btn btn-secondary" data-calendar-include="${esc(item.id)}">Re-enable</button></div>`).join('')}</div></details>`:''}
     <p class="weekly-footnote">Broadcast and listed film dates may differ from UK streaming availability. Date-only releases use noon in the device timezone.</p>

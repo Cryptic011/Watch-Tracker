@@ -12,23 +12,29 @@ function app(){
  const c=vm.createContext({Date,console});
  vm.runInContext(['toMillis','isEpisodeTrackable','normalizeReleasedEpisodeMap','positiveEpisodeMap','releasedEpisodeMap','normalizeWatchedEpisodeMap','legacyWatchedEpisodeMap','watchedEpisodeMap','nextWatchEpisode','calendarRange','calendarEvents','localISODate'].map(n=>extractFunction(html,n)).join('\n'),c);return c;
 }
-test('Calendar filters show Monday to Sunday and the following seven-day window only',()=>{
+test('Calendar shows the selected week remainder and Upcoming from today through the 29th',()=>{
  const c=app(),now=new Date(2026,9,22,18),week=c.calendarRange('week',now),upcoming=c.calendarRange('upcoming',now),today=c.calendarRange('today',now);
- assert.equal(c.localISODate(week.start),'2026-10-19');
- assert.equal(week.days,7);
- assert.equal(c.localISODate(upcoming.start),'2026-10-26');
- assert.equal(upcoming.days,7);
+ assert.equal(c.localISODate(week.start),'2026-10-22');
+ assert.equal(week.days,4);
+ assert.equal(c.localISODate(week.priorStart),'2026-10-19');
+ assert.equal(week.priorDays,3);
+ assert.equal(c.localISODate(upcoming.start),'2026-10-22');
+ assert.equal(upcoming.days,8);
+ assert.equal(upcoming.label,'22–29 Oct');
  assert.equal(c.localISODate(today.start),'2026-10-22');
  assert.equal(today.days,1);
- const items=['2026-10-18','2026-10-19','2026-10-25','2026-10-26','2026-11-01','2026-11-02'].map((date,index)=>({id:String(index),title:date,type:'Film',filmReleaseDate:date}));
- assert.equal(JSON.stringify(c.calendarEvents(items,week.start,week.days).events.map(event=>event.item.title)),JSON.stringify(['2026-10-19','2026-10-25']));
- assert.equal(JSON.stringify(c.calendarEvents(items,upcoming.start,upcoming.days).events.map(event=>event.item.title)),JSON.stringify(['2026-10-26','2026-11-01']));
+ const items=['2026-10-18','2026-10-19','2026-10-21','2026-10-22','2026-10-25','2026-10-26','2026-10-29','2026-10-30'].map((date,index)=>({id:String(index),title:date,type:'Film',filmReleaseDate:date}));
+ assert.equal(JSON.stringify(c.calendarEvents(items,week.start,week.days).events.map(event=>event.item.title)),JSON.stringify(['2026-10-22','2026-10-25']));
+ assert.equal(JSON.stringify(c.calendarEvents(items,week.priorStart,week.priorDays).events.map(event=>event.item.title)),JSON.stringify(['2026-10-19','2026-10-21']));
+ assert.equal(JSON.stringify(c.calendarEvents(items,upcoming.start,upcoming.days).events.map(event=>event.item.title)),JSON.stringify(['2026-10-22','2026-10-25','2026-10-26','2026-10-29']));
 });
 test('Calendar shows only the selected window while retaining TBA and excluded sections',()=>{
  const dashboard=fs.readFileSync(new URL('../assets/js/dashboard.js',import.meta.url),'utf8');
  assert.doesNotMatch(dashboard,/upcomingBeyondWeek|upcomingMarkup|next 30 days/i);
  assert.match(dashboard,/data-dashboard-section="unknown"/);
  assert.match(dashboard,/data-dashboard-section="excluded"/);
+ assert.match(dashboard,/data-dashboard-section="prior"/);
+ assert.match(dashboard,/Prior Releases/);
 });
 test('Next to watch selects released gaps before later seasons and ignores announced totals',()=>{
  const c=app(),item={type:'Series',episodeScheduleVerified:true,releasedEpisodes:{1:[1,2,4],2:[1]},watchedEpisodes:{1:[1,4]},episodeCounts:{1:20}};

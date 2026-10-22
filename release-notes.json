@@ -64,12 +64,12 @@
     "number": 224
   },
   "__current": {
-    "title": "Fix mobile Upcoming Releases layout and add Watch Logger app icon",
+    "title": "Schedule windows, Prior Releases, and Chicago Fire correction",
     "changes": [
       "Fix mobile release-card overflow so episode/date and platform metadata stay readable within the card.",
       "Add a compact narrow-screen layout and bump the dashboard stylesheet cache version.",
       "Replace the placeholder app icon with a custom SVG Watch Logger mark and register it in the web app manifest.",
-      "Make This week show only Monday through Sunday and Upcoming show only the following Monday-through-Sunday seven-day window. Today shows only the local calendar day; each filter displays only its selected range, with Dates to be announced and Excluded sections retained.",
+      "Make Upcoming show the inclusive rolling range from today through seven days later (October 22–29 for this release), and show only today through Sunday in This week; move earlier releases from that Monday–Sunday week into Prior Releases.",
       "Keep Chicago Fire’s active Season 15 episode labels in Season 15 and do not surface a misleading Season 16 TBA entry while Season 15 is still airing.",
       "Run the complete app and browser test suites before publishing; prevent overlapping deploys from cancelling one another; record the actual run number and attempt for every workflow attempt; and report the failed check plus recovery guidance.",
       "Add a post-deploy health check. Run 281's Pages deployment and health check succeeded, but its owner-notification step failed with HTTP 401 because the deployed reminder endpoint required a GitHub verification token.",

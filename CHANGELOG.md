@@ -7,11 +7,12 @@
 
 ## 2026-10-22
 
-### Schedule filters and release season correction
-- Make This week show exactly Monday through Sunday, and Upcoming show the following seven calendar days (the next Monday through Sunday). Today remains the local calendar day.
-- Show only the selected date window instead of appending another long upcoming list. Keep Dates to be announced and Excluded from Weekly Releases available beneath the selected window.
+### Upcoming range, Prior Releases, and Chicago Fire season correction
+- Upcoming shows the inclusive rolling window from today through seven days later—October 22–29 for this release.
+- This week shows today through Sunday only; earlier releases from Monday through yesterday are grouped under Prior Releases.
+- Show only the selected date window, while keeping Dates to be announced and Excluded from Weekly Releases available.
 - Keep Chicago Fire's currently airing episodes in Season 15 and suppress the inaccurate Season 16 TBA label while Season 15 continues airing.
-- Push-status notifications remain unavailable until the production `watchlog-reminders` Edge Function is updated to the secure server-side verification code. Deployment is waiting on approval for the function's existing platform-JWT-disabled configuration; no notification delivery is claimed yet.
+- Push-status notifications are still unavailable: Actions continues to log HTTP 401 because production has the older `watchlog-reminders` function. The secure replacement is waiting for approval to redeploy with its existing `verify_jwt: false` setting. No push delivery is claimed.
 
 ## 2026-10-22
 
