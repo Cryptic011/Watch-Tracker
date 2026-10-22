@@ -64,10 +64,12 @@
     "number": 224
   },
   "__current": {
-    "title": "Repair Settings navigation and reminder activity regression",
+    "title": "Allow slow Playwright setup and repair Settings navigation",
     "changes": [
+      "Increased GitHub Actions job limits from 10 to 30 minutes after runs #302 attempts 1 and 2 timed out while Ubuntu downloaded Playwright's 142 MB system dependency set.",
+      "Both cancellations occurred during browser setup before application tests or deployment.",
       "Renamed the settings landing page to Settings and added iOS-style category navigation with General, Release Reminders, Account & Sync, and a Track Sync shortcut.",
-      "Preserved the actual workflow run number and attempt in deployment history.",
+      "Preserved the actual run number and attempt in deployment history.",
       "Preserved library export and merge-based restore behavior.",
       "Restored Reminder activity and its View activity dialog so existing handlers no longer reference missing elements.",
       "Updated mobile browser smoke coverage to open each Settings category and verify the controls in the relevant panel."

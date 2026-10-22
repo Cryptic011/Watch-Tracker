@@ -1,3 +1,8 @@
+## 2026-10-22 — Allow slow Playwright dependency setup to complete
+- Increased both Actions job limits from 10 to 30 minutes after runs #302 attempts 1 and 2 timed out while Ubuntu's package mirror downloaded Playwright's 142 MB dependency set.
+- The cancellation happened during browser setup before application tests or deployment; no source-test failure was reported for those attempts.
+- Kept Chromium and WebKit checks enabled and gated deployment on their results.
+
 ## 2026-10-22 — Repair Settings navigation and reminder activity regression
 - Restored Reminder activity and its View activity dialog inside Settings so existing event handlers do not target missing DOM elements.
 - Preserved required release-note history for the actual workflow run number/attempt and library export plus merge-based restore.
