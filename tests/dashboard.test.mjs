@@ -10,8 +10,56 @@ const helper=suite.slice(suite.indexOf('function extractFunction'),suite.indexOf
 const {extractFunction}=new Function('html','assert','vm',helper+'\nreturn {extractFunction};')(html,assert,vm);
 function app(){
  const c=vm.createContext({Date,console});
- vm.runInContext(['toMillis','isEpisodeTrackable','normalizeReleasedEpisodeMap','positiveEpisodeMap','releasedEpisodeMap','normalizeWatchedEpisodeMap','legacyWatchedEpisodeMap','watchedEpisodeMap','nextWatchEpisode','calendarRange','calendarEvents','localISODate'].map(n=>extractFunction(html,n)).join('\n'),c);return c;
+ vm.runInContext(['toMillis','isEpisodeTrackable','normalizeReleasedEpisodeMap','positiveEpisodeMap','releasedEpisodeMap','normalizeWatchedEpisodeMap','legacyWatchedEpisodeMap','watchedEpisodeMap','nextWatchEpisode','calendarRange','calendarEvents','localISODate','weeklyReleasePattern','recurringWeeklyShows'].map(n=>extractFunction(html,n)).join('\n'),c);return c;
 }
+test('Recurring shows retain an aired episode for exactly 24 hours then advance to the next confirmed episode',()=>{
+ const c=app(),episodes=[8,15,22,29].map((day,index)=>({season:2,number:index+1,raw:new Date(2026,9,day,20).toISOString()}));
+ const item={id:'weekly',title:'Weekly show',type:'Series',status:'Watched',recurringWeeklySchedule:c.weeklyReleasePattern(episodes)};
+ const before=JSON.stringify(item),air=new Date(2026,9,22,20).getTime();
+ assert.equal(c.recurringWeeklyShows([item],new Date(air+86400000-1))[0].episodes[0].number,3);
+ assert.equal(c.recurringWeeklyShows([item],new Date(air+86400000-1))[0].state,'released');
+ const next=c.recurringWeeklyShows([item],new Date(air+86400000))[0];
+ assert.equal(next.episodes[0].number,4);assert.equal(next.state,'upcoming');assert.equal(next.day,4);
+ assert.equal(JSON.stringify(item),before,'display rollover never edits the saved library');
+});
+
+test('Recurring membership survives past the last known air date with no invented episode or date',()=>{
+ const c=app(),episodes=[8,15,22].map((day,index)=>({season:1,number:index+1,raw:new Date(2026,9,day,20).toISOString()}));
+ const item={id:'pause',title:'On a break',type:'Anime',recurringWeeklySchedule:c.weeklyReleasePattern(episodes),scheduledEpisodeReleases:[]};
+ const rows=c.recurringWeeklyShows([item],new Date(2027,0,1));
+ assert.equal(rows.length,1);assert.equal(rows[0].day,4);assert.equal(rows[0].state,'tba');
+ assert.equal(rows[0].date,null);assert.equal(rows[0].episodes.length,0);
+});
+
+test('Recurring weekdays always sort Monday to Sunday and exclude films, one-off releases and explicitly hidden shows',()=>{
+ const c=app(),make=(id,days)=>({id,title:id,type:'Series',status:'Planned',scheduledEpisodeReleases:days.map((day,index)=>({season:1,number:index+1,raw:new Date(2026,9,day,20).toISOString()}))});
+ const monday=make('Monday',[12,19,26]),sunday=make('Sunday',[11,18,25]),thursday=make('Thursday',[8,15,22]);
+ const rows=c.recurringWeeklyShows([sunday,{...monday,type:'Film'},{...thursday,hideFromWeeklyReleases:true},make('One-off',[20]),thursday,monday],new Date(2026,9,22,21));
+ assert.equal(JSON.stringify(rows.map(row=>row.day)),JSON.stringify([1,4,0]));
+ assert.equal(JSON.stringify(rows.map(row=>row.item.id)),JSON.stringify(['Monday','Thursday','Sunday']));
+});
+
+test('Recurring batch episodes deduplicate metadata and stay together before advancing',()=>{
+ const c=app(),episodes=[{season:1,number:1,raw:'2026-10-15'},{season:1,number:2,raw:'2026-10-15'},{season:1,number:3,raw:'2026-10-22'},{season:1,number:4,raw:'2026-10-22'},{season:1,number:5,raw:'2026-10-29'}];
+ const item={id:'batch',title:'Batch',type:'Series',airingSeason:1,nextEpisodeNum:3,nextEpisodeDate:'2026-10-22',recurringWeeklySchedule:c.weeklyReleasePattern(episodes),scheduledEpisodeReleases:episodes};
+ const current=c.recurringWeeklyShows([item],new Date(2026,9,22,13))[0];
+ assert.equal(current.date.getHours(),12);
+ assert.equal(JSON.stringify(current.episodes.map(row=>row.number)),JSON.stringify([3,4]));
+ assert.equal(c.recurringWeeklyShows([item],new Date(2026,9,23,12))[0].episodes[0].number,5);
+});
+
+test('Official weekly patterns and stored schedules persist through refreshes and edits',()=>{
+ const c=app(),rows=[{season:4,number:1,raw:'2026-10-22T20:00:00Z'}];
+ assert.equal(c.weeklyReleasePattern(rows),null);
+ assert.equal(c.weeklyReleasePattern(rows,['Thursday']).days.length,1);
+ assert.equal(c.weeklyReleasePattern([null,{season:1,number:0,raw:'bad'}]),null);
+ const catalogue=fs.readFileSync(new URL('../assets/js/catalogue.js',import.meta.url),'utf8');
+ assert.equal(catalogue.split('weeklyReleasePattern(schedule.episodes.map(').length-1,2);
+ assert.ok(catalogue.includes('recurringWeeklySchedule:ended?null:')&&catalogue.includes('recurringWeeklySchedule:tvEnded?null:'));
+ assert.match(fs.readFileSync(new URL('../assets/js/editor.js',import.meta.url),'utf8'),/recurringWeeklySchedule:type==="Film"\?null/);
+ assert.match(fs.readFileSync(new URL('../assets/js/sync.js',import.meta.url),'utf8'),/recurringWeeklySchedule:result.recurringWeeklySchedule\|\|current.recurringWeeklySchedule\|\|null/);
+});
+
 test('Calendar shows the selected week remainder and Upcoming from today through the 29th',()=>{
  const c=app(),now=new Date(2026,9,22,18),week=c.calendarRange('week',now),upcoming=c.calendarRange('upcoming',now),today=c.calendarRange('today',now);
  assert.equal(c.localISODate(week.start),'2026-10-22');

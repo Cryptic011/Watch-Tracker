@@ -305,6 +305,30 @@
     return episode.airdate||"";
   }
 
+  function weeklyReleasePattern(episodes,broadcastDays=[]){
+    const unique=new Map();
+    for(const row of Array.isArray(episodes)?episodes:[]){
+      const season=Number(row?.season),number=Number(row?.number),raw=String(row?.raw||"");
+      const date=new Date(/^\d{4}-\d{2}-\d{2}$/.test(raw)?raw+"T12:00:00":raw);
+      if(!Number.isInteger(season)||season<1||!Number.isInteger(number)||number<1||!Number.isFinite(date.getTime()))continue;
+      unique.set(season+":"+number,{season,number,raw,date});
+    }
+    const rows=[...unique.values()].sort((left,right)=>left.date-right.date);
+    if(!rows.length)return null;
+    const current=rows.filter(row=>row.season===rows.at(-1).season).slice(-40),days=[];
+    for(let day=0;day<7;day++){
+      const matches=current.filter(row=>row.date.getDay()===day);
+      if(matches.some((row,index)=>matches.slice(index+1).some(next=>next.date-row.date>=6*86400000&&next.date-row.date<=8*86400000)))days.push(day);
+    }
+    const officialDays=(Array.isArray(broadcastDays)?broadcastDays:[]).filter(day=>["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"].includes(day));
+    if(!days.length&&officialDays.length){
+      const counts=new Map();
+      for(const row of current)counts.set(row.date.getDay(),(counts.get(row.date.getDay())||0)+1);
+      days.push(...[...counts].sort((left,right)=>right[1]-left[1]).slice(0,officialDays.length).map(([day])=>day));
+    }
+    return days.length?{days,episodes:rows.slice(-100).map(({season,number,raw})=>({season,number,raw}))}:null;
+  }
+
   function analyzeTVSchedule(seasonsRaw,episodesRaw,show,now=Date.now()){
     const seasons=(Array.isArray(seasonsRaw)?seasonsRaw:[])
       .filter(s=>Number.isFinite(Number(s?.number))&&Number(s.number)>0)
@@ -461,6 +485,7 @@
       latestEpisodeDate:episodeReleaseTimestamp(schedule.currentEpisodeRow),seriesReleaseDate:show?.premiered||"",
       completedSeasons:schedule.completedSeasons,upcoming,nextEpisode:schedule.nextEpisode,airing:schedule.airing,episodeImages:officialEpisodeImageMap(schedule.episodes,show?.image),episodeImagesSource:"TVMaze",seasonImages:officialSeasonImageMap(schedule.seasons),seasonImagesSource:"TVMaze",
       scheduledEpisodeReleases:schedule.episodes.filter(ep=>episodeAirTime(ep)>Date.now()-86400000).map(ep=>({season:ep.season,number:ep.number,raw:episodeReleaseTimestamp(ep)})),
+      recurringWeeklySchedule:ended?null:weeklyReleasePattern(schedule.episodes.map(ep=>({season:ep.season,number:ep.number,raw:episodeReleaseTimestamp(ep)})),show?.schedule?.days),
       episodeCounts:schedule.episodeCounts,airedEpisodeCounts:schedule.airedEpisodeCounts,releasedEpisodes:schedule.releasedEpisodes,known:new Set(schedule.known),
       sources:tvAvailable?["TVMaze"]:[],tvAvailable,episodeScheduleAvailable,resolvedShowId,
       imdbId:String(imdbId||show?.externals?.imdb||""),imdbConfirmed:false,show,ended,provisional:true
@@ -534,6 +559,7 @@
     return {
       highest,latestAired,currentEpisode,latestEpisodeDate:episodeReleaseTimestamp(schedule.currentEpisodeRow),seriesReleaseDate:show?.premiered||"",completedSeasons:schedule.completedSeasons,upcoming,nextEpisode:schedule.nextEpisode,airing:schedule.airing,episodeImages:officialEpisodeImageMap(schedule.episodes,show?.image),episodeImagesSource:"TVMaze",seasonImages:officialSeasonImageMap(schedule.seasons),seasonImagesSource:"TVMaze",
       scheduledEpisodeReleases:schedule.episodes.filter(ep=>episodeAirTime(ep)>Date.now()-86400000).map(ep=>({season:ep.season,number:ep.number,raw:episodeReleaseTimestamp(ep)})),
+      recurringWeeklySchedule:tvEnded?null:weeklyReleasePattern(schedule.episodes.map(ep=>({season:ep.season,number:ep.number,raw:episodeReleaseTimestamp(ep)})),show?.schedule?.days),
       episodeCounts:schedule.episodeCounts,airedEpisodeCounts:schedule.airedEpisodeCounts,releasedEpisodes:schedule.releasedEpisodes,known,sources,tvAvailable,episodeScheduleAvailable,
       resolvedShowId,imdbId:resolvedImdbId,imdbConfirmed:imdb?.confirmed===true,show,ended:tvEnded,provisional:false
     };

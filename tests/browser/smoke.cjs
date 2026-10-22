@@ -322,6 +322,41 @@ const server=http.createServer((req,res)=>{
     assert.equal(await page.locator(selector).first().isVisible(),false,selector+' must not be visible in Library');
   }
   // Force a pending memory change: refresh must save it before navigation.
+  phase='recurring weekly schedule';
+  await page.evaluate(async()=>{
+   const item=mediaItems.find(row=>row.id==='show'),air=Date.now()-3600000;
+   const episodes=[-7,0,7].map((days,index)=>({season:2,number:index+1,raw:new Date(air+days*86400000).toISOString()}));
+   item.recurringWeeklySchedule=weeklyReleasePattern(episodes);item.scheduledEpisodeReleases=episodes.slice(1);
+   await persistLibrary(mediaItems);render();
+  });
+  const recurring=page.locator('#recurring-weekly-dashboard');
+  assert.equal(await recurring.isVisible(),true);
+  assert.deepEqual(await recurring.locator('[data-recurring-day]').evaluateAll(nodes=>nodes.map(node=>Number(node.dataset.recurringDay))),[1,2,3,4,5,6,0]);
+  assert.equal(await recurring.locator('[data-recurring-open="show"]').count(),1);
+  assert.match(await recurring.textContent(),/S2 E2/);
+  const scheduleText=await recurring.textContent();
+  await page.locator('[data-calendar-range="today"]').click();
+  assert.equal(await recurring.textContent(),scheduleText,'calendar range cannot change the recurring schedule');
+  await page.locator('[data-gallery-category="Series"]').click();
+  await page.locator('[data-filter="Watched"]').click();
+  await page.locator('#sort-mode').selectOption('platform');
+  await page.locator('#search-input').fill('No matching title at all');
+  await page.waitForFunction(()=>searchQuery==='No matching title at all'&&document.querySelector('.gallery-empty'));
+  assert.equal(await recurring.isVisible(),true);
+  assert.equal(await recurring.textContent(),scheduleText,'Library status, search and sorting cannot remove recurring shows');
+  await page.locator('#search-input').fill('');
+  await page.waitForFunction(()=>searchQuery==='');
+  await page.locator('[data-filter="All"]').click();await page.locator('#sort-mode').selectOption('current');
+  await page.locator('[data-gallery-back]').click();
+  for(const width of [320,390,768]){
+   await page.setViewportSize({width,height:844});
+   assert.equal(await recurring.evaluate(root=>root.scrollWidth<=root.clientWidth),true,'recurring schedule fits the viewport');
+   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+  }
+  await page.setViewportSize({width:390,height:844});
+  if(process.env.BROWSER_SCREENSHOT_DIR)await recurring.screenshot({path:path.join(process.env.BROWSER_SCREENSHOT_DIR,engine.name()+'-recurring.png')});
+  await recurring.locator('[data-recurring-open="show"]').click();await page.locator('#episode-tracker-modal').waitFor({state:'visible'});
+  await page.locator('#close-episode-tracker').click();
   phase='refresh';
   const refreshItemId=await page.evaluate(()=>{mediaItems[0].platform='Saved before refresh';return mediaItems[0].id;});
   const before=loads;const reload=page.waitForEvent('load');await page.locator('#refresh-app').click();await reload;
@@ -331,6 +366,7 @@ const server=http.createServer((req,res)=>{
   await page.waitForFunction(()=>document.querySelector('#auth-screen').classList.contains('hidden'),{timeout:10000});
   await page.waitForFunction(id=>mediaItems.find(item=>item.id===id)?.platform==='Saved before refresh',refreshItemId,{timeout:10000});
   assert.equal(items.find(item=>item.id===refreshItemId)?.platform,'Saved before refresh');
+  assert.equal(await page.locator('#recurring-weekly-dashboard [data-recurring-open="show"]').count(),1,'recurring membership survives reload');
   assert.ok(loads>before);
   // A failed cloud save must leave the current page and edit intact.
   phase='failed save';

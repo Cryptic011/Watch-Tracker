@@ -100,7 +100,65 @@ function updateDashboardMarkup(root,markup){
   for(const node of root.querySelectorAll('details[data-dashboard-section]'))node.open=expanded.has(node.dataset.dashboardSection);
 }
 
+let recurringWeeklyTimer=null;
+function recurringWeeklyShows(items,now=new Date()){
+  const result=[];
+  for(const item of Array.isArray(items)?items:[]){
+    if(!isEpisodeTrackable(item)||item.hideFromWeeklyReleases===true)continue;
+    const stored=item.recurringWeeklySchedule;
+    const scheduled=Array.isArray(item.scheduledEpisodeReleases)?item.scheduledEpisodeReleases:[];
+    const activeSeason=Number(item.airingSeason||item.curSeason||0);
+    const nextMatch=scheduled.find(row=>Number(row.number)===Number(item.nextEpisodeNum)&&row.raw===item.nextEpisodeDate);
+    const nextSeason=Number(nextMatch?.season||(Number(item.nextEpisodeNum)===1?item.nextSeasonNum:activeSeason)||activeSeason);
+    const rows=[...(Array.isArray(stored?.episodes)?stored.episodes:[]),...scheduled,
+      {season:activeSeason,number:item.latestEpisodeNum,raw:item.latestEpisodeDate},
+      {season:nextSeason,number:item.nextEpisodeNum,raw:item.nextEpisodeDate}];
+    const pattern=weeklyReleasePattern(rows);
+    const days=[...new Set((Array.isArray(stored?.days)?stored.days:pattern?.days||[]).filter(day=>Number.isInteger(day)&&day>=0&&day<7))];
+    const episodes=[...new Map((pattern?.episodes||rows).filter(row=>row&&Number.isInteger(Number(row.season))&&Number(row.season)>0&&Number.isInteger(Number(row.number))&&Number(row.number)>0).map(row=>[row.season+":"+row.number,row])).values()];
+    for(const day of days){
+      const releases=episodes.map(row=>({...row,date:new Date(/^\d{4}-\d{2}-\d{2}$/.test(row.raw)?row.raw+"T12:00:00":row.raw)}))
+        .filter(row=>row.date.getDay()===day).sort((left,right)=>left.date-right.date);
+      const next=releases.find(row=>row.date.getTime()+86400000>now.getTime());
+      const batch=next?releases.filter(row=>row.date.getTime()===next.date.getTime()):[];
+      result.push({item,day,date:next?.date||null,episodes:batch,state:next?(next.date>now?"upcoming":"released"):"tba"});
+    }
+  }
+  return result.sort((left,right)=>(left.day+6)%7-(right.day+6)%7||(left.date?.getTime()||Infinity)-(right.date?.getTime()||Infinity)||String(left.item.title).localeCompare(String(right.item.title)));
+}
+function renderRecurringWeeklySchedule(){
+  clearTimeout(recurringWeeklyTimer);recurringWeeklyTimer=null;
+  let root=document.getElementById("recurring-weekly-dashboard");
+  if(!root){
+    const calendar=document.getElementById("library-dashboard");if(!calendar)return;
+    root=document.createElement("div");root.id="recurring-weekly-dashboard";calendar.after(root);
+    root.addEventListener("click",event=>{
+      const button=event.target.closest("[data-recurring-open]");if(button)openMediaRow(button.dataset.recurringOpen);
+    });
+  }
+  const visible=Boolean(currentUser&&currentTab==="library");
+  root.classList.toggle("hidden",!visible);
+  if(!visible){root.replaceChildren();root._dashboardMarkup=null;return;}
+  const now=new Date(),rows=recurringWeeklyShows(mediaItems,now),total=new Set(rows.map(row=>String(row.item.id))).size;
+  const days=Array.from({length:7},(_,index)=>{
+    const day=(index+1)%7,label=new Date(2026,0,5+index).toLocaleDateString(USER_LOCALE,{weekday:"long"}),shows=rows.filter(row=>row.day===day);
+    return `<section class="release-day recurring-weekday" data-recurring-day="${day}" aria-label="${esc(label)}"><header class="release-day-heading"><span class="release-day-name">${esc(label)}</span><span class="release-day-count">${shows.length} ${shows.length===1?"show":"shows"}</span></header>${shows.length?shows.map(row=>{
+      const episode=row.episodes.length?row.episodes.map(ep=>`S${ep.season} E${ep.number}`).join(" · "):"Next episode TBA";
+      const date=row.date?row.date.toLocaleDateString(USER_LOCALE,{day:"numeric",month:"short"}):"Date TBA";
+      const time=row.date&&!/^\d{4}-\d{2}-\d{2}$/.test(row.episodes[0].raw)?row.date.toLocaleTimeString(USER_LOCALE,{hour:"2-digit",minute:"2-digit"}):"Time TBA";
+      return `<button type="button" class="release-card recurring-release-card" data-recurring-open="${esc(row.item.id)}"><span class="release-time">${esc(time)}</span><span class="release-card-copy"><strong>${esc(row.item.title)}</strong><span class="release-episode">${esc(episode)} · ${esc(date)}</span><span class="release-state-badge" data-release-state="${row.state}">${row.state==="released"?"Released · last 24 hours":row.state==="upcoming"?"Upcoming":"Awaiting next episode"}</span><span class="release-platform">${esc(row.item.platform||"Platform not saved")}</span></span><span class="release-chevron" aria-hidden="true">›</span></button>`;
+    }).join(""):'<p class="release-empty">No recurring shows</p>'}</section>`;
+  }).join("");
+  updateDashboardMarkup(root,`<section class="dashboard-section weekly-releases recurring-weekly-releases" aria-labelledby="recurring-weekly-title"><header class="weekly-releases-heading"><div><span class="weekly-eyebrow">MONDAY–SUNDAY</span><h2 id="recurring-weekly-title">Recurring weekly shows</h2><p class="dashboard-note">Independent of Library filters · device timezone (${esc(DEVICE_TIME_ZONE||Intl.DateTimeFormat().resolvedOptions().timeZone||"UTC")})</p></div><span class="weekly-total">${total}<small>shows</small></span></header><div class="release-week-list">${days}</div><p class="weekly-footnote">Shows stay listed. Episodes remain for 24 hours after airing, then advance to the next confirmed episode. Unannounced dates stay TBA; no dates or episode numbers are guessed.</p></section>`);
+  if(document.visibilityState==="visible"){
+    const deadlines=rows.filter(row=>row.date).map(row=>row.date.getTime()+86400000-now.getTime()).filter(delay=>delay>0);
+    recurringWeeklyTimer=setTimeout(renderRecurringWeeklySchedule,Math.max(1,Math.min(60000,...deadlines)));
+  }
+}
+document.addEventListener("visibilitychange",renderRecurringWeeklySchedule);
+
 function renderDashboard(){
+  renderRecurringWeeklySchedule();
   const root=document.getElementById('library-dashboard');if(!root)return;
   const stats=watchStatistics(mediaItems);
   let statsTarget=document.getElementById('settings-watch-statistics');

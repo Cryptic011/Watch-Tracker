@@ -64,8 +64,11 @@
     "number": 224
   },
   "__current": {
-    "title": "Match Settings panels to the Changelog colour",
+    "title": "Add a permanent Monday–Sunday recurring schedule",
     "changes": [
+      "Add Recurring weekly shows as a separate Monday–Sunday section unaffected by Library filters, search, sorting, or the release-calendar range.",
+      "Keep each show listed, hold its aired episode for 24 hours, then advance to the next confirmed episode; retain Next episode TBA when no date is announced.",
+      "Save verified recurring patterns across edits, metadata refreshes and reloads, respecting explicit Weekly Releases exclusions and showing device-local dates.",
       "Match Settings categories, Track Sync, and detail panels to the same grey as Changelog, with consistent separators and theme-aware light-mode colours.",
       "Marking any episode watched also marks earlier released episodes in that season only, across every season; other seasons and later episodes stay unchanged.",
       "Keep unmarking individual and let Undo restore the exact previous season selection, preserving existing progress and gaps.",

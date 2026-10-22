@@ -1,3 +1,10 @@
+## 2026-10-23 — Add a permanent Monday–Sunday recurring schedule
+- Add Recurring weekly shows as its own section, independent of Library search, status filters, sorting, and calendar ranges.
+- Always show Monday through Sunday in device-local time, retaining each recurring show between episodes.
+- Keep aired episodes for exactly 24 elapsed hours, then select the next confirmed episode; retain a Next episode TBA row when no date is announced.
+- Preserve verified weekly patterns through metadata refreshes, edits, saves, and reloads, while respecting explicit Weekly Releases exclusions.
+- Refresh the schedule at the rollover boundary and when returning to the app; cover rollover, batches, missing dates, mobile layouts, and filter independence.
+
 ## 2026-10-23 — Match Settings panels to the Changelog colour
 - Use the same theme-aware card colour for Settings categories, Track Sync, and category detail panels as Changelog.
 - Remove lighter hard-coded grey surfaces and make detail separators follow the theme, retaining coloured category icons.

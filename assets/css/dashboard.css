@@ -53,6 +53,10 @@
 @media(max-width:390px){.prior-releases .release-tba-item{grid-template-columns:minmax(0,1fr) minmax(132px,42%);column-gap:8px}.prior-releases .release-tba-item>span:nth-child(2){font-size:.69rem}}
 .weekly-footnote{padding:11px 17px 15px;border-top:1px solid var(--border);font-size:.67rem;line-height:1.45;color:var(--muted)}
 .release-card:focus-visible,.release-tba-item:focus-visible{outline:2px solid var(--blue2);outline-offset:2px}
+.recurring-weekly-releases{background:var(--card)}
+.recurring-release-card{border-color:var(--border)}
+.recurring-release-card .release-episode{color:var(--muted)}
+.recurring-weekly-releases .release-state-badge[data-release-state="tba"]{background:var(--inner);border-color:var(--border);color:var(--muted)}
 @media(min-width:620px){.release-week-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:18px}.release-day:nth-child(2){border-top:0}.release-day{min-width:0}}
 
 /* Compact statistics overview; keeps labels readable at narrow phone widths. */
