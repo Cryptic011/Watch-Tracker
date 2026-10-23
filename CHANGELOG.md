@@ -1,5 +1,6 @@
 ## 2026-10-24 — Reliable automatic cross-device sync
 - Check the account revision every 10 seconds while visible and immediately on focus, return or reconnection; unchanged checks do not download the Library.
+- Record accepted granular writes atomically so a lost acknowledgement cannot repeat an edit over a newer device change.
 - Retry interrupted uploads automatically with bounded backoff, retain offline edits across reopening, and stop invalid-session retries until sign-in.
 - Merge incoming changes with in-flight edits, preserve notes drafts and keep newer episode ticks when saving an older edit form.
 - Keep save status pending until device and cloud writes are acknowledged; retry failed device writes before sending cached content.

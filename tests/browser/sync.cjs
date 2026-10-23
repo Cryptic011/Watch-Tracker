@@ -2,7 +2,7 @@ const {chromium,webkit}=require('playwright');
 const assert=require('node:assert/strict'),http=require('node:http'),fs=require('node:fs'),path=require('node:path');
 const root=path.resolve(__dirname,'../..'),account={id:'two-device-account',email:'devices@example.test',displayName:'Two devices'};
 let revision=0,serial=0,conflicts=0,barrierRemaining=0,barrier=[],dropToken='',failures=new Map();
-const tokens=new Set(),errors=[],calls=new Map();
+const tokens=new Set(),errors=[],calls=new Map(),receipts=new Map();
 let items=[{id:'show',title:'Two Device Show',type:'Series',status:'Watching',platform:'Original service',episodeScheduleVerified:true,releasedEpisodes:{1:[1,2,3,4,5,6,7,8,9,10]},watchedEpisodes:{1:[1]},episodeCounts:{1:10},verifiedCompletedSeasons:1,totalSeasons:1,curSeason:1,curEp:1,watchedSeasons:0,seriesReleaseDate:'2020-01-01'}, {id:'film',title:'Deletion test',type:'Film',status:'Planned',filmReleaseDate:'2020-01-01',filmReleaseSource:'Manual'}];
 function patch(changes){
  const map=new Map(items.map(item=>[String(item.id),structuredClone(item)]));
@@ -34,8 +34,10 @@ const server=http.createServer(async(req,res)=>{
    if(body.action==='save'){
     if(failures.get(token)>0){failures.set(token,failures.get(token)-1);return reply({error:'Temporary outage'},503);}
     if(barrierRemaining>0){barrierRemaining--;await new Promise(resolve=>{barrier.push(resolve);if(barrierRemaining===0){barrier.splice(0).forEach(release=>release());}});}
+    const requestKey=JSON.stringify({expectedRevision:body.expectedRevision,changes:body.changes});
+    if(receipts.has(requestKey))return reply({ok:true,revision:receipts.get(requestKey),replayed:true});
     if(body.expectedRevision!==revision){conflicts++;return reply({code:'revision_conflict',error:'Conflict',items,revision},409);}
-    assert.ok(!('items' in body)&&Array.isArray(body.changes));patch(body.changes);
+    assert.ok(!('items' in body)&&Array.isArray(body.changes));patch(body.changes);receipts.set(requestKey,revision);
     if(dropToken===token){dropToken='';res.destroy();return;}
     return reply({ok:true,revision});
    }

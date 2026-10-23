@@ -458,7 +458,8 @@ Deno.serve(async (req: Request) => {
         if(change.watched!==undefined&&(change.watched===null||Array.isArray(change.watched)||typeof change.watched!=="object"||Object.entries(change.watched).some(([season,delta]:[string,any])=>!/^[1-9][0-9]*$/.test(season)||!delta||!positiveArray(delta.add)||!positiveArray(delta.remove))))return json({error:"Invalid episode changes."},400);
         if(change.unset!==undefined&&(!Array.isArray(change.unset)||change.unset.some((key:any)=>typeof key!=="string"||key==="id")))return json({error:"Invalid removed fields."},400);
       }
-      const {data:saved,error}=await db.rpc("watchlog_patch_library",{p_account:session.accountId,p_revision:body.expectedRevision,p_changes:changes});
+      const requestHash=await sha256(JSON.stringify({expectedRevision:body.expectedRevision,changes}));
+      const {data:saved,error}=await db.rpc("watchlog_patch_library_once",{p_account:session.accountId,p_revision:body.expectedRevision,p_changes:changes,p_request_hash:requestHash});
       if(error)throw error;
       if(!saved?.ok)return json({error:"Library changed on another device. Both changes will be kept.",...saved},409);
       return json(saved);

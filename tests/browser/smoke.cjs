@@ -352,9 +352,9 @@ const server=http.createServer((req,res)=>{
     assert.equal(await page.locator(selector).first().isVisible(),true,selector+' visible in Account & Sync');
   }
   await page.locator('[data-settings-panel="account"] [data-settings-back]').click();
+  await page.waitForFunction(()=>!cloudSyncInFlight&&!cloudSaveInFlight&&!localSaveInFlight);
   const loadsBeforeTrackSync=loads;
   await page.locator('#settings-sync-shortcut').click();
-  await page.waitForFunction(()=>document.querySelector('#sync-now').disabled,'',{timeout:5000});
   for(let attempt=0;attempt<100&&loads===loadsBeforeTrackSync;attempt++)await new Promise(resolve=>setTimeout(resolve,50));
   assert.ok(loads>loadsBeforeTrackSync,'Track Sync performs a cloud library load');
   await page.waitForFunction(()=>!document.querySelector('#sync-now').disabled&&document.querySelector('#sync-status').textContent.includes('Synced.'),null,{timeout:10000});
