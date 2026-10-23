@@ -31,7 +31,7 @@ function patch(items,changes){
  return [...map.values()];
 }
 (async()=>{
- await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const base=`http://127.0.0.1:${server.address().port}`;
+ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const port=server.address().port,base=`http://127.0.0.1:${port}`;
  for(const engine of process.env.BROWSER_ENGINES==='all'?[chromium,webkit]:[chromium]){
   const browser=await engine.launch({headless:true});
   try{
@@ -111,17 +111,26 @@ function patch(items,changes){
    await page.locator('[data-gallery-menu]').click();await page.locator('[data-gallery-archive]').click();
    await page.waitForFunction(()=>mediaItems.find(item=>item.id==='show').archived===false);
    await page.waitForFunction(()=>!cloudSaveInFlight&&!localSaveInFlight&&!queuedCloudSnapshot);
-   offline=true;await context.setOffline(true);await page.goto(base+'/#/title/show');
+   offline=true;
+   // WebKit offline emulation rejects even literal worker responses:
+   // https://github.com/microsoft/playwright/issues/42775
+   // Stop the origin itself, and retain Chromium's offline emulation as well.
+   const stopped=new Promise((resolve,reject)=>server.close(error=>error?reject(error):resolve()));server.closeAllConnections();await stopped;
+   if(engine===chromium)await context.setOffline(true);
+   const uncached=await browser.newContext({serviceWorkers:'block'}),probe=await uncached.newPage();
+   await assert.rejects(probe.goto(base,{timeout:5000}),'an uncached page must fail with the origin stopped');await uncached.close();
+   await page.goto(base+'/#/title/show');
    await page.locator('.gallery-detail[open]').waitFor({timeout:20000});
    await page.locator('.gallery-season[data-season="1"]>summary').click();await page.locator('[data-gallery-toggle-episode="1:4"]').click();
    await page.waitForFunction(()=>!cloudSaveInFlight&&!localSaveInFlight&&mediaItems.find(item=>item.id==='show').watchedEpisodes[1].includes(4));
    // Close and reopen the page: the edit must survive beyond the old document.
-   // WebKit's automation reload command errors internally while offline.
    await page.close();page=await context.newPage();observePage(page);
    await page.goto(base+'/#/title/show');await page.locator('.gallery-detail[open]').waitFor({timeout:20000});
    assert.equal(await page.evaluate(()=>mediaItems.find(item=>item.id==='show').watchedEpisodes[1].includes(4)),true,'offline progress survives reopening');
    assert.equal(items.find(item=>item.id==='show').watchedEpisodes[1].includes(4),false,'offline edit has not reached the server');
-   offline=false;await context.setOffline(false);await page.evaluate(()=>window.dispatchEvent(new Event('online')));
+   await new Promise(resolve=>server.listen(port,'127.0.0.1',resolve));offline=false;
+   if(engine===chromium)await context.setOffline(false);
+   await page.evaluate(()=>window.dispatchEvent(new Event('online')));
    await page.waitForFunction(()=>!cloudSaveInFlight&&!localSaveInFlight&&!queuedCloudSnapshot);
    for(let i=0;i<100&&!items.find(item=>item.id==='show').watchedEpisodes[1].includes(4);i++)await new Promise(resolve=>setTimeout(resolve,50));
    assert.equal(items.find(item=>item.id==='show').watchedEpisodes[1].includes(4),true,'reconnection uploads the saved offline change');
@@ -142,4 +151,4 @@ function patch(items,changes){
    assert.deepEqual(errors,[]);console.log(`${engine.name()}: granular sync, offline reopen/edit/reopen/reconnect, recovery, routing, lazy seasons, favourites, archive and lists passed`);
   }finally{await browser.close();}
  }
-})().catch(error=>{console.error(error);process.exitCode=1;}).finally(()=>server.close());
+})().catch(error=>{console.error(error);process.exitCode=1;}).finally(()=>{if(server.listening)server.close();});
