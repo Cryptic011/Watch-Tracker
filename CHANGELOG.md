@@ -1,3 +1,7 @@
+## 2026-10-23 — Show page titles without the repeated app heading
+- Keep the app heading on Library home only. Settings, Search, Movies, and Series use their own page headings.
+- Preserve the page heading while opening Settings categories and restore the app heading on return home.
+
 ## 2026-10-23 — Keep Settings focused on settings
 - Hide the Library search box and Planned, Watching, and Watched tracking totals on Settings and all its category panels.
 - Restore both controls when returning to Library, and keep the separate Search page's existing layout.

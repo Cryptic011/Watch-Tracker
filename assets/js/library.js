@@ -258,7 +258,11 @@
     $("count-planned").textContent=planned;$("count-watching").textContent=watching;$("count-watched").textContent=watched;
   }
   function categoryControlsVisible(){return currentTab==="library"&&Boolean(window.WatchLogGallery?.hasCategory?.());}
-  function updateFloatingAddVisibility(){renderLibraryMaintenance();addBtn.classList.toggle("hidden",!(currentUser&&currentTab==="library"&&(!categoryControlsVisible()||activeFilter==="All")));}
+  function updateFloatingAddVisibility(){
+    renderLibraryMaintenance();
+    document.querySelector(".top-nav h1").classList.toggle("hidden",currentTab!=="library"||categoryControlsVisible());
+    addBtn.classList.toggle("hidden",!(currentUser&&currentTab==="library"&&(!categoryControlsVisible()||activeFilter==="All")));
+  }
   document.querySelectorAll(".bottom-tabs .tab-btn").forEach(button=>button.addEventListener("click",()=>{if(button.dataset.tab!=="library")addBtn.classList.add("hidden");}));
   const ALLOWED_BOTTOM_TABS=new Set(["library","search","settings"]);
   function enforceBottomNavigation(){

@@ -297,13 +297,14 @@ const server=http.createServer((req,res)=>{
   // Exercise the Settings menu and each drill-in panel in a mobile browser.
   phase='settings visibility';
   const assertSettingsOnly=async()=>{
-   for(const selector of ['.top-nav .search-box','.stats-row','#library-view','#discovery-view','#add-btn']){
+   for(const selector of ['.top-nav h1','.top-nav .search-box','.stats-row','#library-view','#discovery-view','#add-btn']){
     assert.equal(await page.locator(selector).isVisible(),false,selector+' must not be visible in Settings');
    }
   };
   await page.locator('[data-tab="settings"]').click();
   await page.waitForFunction(()=>!document.querySelector('#settings-view').classList.contains('hidden')&&document.querySelector('#library-view').classList.contains('hidden'));
   assert.equal(await page.locator('#settings-category-menu').isVisible(),true,'Settings category menu is visible');
+  assert.equal(await page.getByRole('heading',{name:'Settings',exact:true}).isVisible(),true,'Settings has its own page title');
   assert.equal(await page.locator('.settings-quick-actions').isVisible(),true,'Track Sync shortcut is visible');
   await assertSettingsOnly();
   for(const theme of ['dark','light']){
@@ -340,6 +341,7 @@ const server=http.createServer((req,res)=>{
   await assertSettingsOnly();
   await page.locator('[data-tab="search"]').click();
   assert.equal(await page.locator('#discovery-view').isVisible(),true,'Search opens after leaving Settings');
+  assert.equal(await page.locator('.top-nav h1').isVisible(),false,'Search has its own heading without the app title');
   assert.equal(await page.locator('.top-nav .search-box').isVisible(),false);
   assert.equal(await page.locator('.stats-row').isVisible(),false);
   await page.locator('[data-tab="settings"]').click();
@@ -348,6 +350,7 @@ const server=http.createServer((req,res)=>{
   await page.waitForFunction(()=>document.querySelector('#settings-view').classList.contains('hidden')&&!document.querySelector('#library-view').classList.contains('hidden'));
   assert.equal(await page.locator('.top-nav .search-box').isVisible(),true,'Library search returns on Library');
   assert.equal(await page.locator('.stats-row').isVisible(),true,'Tracking totals return on Library');
+  assert.equal(await page.locator('.top-nav h1').isVisible(),true,'App title returns on Library home');
   for(const selector of ['.profile-card','#sync-now','#logout-btn','#appearance-mode','#background-reminder-status','#enable-background-reminders']){
     assert.equal(await page.locator(selector).first().isVisible(),false,selector+' must not be visible in Library');
   }
@@ -382,6 +385,7 @@ const server=http.createServer((req,res)=>{
   assert.equal(await calendarDropdown.getAttribute('open'),'','range changes keep Your schedule expanded');
   assert.equal(await recurring.textContent(),scheduleText,'calendar range cannot change the recurring schedule');
   await page.locator('[data-gallery-category="Series"]').click();
+  assert.equal(await page.locator('.top-nav h1').isVisible(),false,'Series shows its category heading without the app title');
   await page.locator('[data-filter="Watched"]').click();
   await page.locator('#sort-mode').selectOption('platform');
   await page.locator('#search-input').fill('No matching title at all');

@@ -64,10 +64,10 @@
     "number": 224
   },
   "__current": {
-    "title": "Keep Settings focused on settings",
+    "title": "Show page titles without the repeated app heading",
     "changes": [
-      "Hide Library search and the Planned, Watching and Watched tracking totals throughout Settings.",
-      "Restore search and totals when returning to Library; preserve the separate Search page layout."
+      "Keep the app heading on Library home only; show Settings, Search and category headings on their respective pages.",
+      "Hide the repeated app heading throughout Settings categories and restore it when returning to Library home."
     ]
   },
   "37f6c39e9d0355b1bde705cb3fcb3cda2533119f": {
@@ -147,6 +147,13 @@
       "Use the supplied PNG app icon and dedicated iOS home-screen icon.",
       "Preserve library export and merge-based restore in Account & Sync.",
       "Report the actual run number and attempt; gate deployment on application and Chromium/WebKit browser checks, with preinstalled browser dependencies and a ten-minute job limit."
+    ]
+  },
+  "8e8e35c61707c530033c0b465d3661d7d365829c": {
+    "title": "Keep Settings focused on settings",
+    "changes": [
+      "Hide Library search and the Planned, Watching and Watched tracking totals throughout Settings.",
+      "Restore search and totals when returning to Library; preserve the separate Search page layout."
     ]
   }
 }
