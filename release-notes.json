@@ -64,19 +64,16 @@
     "number": 224
   },
   "__current": {
-    "title": "Add neon-green status with a 24-hour episode grace period",
+    "title": "Granular sync, offline use, recovery and Library upgrades",
     "changes": [
-      "Use neon green when up to date, keeping newly aired episodes green for their first 24 hours before they count as behind.",
-      "After the grace period, show amber for one or two overdue episodes or red for more than two; keep all markers colour-only.",
-      "Show a small amber dot when one or two released episodes behind, or a red dot when more than two behind, beside scheduled show titles.",
-      "Keep markers colour-only with no visible count, using neon green when caught up and ignoring films and unverified schedules.",
-      "Calculate timeline keys once per title, avoid rebuilding hidden Library content, and reuse episode progress maps in statistics.",
-      "Apply whole-season watch changes once while preserving episode history, rollback and other-season progress.",
-      "Retain unchanged posters and search controls, update film descriptions in place, and avoid repeated missing-poster requests.",
-      "Load changelog and workflow history only when opened; preserve expanded releases while statuses refresh.",
-      "Reuse calendar formatting and grouping work; update recurring schedules at actual release and rollover boundaries.",
-      "Remove the document-wide navigation observer and load gallery styles with the initial page styles.",
-      "Fix saved-title search navigation and bulk-edit timestamps used by sync."
+      "Save changed titles and episode deltas to account-scoped database rows with atomic conflict checks.",
+      "Reopen the full app offline; retain local edits across reopening and upload them on reconnection.",
+      "Create a single-use recovery code in Account & Sync; a PIN reset rotates the code and revokes old sessions.",
+      "Continue Watching lists each started show’s next released episode with one-tap marking and Undo.",
+      "Use shareable page URLs with Back/Forward and restored Library and Search state.",
+      "Load episode rows when opening a season; preserve expanded seasons during progress updates.",
+      "Organise titles with Favourites, Archive and custom lists without replacing watch status or history.",
+      "Retain the colour-only schedule status and 24-hour grace period."
     ]
   },
   "37f6c39e9d0355b1bde705cb3fcb3cda2533119f": {
@@ -170,6 +167,22 @@
     "changes": [
       "Keep the app heading on Library home only; show Settings, Search and category headings on their respective pages.",
       "Hide the repeated app heading throughout Settings categories and restore it when returning to Library home."
+    ]
+  },
+  "a5dd887fa62a9ccd140c585af039094ef1a70eac": {
+    "title": "Add neon-green status with a 24-hour episode grace period",
+    "changes": [
+      "Use neon green when up to date, keeping newly aired episodes green for their first 24 hours before they count as behind.",
+      "After the grace period, show amber for one or two overdue episodes or red for more than two; keep all markers colour-only.",
+      "Show a small amber dot when one or two released episodes behind, or a red dot when more than two behind, beside scheduled show titles.",
+      "Keep markers colour-only with no visible count, using neon green when caught up and ignoring films and unverified schedules.",
+      "Calculate timeline keys once per title, avoid rebuilding hidden Library content, and reuse episode progress maps in statistics.",
+      "Apply whole-season watch changes once while preserving episode history, rollback and other-season progress.",
+      "Retain unchanged posters and search controls, update film descriptions in place, and avoid repeated missing-poster requests.",
+      "Load changelog and workflow history only when opened; preserve expanded releases while statuses refresh.",
+      "Reuse calendar formatting and grouping work; update recurring schedules at actual release and rollover boundaries.",
+      "Remove the document-wide navigation observer and load gallery styles with the initial page styles.",
+      "Fix saved-title search navigation and bulk-edit timestamps used by sync."
     ]
   }
 }

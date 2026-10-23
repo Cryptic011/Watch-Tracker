@@ -208,6 +208,28 @@ async function getSession(req: Request) {
   return { accountId: data.account_id as string, tokenHash };
 }
 
+async function readLibrary(accountId: string) {
+  const {data,error}=await db.rpc("watchlog_read_libraries",{p_accounts:[accountId]});
+  if(error)throw error;
+  return data?.[0]||{items:[],revision:0,updated_at:null};
+}
+function recoveryCode() {
+  return Array.from(crypto.getRandomValues(new Uint8Array(16)),b=>b.toString(16).padStart(2,"0")).join("").toUpperCase().match(/.{4}/g)!.join("-");
+}
+function normalizeRecoveryCode(value: unknown) { return String(value||"").toLowerCase().replace(/[\s-]/g,""); }
+async function recoveryHash(code: string) { return sha256("watchlog-recovery:"+normalizeRecoveryCode(code)); }
+function replacementChanges(before: any[],after: any[]) {
+  const previous=new Map(before.map(item=>[String(item.id),item]));
+  const changes:any[]=[];
+  for(const item of after){
+    const id=String(item?.id||""),old=previous.get(id);previous.delete(id);
+    if(!old)changes.push({id,create:item});
+    else if(JSON.stringify(old)!==JSON.stringify(item))changes.push({id,set:item,unset:Object.keys(old).filter(key=>!(key in item))});
+  }
+  for(const id of previous.keys())changes.push({id,delete:true});
+  return changes;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
@@ -220,6 +242,18 @@ Deno.serve(async (req: Request) => {
     if (action === "app_status") {
       const maintenance = await readMaintenance();
       return json({ ok: true, maintenance: maintenance.enabled, message: maintenance.message, updatedAt: maintenance.updatedAt });
+    }
+
+    if (action === "recover") {
+      const email=normalizeEmail(body.email),code=normalizeRecoveryCode(body.code),pin=String(body.pin||"");
+      if(!validEmail(email)||!validPin(pin)||!/^([0-9a-f]{32})$/.test(code))return json({error:"Email or recovery code is incorrect.",code:"invalid_recovery"},401);
+      const nextCode=recoveryCode(),salt=crypto.getRandomValues(new Uint8Array(16));
+      const {data,error}=await db.rpc("watchlog_recover_account",{p_email:email,p_code_hash:await recoveryHash(code),p_pin_hash:await derivePin(pin,salt),p_pin_salt:b64(salt),p_next_code_hash:await recoveryHash(nextCode)});
+      if(error)throw error;
+      if(!data?.ok)return json({error:data?.locked?"Too many attempts. Try again in 15 minutes.":"Email or recovery code is incorrect.",code:data?.locked?"locked":"invalid_recovery"},data?.locked?429:401);
+      // PIN replacement revokes every existing session atomically. The user
+      // signs in with the new PIN; recovery never grants maintenance bypass.
+      return json({ok:true,recoveryCode:nextCode});
     }
 
     if (action === "register") {
@@ -318,8 +352,7 @@ Deno.serve(async (req: Request) => {
         return json({ error: "Email or PIN is incorrect. Try signing in again.", code: "invalid_login" }, 401);
       }
       const session = await createSession(account.id);
-      const { data: library, error: libraryError } = await db.from("watchlog_pin_library").select("items,updated_at,revision").eq("account_id", account.id).maybeSingle();
-      if (libraryError) throw libraryError;
+      const library=await readLibrary(account.id);
       return json({ ok: true, account: { id: account.id, email: account.email, displayName: account.display_name }, items: Array.isArray(library?.items) ? library!.items : [], updatedAt: library?.updated_at || null, revision: Number(library?.revision || 0), sessionToken: session.token, expiresAt: session.expiresAt });
     }
 
@@ -377,46 +410,50 @@ Deno.serve(async (req: Request) => {
     }
 
     if (action === "load") {
-      const [{ data: account, error: aerr }, { data: library, error: lerr }] = await Promise.all([
+      const [{ data: account, error: aerr }, library] = await Promise.all([
         db.from("watchlog_pin_accounts").select("id,email,display_name").eq("id", session.accountId).single(),
-        db.from("watchlog_pin_library").select("items,updated_at,revision").eq("account_id", session.accountId).maybeSingle(),
+        readLibrary(session.accountId),
       ]);
-      if (aerr) throw aerr; if (lerr) throw lerr;
+      if (aerr) throw aerr;
       return json({ ok: true, account: { id: account.id, email: account.email, displayName: account.display_name }, items: Array.isArray(library?.items) ? library!.items : [], updatedAt: library?.updated_at || null, revision: Number(library?.revision || 0) });
     }
 
+    if (action === "recovery_generate") {
+      const {data:account,error}=await db.from("watchlog_pin_accounts").select("id,pin_hash,pin_salt,locked_until").eq("id",session.accountId).single();
+      if(error)throw error;
+      const pin=String(body.pin||"");
+      if(account.locked_until&&new Date(account.locked_until).getTime()>Date.now())return json({error:"Too many attempts. Try again later."},429);
+      if(!validPin(pin)||!safeEqual(await derivePin(pin,unb64(account.pin_salt)),account.pin_hash)){
+        await db.rpc("watchlog_record_pin_failure",{p_account_id:account.id,p_max_attempts:5,p_lock_minutes:15});
+        return json({error:"PIN is incorrect."},401);
+      }
+      const code=recoveryCode();
+      const {data:saved,error:saveError}=await db.rpc("watchlog_set_recovery",{p_account:session.accountId,p_pin_hash:account.pin_hash,p_code_hash:await recoveryHash(code)});
+      if(saveError)throw saveError;
+      if(!saved)return json({error:"Account changed. Sign in again."},409);
+      return json({ok:true,recoveryCode:code});
+    }
+
     if (action === "save") {
-      if (!Array.isArray(body.items)) return json({ error: "Invalid library." }, 400);
-      const serialized = JSON.stringify(body.items);
-      if (serialized.length > 3_000_000) return json({ error: "Library is too large to sync." }, 413);
-      const expectedRevision = body.expectedRevision;
-      if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 0 || expectedRevision >= Number.MAX_SAFE_INTEGER) {
-        return json({ error: "Reload the latest library before saving.", code: "revision_required" }, 428);
+      if(!Number.isSafeInteger(body.expectedRevision)||body.expectedRevision<0||body.expectedRevision>=Number.MAX_SAFE_INTEGER)return json({error:"Reload the latest library before saving.",code:"revision_required"},428);
+      let changes=body.changes;
+      if(!Array.isArray(changes)){
+        if(!Array.isArray(body.items))return json({error:"Invalid library."},400);
+        const current=await readLibrary(session.accountId);
+        if(Number(current.revision)!==body.expectedRevision)return json({error:"Library changed on another device.",code:"revision_conflict",...current},409);
+        changes=replacementChanges(current.items,body.items);
       }
-      const updatedAt = new Date().toISOString();
-      const nextRevision = expectedRevision + 1;
-      const { data: saved, error } = await db.from("watchlog_pin_library")
-        .update({ items: body.items, updated_at: updatedAt, revision: nextRevision })
-        .eq("account_id", session.accountId)
-        .eq("revision", expectedRevision)
-        .select("updated_at,revision")
-        .maybeSingle();
-      if (error) throw error;
-      if (!saved) {
-        const { data: latest, error: latestError } = await db.from("watchlog_pin_library")
-          .select("items,updated_at,revision")
-          .eq("account_id", session.accountId)
-          .single();
-        if (latestError) throw latestError;
-        return json({
-          error: "This library changed on another device. Watched Logger kept both changes and will retry.",
-          code: "revision_conflict",
-          items: Array.isArray(latest.items) ? latest.items : [],
-          updatedAt: latest.updated_at,
-          revision: Number(latest.revision || 0),
-        }, 409);
+      if(JSON.stringify(changes).length>3_000_000)return json({error:"Changes are too large to sync."},413);
+      if(changes.length>10000||changes.some((change:any)=>!change||typeof change.id!=="string"||change.id.length<1||change.id.length>200))return json({error:"Invalid title changes."},400);
+      const positiveArray=(value:any)=>Array.isArray(value)&&value.length<=10000&&value.every(number=>Number.isSafeInteger(number)&&number>0);
+      for(const change of changes){
+        if(change.watched!==undefined&&(change.watched===null||Array.isArray(change.watched)||typeof change.watched!=="object"||Object.entries(change.watched).some(([season,delta]:[string,any])=>!/^[1-9][0-9]*$/.test(season)||!delta||!positiveArray(delta.add)||!positiveArray(delta.remove))))return json({error:"Invalid episode changes."},400);
+        if(change.unset!==undefined&&(!Array.isArray(change.unset)||change.unset.some((key:any)=>typeof key!=="string"||key==="id")))return json({error:"Invalid removed fields."},400);
       }
-      return json({ ok: true, updatedAt: saved.updated_at, revision: Number(saved.revision) });
+      const {data:saved,error}=await db.rpc("watchlog_patch_library",{p_account:session.accountId,p_revision:body.expectedRevision,p_changes:changes});
+      if(error)throw error;
+      if(!saved?.ok)return json({error:"Library changed on another device. Both changes will be kept.",...saved},409);
+      return json(saved);
     }
 
     if (action === "profile") {

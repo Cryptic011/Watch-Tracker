@@ -1,3 +1,14 @@
+## 2026-10-23 — Granular sync, full offline use, recovery and Library upgrades
+- Store titles in private account-scoped database rows and save only changed fields, episode deltas, additions and deletions through an atomic revision-checked function.
+- Migrate existing Libraries without deleting the legacy compatibility snapshot, and update both account and reminder backends to read canonical title rows.
+- Cache a complete versioned app shell before activating an update, allowing offline reopening and durable local edits that sync on reconnection.
+- Add optional single-use recovery codes under Account & Sync, verified against the current PIN; recovery rotates the code, resets the PIN and atomically revokes existing sessions.
+- Add Continue Watching with the next unwatched released episode, one-tap marking and the existing Undo behaviour.
+- Give Library categories, title pages, Search and Settings sections hash URLs with browser Back/Forward and view-state restoration.
+- Render episode rows when a season opens instead of constructing every season upfront; preserve expanded seasons and progress-saving behaviour.
+- Add Favourites, Archive and custom-list organisation independently of watch status, preserving existing watch history and reminder preferences.
+- Preserve the latest colour-only schedule indicators and 24-hour episode grace period.
+
 ## 2026-10-23 — Add neon-green status and a 24-hour episode grace period
 - Show a neon-green dot when up to date, including newly aired episodes during their first 24 elapsed hours.
 - Only count unwatched episodes as behind after the grace period expires; retain amber for one or two older episodes and red for more than two.

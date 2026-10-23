@@ -40,7 +40,7 @@ function memoryDB(initial){
   };
 }
 
-const persistenceFunctions=["toMillis","canonicalRecordJSON","sameSyncValue","mergeEpisodeSetChanges","mergeEpisodeHistory","mergeRecordChanges","detectSyncConflicts","activePersistenceContext","setCloudBaseline","saveCache","cachePut","cacheGet","cloneLibrarySnapshot","createLibrarySnapshot","replayLocalChanges","acknowledgeCloudSnapshot","acknowledgeCachedSnapshot","uploadCloudLibrary","queueLocalLibrarySave","queueCloudLibrarySave","persistLibrary","mergePendingCache"];
+const persistenceFunctions=["toMillis","canonicalRecordJSON","sameSyncValue","mergeEpisodeSetChanges","mergeEpisodeHistory","mergeRecordChanges","detectSyncConflicts","activePersistenceContext","setCloudBaseline","saveCache","cachePut","cacheGet","cloneLibrarySnapshot","createLibrarySnapshot","replayLocalChanges","acknowledgeCloudSnapshot","acknowledgeCachedSnapshot","libraryChangeSet","uploadCloudLibrary","queueLocalLibrarySave","queueCloudLibrarySave","persistLibrary","mergePendingCache"];
 function harness(extra={}){
   const pending=new Set();
   const context=vm.createContext({
@@ -87,8 +87,9 @@ test("An old acknowledgement preserves newer edits and rebases the next request"
     if(calls===1)throw Object.assign(new Error("Conflict"),{code:"revision_conflict",items:remote,revision:3});
     const outgoing=JSON.parse(body);
     assert.equal(outgoing.expectedRevision,3);
-    assert.equal(outgoing.items.find(row=>row.id==="a").title,"A changed on other device");
-    assert.equal(outgoing.items.some(row=>row.id==="b"),false);
+    assert.equal(outgoing.items,undefined,'normal saves never send the whole Library');
+    assert.deepEqual(outgoing.changes.map(change=>change.id),['c']);
+    assert.equal(outgoing.changes[0].create.title,'C added locally');
     return{ok:true,revision:4};
   };
   await app.uploadCloudLibrary(waiting);
@@ -183,4 +184,13 @@ test("A deferred refresh resumes after the save queue drains, but waits after a 
     assert.equal(app.pendingAppUpdate,fails);
     assert.equal(Boolean(app.queuedCloudSnapshot),fails);
   }
+});
+
+test('Granular saves send only changed fields, watched-episode deltas, creates and deletions',()=>{
+ const c=harness(),base=[{id:'s',title:'Show',notes:'old',episodeImages:{1:{1:'large unchanged artwork'}},watchedEpisodes:{1:[1,3],2:[1]}},{id:'keep',title:'Unchanged'},{id:'remove',title:'Removed'}];
+ const after=[{...base[0],notes:'new',watchedEpisodes:{1:[1,2],2:[1]}},base[1],{id:'add',title:'Added'}];
+ const changes=copy(c.libraryChangeSet(base,after));
+ assert.deepEqual(changes,[{id:'s',set:{notes:'new'},unset:[],watched:{1:{add:[2],remove:[3]}}},{id:'add',create:{id:'add',title:'Added'}},{id:'remove',delete:true}]);
+ assert.equal(JSON.stringify(changes).includes('large unchanged artwork'),false);
+ assert.deepEqual(copy(c.libraryChangeSet(after,after)),[]);
 });

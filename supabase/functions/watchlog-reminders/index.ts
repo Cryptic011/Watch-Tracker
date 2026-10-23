@@ -294,6 +294,15 @@ function serverScheduleRefreshDue(item: Record<string, unknown>, now = Date.now(
   return !Array.isArray(item.scheduledEpisodeReleases) || !Number.isFinite(refreshed) || now - refreshed >= EPISODE_SCHEDULE_REFRESH_MS || (Number.isFinite(next) && next <= now);
 }
 
+async function readLibraries(accountIds: string[]) {
+  const {data,error}=await db.rpc("watchlog_read_libraries",{p_accounts:accountIds});
+  if(error)throw error;return data||[];
+}
+async function privateLibrary(accountId: string) {
+  try{return {data:(await readLibraries([accountId]))[0]||null,error:null};}
+  catch(error){return {data:null,error};}
+}
+
 async function refreshServerEpisodeSchedules(libraries: LibraryRow[], now = Date.now()) {
   const requests = new Map<string, Promise<unknown[] | null>>();
   const load = (showId: unknown) => {
@@ -328,13 +337,14 @@ async function refreshServerEpisodeSchedules(libraries: LibraryRow[], now = Date
     }
     if (changed) {
       const revision = Math.max(0, Number(library.revision || 0));
-      const { data: saved, error } = await db.from("watchlog_pin_library").update({ items, revision: revision + 1, updated_at: new Date(now).toISOString() }).eq("account_id", library.account_id).eq("revision", revision).select("account_id").maybeSingle();
+      const changes=items.flatMap((item,index)=>item===source[index]?[]:[{id:String(item.id),set:Object.fromEntries(Object.entries(item).filter(([key,value])=>JSON.stringify(value)!==JSON.stringify(source[index][key])))}]);
+      const { data: result, error } = await db.rpc("watchlog_patch_library",{p_account:library.account_id,p_revision:revision,p_changes:changes});
+      const saved=result?.ok===true;
       if (error) console.error("Server episode schedule save failed", error.code || error.message);
       if (!saved) {
         // A user edited/deleted a title while the catalogue request was in
         // flight. Do not send alerts using that stale library snapshot.
-        const { data: latest, error: readError } = await db.from("watchlog_pin_library").select("account_id,items,revision").eq("account_id", library.account_id).maybeSingle();
-        if (readError) throw readError;
+        const latest=(await readLibraries([library.account_id]))[0];
         if (latest) refreshed.push(latest);
         continue;
       }
@@ -577,11 +587,7 @@ async function processPlannedReminders(
   const accountIds = [...new Set(subscriptions.map((row) => row.account_id))];
   if (!accountIds.length) return { sent: 0, failed: 0 };
 
-  const { data: libraryRows, error } = await db
-    .from("watchlog_pin_library")
-    .select("account_id,items,revision")
-    .in("account_id", accountIds);
-  if (error) throw error;
+  const libraryRows=await readLibraries(accountIds);
   const libraries = await refreshServerEpisodeSchedules(libraryRows || [], Date.now());
 
   const byAccount = new Map(
@@ -884,7 +890,7 @@ Deno.serve(async (req: Request) => {
       // accept an account ID from the request body or expose push credentials.
       const [deliveries, library, subscriptions] = await Promise.all([
         db.from("watchlog_push_deliveries").select("item_id,event_key,scheduled_for,status,attempts,next_attempt_at,sent_at,last_error,updated_at").eq("account_id", session.accountId).order("updated_at", { ascending: false }).limit(50),
-        db.from("watchlog_pin_library").select("items").eq("account_id", session.accountId).maybeSingle(),
+        privateLibrary(session.accountId),
         db.from("watchlog_push_subscriptions").select("time_zone").eq("account_id", session.accountId).eq("enabled", true),
       ]);
       for (const result of [deliveries, library, subscriptions]) if (result.error) throw result.error;

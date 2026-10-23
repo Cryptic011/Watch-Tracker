@@ -182,7 +182,7 @@ test('Library save indicator uses the persistence status and hides for signed-ou
 const backend=stripTypeScriptTypes(fs.readFileSync(new URL('../supabase/functions/watchlog-reminders/index.ts',import.meta.url),'utf8').replace(/^import[\s\S]*?;\n/gm,''));
 async function requestHistory({session=true,owner=false}={}){
  const reads=[],filters=[];let handler;
- const db={from(table){reads.push(table);const q={select(){return q},eq(k,v){filters.push([table,k,v]);return q},order(){return q},limit(){return q},single(){return Promise.resolve({data:{email:'owner@example.test'}})},maybeSingle(){return Promise.resolve({data:{items:[]}})},then(resolve){resolve({data:[]})}};return q}};
+ const db={from(table){reads.push(table);const q={select(){return q},eq(k,v){filters.push([table,k,v]);return q},order(){return q},limit(){return q},single(){return Promise.resolve({data:{email:'owner@example.test'}})},maybeSingle(){return Promise.resolve({data:{items:[]}})},then(resolve){resolve({data:[]})}};return q},rpc(name,args){reads.push(name);filters.push([name,'p_accounts',args.p_accounts]);return Promise.resolve({data:[{items:[]}],error:null});}};
  const c=vm.createContext({TextEncoder,Response,Request,console,Date,createClient:()=>db,Deno:{env:{get:()=>''},serve:fn=>handler=fn}});vm.runInContext(backend,c);
  vm.runInContext(`getSession=async()=>${session?"({accountId:'session-owner'})":"null"};sha256=async()=>${owner?'PRIVATE_TEST_ACCOUNT_HASH':"'other-account'"};`,c);
  const response=await handler(new Request('https://example.test',{method:'POST',body:JSON.stringify({action:'private_history',accountId:'victim'})}));return {response,reads,filters};
@@ -193,7 +193,8 @@ test('Reminder history rejects signed-out sessions and permits any signed-in acc
 });
 test('Private reminder history scopes every data query to the verified session, ignoring supplied account ID',async()=>{
  const result=await requestHistory();assert.equal(result.response.status,200);
- for(const table of ['watchlog_push_deliveries','watchlog_pin_library','watchlog_push_subscriptions'])assert.ok(result.filters.some(([t,k,v])=>t===table&&k==='account_id'&&v==='session-owner'));
+ for(const table of ['watchlog_push_deliveries','watchlog_push_subscriptions'])assert.ok(result.filters.some(([t,k,v])=>t===table&&k==='account_id'&&v==='session-owner'));
+ assert.ok(result.filters.some(([t,k,v])=>t==='watchlog_read_libraries'&&k==='p_accounts'&&JSON.stringify(v)==='[\"session-owner\"]'));
  assert.equal((await result.response.json()).enabledDevices,0);
 });
 

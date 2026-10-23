@@ -1,2 +1,6 @@
 node_modules/
 build-info.js
+
+supabase/.temp/
+
+asset-manifest.json
