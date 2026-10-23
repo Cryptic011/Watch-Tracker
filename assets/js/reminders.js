@@ -177,7 +177,8 @@
         }
         throw err;
       }
-      if(data.ok!==true||(["load","login"].includes(action)&&(!Array.isArray(data.items)||!data.account?.id))||(["save","load","login","register"].includes(action)&&(!Number.isSafeInteger(data.revision)||data.revision<0))){
+      const unchangedLoad=action==="load"&&data.unchanged===true&&Number.isSafeInteger(payload.knownRevision)&&data.revision===payload.knownRevision;
+      if(data.ok!==true||(["load","login"].includes(action)&&((!Array.isArray(data.items)&&!unchangedLoad)||!data.account?.id))||(["save","load","login","register"].includes(action)&&(!Number.isSafeInteger(data.revision)||data.revision<0))){
         const error=new Error("The cloud returned an incomplete response. Your local changes are still available.");error.code="invalid_response";throw error;
       }
       return data;
@@ -301,5 +302,5 @@
   async function saveProfile(profile){if(!currentUser)return;await cachePut({key:"profile",userId:currentUser.id,profile,updatedAt:nowISO()});}
   async function loadProfile(){if(!currentUser)return null;const r=await cacheGet("profile");return r?.userId===currentUser.id?r.profile||null:null;}
   function pendingKey(accountId=String(currentUser?.id||"")){return accountId?`watchlog_pin_pending_${accountId}`:"";}
-  function markPending(value,accountId=String(currentUser?.id||"")){const key=pendingKey(accountId);if(!key)return;if(value)localStorage.setItem(key,"1");else localStorage.removeItem(key);}
-  function hasPending(accountId=String(currentUser?.id||"")){const key=pendingKey(accountId);return !!key&&localStorage.getItem(key)==="1";}
+  function markPending(value,accountId=String(currentUser?.id||"")){const key=pendingKey(accountId);if(!key)return;if(value)pendingCloudAccounts.add(accountId);else pendingCloudAccounts.delete(accountId);try{if(value)localStorage.setItem(key,"1");else localStorage.removeItem(key);}catch(_){/* IndexedDB remains the durable queue. */}}
+  function hasPending(accountId=String(currentUser?.id||"")){if(pendingCloudAccounts.has(accountId))return true;try{const key=pendingKey(accountId);return !!key&&localStorage.getItem(key)==="1";}catch(_){return false;}}

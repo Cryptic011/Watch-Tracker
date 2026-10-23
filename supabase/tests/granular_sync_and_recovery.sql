@@ -13,6 +13,15 @@ begin
   result=public.watchlog_patch_library(a,1,'[{"id":"two","delete":true},{"id":"three","create":{"id":"three","title":"Three"}}]');
   select items into library from public.watchlog_read_libraries(array[a]);
   if jsonb_array_length(library)<>2 or library->1->>'id'<>'three' then raise exception 'Create/delete failed'; end if;
+  result=public.watchlog_patch_library_once(a,2,'[{"id":"receipt","create":{"id":"receipt","title":"Receipt","notes":"original"}}]',repeat('a',64));
+  if result->>'revision'<>'3' then raise exception 'Receipt write failed'; end if;
+  perform public.watchlog_patch_library(a,3,'[{"id":"receipt","set":{"notes":"changed on other device"}}]');
+  result=public.watchlog_patch_library_once(a,2,'[{"id":"receipt","create":{"id":"receipt","title":"Receipt","notes":"original"}}]',repeat('a',64));
+  if result->>'revision'<>'3' or not (result->>'replayed')::boolean then raise exception 'Receipt was not replayed'; end if;
+  select items into library from public.watchlog_read_libraries(array[a]);
+  if not exists(select 1 from jsonb_array_elements(library) item where item->>'id'='receipt' and item->>'notes'='changed on other device') then raise exception 'Retry replaced a newer remote edit'; end if;
+  if (select revision from public.watchlog_pin_library where account_id=a)<>4 then raise exception 'Retry advanced revision'; end if;
+  if has_function_privilege('anon','public.watchlog_patch_library_once(uuid,bigint,jsonb,text)','EXECUTE') or has_table_privilege('anon','public.watchlog_sync_receipts','SELECT') then raise exception 'Write receipts exposed'; end if;
   perform public.watchlog_set_recovery(a,'old',repeat('a',64));
   insert into public.watchlog_pin_sessions(token_hash,account_id,expires_at) values('test-'||a,a,now()+interval '1 day');
   result=public.watchlog_recover_account(a::text||'@test.invalid',repeat('b',64),'new','salt2',repeat('c',64));

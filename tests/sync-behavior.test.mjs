@@ -40,7 +40,7 @@ function memoryDB(initial){
   };
 }
 
-const persistenceFunctions=["toMillis","canonicalRecordJSON","sameSyncValue","mergeEpisodeSetChanges","mergeEpisodeHistory","mergeRecordChanges","detectSyncConflicts","activePersistenceContext","setCloudBaseline","saveCache","cachePut","cacheGet","cloneLibrarySnapshot","createLibrarySnapshot","replayLocalChanges","acknowledgeCloudSnapshot","acknowledgeCachedSnapshot","libraryChangeSet","uploadCloudLibrary","queueLocalLibrarySave","queueCloudLibrarySave","persistLibrary","mergePendingCache"];
+const persistenceFunctions=["toMillis","canonicalRecordJSON","sameSyncValue","mergeEpisodeSetChanges","mergeEpisodeHistory","mergeRecordChanges","detectSyncConflicts","activePersistenceContext","setCloudBaseline","saveCache","cachePut","cacheGet","cloneLibrarySnapshot","createLibrarySnapshot","replayLocalChanges","acknowledgeCloudSnapshot","acknowledgeCachedSnapshot","libraryChangeSet","uploadCloudLibrary","queueLocalLibrarySave","queueCloudLibrarySave","persistLibrary","mergePendingCache","localSyncPending"];
 function harness(extra={}){
   const pending=new Set();
   const context=vm.createContext({
@@ -51,6 +51,7 @@ function harness(extra={}){
     localSaveInFlight:null,cloudSaveInFlight:null,lastCloudAccountId:"",lastLocalAccountId:"",
     lastCloudLibraryJSON:"",lastLocalLibraryJSON:"",CLOUD_SAVE_COALESCE_MS:0,
     nowISO:()=>"2026-09-05T10:00:00.000Z",render(){},setSync(){},applyPendingAppUpdate(){},
+    scheduleCloudSync(){},noteCloudSyncFailure(){},cloudSyncRetryDelay:()=>1000,CLOUD_SYNC_INTERVAL_MS:10000,
     markPending(value,id="account"){if(value)pending.add(id);else pending.delete(id);},
     hasPending:(id="account")=>pending.has(id),
     migratePlannedStatuses:items=>({rows:items}),cleanLibraryRecords:items=>({items}),
@@ -198,4 +199,84 @@ test('Granular saves send only changed fields, watched-episode deltas, creates a
 test('Clearing a field to undefined removes its stored value',()=>{
  const c=harness(),before=[{id:'title',title:'Title',notes:'old'}],after=[{...before[0],notes:undefined}];
  const changes=copy(c.libraryChangeSet(before,after));assert.deepEqual(changes,[{id:'title',set:{},unset:['notes'],watched:{}}]);
+});
+
+function autoSyncHarness(extra={}){
+ const scheduled=[],statuses=[];
+ const app=harness({cloudSyncTimer:null,cloudSyncInFlight:null,cloudSyncFailures:0,cloudSyncAuthBlocked:false,
+  navigator:{onLine:true},document:{visibilityState:'visible',addEventListener(){}},window:{addEventListener(){}},authPin:{value:''},authEmail:{value:''},isSignUp:false,updateAuthMode(){},showAuth(){},showMessage(){},
+  applyAccount(account){app.currentUser={id:account.id};},loadCacheRecord:async()=>app.cacheDB.records.get('library'),
+  setSync:(text,state)=>statuses.push({text,state}),...extra});
+ vm.runInContext(['retryPendingCloudSave','cloudSyncRetryDelay','scheduleCloudSync','noteCloudSyncFailure','synchronizeCloudLibrary'].map(declaration).join('\n'),app);
+ app.scheduleCloudSync=delay=>scheduled.push(delay);
+ return {app,scheduled,statuses};
+}
+
+test('An automatic pull merges edits made during the read and persists the new cloud baseline',async()=>{
+ const base=[{id:'s',title:'Show',notes:'before',watchedEpisodes:{1:[1]}}],remote=[{...base[0],watchedEpisodes:{1:[1,3]}}];
+ const db=memoryDB({library:{key:'library',userId:'account',items:base,cloudItems:base,cloudRevision:0,dirty:false,localSequence:0}});
+ let release;const read=new Promise(resolve=>release=resolve),writes=[];
+ const {app,scheduled}=autoSyncHarness({cacheDB:db,mediaItems:copy(base),cloudBaseItems:copy(base),pinApi:async(action,payload,_token,body)=>{
+  if(action==='load'){assert.equal(payload.knownRevision,0);return read;}
+  const request=JSON.parse(body);writes.push(request);assert.equal(request.expectedRevision,1);return {ok:true,revision:2};
+ }});
+ const task=app.synchronizeCloudLibrary();app.mediaItems[0].notes='typed during read';
+ release({ok:true,account:{id:'account'},items:remote,revision:1});assert.equal(await task,true);
+ assert.equal(app.mediaItems[0].notes,'typed during read');assert.deepEqual(copy(app.mediaItems[0].watchedEpisodes),{1:[1,3]});
+ assert.equal(writes.length,1);assert.equal(writes[0].changes[0].set.notes,'typed during read');assert.deepEqual(writes[0].changes[0].watched,{});
+ assert.equal(db.records.get('library').dirty,false);assert.equal(db.records.get('library').cloudRevision,2);assert.equal(scheduled.at(-1),10000);
+});
+
+test('Overlapping automatic checks share one read and stale responses cannot regress accepted progress',async()=>{
+ let release,calls=0;const accepted=[{id:'s',title:'Show',watchedEpisodes:{1:[1,2]}}];
+ const {app}=autoSyncHarness({mediaItems:accepted,cloudBaseItems:accepted,cloudRevision:1,pinApi:()=>{calls++;return new Promise(resolve=>release=resolve);}});
+ const first=app.synchronizeCloudLibrary(),second=app.synchronizeCloudLibrary();assert.equal(first,second);assert.equal(calls,1);
+ app.cloudRevision=2;release({ok:true,account:{id:'account'},items:[],revision:1});assert.equal(await first,true);
+ assert.equal(app.cloudRevision,2);assert.deepEqual(copy(app.mediaItems),accepted);
+});
+
+test('Late account reads cannot change a newly signed-in account',async()=>{
+ let release;const {app}=autoSyncHarness({mediaItems:[],pinApi:()=>new Promise(resolve=>release=resolve)});
+ const task=app.synchronizeCloudLibrary();app.currentUser={id:'other'};app.persistenceGeneration++;app.mediaItems=[{id:'private',title:'Other account'}];
+ release({ok:true,account:{id:'account'},items:[{id:'old',title:'Old account'}],revision:2});assert.equal(await task,false);
+ assert.equal(app.currentUser.id,'other');assert.equal(app.mediaItems[0].id,'private');
+});
+
+test('Transient checks back off within a bound and recover without losing the Library',async()=>{
+ let fail=true;const items=[{id:'a',title:'Retained'}];
+ const {app,scheduled,statuses}=autoSyncHarness({mediaItems:items,pinApi:async()=>{if(fail)throw Error('temporary outage');return {ok:true,account:{id:'account'},unchanged:true,revision:0};}});
+ for(let i=0;i<8;i++){assert.equal(await app.synchronizeCloudLibrary(),false);assert.ok(scheduled.at(-1)>=1000&&scheduled.at(-1)<60500);}
+ assert.deepEqual(copy(app.mediaItems),items);fail=false;assert.equal(await app.synchronizeCloudLibrary(),true);
+ assert.equal(app.cloudSyncFailures,0);assert.equal(scheduled.at(-1),10000);assert.equal(statuses.at(-1).state,'ok');
+});
+
+test('Expired sessions stop retrying and retain queued changes for reauthentication',async()=>{
+ let shown=0;const items=[{id:'a',title:'Saved locally'}],db=memoryDB({library:{key:'library',userId:'account',items,dirty:true}});
+ const {app,scheduled}=autoSyncHarness({cacheDB:db,mediaItems:items,currentUser:{id:'account',email:'same@example.test'},isSignUp:true,showAuth:()=>shown++,pinApi:async()=>{throw Object.assign(Error('expired'),{status:401});}});
+ assert.equal(await app.synchronizeCloudLibrary(),false);assert.equal(app.cloudSyncAuthBlocked,true);assert.equal(shown,1);
+ assert.equal(app.authEmail.value,'same@example.test');assert.equal(app.isSignUp,false);
+ assert.equal(await app.synchronizeCloudLibrary(),false);assert.equal(shown,1);assert.equal(db.records.get('library').dirty,true);
+ // The actual scheduler refuses auth-blocked, hidden and offline sessions.
+ let timers=0;app.setTimeout=()=>{timers++;return 1;};vm.runInContext(declaration('scheduleCloudSync'),app);
+ app.scheduleCloudSync(0);app.cloudSyncAuthBlocked=false;app.document.visibilityState='hidden';app.scheduleCloudSync(0);
+ app.document.visibilityState='visible';app.navigator.onLine=false;app.scheduleCloudSync(0);assert.equal(timers,0);
+ app.navigator.onLine=true;app.scheduleCloudSync(0);assert.equal(timers,1);assert.ok(scheduled.length);
+});
+
+test('Conditional load acknowledgements require the exact requested revision',async()=>{
+ for(const [knownRevision,returnedRevision,valid] of [[4,4,true],[4,3,false],[undefined,4,false]]){
+  const app=harness({PIN_API:'https://example.test',CLOUD_REQUEST_TIMEOUT_MS:1000,fetch:async()=>({ok:true,json:async()=>({ok:true,account:{id:'account'},unchanged:true,revision:returnedRevision})})});
+  vm.runInContext(declaration('pinApi'),app);
+  if(valid)assert.equal((await app.pinApi('load',{knownRevision})).unchanged,true);
+  else await assert.rejects(app.pinApi('load',{knownRevision}),error=>error.code==='invalid_response');
+ }
+});
+
+test('A failed device write cannot upload an older cached copy and is retried before cloud sync',async()=>{
+ const base=[{id:'a',title:'A',notes:'old'}],edited=[{...base[0],notes:'new'}],db=memoryDB({library:{key:'library',userId:'account',items:base,cloudItems:base,cloudRevision:0,dirty:false,localSequence:0}});
+ const writes=[];const {app}=autoSyncHarness({cacheDB:db,cloudBaseItems:base,mediaItems:edited,pinApi:async(action,payload,_token,body)=>{if(action==='load')return {ok:true,account:{id:'account'},unchanged:true,revision:1};writes.push(JSON.parse(body));return {ok:true,revision:1};}});
+ app.latestLocalSnapshot=app.createLibrarySnapshot(edited);app.markPending(true);const save=app.queueLocalLibrarySave;app.queueLocalLibrarySave=async()=>{throw Error('device write failed');};
+ assert.equal(await app.synchronizeCloudLibrary(),false);assert.equal(writes.length,0);assert.equal(db.records.get('library').items[0].notes,'old');
+ app.queueLocalLibrarySave=save;assert.equal(await app.synchronizeCloudLibrary(),true);
+ assert.equal(writes.length,1);assert.equal(writes[0].changes[0].set.notes,'new');assert.equal(db.records.get('library').items[0].notes,'new');assert.equal(db.records.get('library').dirty,false);
 });

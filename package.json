@@ -1,1 +1,1 @@
-{"private":true,"engines":{"node":"24.x"},"scripts":{"test":"node --test tests/*.test.mjs","test:browser":"node tests/browser/smoke.cjs && node tests/browser/upgrade.cjs"},"devDependencies":{"playwright":"1.62.1"}}
+{"private":true,"engines":{"node":"24.x"},"scripts":{"test":"node --test tests/*.test.mjs","test:browser":"node tests/browser/smoke.cjs && node tests/browser/upgrade.cjs && node tests/browser/sync.cjs"},"devDependencies":{"playwright":"1.62.1"}}

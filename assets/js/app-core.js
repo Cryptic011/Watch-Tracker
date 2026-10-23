@@ -100,6 +100,9 @@
   const SERIES_REFRESH_RETRY_MS = 10 * 60 * 1000;
   const CLOUD_SAVE_COALESCE_MS = 180;
   const CLOUD_REQUEST_TIMEOUT_MS = 12 * 1000;
+  const CLOUD_SYNC_INTERVAL_MS = 10 * 1000;
+  let cloudSyncTimer=null,cloudSyncInFlight=null,cloudSyncFailures=0,cloudSyncAuthBlocked=false;
+  const pendingCloudAccounts=new Set();
   const EXTERNAL_REQUEST_TIMEOUT_MS = 8 * 1000;
   const MAX_STALE_SERIES_PER_SWEEP = 5;
   const MAX_METADATA_REFRESH_WORKERS = 2;
