@@ -94,9 +94,11 @@ const mark=(page,episode)=>page.evaluate(ep=>toggleEpisodeWatched('show',1,ep),e
   const events=show().episodeHistory.filter(event=>event.episode===8&&event.kind==='mark');assert.equal(events.length,1,'a dropped acknowledgement must not duplicate the watch event');
   console.log('cross-device: transient failures and dropped acknowledgements recover automatically');
 
+  await a.locator('[data-gallery-menu]').click();await a.locator('[data-gallery-notes]').click();await a.locator('[data-gallery-notes-field]').fill('Resume this draft');
   tokens.delete(tokenA);await mark(a,9);await a.locator('#auth-screen').waitFor({state:'visible'});assert.equal(show().watchedEpisodes[1].includes(9),false);
   const before=calls.get(tokenA);await a.waitForTimeout(1700);assert.equal(calls.get(tokenA),before,'revoked sessions stop retrying');
   await a.locator('#auth-pin').fill('1234');await a.locator('#auth-submit').click();await a.waitForFunction(()=>document.querySelector('#auth-screen').classList.contains('hidden'));await progress(b,[9]);await settled(a);
+  await a.locator('.gallery-detail[open]').waitFor();assert.equal(await a.locator('[data-gallery-notes-field]').inputValue(),'Resume this draft');await a.locator('[data-gallery-cancel-notes]').click();
   console.log('cross-device: expired-session sign-in replays the retained edit');
 
   await b.evaluate(()=>openMediaRow('show'));await b.locator('[data-gallery-menu]').click();await b.locator('[data-gallery-notes]').click();await b.locator('[data-gallery-notes-field]').fill('Unsaved draft');
