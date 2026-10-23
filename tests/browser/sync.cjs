@@ -75,14 +75,17 @@ const mark=(page,episode)=>page.evaluate(ep=>toggleEpisodeWatched('show',1,ep),e
   await b.evaluate(()=>document.querySelector('.gallery-detail').close());await b.waitForFunction(()=>!document.querySelector('.gallery-detail[open]'));
   barrierRemaining=2;await Promise.all([mark(a,3),mark(b,4)]);await Promise.all([settled(a),settled(b)]);
   await Promise.all([progress(a,[3,4]),progress(b,[3,4])]);assert.ok(conflicts>0);
+  for(const episode of [3,4])assert.equal(show().episodeHistory.filter(event=>event.episode===episode&&event.kind==='mark').length,1);
   console.log('cross-device: concurrent episode writes rebase after a real revision conflict');
 
   offlineA=true;await contexts[0].setOffline(true);await mark(a,5);await a.waitForFunction(()=>!localSaveInFlight&&!cloudSaveInFlight);
   await b.evaluate(async()=>{await saveTitleNotes('show','Notes from the other device');await saveTitleOrganisation('show',{favorite:true});mediaItems=mediaItems.filter(item=>item.id!=='film');await persistLibrary(mediaItems,{background:true,precleaned:true});});await mark(b,6);await settled(b);
   await a.close();a=await contexts[0].newPage();observe(a);await a.goto(base+'/#/title/show');await progress(a,[5]);
-  assert.equal(show().watchedEpisodes[1].includes(5),false);
+  assert.equal(show().episodeHistory.some(event=>event.episode===5),false,'the offline watch event has not reached the server');
+  assert.equal(await a.evaluate(()=>mediaItems.find(item=>item.id==='show').curEp),5,'reopening reads this device cache while the other device is at episode 6');
   offlineA=false;await contexts[0].setOffline(false);await a.evaluate(()=>window.dispatchEvent(new Event('online')));
   await Promise.all([progress(a,[5,6]),progress(b,[5,6])]);await Promise.all([settled(a),settled(b)]);
+  for(const episode of [5,6])assert.equal(show().episodeHistory.filter(event=>event.episode===episode&&event.kind==='mark').length,1);
   for(const page of [a,b])assert.equal(await page.evaluate(()=>{const item=mediaItems.find(item=>item.id==='show');return item.notes==='Notes from the other device'&&item.favorite===true&&!mediaItems.some(item=>item.id==='film');}),true);
   console.log('cross-device: offline close/reopen/reconnect retains ticks, remote notes, favourites and deletion');
 
