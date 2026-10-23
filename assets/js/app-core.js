@@ -46,7 +46,11 @@
     swipeComplete=true;globalSwipeHandledAt=now;
     if(event.cancelable)event.preventDefault();
     const openDialog=document.querySelector("dialog[open]");
-    if(openDialog){openDialog.close();return;}
+    if(openDialog){
+      if(openDialog.classList?.contains?.("gallery-detail")){window.WatchLogGallery?.back?.();return;}
+      if(openDialog.id==="recovery-code-dialog"&&!document.getElementById("recovery-code-saved")?.checked){showAppToast("Save your recovery code before closing.","warn");return;}
+      openDialog.close();return;
+    }
     if(!episodeTrackerModal.classList.contains("hidden")){closeEpisodeTrackerSheet();return;}
     if(!modal.classList.contains("hidden")){closeEditor();return;}
     if(window.WatchLogNavigation?.back?.())return;
@@ -110,7 +114,7 @@
       (latestLocalSnapshot && activePersistenceContext(latestLocalSnapshot) &&
         latestLocalSnapshot.json!==lastLocalLibraryJSON && latestLocalSnapshot.json!==lastCloudLibraryJSON) ||
       document.querySelector?.('dialog[data-block-refresh][open]') ||
-      document.querySelector?.('.gallery-notes-editor:not(.hidden)') ||
+      document.querySelector?.('.gallery-detail[open] .gallery-notes-editor:not(.hidden)') ||
       document.getElementById("save-btn")?.disabled ||
       !document.getElementById("modal")?.classList.contains("hidden") ||
       document.getElementById("episode-tracker-modal")?.classList?.contains("hidden")===false

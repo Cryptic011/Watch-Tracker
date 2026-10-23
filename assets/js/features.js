@@ -5,7 +5,7 @@ function libraryScopeIncludes(item){
   if(libraryScope==='archived')return item.archived===true;
   if(item.archived===true)return false;
   if(libraryScope==='favourites')return item.favorite===true;
-  if(libraryScope.startsWith('list:'))return (item.lists||[]).includes(libraryScope.slice(5));
+  if(libraryScope.startsWith('list:'))return (Array.isArray(item.lists)?item.lists:[]).includes(libraryScope.slice(5));
   return true;
 }
 async function saveTitleOrganisation(id,patch){
@@ -74,7 +74,7 @@ $('copy-recovery-code').onclick=async()=>{
   try{await navigator.clipboard.writeText(displayedRecoveryCode);$('recovery-copy-status').textContent='Copied. Store this somewhere safe outside Watch Logger.';}
   catch(_){$('recovery-copy-status').textContent='Select and copy the code above.';}
 };
-$('close-recovery-code').onclick=()=>$('recovery-code-dialog').close();
+$('close-recovery-code').onclick=()=>{displayedRecoveryCode='';$('recovery-code-output').textContent='';$('recovery-code-dialog').close();};
 $('recovery-code-dialog').addEventListener('cancel',event=>{if(!$('recovery-code-saved').checked)event.preventDefault();});
 $('recovery-code-dialog').addEventListener('close',()=>{displayedRecoveryCode='';$('recovery-code-output').textContent='';setTimeout(applyPendingAppUpdate,0);});
 $('forgot-pin').onclick=()=>{$('recover-email').value=authEmail.value;$('recover-status').textContent='';$('recover-code').value='';$('recover-pin').value='';$('recover-account-dialog').showModal();};

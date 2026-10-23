@@ -214,12 +214,18 @@ window.WatchLogGallery=(()=>{
       target.querySelector('button').onclick=()=>loadTitleDetails(item);
     }
   }
+  function closeDetail(){
+    const notes=dialog?.querySelector('[data-gallery-notes-field]'),item=api?.items?.().find(row=>String(row.id)===dialog?.dataset.item);
+    if(notes&&notes.value.trim()!==String(item?.notes||'').trim()&&!confirm('Discard unsaved notes?'))return false;
+    dialog?.close();return true;
+  }
   function detail(item){
     if(!dialog){
       dialog=document.createElement('dialog');dialog.className='gallery-detail';dialog.setAttribute('aria-label','Title details');document.body.append(dialog);
-      dialog.addEventListener('click',event=>{if(event.target===dialog||event.target.closest('[data-gallery-close]')){const notes=dialog.querySelector('[data-gallery-notes-field]'),item=api.items().find(row=>String(row.id)===dialog.dataset.item);if(notes&&notes.value.trim()!==String(item?.notes||'').trim()&&!confirm('Discard unsaved notes?'))return;dialog.close();}});
+      dialog.addEventListener('click',event=>{if(event.target===dialog||event.target.closest('[data-gallery-close]'))closeDetail();});
       dialog.addEventListener('scroll',()=>{if(typeof saveNavigationPosition==='function')saveNavigationPosition();},{passive:true});
-      dialog.addEventListener('close',()=>{window.WatchLogNavigation?.titleClosed?.();const target=returnFocus?.isConnected?returnFocus:host?.querySelector(`[data-gallery-item="${CSS.escape(dialog.dataset.item||'')}"]`);target?.focus({preventScroll:true});});
+      dialog.addEventListener('cancel',event=>{event.preventDefault();closeDetail();});
+      dialog.addEventListener('close',()=>{if(typeof applyPendingAppUpdate==='function')setTimeout(applyPendingAppUpdate,0);window.WatchLogNavigation?.titleClosed?.();const target=returnFocus?.isConnected?returnFocus:host?.querySelector(`[data-gallery-item="${CSS.escape(dialog.dataset.item||'')}"]`);target?.focus({preventScroll:true});});
     }
     dialog.dataset.item=String(item.id);
     const show=!isFilm(item),last=api.last(item);
@@ -318,7 +324,7 @@ window.WatchLogGallery=(()=>{
     window.WatchLogNavigation?.beforeTitle?.();returnFocus=trigger;detail(item);window.WatchLogNavigation?.titleOpened?.();return true;
   }
   function back(){
-    if(dialog?.open){dialog.close();return true;}
+    if(dialog?.open){closeDetail();return true;}
     if(category){if(window.WatchLogNavigation?.back?.())return true;category='';api?.render?.();api?.navigate?.();return true;}
     return false;
   }
