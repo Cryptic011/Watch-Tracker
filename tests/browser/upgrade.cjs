@@ -31,7 +31,7 @@ function patch(items,changes){
    let items=[{id:'show',title:'Offline Show',type:'Series',status:'Watching',episodeScheduleVerified:true,releasedEpisodes:{1:Array.from({length:300},(_,i)=>i+1),2:[1,2,3]},watchedEpisodes:{1:[1]},episodeCounts:{1:300,2:3},verifiedCompletedSeasons:2,seriesReleaseDate:'2020-01-01'}, {id:'film',title:'Unchanged Film',type:'Film',filmReleaseDate:'2020-01-01',status:'Planned'}];
    await context.addInitScript(({account})=>{if(!localStorage.getItem('watchlog_pin_session_v1'))localStorage.setItem('watchlog_pin_session_v1',JSON.stringify({token:'initial',account,revision:0}));window.WebSocket=undefined;},{account});
    await context.route('https://**/*',async route=>{
-    const req=route.request(),headers={'access-control-allow-origin':req.headers().origin||base,'access-control-allow-methods':'POST, GET, OPTIONS','access-control-allow-headers':req.headers()['access-control-request-headers']||'content-type, x-watchlog-session'};
+    const req=route.request(),headers={'access-control-allow-origin':req.headers().origin||base,'access-control-allow-methods':'POST, GET, OPTIONS','access-control-allow-headers':req.headers()['access-control-request-headers']||'content-type, x-watchlog-session','access-control-max-age':'600'};
     if(offline)return route.abort('internetdisconnected');
     if(req.method()==='OPTIONS')return route.fulfill({status:204,headers,body:''});
     if(!req.url().includes('/functions/v1/watchlog-pin'))return route.fulfill({headers,json:{ok:true,enabled:false,results:[]}});
@@ -60,13 +60,15 @@ function patch(items,changes){
     if(body.action==='logout')tokens.delete(token);
     return route.fulfill({headers,json:data});
    });
-   const page=await context.newPage();page.on('pageerror',error=>errors.push(error.message));
+   const page=await context.newPage();page.on('pageerror',error=>{errors.push(error.message);console.error(engine.name(),error.message);});
+   page.on('console',message=>{if(!offline&&['warning','error'].includes(message.type()))console.error(engine.name(),message.text());});
+   page.on('requestfailed',request=>{if(!offline)console.error(engine.name(),request.method(),request.url(),request.failure()?.errorText);});
    await page.goto(base);await page.waitForFunction(()=>document.querySelector('#auth-screen').classList.contains('hidden'));
    await page.waitForFunction(()=>navigator.serviceWorker.controller,{timeout:20000});
    await page.waitForFunction(()=>document.querySelector('#offline-status').textContent.includes('Ready for offline'));
    assert.equal(await page.locator('[data-continue-mark="show"]').count(),1);
    await page.locator('[data-continue-mark="show"]').click();
-   await page.waitForFunction(()=>!cloudSaveInFlight&&!localSaveInFlight&&!queuedCloudSnapshot);
+   await page.waitForFunction(()=>!cloudSaveInFlight&&!localSaveInFlight&&!queuedCloudSnapshot).catch(async error=>{console.error(engine.name(),'first-save state',await page.evaluate(()=>({cloud:!!cloudSaveInFlight,local:!!localSaveInFlight,queued:!!queuedCloudSnapshot,revision:cloudRevision,status:document.querySelector('#sync-status')?.textContent})),{saves:saves.length});throw error;});
    assert.deepEqual(items[0].watchedEpisodes[1],[1,2]);
    await page.locator('[data-gallery-category="Series"]').click();await page.locator('[data-gallery-item="show"]').click();
    await page.waitForFunction(()=>location.hash.startsWith('#/title/show'));
