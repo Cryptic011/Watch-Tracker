@@ -1,3 +1,9 @@
+## 2026-10-23 — Add colour-only catch-up markers to scheduled shows
+- Add a small amber dot for one or two released episodes behind and a red dot for more than two, beside show titles in both schedules and release-history/TBA rows.
+- Show no dot when caught up, exclude films and unreleased episodes, and update markers when watch progress changes.
+- Use colour-only visible markers with accessible descriptions, without displaying an episode-behind count.
+- Reuse marker calculations for repeated show entries within each schedule render.
+
 ## 2026-10-23 — Optimise startup, Library, search and episode tracking
 - Calculate timeline sorting keys once per title per sort, preserving Current/Recent/release order and fresh release decisions.
 - Skip hidden Library sorting and rendering on Settings and Search, calculate watch statistics only on Settings, and reuse progress maps within statistics.

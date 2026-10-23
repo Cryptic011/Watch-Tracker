@@ -64,8 +64,10 @@
     "number": 224
   },
   "__current": {
-    "title": "Optimise startup, Library, search and episode tracking",
+    "title": "Add colour-only catch-up markers to scheduled shows",
     "changes": [
+      "Show a small amber dot when one or two released episodes behind, or a red dot when more than two behind, beside scheduled show titles.",
+      "Keep markers colour-only with no visible count; remove them when caught up and ignore films and unreleased episodes.",
       "Calculate timeline keys once per title, avoid rebuilding hidden Library content, and reuse episode progress maps in statistics.",
       "Apply whole-season watch changes once while preserving episode history, rollback and other-season progress.",
       "Retain unchanged posters and search controls, update film descriptions in place, and avoid repeated missing-poster requests.",

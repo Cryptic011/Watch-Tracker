@@ -10,8 +10,40 @@ const helper=suite.slice(suite.indexOf('function extractFunction'),suite.indexOf
 const {extractFunction}=new Function('html','assert','vm',helper+'\nreturn {extractFunction};')(html,assert,vm);
 function app(){
  const c=vm.createContext({Date,console});
- vm.runInContext(['toMillis','isEpisodeTrackable','normalizeReleasedEpisodeMap','positiveEpisodeMap','releasedEpisodeMap','normalizeWatchedEpisodeMap','legacyWatchedEpisodeMap','watchedEpisodeMap','nextWatchEpisode','calendarRange','calendarEvents','localISODate','weeklyReleasePattern','recurringWeeklyShows'].map(n=>extractFunction(html,n)).join('\n'),c);return c;
+ vm.runInContext(['toMillis','isEpisodeTrackable','normalizeReleasedEpisodeMap','positiveEpisodeMap','releasedEpisodeMap','normalizeWatchedEpisodeMap','legacyWatchedEpisodeMap','watchedEpisodeMap','nextWatchEpisode','calendarRange','calendarEvents','localISODate','weeklyReleasePattern','recurringWeeklyShows','scheduleBehindLevel','scheduleProgressMarker'].map(n=>extractFunction(html,n)).join('\n'),c);return c;
 }
+test('Schedule dots use amber for one or two released episodes behind and red for more than two',()=>{
+ const c=app(),released={1:[1,2,3],2:[1,3]},all=Object.entries(released).flatMap(([season,episodes])=>episodes.map(episode=>[season,episode]));
+ for(let behind=0;behind<=all.length;behind++){
+  const watched={};
+  for(const [season,episode] of all.slice(0,all.length-behind))(watched[season]||=[]).push(episode);
+  const item={id:'show',type:'Series',status:'Watched',episodeScheduleVerified:true,releasedEpisodes:released,watchedEpisodes:watched};
+  const before=JSON.stringify(item);
+  assert.equal(c.scheduleBehindLevel(item),behind>2?'red':behind?'amber':'');
+  assert.equal(JSON.stringify(item),before,'calculating the marker never changes saved progress');
+ }
+});
+
+test('Schedule dots ignore films, unknown schedules and unreleased episode totals',()=>{
+ const c=app(),item={id:'anime',type:'Anime',episodeScheduleVerified:true,releasedEpisodes:{1:[1,3]},episodeCounts:{1:20},watchedEpisodes:{1:[1,3]}};
+ assert.equal(c.scheduleBehindLevel(item),'');
+ assert.equal(c.scheduleBehindLevel({...item,watchedEpisodes:{1:[1]}}),'amber');
+ assert.equal(c.scheduleBehindLevel({...item,type:'Film',watchedEpisodes:{}}),'');
+ assert.equal(c.scheduleBehindLevel({id:'unknown',type:'Series',episodeCounts:{1:20}}),'');
+ assert.equal(c.scheduleBehindLevel({type:'Series',episodeScheduleVerified:true,releasedEpisodes:{1:[1,2,3],2:[1,2]},watchedSeasons:1,curSeason:2,curEp:1}),'amber','legacy progress remains respected');
+});
+
+test('Schedule markers contain no visible count and reuse results for repeated show cards',()=>{
+ const c=app(),cache=new Map();let calls=0;
+ c.scheduleBehindLevel=()=>{calls++;return 'red';};
+ const marker=c.scheduleProgressMarker({id:'show'},cache);
+ assert.equal(c.scheduleProgressMarker({id:'show'},cache),marker);assert.equal(calls,1);
+ assert.ok(marker.includes('data-behind-level="red"')&&marker.includes('role="img"')&&marker.includes('aria-label='));
+ assert.ok(marker.endsWith('></span>'),'the dot has no visible text or number');
+ c.scheduleBehindLevel=()=>'';
+ assert.equal(c.scheduleProgressMarker({id:'caught-up'}),'');
+});
+
 test('Recurring shows retain an aired episode for exactly 24 hours then advance to the next confirmed episode',()=>{
  const c=app(),episodes=[8,15,22,29].map((day,index)=>({season:2,number:index+1,raw:new Date(2026,9,day,20).toISOString()}));
  const item={id:'weekly',title:'Weekly show',type:'Series',status:'Watched',recurringWeeklySchedule:c.weeklyReleasePattern(episodes)};

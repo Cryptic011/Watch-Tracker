@@ -383,6 +383,25 @@ const server=http.createServer((req,res)=>{
   assert.deepEqual(await recurring.locator('[data-recurring-day]').evaluateAll(nodes=>nodes.map(node=>Number(node.dataset.recurringDay))),[1,2,3,4,5,6,0]);
   assert.equal(await recurring.locator('[data-recurring-open="show"]').count(),1);
   assert.match(await recurring.textContent(),/S2 E2/);
+  const recurringMarker=()=>recurring.locator('[data-recurring-open="show"] .release-progress-dot');
+  assert.equal(await recurringMarker().getAttribute('data-behind-level'),'red');
+  const savedMarkerProgress=await page.evaluate(()=>structuredClone(mediaItems.find(item=>item.id==='show').watchedEpisodes));
+  for(const behind of [0,1,2,3]){
+   await page.evaluate(behind=>{
+    const item=mediaItems.find(item=>item.id==='show'),releases=releasedEpisodeMap(item);
+    const episodes=Object.entries(releases).flatMap(([season,numbers])=>numbers.map(episode=>[season,episode]));
+    item.watchedEpisodes={};
+    for(const [season,episode] of episodes.slice(0,episodes.length-behind))(item.watchedEpisodes[season]||=[]).push(episode);
+    render();
+   },behind);
+   if(!behind)assert.equal(await recurringMarker().count(),0,'caught-up shows have no dot');
+   else{
+    assert.equal(await recurringMarker().getAttribute('data-behind-level'),behind>2?'red':'amber');
+    assert.equal(await recurringMarker().textContent(),'','only the coloured marker is visible, not a count');
+    assert.equal(await recurringMarker().getAttribute('role'),'img');
+   }
+  }
+  await page.evaluate(progress=>{mediaItems.find(item=>item.id==='show').watchedEpisodes=progress;render();},savedMarkerProgress);
   const scheduleText=await recurring.textContent();
   const calendarDropdown=page.locator('#library-dashboard>details');
   assert.equal(await calendarDropdown.getAttribute('open'),null,'Your schedule starts collapsed');
@@ -430,6 +449,7 @@ const server=http.createServer((req,res)=>{
   await page.locator('[data-gallery-close]').click();
   await page.waitForFunction(()=>document.activeElement?.matches('#recurring-weekly-dashboard [data-recurring-open="show"]'));
   await page.locator('[data-calendar-range="upcoming"]').click();
+  assert.equal(await page.locator('#library-dashboard [data-dashboard-open="show"] .release-progress-dot').first().getAttribute('data-behind-level'),'red','release calendar uses the same marker rules');
   await page.locator('#library-dashboard [data-dashboard-open="show"]').first().click();
   assert.equal(await page.getByRole('tab',{name:'Episodes',exact:true}).getAttribute('aria-selected'),'true','upcoming releases open the new Episodes page');
   assert.equal(await page.locator('#episode-tracker-modal').isVisible(),false);
@@ -441,6 +461,8 @@ const server=http.createServer((req,res)=>{
   assert.equal(await page.locator('[data-gallery-watch-next]').count(),0,'unreleased episodes are never offered by Watch next');
   assert.equal(await page.locator('.gallery-caught-up').textContent(),'All released episodes watched');
   await page.locator('[data-gallery-close]').click();
+  assert.equal(await recurringMarker().count(),0,'watching released episodes clears the recurring marker');
+  assert.equal(await page.locator('#library-dashboard [data-dashboard-open="show"] .release-progress-dot').count(),0,'watching released episodes clears the release-calendar marker');
   phase='refresh';
   const refreshItemId=await page.evaluate(()=>{mediaItems[0].platform='Saved before refresh';return mediaItems[0].id;});
   const before=loads;const reload=page.waitForEvent('load');await page.locator('#refresh-app').click();await reload;

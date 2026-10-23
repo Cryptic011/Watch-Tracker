@@ -33,6 +33,10 @@
 .release-card-copy{display:flex;flex-direction:column;gap:3px;min-width:0}
 .release-state-badge{display:inline-flex;align-self:flex-start;align-items:center;min-height:20px;margin-top:3px;padding:3px 7px;border:1px solid #60a5fa3b;border-radius:999px;background:#1a2c46;color:#b9d7ff;font-size:.61rem;font-weight:850;line-height:1}.release-state-badge[data-release-state="today"]{border-color:#3b82f677;background:#244775;color:#d5e8ff}.release-state-badge[data-release-state="released"]{border-color:#34d39955;background:#14392f;color:#a7f3d0}.release-state-badge[data-release-state="excluded"]{border-color:#fbbf2455;background:#3a2e16;color:#fcd985}.excluded-release-row>div{display:grid;justify-items:start;gap:5px}
 .release-card-copy strong{font-size:.88rem;font-weight:800;line-height:1.25;overflow-wrap:anywhere}
+.release-show-title{display:flex;align-items:center;gap:7px;min-width:0}
+.release-show-title>span:first-child{min-width:0;overflow-wrap:anywhere}
+.release-progress-dot{display:inline-block;flex:0 0 8px;width:8px;height:8px;border-radius:50%;background:var(--amber)}
+.release-progress-dot[data-behind-level="red"]{background:var(--red)}
 .release-episode{font-size:.75rem;color:#b5bdca;line-height:1.35}
 .release-platform{display:flex;align-items:center;gap:5px;min-width:0;margin-top:2px;color:var(--muted);font-size:.7rem;line-height:1.35;overflow-wrap:anywhere}
 .release-platform-dot{width:6px;height:6px;flex:0 0 6px;border-radius:50%;background:var(--blue2)}

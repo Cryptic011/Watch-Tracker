@@ -25,7 +25,7 @@ test('Settings is consolidated into General, Release Reminders, and Account & Sy
 test('Settings categories use scalable icons and Prior Releases reserves readable metadata width',()=>{
  const html=read('index.html'),dashboard=read('assets/js/dashboard.js'),css=read('assets/css/dashboard.css'),appCss=read('assets/css/app.css'),core=read('assets/js/app-core.js');
  assert.match(html,/settings-category-icon[^>]*aria-hidden="true"><svg viewBox=/);
- assert.match(dashboard,/class="release-tba-item"[^>]*><strong>\$\{esc\(event\.item\.title\)\}<\/strong><span>\$\{esc\(event\.label\)/);
+ assert.ok(dashboard.includes("<strong class=\"release-show-title\"><span>${esc(event.item.title)}</span>${scheduleProgressMarker(event.item,progressMarkers)}</strong><span>${esc(event.label)}"));
  assert.match(css,/\.prior-releases \.release-tba-item\{grid-template-columns:minmax\(0,1fr\) minmax\(145px,40%\)/);
  assert.match(appCss,/\.settings-category-icon svg\{width:24px;height:24px;fill:none;stroke:currentColor/);
  assert.match(appCss,/\.settings-category-row\[data-settings-open="general"\] \.settings-category-icon\{background:linear-gradient/);
