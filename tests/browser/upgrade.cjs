@@ -69,9 +69,12 @@ function patch(items,changes){
     return {json:data};
    };
    await context.route('https://**/*',route=>offline?route.abort('internetdisconnected'):route.fulfill({headers:{'access-control-allow-origin':'*'},json:{ok:true,enabled:false,results:[]}}));
-   const page=await context.newPage();page.on('pageerror',error=>{errors.push(error.message);console.error(engine.name(),error.message);});
-   page.on('console',message=>{if(!offline&&['warning','error'].includes(message.type()))console.error(engine.name(),message.text());});
-   page.on('requestfailed',request=>{if(!offline)console.error(engine.name(),request.method(),request.url(),request.failure()?.errorText);});
+   function observePage(page){
+    page.on('pageerror',error=>{errors.push(error.message);console.error(engine.name(),error.message);});
+    page.on('console',message=>{if(!offline&&['warning','error'].includes(message.type()))console.error(engine.name(),message.text());});
+    page.on('requestfailed',request=>{if(!offline)console.error(engine.name(),request.method(),request.url(),request.failure()?.errorText);});
+   }
+   let page=await context.newPage();observePage(page);
    await page.goto(base);await page.waitForFunction(()=>document.querySelector('#auth-screen').classList.contains('hidden'));
    await page.waitForFunction(()=>navigator.serviceWorker.controller,{timeout:20000});
    await page.waitForFunction(()=>document.querySelector('#offline-status').textContent.includes('Ready for offline'));
@@ -112,7 +115,10 @@ function patch(items,changes){
    await page.locator('.gallery-detail[open]').waitFor({timeout:20000});
    await page.locator('.gallery-season[data-season="1"]>summary').click();await page.locator('[data-gallery-toggle-episode="1:4"]').click();
    await page.waitForFunction(()=>!cloudSaveInFlight&&!localSaveInFlight&&mediaItems.find(item=>item.id==='show').watchedEpisodes[1].includes(4));
-   await page.reload();await page.locator('.gallery-detail[open]').waitFor({timeout:20000});
+   // Close and reopen the page: the edit must survive beyond the old document.
+   // WebKit's automation reload command errors internally while offline.
+   await page.close();page=await context.newPage();observePage(page);
+   await page.goto(base+'/#/title/show');await page.locator('.gallery-detail[open]').waitFor({timeout:20000});
    assert.equal(await page.evaluate(()=>mediaItems.find(item=>item.id==='show').watchedEpisodes[1].includes(4)),true,'offline progress survives reopening');
    assert.equal(items.find(item=>item.id==='show').watchedEpisodes[1].includes(4),false,'offline edit has not reached the server');
    offline=false;await context.setOffline(false);await page.evaluate(()=>window.dispatchEvent(new Event('online')));
