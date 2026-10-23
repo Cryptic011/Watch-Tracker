@@ -215,7 +215,9 @@
   };
   const renderChangelogEntries=()=>{
     const body=$("changelog-body");
+    const expanded=body.querySelector("details.changelog-entry[open]")?.dataset.commitSha;
     body.querySelectorAll("details.changelog-entry").forEach(node=>node.remove());
+    const fragment=document.createDocumentFragment();
     for(const entry of APP_CHANGELOG_FULL){
       const details=document.createElement("details");details.className="changelog-entry";details.dataset.commitSha=entry.commit||"";
       const summary=document.createElement("summary");
@@ -231,37 +233,42 @@
       for(const change of entry.changes||[entry.title]){const li=document.createElement("li");li.textContent=change;changes.appendChild(li);}
       details.appendChild(changes);
       details.addEventListener("toggle",()=>{if(details.open)for(const other of body.children)if(other!==details&&other.tagName==="DETAILS")other.open=false;});
-      body.appendChild(details);
+      details.open=Boolean(expanded&&expanded===entry.commit);
+      fragment.appendChild(details);
     }
+    body.appendChild(fragment);changelogDialog._entriesRendered=true;
   };
-  const loadPushStatuses=async()=>{
-    try{
-      const runs=[];
-      for(let page=1;page<=10;page++){
-        const response=await fetch("https://api.github.com/repos/Cryptic011/Watched-Tracker/actions/runs?per_page=100&page="+page,{headers:{Accept:"application/vnd.github+json"}});
-        if(!response.ok)throw new Error("GitHub Actions request failed");
-        const data=await response.json();
-        for(const [runIndex,run] of (data.workflow_runs||[]).entries()) {
-          if(!run.head_sha||run.head_branch!=="main")continue;
-          const title=String(run.head_commit?.message||run.display_title||"Repository push").split("\n")[0];
-          const matchingCommit=(currentBuild.commits||[]).find(commit=>commit.commit===run.head_sha);
-          const entry={appCommit:Number.isInteger(matchingCommit?.number)?matchingCommit.number:null,workflowRunNumber:Number.isInteger(run.run_number)?run.run_number:null,workflowRunAttempt:Number.isInteger(run.run_attempt)?run.run_attempt:null,workflowRunId:Number.isInteger(run.id)?run.id:null,commit:run.head_sha,date:String(run.created_at||"").slice(0,10),title,changes:[title],status:run.conclusion||run.status||"unknown"};
-          runs.push(entry);
-          if(run.head_sha&&!statusBySha.has(run.head_sha))statusBySha.set(run.head_sha,entry.status);
+  let pushStatusesInFlight=null;
+  const loadPushStatuses=()=>{
+    if(pushStatusesInFlight)return pushStatusesInFlight;
+    pushStatusesInFlight=(async()=>{
+      try{
+        const runs=[],seenStatuses=new Set(),commitsBySha=new Map((currentBuild.commits||[]).map(entry=>[entry.commit,entry]));
+        for(let page=1;page<=10;page++){
+          const response=await fetch("https://api.github.com/repos/Cryptic011/Watched-Tracker/actions/runs?per_page=100&page="+page,{headers:{Accept:"application/vnd.github+json"}});
+          if(!response.ok)throw new Error("GitHub Actions request failed");
+          const data=await response.json();
+          for(const run of (data.workflow_runs||[])) {
+            if(!run.head_sha||run.head_branch!=="main")continue;
+            const title=String(run.head_commit?.message||run.display_title||"Repository push").split("\n")[0];
+            const matchingCommit=commitsBySha.get(run.head_sha);
+            const entry={appCommit:Number.isInteger(matchingCommit?.number)?matchingCommit.number:null,workflowRunNumber:Number.isInteger(run.run_number)?run.run_number:null,workflowRunAttempt:Number.isInteger(run.run_attempt)?run.run_attempt:null,workflowRunId:Number.isInteger(run.id)?run.id:null,commit:run.head_sha,date:String(run.created_at||"").slice(0,10),title,changes:[title],status:run.conclusion||run.status||"unknown"};
+            runs.push(entry);
+            if(!seenStatuses.has(run.head_sha)){seenStatuses.add(run.head_sha);statusBySha.set(run.head_sha,entry.status);}
+          }
+          if((data.workflow_runs||[]).length<100)break;
         }
-        if((data.workflow_runs||[]).length<100)break;
+        const workflowByCommit=new Map();
+        for(const run of runs){const list=workflowByCommit.get(run.commit)||[];list.push(run);workflowByCommit.set(run.commit,list);}
+        APP_CHANGELOG_FULL=(currentBuild.commits||APP_CHANGELOG_FULL).map(entry=>{const matching=workflowByCommit.get(entry.commit)||[];const run=matching[0];return {...entry,workflowRuns:matching,workflowRunNumber:run?.workflowRunNumber??entry.workflowRunNumber??null,status:run?.status||statusBySha.get(entry.commit)||entry.status};});
+        renderChangelogEntries();
+      }catch(_){
+        renderChangelogEntries();
       }
-      const workflowByCommit=new Map();
-      for(const run of runs){const list=workflowByCommit.get(run.commit)||[];list.push(run);workflowByCommit.set(run.commit,list);}
-      APP_CHANGELOG_FULL=(currentBuild.commits||APP_CHANGELOG_FULL).map(entry=>{const matching=workflowByCommit.get(entry.commit)||[];const run=matching[0];return {...entry,workflowRuns:matching,workflowRunNumber:run?.workflowRunNumber??entry.workflowRunNumber??null,status:run?.status||statusBySha.get(entry.commit)||entry.status};});
-      renderChangelogEntries();
-    }catch(_){
-      renderChangelogEntries();
-    }
+    })().finally(()=>{pushStatusesInFlight=null;});
+    return pushStatusesInFlight;
   };
-  renderChangelogEntries();
-  loadPushStatuses();
-  whatsNewButton.onclick=()=>{changelogDialog.showModal();document.documentElement.classList.add("changelog-open");};
+  whatsNewButton.onclick=()=>{if(!changelogDialog._entriesRendered)renderChangelogEntries();changelogDialog.showModal();document.documentElement.classList.add("changelog-open");void loadPushStatuses();};
   $("close-changelog").onclick=()=>changelogDialog.close();
   changelogDialog.addEventListener("click",event=>{if(event.target===changelogDialog)changelogDialog.close();});
   changelogDialog.addEventListener("close",()=>{document.documentElement.classList.remove("changelog-open");whatsNewButton.focus();});

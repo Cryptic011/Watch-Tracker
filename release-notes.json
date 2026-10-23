@@ -64,10 +64,15 @@
     "number": 224
   },
   "__current": {
-    "title": "Show page titles without the repeated app heading",
+    "title": "Optimise startup, Library, search and episode tracking",
     "changes": [
-      "Keep the app heading on Library home only; show Settings, Search and category headings on their respective pages.",
-      "Hide the repeated app heading throughout Settings categories and restore it when returning to Library home."
+      "Calculate timeline keys once per title, avoid rebuilding hidden Library content, and reuse episode progress maps in statistics.",
+      "Apply whole-season watch changes once while preserving episode history, rollback and other-season progress.",
+      "Retain unchanged posters and search controls, update film descriptions in place, and avoid repeated missing-poster requests.",
+      "Load changelog and workflow history only when opened; preserve expanded releases while statuses refresh.",
+      "Reuse calendar formatting and grouping work; update recurring schedules at actual release and rollover boundaries.",
+      "Remove the document-wide navigation observer and load gallery styles with the initial page styles.",
+      "Fix saved-title search navigation and bulk-edit timestamps used by sync."
     ]
   },
   "37f6c39e9d0355b1bde705cb3fcb3cda2533119f": {
@@ -154,6 +159,13 @@
     "changes": [
       "Hide Library search and the Planned, Watching and Watched tracking totals throughout Settings.",
       "Restore search and totals when returning to Library; preserve the separate Search page layout."
+    ]
+  },
+  "699106a4b499504c6a30b065fe738085ea0e91d2": {
+    "title": "Show page titles without the repeated app heading",
+    "changes": [
+      "Keep the app heading on Library home only; show Settings, Search and category headings on their respective pages.",
+      "Hide the repeated app heading throughout Settings categories and restore it when returning to Library home."
     ]
   }
 }

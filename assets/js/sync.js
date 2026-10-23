@@ -762,8 +762,8 @@
     if(!Number.isFinite(time)||time<=0)return{bucket:0,time:0};
     return{bucket:time>now?1:2,time};
   }
-  function compareReleaseRecency(a,b,now=Date.now()){
-    const ar=releaseSortInfo(a,now),br=releaseSortInfo(b,now);
+  function compareReleaseRecency(a,b,now=Date.now(),releaseInfo=null){
+    const ar=releaseInfo?.get(a)||releaseSortInfo(a,now),br=releaseInfo?.get(b)||releaseSortInfo(b,now);
     if(ar.bucket!==br.bucket)return br.bucket-ar.bucket;
     if(ar.bucket===2&&ar.time!==br.time)return br.time-ar.time;
     if(ar.bucket===1&&ar.time!==br.time)return ar.time-br.time;
@@ -789,11 +789,11 @@
 
     if(isEpisodeTrackable(item)){
       const latestEpisode=eventInfo(item.latestEpisodeDate);
-      const recentScheduled=(Array.isArray(item?.scheduledEpisodeReleases)?item.scheduledEpisodeReleases:[])
-        .map(ep=>({ep,time:eventInfo(ep?.raw)}))
-        .filter(entry=>entry.time.time>0&&entry.time.time<=now&&now-entry.time.time<=day)
-        .sort((a,b)=>b.time.time-a.time.time)[0];
-      const latestTimelineEpisode=recentScheduled?.time?.time>latestEpisode.time?recentScheduled.time:latestEpisode;
+      let latestTimelineEpisode=latestEpisode;
+      for(const episode of (Array.isArray(item?.scheduledEpisodeReleases)?item.scheduledEpisodeReleases:[])){
+        const time=eventInfo(episode?.raw);
+        if(time.time>latestTimelineEpisode.time&&time.time<=now&&now-time.time<=day)latestTimelineEpisode=time;
+      }
       const nextEpisode=eventInfo(item.nextEpisodeDate);
       const nextSeason=eventInfo(item.nextSeasonDate);
       const latestEpisodeAired=latestTimelineEpisode.time>0&&(latestTimelineEpisode.dateOnly?latestTimelineEpisode.dayStart<=now:latestTimelineEpisode.time<=now);
@@ -836,8 +836,8 @@
 
     return{current:false,phase:0,time:0,kind:"tba"};
   }
-  function compareCurrentOrder(a,b,now=Date.now()){
-    const ai=currentSortInfo(a,now),bi=currentSortInfo(b,now);
+  function compareCurrentOrder(a,b,now=Date.now(),currentInfo=null){
+    const ai=currentInfo?.get(a)||currentSortInfo(a,now),bi=currentInfo?.get(b)||currentSortInfo(b,now);
     if(ai.phase!==bi.phase)return bi.phase-ai.phase;
     if(ai.phase===4&&ai.time!==bi.time)return ai.time-bi.time;
     if(ai.phase===3&&ai.time!==bi.time)return bi.time-ai.time;
@@ -845,14 +845,14 @@
     if(ai.phase===1&&ai.time!==bi.time)return bi.time-ai.time;
     return titleCollator.compare(a.title||"",b.title||"");
   }
-  function compareRecentOrder(a,b,now=Date.now()){
-    const ai=currentSortInfo(a,now),bi=currentSortInfo(b,now);
+  function compareRecentOrder(a,b,now=Date.now(),currentInfo=null,releaseInfo=null){
+    const ai=currentInfo?.get(a)||currentSortInfo(a,now),bi=currentInfo?.get(b)||currentSortInfo(b,now);
     if(ai.current!==bi.current)return ai.current?-1:1;
     if(ai.current&&bi.current){
       const added=addedSortTime(b)-addedSortTime(a);
       if(added)return added;
     }
-    return compareReleaseRecency(a,b,now)||addedSortTime(b)-addedSortTime(a)||titleCollator.compare(a.title||"",b.title||"");
+    return compareReleaseRecency(a,b,now,releaseInfo)||addedSortTime(b)-addedSortTime(a)||titleCollator.compare(a.title||"",b.title||"");
   }
   function knownSeasonTotal(item){
     if(item?.type==="Film")return 0;

@@ -20,7 +20,7 @@ const server=http.createServer((req,res)=>{
   const page=await context.newPage(),errors=[];let phase='login';
   page.on('pageerror',error=>{const message=String(error.message||'');const expectedWebKitPinCors=engine.name()==='webkit'&&message.includes('watchlog-pin?forceFunctionRegion=eu-west-1')&&message.includes('access control checks');if(!expectedWebKitPinCors)errors.push(message);console.error(`${engine.name()} [${phase}] page error: ${error.stack||error.message}`);});
   page.on('requestfailed',request=>console.error(`${engine.name()} [${phase}] request failed: ${request.method()} ${new URL(request.url()).pathname} ${request.failure()?.errorText}`));
-  let items=[],revision=0,failSave=false,saves=0,loads=0;
+  let items=[],revision=0,failSave=false,saves=0,loads=0,changelogRequests=0;
   const account={id:'browser-test',email:'browser@example.test',displayName:'Browser Test'};
   await context.route('**/*',async route=>{
    const req=route.request();
@@ -29,6 +29,7 @@ const server=http.createServer((req,res)=>{
    // WebKit applies CORS to fulfilled mocks, including failures and preflights.
    if(req.method()==='OPTIONS')return route.fulfill({status:204,headers,body:''});
    const url=new URL(req.url());
+   if(url.hostname==='api.github.com'){changelogRequests++;return route.fulfill({headers,json:{workflow_runs:[]}});}
    if(url.hostname==='api.tvmaze.com'&&url.pathname==='/shows/12')return route.fulfill({headers,json:{id:12,name:'Test Series',premiered:'2020-01-01',externals:{imdb:'tt1234568'},image:{original:'https://static.tvmaze.com/series-poster.jpg'},summary:'<p>An official series description &amp; a second detail.</p>',genres:['Drama','Action'],status:'Running',rating:{average:8.4},runtime:42,language:'English'}});
    if(url.hostname==='api.tvmaze.com'&&url.pathname==='/shows/12/episodes')return route.fulfill({headers,json:[
     {season:1,number:1,image:{original:'https://static.tvmaze.com/episode-one.jpg'}},
@@ -59,6 +60,9 @@ const server=http.createServer((req,res)=>{
   await page.goto(base);
   await page.locator('#auth-email').fill(account.email);await page.locator('#auth-pin').fill('1234');await page.locator('#auth-submit').click();
   await page.waitForFunction(()=>document.querySelector('#auth-screen').classList.contains('hidden'));
+  assert.equal(changelogRequests,0,'startup does not request workflow history');
+  assert.equal(await page.locator('.changelog-entry').count(),0,'startup does not construct the full hidden changelog');
+  assert.equal(await page.evaluate(()=>{const node=mediaList.querySelector('.gallery-category');render();return Boolean(node)&&node===mediaList.querySelector('.gallery-category');}),true,'unchanged Library render retains category and poster nodes');
   // Add and edit via the real form; external catalogue responses stay mocked.
   phase='search';
   await page.locator('#add-btn').click();
@@ -307,6 +311,13 @@ const server=http.createServer((req,res)=>{
   assert.equal(await page.getByRole('heading',{name:'Settings',exact:true}).isVisible(),true,'Settings has its own page title');
   assert.equal(await page.locator('.settings-quick-actions').isVisible(),true,'Track Sync shortcut is visible');
   await assertSettingsOnly();
+  await page.locator('#whats-new-button').click();
+  await page.waitForFunction(()=>!pushStatusesInFlight&&document.querySelector('.changelog-entry'));
+  assert.equal(changelogRequests,1,'workflow history loads only when Changelog opens');
+  await page.locator('.changelog-entry summary').first().click();
+  await page.evaluate(()=>loadPushStatuses());
+  assert.equal(await page.locator('.changelog-entry').first().getAttribute('open'),'','status refresh preserves the expanded release');
+  await page.locator('#close-changelog').click();
   for(const theme of ['dark','light']){
    await page.evaluate(value=>document.documentElement.dataset.theme=value,theme);
    const colours=await page.evaluate(()=>{

@@ -26,9 +26,13 @@
     const image=discoveryImage(item.posterUrl),initials=String(item.title||"?").split(/\s+/).slice(0,2).map(word=>word[0]).join("");
     return `<span class="discovery-poster"><span aria-hidden="true">${esc(initials)}</span>${image?`<img src="${esc(image)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">`:""}</span>`;
   }
+  function discoveryDescriptionMarkup(item){
+    const description=discoveryDescription(item);
+    return description?`<details class="discovery-description"><summary aria-label="Description of ${esc(item.title)}"><span class="discovery-preview">${esc(description)}</span><span class="discovery-more" aria-hidden="true"></span></summary><p>${esc(description)}</p>${discoveryAttribution(item)}</details>`:'<p class="discovery-unavailable">Description unavailable.</p>';
+  }
   function discoveryCard(item,index){
-    const description=discoveryDescription(item),duplicate=discoveryDuplicate(item),meta=[item.year,item.format,item.detail&&!/^(?:film|series|tv series|tvseries)$/i.test(item.detail)?item.detail:""].filter(Boolean).join(" · ");
-    return `<article class="discovery-card" data-discovery-row="${index}"><button type="button" class="discovery-poster-button" data-discovery-open="${index}" aria-label="Details for ${esc(item.title)}">${discoveryPoster(item)}</button><div class="discovery-copy"><button type="button" class="discovery-title" data-discovery-open="${index}">${esc(item.title)}</button><p class="discovery-meta">${esc(meta)}</p>${description?`<details class="discovery-description"><summary aria-label="Description of ${esc(item.title)}"><span class="discovery-preview">${esc(description)}</span><span class="discovery-more" aria-hidden="true"></span></summary><p>${esc(description)}</p>${discoveryAttribution(item)}</details>`:'<p class="discovery-unavailable">Description unavailable.</p>'}<div class="discovery-actions"><span class="discovery-added${duplicate?"":" hidden"}" data-discovery-badge="${index}">✓ Already added</span><button type="button" data-discovery-add="${index}">${duplicate?"View in library":"+ Add"}</button></div></div></article>`;
+    const duplicate=discoveryDuplicate(item),meta=[item.year,item.format,item.detail&&!/^(?:film|series|tv series|tvseries)$/i.test(item.detail)?item.detail:""].filter(Boolean).join(" · ");
+    return `<article class="discovery-card" data-discovery-row="${index}"><button type="button" class="discovery-poster-button" data-discovery-open="${index}" aria-label="Details for ${esc(item.title)}">${discoveryPoster(item)}</button><div class="discovery-copy"><button type="button" class="discovery-title" data-discovery-open="${index}">${esc(item.title)}</button><p class="discovery-meta">${esc(meta)}</p>${discoveryDescriptionMarkup(item)}<div class="discovery-actions"><span class="discovery-added${duplicate?"":" hidden"}" data-discovery-badge="${index}">✓ Already added</span><button type="button" data-discovery-add="${index}">${duplicate?"View in library":"+ Add"}</button></div></div></article>`;
   }
   function wireDiscoveryImages(root){
     root.querySelectorAll(".discovery-poster img").forEach(img=>img.addEventListener("error",()=>{img.hidden=true;},{once:true}));
@@ -37,9 +41,13 @@
     $("discovery-browse")?.classList.toggle("hidden",discoveryQuery.length>=2);
     const expanded=new Set([...discoveryResults.querySelectorAll("[data-discovery-row]")].filter(row=>row.querySelector("details")?.open).map(row=>row.dataset.discoveryRow));
     const visible=discoveryRows.map((item,index)=>({item,index})).filter(({item})=>["Film","Series"].includes(item.format)&&(discoveryFilter==="All"||item.format===discoveryFilter));
-    discoveryResults.innerHTML=visible.map(({item,index})=>discoveryCard(item,index)).join("");
-    discoveryResults.querySelectorAll("[data-discovery-row]").forEach(row=>{if(expanded.has(row.dataset.discoveryRow)&&row.querySelector("details"))row.querySelector("details").open=true;});
-    discoveryResults.setAttribute("aria-busy",String(discoveryLoading));wireDiscoveryImages(discoveryResults);
+    const markup=visible.map(({item,index})=>discoveryCard(item,index)).join("");
+    if(discoveryResults._discoveryMarkup!==markup){
+      discoveryResults.innerHTML=markup;discoveryResults._discoveryMarkup=markup;
+      discoveryResults.querySelectorAll("[data-discovery-row]").forEach(row=>{if(expanded.has(row.dataset.discoveryRow)&&row.querySelector("details"))row.querySelector("details").open=true;});
+      wireDiscoveryImages(discoveryResults);
+    }
+    discoveryResults.setAttribute("aria-busy",String(discoveryLoading));
     $("discovery-retry").classList.toggle("hidden",!discoveryError);
     document.querySelectorAll("[data-discovery-filter]").forEach(button=>button.setAttribute("aria-pressed",String(button.dataset.discoveryFilter===discoveryFilter)));
     discoveryStatus.textContent=discoveryLoading?"Searching shows and films…":discoveryError?"Search is unavailable right now. Please try again.":discoveryQuery.length<2?"Enter at least two characters to search.":visible.length?`${visible.length} result${visible.length===1?"":"s"} for “${discoveryQuery}”`:"No matching titles. Try another spelling or choose All.";
@@ -50,7 +58,7 @@
   }
   function resetTitleSearch(){
     pauseTitleSearch();discoveryRows=[];discoveryQuery="";discoveryOwner=String(currentUser?.id||"");discoveryInput.value="";discoveryFilter="All";discoveryError=false;discoveryDetailItem=null;
-    discoveryResults.replaceChildren();$("discovery-detail-body").replaceChildren();
+    discoveryResults.replaceChildren();discoveryResults._discoveryMarkup=null;$("discovery-detail-body").replaceChildren();
   }
   function activateTitleSearch(){
     if(discoveryOwner!==String(currentUser?.id||""))resetTitleSearch();
@@ -108,7 +116,10 @@
         try{
           const description=await fetchDiscoveryDescription(item,signal);
           if(description&&isCurrent()){
-            item.description=description;item.descriptionSource="Wikipedia";renderTitleSearch();
+            item.description=description;item.descriptionSource="Wikipedia";
+            const index=discoveryRows.indexOf(item),row=discoveryResults.querySelector(`[data-discovery-row="${index}"]`);
+            const placeholder=row?.querySelector('.discovery-unavailable');
+            if(placeholder){placeholder.outerHTML=discoveryDescriptionMarkup(item);discoveryResults._discoveryMarkup=null;}
             if(discoveryDialog.open&&discoveryDetailItem===item){
               const paragraph=$("discovery-detail-body").querySelector(".discovery-full-description");if(paragraph){paragraph.textContent=description;const citation=document.createElement("p");citation.innerHTML=discoveryAttribution(item);paragraph.after(citation);}
             }
@@ -123,8 +134,11 @@
     discoveryResults.querySelectorAll("[data-discovery-row]").forEach(row=>{
       const item=discoveryRows[Number(row.dataset.discoveryRow)];if(!item)return;
       const duplicate=discoveryDuplicate(item);
-      row.querySelector("[data-discovery-badge]").classList.toggle("hidden",!duplicate);
-      row.querySelector("[data-discovery-add]").textContent=duplicate?"View in library":"+ Add";
+      const badge=row.querySelector("[data-discovery-badge]"),button=row.querySelector("[data-discovery-add]");
+      const label=duplicate?"View in library":"+ Add";
+      if(badge.classList.contains("hidden")===Boolean(duplicate)||button.textContent!==label){
+        badge.classList.toggle("hidden",!duplicate);button.textContent=label;discoveryResults._discoveryMarkup=null;
+      }
     });
   }
   function addDiscoveryTitle(item){

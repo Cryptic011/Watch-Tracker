@@ -36,6 +36,22 @@ test('Filters retain the query and full descriptions expand using native details
   filters[1].onclick();assert.match($('discovery-results').innerHTML,/Film title/);assert.doesNotMatch($('discovery-results').innerHTML,/Series title/);
   assert.equal($('discovery-query').value,'Title');assert.equal(c.discoveryDescription({description:'A &amp; B'}),'A & B');
 });
+test('Unchanged results do not rebuild posters or focused controls',async()=>{
+  const {c,$}=harness(),results=$('discovery-results');let writes=0,markup=results.innerHTML;
+  Object.defineProperty(results,'innerHTML',{get:()=>markup,set:value=>{writes++;markup=value;}});
+  $('discovery-query').value='Title';c.searchAllTitles=async()=>[{title:'Title',format:'Series',description:'A story.'}];
+  await c.runTitleSearch();await c.runTitleSearch();assert.equal(writes,1);
+});
+test('Film description enrichment updates its placeholder without replacing the results list',async()=>{
+  const {c,$}=harness();let description='';
+  const placeholder={set outerHTML(value){description=value;}};
+  $('discovery-results').querySelector=()=>({querySelector:()=>placeholder});
+  c.fetchDiscoveryDescription=async()=>'&lt;A safe description&gt; &amp; more';
+  c.renderTitleSearch=()=>{throw Error('Description updates must not rebuild the list');};
+  vm.runInContext("discoveryRows=[{title:'Film',format:'Film',imdbId:'tt1234567'}]",c);
+  await c.enrichDiscoveryDescriptions(new AbortController().signal,()=>true);
+  assert.match(description,/&lt;A safe description&gt; &amp; more/);
+});
 test('Provider text is escaped and only allowed HTTPS artwork is rendered',()=>{
   const {c}=harness();const html=c.discoveryCard({title:'<img onerror=evil()>',format:'Film',description:'&lt;script&gt;evil()&lt;/script&gt;',posterUrl:'javascript:evil()'},0);
   assert.doesNotMatch(html,/<script>|<img/);assert.match(html,/&lt;script&gt;/);

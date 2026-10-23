@@ -8,11 +8,13 @@ function gallery({observer=true,results=[],item={id:'film',type:'Film',title:'Th
   const img={hidden:true,dataset:{art:`${item.type}:${item.imdbId||item.tvmazeShowId||item.id}`} ,set src(url){this.url=url;this.onload?.();}};
   const box={querySelector:()=>img};img.parentElement=box;
   const host={classList:{add(){}},addEventListener(){},querySelectorAll:()=>[img]};
-  const context={window:{},URL,AbortSignal,document:{querySelectorAll:()=>[img]},fetch:fetchImpl};
+  let clock=Date.now();
+  const context={window:{},URL,AbortSignal,Date:class extends Date{static now(){return clock;}},document:{querySelectorAll:()=>[img]},fetch:fetchImpl};
   if(observer)context.IntersectionObserver=class{constructor(callback){this.callback=callback;}disconnect(){}unobserve(){}observe(target){observed.push(target);if(target!==img)queueMicrotask(()=>this.callback([{isIntersecting:true,target}]));}};
   vm.runInNewContext(source,context);
-  context.window.WatchLogGallery.mount(host,[item],{artwork:async item=>{lookups.push(item.imdbId);return results;}});
-  return {img,box,observed,lookups};
+  const mount=()=>context.window.WatchLogGallery.mount(host,[item],{artwork:async item=>{lookups.push(item.imdbId);return typeof results==='function'?results(item):results;}});
+  mount();
+  return {img,box,observed,lookups,mount,advance:ms=>{clock+=ms;}};
 }
 const poster='https://m.media-amazon.com/images/M/batman.jpg';
 test('Saved teaser artwork is replaced by the current poster for the exact IMDb identity',async()=>{
@@ -33,6 +35,20 @@ test('Hidden images load when their visible poster cards enter the viewport',asy
 test('Posters also load when IntersectionObserver is unavailable',async()=>{
   const app=gallery({observer:false,results:[{imdbId:'tt1877830',posterUrl:poster}]});
   await new Promise(setImmediate);assert.equal(app.img.url,poster);
+});
+test('A missing poster is retried after a short cooldown, rather than on every render',async()=>{
+  const results=[],app=gallery({results});
+  await new Promise(setImmediate);assert.equal(app.lookups.length,1);
+  app.mount();await new Promise(setImmediate);assert.equal(app.lookups.length,1);
+  results.push({imdbId:'tt1877830',posterUrl:poster});app.advance(5*60*1000+1);
+  app.mount();await new Promise(setImmediate);assert.equal(app.lookups.length,2);assert.equal(app.img.url,poster);
+});
+test('Saved artwork appears while an official poster refresh is still pending',async()=>{
+  let finish;
+  const app=gallery({item:{id:'film',type:'Film',title:'The Batman',imdbId:'tt1877830',posterUrl:poster},results:()=>new Promise(resolve=>{finish=resolve;})});
+  await new Promise(setImmediate);assert.equal(app.img.url,poster);
+  const updated='https://m.media-amazon.com/updated.jpg';finish([{imdbId:'tt1877830',posterUrl:updated}]);
+  await new Promise(setImmediate);assert.equal(app.img.url,updated);
 });
 const reboot={id:'reboot',type:'Series',title:'Prison Break',tvmazeShowId:'83211'};
 const original={imdbId:'tt0455275',title:'Prison Break',format:'Series',year:'2005',posterUrl:'https://m.media-amazon.com/original.jpg'};

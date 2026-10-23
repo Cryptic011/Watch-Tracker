@@ -1,3 +1,14 @@
+## 2026-10-23 — Optimise startup, Library, search and episode tracking
+- Calculate timeline sorting keys once per title per sort, preserving Current/Recent/release order and fresh release decisions.
+- Skip hidden Library sorting and rendering on Settings and Search, calculate watch statistics only on Settings, and reuse progress maps within statistics.
+- Preserve unchanged Library and search-result DOM, update enriched descriptions in place, show saved posters during refresh, and briefly cache missing poster results.
+- Apply whole-season progress once per action while retaining individual history events, rollback data, other-season progress, and the existing save queues.
+- Load changelog entries and GitHub workflow history on demand, coalesce concurrent requests, and preserve the expanded release during status refreshes.
+- Reuse calendar formatters and grouping indexes, and wake recurring schedules at airing, 24-hour rollover, or local midnight instead of every minute.
+- Remove the document-wide legacy-navigation observer and request the gallery stylesheet with the initial page styles.
+- Correct saved-title search navigation and timestamp bulk edits for sync.
+- Add operation-count regressions and mobile-browser coverage for startup work, unchanged DOM, and changelog refreshes.
+
 ## 2026-10-23 — Show page titles without the repeated app heading
 - Keep the app heading on Library home only. Settings, Search, Movies, and Series use their own page headings.
 - Preserve the page heading while opening Settings categories and restore the app heading on return home.

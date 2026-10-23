@@ -3,12 +3,20 @@ window.WatchLogGallery=(()=>{
   let category='',api=null,host=null,observer=null,dialog=null,returnFocus=null,active=0;
   const cache=new Map(),pending=new Set(),queue=[];
   const ARTWORK_CACHE_MS=6*60*60*1000;
-  const freshArt=id=>{const entry=cache.get(id);return entry&&Date.now()-entry.checkedAt<ARTWORK_CACHE_MS?entry.url:'';};
+  const freshArt=id=>{const entry=cache.get(id);return entry&&Date.now()-entry.checkedAt<(entry.url?ARTWORK_CACHE_MS:5*60*1000)?entry:null;};
   const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const isFilm=item=>item.type==='Film';
   const key=item=>`${item.type}:${item.imdbId||item.tvmazeShowId||item.id}`;
   const safeImage=value=>{try{const u=new URL(value);return u.protocol==='https:'&&(/(^|\.)media-amazon\.com$|(^|\.)tvmaze\.com$/.test(u.hostname))?u.href:'';}catch{return '';}};
-  function applyImage(img,url){if(!url)return;img.onload=()=>{img.hidden=false;};img.onerror=()=>{img.hidden=true;};img.src=url;}
+  function savedArt(item){return safeImage(item?.posterUrl||item?.imageUrl||item?.poster||item?.image?.original||item?.image?.medium);}
+  function applyImage(img,url){
+    if(!url)return;
+    if(img.getAttribute?.('src')===url&&(!img._galleryImageFailedAt||Date.now()-img._galleryImageFailedAt<60000))return;
+    img._galleryImageFailedAt=0;
+    img.onload=()=>{img.hidden=false;img._galleryImageFailedAt=0;};
+    img.onerror=()=>{img.hidden=true;img._galleryImageFailedAt=Date.now();};
+    img.src=url;
+  }
   async function fetchArt(item){
     const signal=AbortSignal.timeout(6500);
     // Saved artwork may be an early teaser. Check the same title's provider
@@ -49,13 +57,32 @@ window.WatchLogGallery=(()=>{
     return direct;
   }
   function pump(){while(active<3&&queue.length){const item=queue.shift(),id=key(item);active++;fetchArt(item).catch(()=>'').then(url=>{
-    if(url)cache.set(id,{url,checkedAt:Date.now()});if(cache.size>250)cache.delete(cache.keys().next().value);
+    cache.set(id,{url,checkedAt:Date.now()});if(cache.size>250)cache.delete(cache.keys().next().value);
     document.querySelectorAll('.gallery-art img').forEach(img=>{if(img.dataset.art===id)applyImage(img,url);});
   }).finally(()=>{active--;pending.delete(id);pump();});}}
   function observe(root,items){
     const byKey=new Map(items.map(item=>[key(item),item]));
-    if(!observer&&typeof IntersectionObserver!=="undefined")observer=new IntersectionObserver(entries=>{for(const entry of entries){if(!entry.isIntersecting)continue;const box=entry.target;observer.unobserve(box);const img=box.querySelector("img[data-art]");if(!img)return;const item=img._galleryItem;if(!item)continue;const id=key(item),cached=freshArt(id);if(cached){applyImage(img,cached);continue;}if(!pending.has(id)){pending.add(id);queue.push(item);pump();}}},{rootMargin:'160px'});
-    const images=[...root.querySelectorAll('[data-art]')];images.forEach(img=>{img._galleryItem=byKey.get(img.dataset.art);const cached=freshArt(img.dataset.art);if(cached)applyImage(img,cached);else if(observer)observer.observe(img.parentElement);else if(img._galleryItem&&!pending.has(img.dataset.art)){pending.add(img.dataset.art);queue.push(img._galleryItem);}});if(!observer)pump();
+    const enqueue=(img,item)=>{
+      const id=key(item),cached=freshArt(id);
+      applyImage(img,cached?.url||savedArt(item));
+      if(!cached&&!pending.has(id)){pending.add(id);queue.push(item);pump();}
+    };
+    if(!observer&&typeof IntersectionObserver!=="undefined")observer=new IntersectionObserver(entries=>{
+      for(const entry of entries){
+        if(!entry.isIntersecting)continue;
+        const box=entry.target;observer.unobserve(box);
+        const img=box.querySelector("img[data-art]");
+        if(img?._galleryItem)enqueue(img,img._galleryItem);
+      }
+    },{rootMargin:'160px'});
+    for(const img of root.querySelectorAll('[data-art]')){
+      const item=byKey.get(img.dataset.art);img._galleryItem=item;
+      if(!item)continue;
+      const cached=freshArt(img.dataset.art);
+      if(cached)applyImage(img,cached.url||savedArt(item));
+      else if(observer)observer.observe(img.parentElement);
+      else enqueue(img,item);
+    }
   }
   function art(item){
     const initials=String(item.title||'?').split(/\s+/).slice(0,2).map(s=>s[0]).join('');
@@ -96,6 +123,8 @@ window.WatchLogGallery=(()=>{
   function section(title,items,carousel=false){return items.length?`<section class="gallery-section"><h3>${esc(title)}<span class="gallery-count">${items.length}</span></h3><div class="${carousel?'gallery-carousel'+(category==='Film'?' gallery-film-carousel':''):'gallery-grid'}">${items.map(item=>tile(item,carousel)).join('')}</div></section>`:'';}
   function paintTrackerImage(container,url,label){
     const placeholder=`<span class="gallery-artwork-placeholder" aria-label="No artwork available">${esc(label)}</span>`;
+    if(container._trackerImage===url)return;
+    container._trackerImage=url;
     container.innerHTML=url?`<img src="${esc(url)}" alt="" loading="lazy" decoding="async">`:placeholder;
     const image=container.querySelector('img');
     if(image)image.onerror=()=>{container.innerHTML=placeholder;};
@@ -286,12 +315,14 @@ window.WatchLogGallery=(()=>{
       if(event.target.closest('[data-gallery-back]')){category='';api.render();host.querySelector('.gallery-category')?.focus();return;}
       const target=event.target.closest('[data-gallery-item]');if(target)open(target.dataset.galleryItem,target);
     });}
-    if(!category){host.innerHTML=`<div class="gallery-home">${[['Film','Movies','▤'],['Series','Series','▣']].map(([type,label,icon])=>{
+    let markup;
+    if(!category){markup=`<div class="gallery-home">${[['Film','Movies','▤'],['Series','Series','▣']].map(([type,label,icon])=>{
       const items=rows.filter(item=>type==='Film'?isFilm(item):!isFilm(item));return `<button type="button" class="gallery-category" data-gallery-category="${type}"><span class="gallery-category-icon" aria-hidden="true">${icon}</span><span><strong>${label}</strong><small>${items.length} title${items.length===1?'':'s'}</small></span><span class="gallery-fan" aria-hidden="true">${items.slice(0,3).map(item=>art(item)).join('')}</span></button>`;
     }).join('')}</div><p class="gallery-caption">${rows.length} titles in this view</p>`;}
     else{const items=rows.filter(item=>category==='Film'?isFilm(item):!isFilm(item)),tracked=api.items().filter(item=>category==='Film'?isFilm(item):!isFilm(item)),parts=sections(items,api.upcoming);
       const content=api.filter==='Watched'?releaseGroups(items).map(group=>section(group.year,group.rows)).join(''):section('Upcoming',parts.future,true)+section('Released',parts.released)+section('Date unknown',parts.remaining);
-      host.innerHTML=`<div class="gallery-nav"><button type="button" class="gallery-back" data-gallery-back aria-label="Back to Library">‹</button><h2>${category==='Film'?'Movies':'Series'}</h2><span class="gallery-heading-actions"><span class="gallery-count" data-gallery-total-count aria-label="${tracked.length} tracked ${category==='Film'?'films':'series'}">${tracked.length}</span>${manageButton(tracked,category==='Film'?'Movies':'Series')}</span></div>${content}${items.length?'':'<p class="gallery-empty">No titles match your search or filter.</p>'}`;}
+      markup=`<div class="gallery-nav"><button type="button" class="gallery-back" data-gallery-back aria-label="Back to Library">‹</button><h2>${category==='Film'?'Movies':'Series'}</h2><span class="gallery-heading-actions"><span class="gallery-count" data-gallery-total-count aria-label="${tracked.length} tracked ${category==='Film'?'films':'series'}">${tracked.length}</span>${manageButton(tracked,category==='Film'?'Movies':'Series')}</span></div>${content}${items.length?'':'<p class="gallery-empty">No titles match your search or filter.</p>'}`;}
+    if(host._galleryMarkup!==markup){host.innerHTML=markup;host._galleryMarkup=markup;}
     observe(host,rows);
   }
   return {mount,open,sections,releaseGroups,back,hasCategory:()=>Boolean(category)};

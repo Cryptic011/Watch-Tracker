@@ -124,6 +124,20 @@
     };
     return updated;
   }
+  function applySeasonToggle(item,season,markWatched,events){
+    const releases=releasedEpisodeMap(item),available=releases[season]||[];
+    if(!available.length||events.length!==available.length)return item;
+    const watched=watchedEpisodeMap(item,releases);
+    if(markWatched)watched[season]=[...available];else delete watched[season];
+    const base={...item,watchedEpisodes:watched,episodeHistory:[...(Array.isArray(item.episodeHistory)?item.episodeHistory:[]),...events.slice(0,-1)].slice(-500)};
+    if(!markWatched&&Number(item.curSeason)===season&&available.includes(Number(item.curEp))){
+      const highest=highestWatchedEpisode(watched);
+      base.curSeason=highest?.season||null;base.curEp=highest?.episode||null;
+    }
+    // Reuse the same progress summary and persistence rules, once for the
+    // entire season instead of rebuilding every episode map for every tick.
+    return applyEpisodeToggle(base,season,available[available.length-1],markWatched,events[events.length-1],false);
+  }
   async function toggleEpisodeWatched(id,season,episode,{offerUndo=true,restoreSeasonEpisodes=null}={}){
     const key=String(id);if(episodeLogBusy.has(key))return;
     const index=mediaItems.findIndex(item=>String(item.id)===key),item=mediaItems[index];if(index<0||!item)return;
@@ -160,10 +174,9 @@
     const index=mediaItems.findIndex(item=>String(item.id)===key),item=mediaItems[index];if(index<0||!item)return;
     const releases=releasedEpisodeMap(item),episodes=releases[season]||[];if(!episodes.length)return;
     const watched=watchedEpisodeMap(item,releases)[season]||[],markWatched=!episodes.every(episode=>watched.includes(episode));
-    const original=item;episodeLogBusy.add(key);mediaItems[index]=episodes.reduce((current,episode)=>{
-      const event={id:uuid(),kind:markWatched?"mark":"unmark",season,episode,watchedAt:nowISO()};
-      return applyEpisodeToggle(current,season,episode,markWatched,event);
-    },item);render();
+    const original=item;episodeLogBusy.add(key);
+    const events=episodes.map(episode=>({id:uuid(),kind:markWatched?"mark":"unmark",season,episode,watchedAt:nowISO()}));
+    mediaItems[index]=applySeasonToggle(item,season,markWatched,events);render();
     try{await persistLibrary(mediaItems,{background:true,precleaned:true});}
     catch(error){console.error(error);const currentIndex=mediaItems.findIndex(row=>String(row.id)===key);if(currentIndex>=0)mediaItems[currentIndex]=original;alert("That season could not be saved. Please try again.");}
     finally{episodeLogBusy.delete(key);render();}
@@ -229,9 +242,15 @@
   episodeTrackerEdit.onclick=()=>{const id=activeEpisodeTrackerId;closeEpisodeTrackerSheet();if(id)openEdit(id);};
   function sortMediaRows(rows){
     const list=[...rows],groups=new Map(),now=Date.now();
-    if(activeSort==="current")list.sort((a,b)=>compareCurrentOrder(a,b,now));
-    else if(activeSort==="recent")list.sort((a,b)=>compareRecentOrder(a,b,now));
-    else if(activeSort==="release")list.sort((a,b)=>compareReleaseRecency(a,b,now));
+    // Keys live for this sort only: progress edits and release rollovers must
+    // always be reflected on the next render, including in-place edits.
+    const currentInfo=new Map(),releaseInfo=new Map();
+    const currentSort=!["release","title","platform","watched","shows"].includes(activeSort);
+    if(currentSort)for(const item of list)currentInfo.set(item,currentSortInfo(item,now));
+    if(activeSort==="recent"||activeSort==="release")for(const item of list)releaseInfo.set(item,releaseSortInfo(item,now));
+    if(activeSort==="current")list.sort((a,b)=>compareCurrentOrder(a,b,now,currentInfo));
+    else if(activeSort==="recent")list.sort((a,b)=>compareRecentOrder(a,b,now,currentInfo,releaseInfo));
+    else if(activeSort==="release")list.sort((a,b)=>compareReleaseRecency(a,b,now,releaseInfo));
     else if(activeSort==="title")list.sort((a,b)=>titleCollator.compare(a.title||"",b.title||""));
     else if(activeSort==="platform")list.sort((a,b)=>{
       const ap=String(a.platform||"").trim(),bp=String(b.platform||"").trim();
@@ -249,7 +268,7 @@
         const ag=groups.get(String(a.id)),bg=groups.get(String(b.id));
         return titleCollator.compare(ag?.key||"",bg?.key||"")||titleCollator.compare(a.title||"",b.title||"");
       });
-    }else list.sort((a,b)=>compareCurrentOrder(a,b,now));
+    }else list.sort((a,b)=>compareCurrentOrder(a,b,now,currentInfo));
     return{rows:list,groups};
   }
   function updateCounts(){
@@ -286,7 +305,7 @@
     updateFloatingAddVisibility();
     if(search){activateTitleSearch();return;}
     pauseTitleSearch();
-    if(settings)void refreshPrivateReminderHistory();
+    if(settings){renderWatchStatistics();void refreshPrivateReminderHistory();}
     if(!settings){$("list-label").textContent=tab==="watchlist"?"Upcoming Premieres":tab==="history"?"Watch History":"Titles";render();}
   }
   enforceBottomNavigation();
@@ -368,11 +387,12 @@
     if(typeof refreshTitleSearchBadges==="function")refreshTitleSearchBadges();
     $("list-toolbar").classList.toggle("hidden",!currentUser||!categoryControlsVisible());
     updateCounts();updateFloatingAddVisibility();renderDashboard();
-    if(!currentUser){mediaList.replaceChildren();emptyState.classList.add("hidden");return;}
+    if(!currentUser){mediaList.replaceChildren();mediaList._galleryMarkup=null;emptyState.classList.add("hidden");return;}
+    if(currentTab!=="library"){updateEpisodeTracker();return;}
     const {rows,groups}=currentVisibleMediaRows();emptyState.classList.toggle("hidden",rows.length>0);
     if(currentTab==="library"&&window.WatchLogGallery){
       $("list-label").textContent="Library";
-      window.WatchLogGallery.mount(mediaList,rows,{filter:activeFilter,manage:openBulkManage,upcoming:upcomingSortInfo,next:nextWatchEpisode,last:item=>isEpisodeTrackable(item)?lastLoggedEpisode(item):null,released:item=>releasedEpisodeMap(item),watched:item=>watchedEpisodeMap(item),toggleEpisode:toggleEpisodeWatched,toggleSeason:toggleSeasonWatched,trackerArtwork:fetchOfficialTrackerArtwork,saveNotes:saveTitleNotes,titleDetails:fetchOfficialTitleDetails,remove:async(id)=>{const i=mediaItems.findIndex(row=>String(row.id)===String(id));if(i<0)return false;const old=mediaItems[i];mediaItems.splice(i,1);try{await persistLibrary(mediaItems,{background:true,precleaned:true});render();return true;}catch(error){mediaItems.splice(i,0,old);return false;}},date:formatLocalDate,dateTime:formatLocalDateTime,reminder:reminderMarkup,edit:openEdit,track:openEpisodeTracker,render,back:()=>{if(currentTab!=="library"){currentTab="library";render();}},artwork:async item=>(await pinApi("catalog_search",{query:item.imdbId||item.title,country:"gb"})).results,items:()=>mediaItems});
+      window.WatchLogGallery.mount(mediaList,rows,{filter:activeFilter,manage:openBulkManage,upcoming:upcomingSortInfo,next:nextWatchEpisode,last:item=>isEpisodeTrackable(item)?lastLoggedEpisode(item):null,released:item=>releasedEpisodeMap(item),watched:item=>watchedEpisodeMap(item),toggleEpisode:toggleEpisodeWatched,toggleSeason:toggleSeasonWatched,trackerArtwork:fetchOfficialTrackerArtwork,saveNotes:saveTitleNotes,titleDetails:fetchOfficialTitleDetails,remove:async(id)=>{const i=mediaItems.findIndex(row=>String(row.id)===String(id));if(i<0)return false;const old=mediaItems[i];mediaItems.splice(i,1);try{await persistLibrary(mediaItems,{background:true,precleaned:true});render();return true;}catch(error){mediaItems.splice(i,0,old);return false;}},date:formatLocalDate,dateTime:formatLocalDateTime,reminder:reminderMarkup,edit:openEdit,track:openEpisodeTracker,render,back:()=>{if(currentTab!=="library")switchTab("library");},artwork:async item=>(await pinApi("catalog_search",{query:item.imdbId||item.title,country:"gb"})).results,items:()=>mediaItems});
       updateEpisodeTracker();return;
     }
     mediaList.classList.remove("gallery-active");
@@ -387,7 +407,7 @@
       }
       html+=titleCardMarkup(item);
     }
-    mediaList.innerHTML=html;updateEpisodeTracker();
+    mediaList.innerHTML=html;mediaList._galleryMarkup=null;updateEpisodeTracker();
   }
   const bulkDialog=document.createElement("dialog");bulkDialog.className="changelog-dialog bulk-dialog";bulkDialog.setAttribute("aria-labelledby","bulk-manage-title");bulkDialog.innerHTML='<header class="changelog-heading"><h2 id="bulk-manage-title">Manage titles</h2><button class="close-btn" type="button" aria-label="Close bulk actions">×</button></header><p>Select one or more titles. Existing watch progress is retained unless you mark a show watched.</p><div id="bulk-title-options" class="bulk-title-options"></div><div class="notification-actions"><button type="button" data-bulk-action="watched" class="btn btn-secondary">Mark watched</button><button type="button" data-bulk-action="planned" class="btn btn-secondary">Plan</button><button type="button" data-bulk-action="hide" class="btn btn-secondary">Hide from Weekly Releases</button><button type="button" data-bulk-action="include" class="btn btn-secondary">Re-enable Weekly Releases</button><button type="button" data-bulk-action="remove" class="btn btn-danger">Remove selected</button></div>';
   document.body.appendChild(bulkDialog);
@@ -405,9 +425,9 @@
     const action=event.target.closest("[data-bulk-action]")?.dataset.bulkAction;if(!action)return;
     const ids=[...bulkOptions.querySelectorAll("input:checked")].map(input=>input.value);if(!ids.length){document.getElementById("bulk-manage-status").textContent="Select at least one title.";return;}
     if(action==="remove"&&!confirm(`Remove ${ids.length} selected title(s)? This cannot be undone.`))return;
-    const selected=new Set(ids);
+    const selected=new Set(ids),updatedAt=nowISO();
     if(action==="remove")mediaItems=mediaItems.filter(item=>!selected.has(String(item.id)));
-    else for(const item of mediaItems){if(!selected.has(String(item.id)))continue;if(action==="planned")item.status="Planned";if(action==="hide")item.hideFromWeeklyReleases=true;if(action==="include")item.hideFromWeeklyReleases=false;if(action==="watched"){item.status="Watched";if(isEpisodeTrackable(item)){const released=releasedEpisodeMap(item);item.watchedEpisodes=Object.fromEntries(Object.entries(released).map(([season,episodes])=>[season,[...episodes]]));const latest=Object.entries(item.watchedEpisodes).flatMap(([season,episodes])=>episodes.map(episode=>[Number(season),Number(episode)])).sort((a,b)=>b[0]-a[0]||b[1]-a[1])[0];item.curSeason=latest?.[0]||null;item.curEp=latest?.[1]||null;item.lastWatchedSeason=item.curSeason;item.lastWatchedEpisode=item.curEp;item.watchedSeasons=Object.keys(released).length;item.updatedAt=nowISO();}}}
+    else for(const item of mediaItems){if(!selected.has(String(item.id)))continue;item.updatedAt=updatedAt;if(action==="planned")item.status="Planned";if(action==="hide")item.hideFromWeeklyReleases=true;if(action==="include")item.hideFromWeeklyReleases=false;if(action==="watched"){item.status="Watched";if(isEpisodeTrackable(item)){const released=releasedEpisodeMap(item);item.watchedEpisodes=Object.fromEntries(Object.entries(released).map(([season,episodes])=>[season,[...episodes]]));const latest=Object.entries(item.watchedEpisodes).flatMap(([season,episodes])=>episodes.map(episode=>[Number(season),Number(episode)])).sort((a,b)=>b[0]-a[0]||b[1]-a[1])[0];item.curSeason=latest?.[0]||null;item.curEp=latest?.[1]||null;item.lastWatchedSeason=item.curSeason;item.lastWatchedEpisode=item.curEp;item.watchedSeasons=Object.keys(released).length;item.updatedAt=nowISO();}}}
     render();void persistLibrary(mediaItems,{background:true,precleaned:true});bulkDialog.close();showAppToast(`Updated ${ids.length} title(s).`,"success");
   });
   function scheduleRender(){if(renderFrame)return;renderFrame=requestAnimationFrame(()=>{renderFrame=0;render();});}
@@ -418,7 +438,7 @@
   };
   function openMediaRow(id,trigger=document.activeElement){
     const item=mediaItems.find(row=>String(row.id)===String(id));if(!item)return;
-    if(currentTab!=="library"){currentTab="library";render();}
+    if(currentTab!=="library")switchTab("library");
     if(!window.WatchLogGallery?.open?.(item.id,trigger))void openEdit(item.id);
   }
   mediaList.addEventListener("click",event=>{
