@@ -235,7 +235,7 @@ window.WatchLogGallery=(()=>{
       dialog.addEventListener('click',event=>{if(event.target===dialog||event.target.closest('[data-gallery-close]'))closeDetail();});
       dialog.addEventListener('scroll',()=>{if(typeof saveNavigationPosition==='function')saveNavigationPosition();},{passive:true});
       dialog.addEventListener('cancel',event=>{event.preventDefault();closeDetail();});
-      dialog.addEventListener('close',()=>{if(typeof applyPendingAppUpdate==='function')setTimeout(applyPendingAppUpdate,0);window.WatchLogNavigation?.titleClosed?.();const target=returnFocus?.isConnected?returnFocus:host?.querySelector(`[data-gallery-item="${CSS.escape(dialog.dataset.item||'')}"]`);target?.focus({preventScroll:true});});
+      dialog.addEventListener('close',()=>{if(dialog._authPaused)return;if(typeof applyPendingAppUpdate==='function')setTimeout(applyPendingAppUpdate,0);window.WatchLogNavigation?.titleClosed?.();const target=returnFocus?.isConnected?returnFocus:host?.querySelector(`[data-gallery-item="${CSS.escape(dialog.dataset.item||'')}"]`);target?.focus({preventScroll:true});});
     }
     dialog.dataset.item=String(item.id);
     const show=!isFilm(item),last=api.last(item);

@@ -217,6 +217,7 @@
         : cloneLibrarySnapshot(savedSnapshot.items);
       setCloudBaseline(savedSnapshot.items,revision,originalSnapshot.accountId);
       render();
+      if(!sameSyncValue(originalSnapshot.items,savedSnapshot.items))window.WatchLogGallery?.refreshCurrent?.();
     }
     await acknowledgeCachedSnapshot(originalSnapshot,savedSnapshot,revision);
     /* A delayed callback can enqueue this same snapshot again. Its accepted
@@ -418,14 +419,33 @@
     cloudSyncTimer=setTimeout(()=>{cloudSyncTimer=null;void synchronizeCloudLibrary();},delay);
   }
   function noteCloudSyncFailure(error,context){
-    if(!activePersistenceContext(context))return;
+    if(!activePersistenceContext(context)||cloudSyncAuthBlocked)return;
     cloudSyncFailures++;
     if(error?.status===401){
       cloudSyncAuthBlocked=true;
       setSync("Sign in again to resume sync. Your on-device changes are retained.","warn");
       isSignUp=false;updateAuthMode();authEmail.value=currentUser.email||authEmail.value;authPin.value="";
+      pauseDialogsForAuth();
       showAuth();showMessage("Your session expired. Sign in again with the same account to sync your saved changes.","info");
     }
+  }
+  function pauseDialogsForAuth(){
+    for(const dialog of document.querySelectorAll('dialog[open]')){
+      if(dialog.id==='recovery-code-dialog'&&!document.getElementById('recovery-code-saved')?.checked)continue;
+      if(dialog.classList.contains('gallery-detail')||dialog.id==='title-lists-dialog'){
+        dialog._authPaused=true;authPausedDialogs.push({dialog,accountId:String(currentUser.id),scroll:dialog.scrollTop});
+      }
+      dialog.close();
+    }
+  }
+  function resumeDialogsAfterAuth(){
+    const paused=authPausedDialogs;authPausedDialogs=[];
+    for(const saved of paused){
+      saved.dialog._authPaused=false;
+      if(saved.accountId!==String(currentUser?.id||'')||!saved.dialog.isConnected)continue;
+      saved.dialog.showModal();saved.dialog.scrollTop=saved.scroll;
+    }
+    window.WatchLogGallery?.refreshCurrent?.();
   }
   function synchronizeCloudLibrary({manual=false}={}){
     if(cloudSyncInFlight)return cloudSyncInFlight;
@@ -640,7 +660,7 @@
     setTimeout(()=>{void refreshLibraryEpisodeMetadata({force:true});},0);
     try{await syncExistingBackgroundPush();}catch(error){console.warn("Background reminder sync skipped",error);}
     await refreshMaintenanceAdmin();
-    cloudSyncAuthBlocked=false;cloudSyncFailures=0;scheduleCloudSync(0);
+    cloudSyncAuthBlocked=false;cloudSyncFailures=0;resumeDialogsAfterAuth();scheduleCloudSync(0);
   }
 
   function mergePendingCache(cached,remoteItems,accountId=String(currentUser?.id||"")){
