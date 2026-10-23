@@ -87,7 +87,7 @@ jobs:
       - name: Stage runtime site
         run: |
           mkdir -p _site
-          cp index.html build-info.js library-gallery.js library-gallery.css manifest.webmanifest sw.js _site/
+          cp index.html build-info.js library-gallery.js library-gallery.css manifest.webmanifest sw.js asset-manifest.json _site/
           cp -R assets _site/
 
       - name: Upload site artifact

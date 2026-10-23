@@ -50,7 +50,16 @@ const server=http.createServer((req,res)=>{
     ]};
     if(body.action==='save'){
      if(failSave)return route.fulfill({status:503,headers,json:{error:'Offline'}});
-     items=body.items;revision++;saves++;data={ok:true,revision};
+     if(body.items)items=body.items;
+     else for(const change of body.changes||[]){
+      const index=items.findIndex(item=>String(item.id)===change.id);
+      if(change.delete){if(index>=0)items.splice(index,1);continue;}
+      if(change.create){items.push(change.create);continue;}
+      if(index<0)throw Error('Unknown title');
+      const item=items[index]={...items[index],...change.set};for(const key of change.unset||[])delete item[key];
+      for(const [season,delta] of Object.entries(change.watched||{})){item.watchedEpisodes={...item.watchedEpisodes};const values=new Set(item.watchedEpisodes[season]||[]);for(const ep of delta.remove)values.delete(ep);for(const ep of delta.add)values.add(ep);if(values.size)item.watchedEpisodes[season]=[...values].sort((a,b)=>a-b);else delete item.watchedEpisodes[season];}
+     }
+     revision++;saves++;data={ok:true,revision};
     }
     return route.fulfill({headers,json:data});
    }

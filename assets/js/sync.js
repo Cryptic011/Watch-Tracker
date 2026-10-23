@@ -255,10 +255,33 @@
   }
 
   let detectedSyncConflictCount=0;
+  function libraryChangeSet(before,after){
+    const previous=new Map((before||[]).map(item=>[String(item.id),item])),changes=[];
+    for(const item of after||[]){
+      const id=String(item.id),old=previous.get(id);previous.delete(id);
+      if(!old){changes.push({id,create:item});continue;}
+      const set={},unset=[],watched={};
+      for(const key of new Set([...Object.keys(old),...Object.keys(item)])){
+        if(key==="id"||sameSyncValue(old[key],item[key]))continue;
+        if(!(key in item)||item[key]===undefined){unset.push(key);continue;}
+        if(key==="watchedEpisodes"&&old.watchedEpisodes&&item.watchedEpisodes){
+          for(const season of new Set([...Object.keys(old.watchedEpisodes),...Object.keys(item.watchedEpisodes)])){
+            const prior=new Set(old.watchedEpisodes[season]||[]),next=new Set(item.watchedEpisodes[season]||[]);
+            const add=[...next].filter(episode=>!prior.has(episode)),remove=[...prior].filter(episode=>!next.has(episode));
+            if(add.length||remove.length)watched[season]={add,remove};
+          }
+        }else set[key]=item[key];
+      }
+      if(Object.keys(set).length||unset.length||Object.keys(watched).length)changes.push({id,set,unset,watched});
+    }
+    for(const id of previous.keys())changes.push({id,delete:true});
+    return changes;
+  }
+
   async function uploadCloudLibrary(snapshot){
     let outgoing=snapshot;
     for(let attempt=0;attempt<3;attempt++){
-      const requestBody=`{"action":"save","expectedRevision":${outgoing.expectedRevision},"items":${outgoing.json}}`;
+      const requestBody=JSON.stringify({action:"save",expectedRevision:outgoing.expectedRevision,changes:libraryChangeSet(outgoing.baseItems,outgoing.items)});
       try{
         const result=await pinApi("save",{},outgoing.token,requestBody);
         await acknowledgeCloudSnapshot(snapshot,outgoing,result);
@@ -536,6 +559,7 @@
     hideMessage();authScreen.classList.add("hidden");
     const original=Array.isArray(items)?items:[],migration=migratePlannedStatuses(original),cleanup=cleanLibraryRecords(migration.rows),cleaned=cleanup.items;
     mediaItems=cleaned;render();setSync(syncText,syncState);
+    if(typeof initAppNavigation==="function")initAppNavigation();
     const cleanupMessage=duplicateCleanupMessage(cleanup);if(cleanupMessage)showAppToast(cleanupMessage,"success",6000);
     if(migration.changed||cleanup.removedCount||cleanup.repairedCount||cleaned.length!==original.length)await persistLibrary(cleaned,{background:true,precleaned:true});
     setTimeout(()=>{void refreshLibraryEpisodeMetadata({force:true});},0);

@@ -95,3 +95,13 @@ earliest unwatched gap, and a six-second Undo reverses the latest action.
 Release reminders use “Watch Logger Reminder” with the title and timing in the
 body. Supporting installed apps show a reminder badge dot while unopened;
 private tests do not set a badge, and reopening the app clears it.
+
+## Granular sync, offline use and recovery
+
+`watchlog_pin_titles` is the canonical per-account, per-title store. Clients derive field and watched-episode changes from their acknowledged baseline; `watchlog_patch_library` locks the account revision, applies the batch atomically and returns only an acknowledgement. Revision conflicts still use the existing field/progress rebase and durable IndexedDB save queues. Legacy full-library clients are supported by the account endpoint. The original JSON snapshot is retained for rollback, and mirrored only during the two-function rollout; `watchlog_storage_config.canonical` disables that transitional mirror after verification. Reminder scans read canonical rows and use the same guarded writer for metadata.
+
+Recovery codes are optional and must be saved outside the app. Account & Sync requires the current PIN before issuing or replacing a code. Only a SHA-256 hash of a cryptographically random 128-bit code is stored. Recovery is rate limited through the account lockout, replaces the PIN and code, and revokes all existing sessions in one database transaction. The new code is shown once; plaintext codes and PINs are never written to browser storage. Recovery cannot replace a code that was never created or saved.
+
+The build creates `asset-manifest.json` and versions the service worker. Installation precaches the matching HTML, JavaScript, styles, icons and manifest as a complete shell before activation. API responses and deployment checks are never service-worker cached. On-device Library state remains in the account-scoped IndexedDB cache, including unsynced changes. `tests/browser/upgrade.cjs` checks offline reopen, edit, reopen and reconnect using mocked accounts in both browser engines.
+
+Navigation uses hash URLs so direct links work on GitHub Pages and offline. `navigation.js` owns browser history and view restoration; `features.js` owns Continue Watching, collections, recovery controls and offline readiness. Archived titles remain in the Library and retain their watch history and explicit reminder preferences. Custom lists are stored on their member titles.

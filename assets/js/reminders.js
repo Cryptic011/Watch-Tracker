@@ -45,7 +45,7 @@
     return navigator.serviceWorker.ready;
   }
   async function currentPushSubscription(){
-    if(pushSupportError()&&Notification.permission!=="granted")return null;
+    if(typeof Notification==="undefined"||(pushSupportError()&&Notification.permission!=="granted"))return null;
     try{return(await notificationWorker()).pushManager.getSubscription();}catch(_){return null;}
   }
   async function ensureBackgroundPush({askPermission=false}={}){
@@ -109,7 +109,7 @@
     return true;
   }
   async function syncExistingBackgroundPush(){
-    if(!cloudSessionToken||Notification.permission!=="granted")return refreshBackgroundReminderStatus();
+    if(!cloudSessionToken||typeof Notification==="undefined"||Notification.permission!=="granted")return refreshBackgroundReminderStatus();
     const subscription=await currentPushSubscription();
     if(subscription){
       await reminderApi("subscribe",{

@@ -141,14 +141,12 @@ window.WatchLogGallery=(()=>{
   async function loadTrackerArtwork(item){
     const section=dialog.querySelector('.gallery-season-list'),callbacks=api;
     if(!section)return;
-    paintTrackerArtwork(section,{
-      episodeImages:item.episodeImagesSource==='TVMaze'?item.episodeImages||{}:{},
-      seasonImages:item.seasonImagesSource==='TVMaze'?item.seasonImages||{}:{}
-    });
+    dialog._trackerArtwork={episodeImages:item.episodeImagesSource==='TVMaze'?item.episodeImages||{}:{},seasonImages:item.seasonImagesSource==='TVMaze'?item.seasonImages||{}:{}};
+    paintTrackerArtwork(section,dialog._trackerArtwork);
     if(!callbacks.trackerArtwork)return;
     try{
       const artwork=await callbacks.trackerArtwork(item);
-      if(section===dialog.querySelector('.gallery-season-list')&&dialog.dataset.item===String(item.id))paintTrackerArtwork(section,artwork);
+      if(section===dialog.querySelector('.gallery-season-list')&&dialog.dataset.item===String(item.id)){dialog._trackerArtwork=artwork;paintTrackerArtwork(section,artwork);}
     }catch(_){}
   }
   function episodeRow(item,season,episode,watched){
@@ -167,8 +165,16 @@ window.WatchLogGallery=(()=>{
       <summary><span class="gallery-season-poster" data-gallery-season-art="${season}"><span class="gallery-artwork-placeholder">S${season}</span></span>
         <span class="gallery-season-label"><strong>Season ${season} <span class="gallery-season-chevron" aria-hidden="true">›</span></strong><small>${watchedCount} of ${episodes.length} episodes watched</small></span>
         <button type="button" class="gallery-season-state" data-gallery-season="${season}" aria-pressed="${complete}" aria-label="Mark all Season ${season} episodes ${complete?'unwatched':'watched'}"><span class="gallery-season-check" aria-hidden="true">${complete?'✓':''}</span></button>
-      </summary><div class="gallery-season-episodes">${episodes.map(episode=>episodeRow(item,season,episode,done)).join('')}</div>
+      </summary><div class="gallery-season-episodes" data-season-loaded="false"></div>
     </details>`;
+  }
+  function populateSeason(node,item,releases,watched){
+    const container=node.querySelector('.gallery-season-episodes');
+    if(!container||container.dataset.seasonLoaded==='true')return;
+    const season=Number(node.dataset.season),done=new Set(watched[season]||[]);
+    container.innerHTML=(releases[season]||[]).map(episode=>episodeRow(item,season,episode,done)).join('');
+    container.dataset.seasonLoaded='true';
+    paintTrackerArtwork(node,dialog._trackerArtwork||{});
   }
   async function changeProgress(item,button,save){
     const section=dialog.querySelector('.gallery-season-list'),expanded=[...dialog.querySelectorAll('.gallery-season[open]')].map(node=>node.dataset.season),scrollTop=dialog.scrollTop;
@@ -179,7 +185,7 @@ window.WatchLogGallery=(()=>{
       const fresh=api.items().find(row=>String(row.id)===String(item.id));
       if(fresh&&dialog.open&&section===dialog.querySelector('.gallery-season-list')&&dialog.dataset.item===String(item.id)){
         detail(fresh);
-        for(const node of dialog.querySelectorAll('.gallery-season'))node.open=expanded.includes(node.dataset.season);
+        for(const node of dialog.querySelectorAll('.gallery-season')){node.open=expanded.includes(node.dataset.season);if(node.open)dialog._populateSeason(node);}
         dialog.scrollTop=scrollTop;
         (dialog.querySelector(selector)||dialog.querySelector('[data-gallery-view="watch"]'))?.focus({preventScroll:true});
       }
@@ -208,11 +214,18 @@ window.WatchLogGallery=(()=>{
       target.querySelector('button').onclick=()=>loadTitleDetails(item);
     }
   }
+  function closeDetail(){
+    const notes=dialog?.querySelector('[data-gallery-notes-field]'),item=api?.items?.().find(row=>String(row.id)===dialog?.dataset.item);
+    if(notes&&notes.value.trim()!==String(item?.notes||'').trim()&&!confirm('Discard unsaved notes?'))return false;
+    dialog?.close();return true;
+  }
   function detail(item){
     if(!dialog){
       dialog=document.createElement('dialog');dialog.className='gallery-detail';dialog.setAttribute('aria-label','Title details');document.body.append(dialog);
-      dialog.addEventListener('click',event=>{if(event.target===dialog||event.target.closest('[data-gallery-close]'))dialog.close();});
-      dialog.addEventListener('close',()=>{const target=returnFocus?.isConnected?returnFocus:host?.querySelector(`[data-gallery-item="${CSS.escape(dialog.dataset.item||'')}"]`);target?.focus({preventScroll:true});});
+      dialog.addEventListener('click',event=>{if(event.target===dialog||event.target.closest('[data-gallery-close]'))closeDetail();});
+      dialog.addEventListener('scroll',()=>{if(typeof saveNavigationPosition==='function')saveNavigationPosition();},{passive:true});
+      dialog.addEventListener('cancel',event=>{event.preventDefault();closeDetail();});
+      dialog.addEventListener('close',()=>{if(typeof applyPendingAppUpdate==='function')setTimeout(applyPendingAppUpdate,0);window.WatchLogNavigation?.titleClosed?.();const target=returnFocus?.isConnected?returnFocus:host?.querySelector(`[data-gallery-item="${CSS.escape(dialog.dataset.item||'')}"]`);target?.focus({preventScroll:true});});
     }
     dialog.dataset.item=String(item.id);
     const show=!isFilm(item),last=api.last(item);
@@ -239,7 +252,7 @@ window.WatchLogGallery=(()=>{
         <div class="gallery-detail-copy" data-gallery-watch-summary><strong>${esc(item.status||'Planned')}</strong><p>Watched to - ${esc(watchedTo)}</p><p>Watched on: ${esc(item.platform||'Not specified')}</p></div>
       </section>
       <section id="gallery-info-panel" class="gallery-info-panel hidden" role="tabpanel" aria-labelledby="gallery-info-tab" data-gallery-panel="details"><div data-gallery-details aria-live="polite">Loading details…</div></section>
-      <div class="gallery-action-menu hidden" data-gallery-action-menu><button type="button" data-gallery-edit-menu>Edit show or film</button><button type="button" data-gallery-notes>Notes</button><button type="button" class="danger" data-gallery-delete>Delete show or film</button></div>
+      <div class="gallery-action-menu hidden" data-gallery-action-menu><button type="button" data-gallery-edit-menu>Edit show or film</button><button type="button" data-gallery-notes>Notes</button><button type="button" data-gallery-favourite>${item.favorite?'Remove favourite':'Add to favourites'}</button><button type="button" data-gallery-lists>Custom lists</button><button type="button" data-gallery-archive>${item.archived?'Unarchive':'Archive'}</button><button type="button" class="danger" data-gallery-delete>Delete show or film</button></div>
       </div>`;
     dialog.querySelector('[data-gallery-edit-menu]').onclick=()=>{dialog.close();api.edit(item.id);};
     const menu=dialog.querySelector('[data-gallery-action-menu]'),notes=dialog.querySelector('[data-gallery-notes-field]'),saveNotes=dialog.querySelector('[data-gallery-save-notes]');
@@ -286,44 +299,53 @@ window.WatchLogGallery=(()=>{
       const candidate=api.next?.(current);if(!candidate){detail(current);return;}
       return changeProgress(current,watchNext,()=>api.toggleEpisode?.(current.id,candidate.season,candidate.episode));
     };
-    dialog.querySelectorAll('[data-gallery-toggle-episode]').forEach(button=>{button.onclick=()=>{
-      const [season,episode]=button.dataset.galleryToggleEpisode.split(':').map(Number);
-      return changeProgress(item,button,()=>api.toggleEpisode?.(item.id,season,episode));
-    };});
-    dialog.querySelectorAll('[data-gallery-season]').forEach(button=>{button.onclick=event=>{
+    dialog._populateSeason=node=>populateSeason(node,item,releases,watched);
+    for(const node of dialog.querySelectorAll('.gallery-season'))node.addEventListener('toggle',()=>{if(node.open)dialog._populateSeason(node);});
+    dialog.onclick=event=>{
+      const button=event.target.closest('[data-gallery-toggle-episode],[data-gallery-season]');if(!button)return;
       event.preventDefault();event.stopPropagation();
+      if(button.disabled)return;
+      if(button.hasAttribute('data-gallery-toggle-episode')){
+        const [season,episode]=button.dataset.galleryToggleEpisode.split(':').map(Number);
+        return changeProgress(item,button,()=>api.toggleEpisode?.(item.id,season,episode));
+      }
       return changeProgress(item,button,()=>api.toggleSeason?.(item.id,Number(button.dataset.gallerySeason)));
-    };});
+    };
+    for(const [selector,field,on,off] of [['[data-gallery-favourite]','favorite','Remove favourite','Add to favourites'],['[data-gallery-archive]','archived','Unarchive','Archive']]){
+      const button=dialog.querySelector(selector);
+      button.onclick=async()=>{const current=api.items().find(row=>String(row.id)===String(item.id));if(!current)return;button.disabled=true;const value=!current[field];try{if(await api.organise?.(item.id,{[field]:value}))button.textContent=value?on:off;}finally{button.disabled=false;}};
+    }
+    dialog.querySelector('[data-gallery-lists]').onclick=()=>api.lists?.(item.id);
     observe(dialog,[item]);if(!dialog.open)dialog.showModal();void loadTrackerArtwork(item);void loadTitleDetails(item);
   }
   function open(id,trigger=document.activeElement){
     const item=api?.items?.().find(row=>String(row.id)===String(id));
     if(!item)return false;
-    returnFocus=trigger;detail(item);return true;
+    window.WatchLogNavigation?.beforeTitle?.();returnFocus=trigger;detail(item);window.WatchLogNavigation?.titleOpened?.();return true;
   }
   function back(){
-    if(dialog?.open){dialog.close();return true;}
-    if(category){category='';api?.render?.();return true;}
+    if(dialog?.open){closeDetail();return true;}
+    if(category){if(window.WatchLogNavigation?.back?.())return true;category='';api?.render?.();api?.navigate?.();return true;}
     return false;
   }
   function mount(element,rows,callbacks){
-    host=element;api=callbacks;observer?.disconnect();host.classList.add('gallery-active');
+    host=element;api=callbacks;rows=api.includes?rows.filter(api.includes):rows;observer?.disconnect();host.classList.add('gallery-active');
     if(!host._galleryEvents){host._galleryEvents=true;host.addEventListener('click',event=>{
       const manage=event.target.closest('[data-gallery-manage]');
       if(manage){api.manage?.(JSON.parse(manage.dataset.galleryManageIds||'[]'),manage.dataset.galleryManage);return;}
-      const cat=event.target.closest('[data-gallery-category]');if(cat){category=cat.dataset.galleryCategory;api.render();host.querySelector('.gallery-back')?.focus();return;}
-      if(event.target.closest('[data-gallery-back]')){category='';api.render();host.querySelector('.gallery-category')?.focus();return;}
+      const cat=event.target.closest('[data-gallery-category]');if(cat){if(typeof saveNavigationPosition==='function')saveNavigationPosition();category=cat.dataset.galleryCategory;api.render();api.navigate?.();host.querySelector('.gallery-back')?.focus();return;}
+      if(event.target.closest('[data-gallery-back]')){if(typeof saveNavigationPosition==='function')saveNavigationPosition();category='';api.render();api.navigate?.();host.querySelector('.gallery-category')?.focus();return;}
       const target=event.target.closest('[data-gallery-item]');if(target)open(target.dataset.galleryItem,target);
     });}
     let markup;
     if(!category){markup=`<div class="gallery-home">${[['Film','Movies','▤'],['Series','Series','▣']].map(([type,label,icon])=>{
       const items=rows.filter(item=>type==='Film'?isFilm(item):!isFilm(item));return `<button type="button" class="gallery-category" data-gallery-category="${type}"><span class="gallery-category-icon" aria-hidden="true">${icon}</span><span><strong>${label}</strong><small>${items.length} title${items.length===1?'':'s'}</small></span><span class="gallery-fan" aria-hidden="true">${items.slice(0,3).map(item=>art(item)).join('')}</span></button>`;
     }).join('')}</div><p class="gallery-caption">${rows.length} titles in this view</p>`;}
-    else{const items=rows.filter(item=>category==='Film'?isFilm(item):!isFilm(item)),tracked=api.items().filter(item=>category==='Film'?isFilm(item):!isFilm(item)),parts=sections(items,api.upcoming);
+    else{const items=rows.filter(item=>category==='Film'?isFilm(item):!isFilm(item)),tracked=api.items().filter(item=>(category==='Film'?isFilm(item):!isFilm(item))&&(!api.includes||api.includes(item))),parts=sections(items,api.upcoming);
       const content=api.filter==='Watched'?releaseGroups(items).map(group=>section(group.year,group.rows)).join(''):section('Upcoming',parts.future,true)+section('Released',parts.released)+section('Date unknown',parts.remaining);
       markup=`<div class="gallery-nav"><button type="button" class="gallery-back" data-gallery-back aria-label="Back to Library">‹</button><h2>${category==='Film'?'Movies':'Series'}</h2><span class="gallery-heading-actions"><span class="gallery-count" data-gallery-total-count aria-label="${tracked.length} tracked ${category==='Film'?'films':'series'}">${tracked.length}</span>${manageButton(tracked,category==='Film'?'Movies':'Series')}</span></div>${content}${items.length?'':'<p class="gallery-empty">No titles match your search or filter.</p>'}`;}
     if(host._galleryMarkup!==markup){host.innerHTML=markup;host._galleryMarkup=markup;}
     observe(host,rows);
   }
-  return {mount,open,sections,releaseGroups,back,hasCategory:()=>Boolean(category)};
+  return {mount,open,sections,releaseGroups,back,getCategory:()=>category,setCategory:value=>{category=['Film','Series'].includes(value)?value:'';},hasCategory:()=>Boolean(category)};
 })();

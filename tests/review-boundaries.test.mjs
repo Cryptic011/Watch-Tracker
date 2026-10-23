@@ -69,10 +69,15 @@ function workerHarness(episodes,options={}){
   }
   const context=vm.createContext({console,AbortSignal,Date:class extends Date{static now(){return clock;}},
     fetch:async()=>{calls++;if(options.fail)throw Error("offline");if(options.conflict)library={...library,revision:library.revision+1,items:[]};return{ok:true,json:async()=>episodes};},
-    db:{from:()=>({select:()=>query(),update:payload=>query(payload)})},
+    db:{from:()=>({select:()=>query(),update:payload=>query(payload)}),rpc:async(name,args)=>{
+      if(name==='watchlog_read_libraries')return {data:[copy(library)]};
+      if(args.p_revision!==library.revision)return {data:{ok:false,code:'revision_conflict'}};
+      library={...library,revision:library.revision+1,items:library.items.map(item=>{const change=args.p_changes.find(change=>change.id===item.id);return change?{...item,...copy(change.set)}:item;})};
+      return {data:{ok:true,revision:library.revision}};
+    }},
     claimDelivery:async(_sub,_account,_id,key)=>{if(claimed.has(key))return null;claimed.add(key);return{id:key};},
     sendPush:async(_sub,_config,payload)=>deliveries.push(payload),finishDelivery:async()=>{},sha256:async value=>value});
-  const asyncNames=["refreshServerEpisodeSchedules","processPlannedReminders"];
+  const asyncNames=["readLibraries","refreshServerEpisodeSchedules","processPlannedReminders"];
   const names=["episodeUtcValue","episodeReleaseTime","buildServerEpisodeSchedule","zonedLocalToUtc","scheduledEventTime","serverScheduleRefreshDue",...asyncNames,"plannedEvent","reminderEvents","reminderCopy"];
   vm.runInContext("const EPISODE_SCHEDULE_REFRESH_MS=21600000;\n"+names.map(name=>(asyncNames.includes(name)?"async ":"")+extractFunction(backend,name)).join("\n"),context);
   return{context,deliveries,setTime:value=>clock=Date.parse(value),setStatus:value=>library.items[0].status=value,getLibrary:()=>library,getCalls:()=>calls,

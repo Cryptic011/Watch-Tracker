@@ -46,9 +46,14 @@
     swipeComplete=true;globalSwipeHandledAt=now;
     if(event.cancelable)event.preventDefault();
     const openDialog=document.querySelector("dialog[open]");
-    if(openDialog){openDialog.close();return;}
+    if(openDialog){
+      if(openDialog.classList?.contains?.("gallery-detail")){window.WatchLogGallery?.back?.();return;}
+      if(openDialog.id==="recovery-code-dialog"&&!document.getElementById("recovery-code-saved")?.checked){showAppToast("Save your recovery code before closing.","warn");return;}
+      openDialog.close();return;
+    }
     if(!episodeTrackerModal.classList.contains("hidden")){closeEpisodeTrackerSheet();return;}
     if(!modal.classList.contains("hidden")){closeEditor();return;}
+    if(window.WatchLogNavigation?.back?.())return;
     if(currentTab!=="library"){switchTab("library");return;}
     window.WatchLogGallery?.back?.();
   }
@@ -108,6 +113,8 @@
       localSaveInFlight || cloudSaveInFlight || queuedLocalSnapshot || queuedCloudSnapshot ||
       (latestLocalSnapshot && activePersistenceContext(latestLocalSnapshot) &&
         latestLocalSnapshot.json!==lastLocalLibraryJSON && latestLocalSnapshot.json!==lastCloudLibraryJSON) ||
+      document.querySelector?.('dialog[data-block-refresh][open]') ||
+      document.querySelector?.('.gallery-detail[open] .gallery-notes-editor:not(.hidden)') ||
       document.getElementById("save-btn")?.disabled ||
       !document.getElementById("modal")?.classList.contains("hidden") ||
       document.getElementById("episode-tracker-modal")?.classList?.contains("hidden")===false
@@ -508,16 +515,20 @@
     const panels=[...document.querySelectorAll("#settings-view [data-settings-panel]")];
     const selected=panels.find(panel=>panel.dataset.settingsPanel===category);
     if(!selected)return;
+    if(typeof saveNavigationPosition==="function")saveNavigationPosition();
     if(category==="maintenance"&&selected.dataset.authorized!=="true")return;
     menu?.classList.add("hidden");quick?.classList.add("hidden");heading?.classList.add("hidden");
     panels.forEach(panel=>panel.classList.toggle("hidden",panel!==selected));
+    if(typeof recordAppNavigation==="function")recordAppNavigation();
     window.scrollTo?.({top:0,behavior:"auto"});
   }
   function showSettingsMenu(){
+    if(typeof saveNavigationPosition==="function")saveNavigationPosition();
     document.querySelectorAll("#settings-view [data-settings-panel]").forEach(panel=>panel.classList.add("hidden"));
     document.getElementById("settings-category-menu")?.classList.remove("hidden");
     document.querySelector(".settings-quick-actions")?.classList.remove("hidden");
     document.querySelector("#settings-view .preferences-heading")?.classList.remove("hidden");
+    if(typeof recordAppNavigation==="function")recordAppNavigation();
     window.scrollTo?.({top:0,behavior:"auto"});
   }
   document.querySelectorAll("#settings-view [data-settings-open]").forEach(button=>button.addEventListener("click",()=>showSettingsCategory(button.dataset.settingsOpen)));

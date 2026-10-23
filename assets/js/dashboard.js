@@ -232,6 +232,7 @@ function renderWatchStatistics(){
 }
 
 function renderDashboard(){
+  if(typeof renderLibraryFeatures==="function")renderLibraryFeatures();
   renderRecurringWeeklySchedule();
   const root=document.getElementById('library-dashboard');if(!root)return;
   renderWatchStatistics();

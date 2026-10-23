@@ -16,7 +16,8 @@ test("PWA and iOS home screen use the supplied Watch Logger icon", () => {
   const touchIcon = fs.readFileSync(path.join(root, "assets/img/apple-touch-icon.png"));
   assert.match(html, /apple-touch-icon[^>]+apple-touch-icon\.png\?v=1/);
   assert.match(html, /rel="icon"[^>]+app-icon\.png\?v=3/);
-  assert.equal(manifest.icons[0].src, "/Watched-Tracker/assets/img/app-icon.png?v=3");
+  assert.equal(new URL(manifest.icons[0].src,"https://example.test/Watched-Tracker/manifest.webmanifest").pathname,"/Watched-Tracker/assets/img/app-icon.png");
+  assert.equal(new URL(manifest.start_url,"https://example.test/manifest.webmanifest").pathname,"/");
   assert.equal(manifest.icons[0].purpose, "any");
   assert.deepEqual([appIcon.readUInt32BE(16), appIcon.readUInt32BE(20)], [512, 512]);
   assert.deepEqual([touchIcon.readUInt32BE(16), touchIcon.readUInt32BE(20)], [180, 180]);
@@ -339,7 +340,7 @@ test("TVMaze release timestamps are stored in UTC", () => {
 test("Reminder backend refreshes schedules before scanning and uses revision checks", () => {
   const source=fs.readFileSync(path.join(root,"supabase/functions/watchlog-reminders/index.ts"),"utf8");
   assert.match(source,/refreshServerEpisodeSchedules\(libraryRows \|\| \[\], Date\.now\(\)\)/);
-  assert.match(source,/\.eq\("revision", revision\)/);
+  assert.match(source,/p_revision:revision/);
   assert.match(source,/nextEpisodeDate: episodeUtcValue\(next\)/);
   assert.match(source,/releasedEpisodes,/);
 });
@@ -373,14 +374,14 @@ test("HTML ids are unique and Pages uploads only runtime files", () => {
   assert.match(workflow, /uses: actions\/upload-pages-artifact@v5/);
   assert.match(workflow, /uses: actions\/deploy-pages@v5/);
   assert.match(workflow, /path: _site/);
-  assert.match(workflow, /cp index\.html build-info\.js library-gallery\.js library-gallery\.css manifest\.webmanifest sw\.js _site\//);
+  assert.match(workflow, /cp index\.html build-info\.js library-gallery\.js library-gallery\.css manifest\.webmanifest sw\.js asset-manifest\.json _site\//);
 });
 
 test("Backend requires revisions and provides an owned catalogue gateway", () => {
   const source = fs.readFileSync(path.join(root, "supabase/functions/watchlog-pin/index.ts"), "utf8");
   assert.match(source, /action === "catalog_search"/);
-  assert.match(source, /code: "revision_conflict"/);
-  assert.match(source, /\.eq\("revision", expectedRevision\)/);
+  assert.match(source, /code:\s*"revision_conflict"/);
+  assert.match(source, /p_revision:body\.expectedRevision/);
   assert.match(source, /watchlog_record_pin_failure/);
   const migration = fs.readFileSync(path.join(root, "supabase/migrations/20260904000200_harden_watchlog_sync.sql"), "utf8");
   assert.match(migration, /add column if not exists revision bigint/);

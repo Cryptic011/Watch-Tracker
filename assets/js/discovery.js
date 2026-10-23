@@ -74,6 +74,7 @@
     discoveryQuery=query;discoveryError=false;
     if(!currentUser||query.length<2){discoveryRows=[];discoveryLoading=false;renderTitleSearch();return;}
     const controller=new AbortController();discoveryController=controller;discoveryLoading=true;renderTitleSearch();
+    if(typeof recordAppNavigation==="function")recordAppNavigation();
     const isCurrent=()=>request===discoveryRequest&&currentTab==="search"&&String(currentUser?.id||"")===owner&&discoveryInput.value.trim()===query;
     try{
       const rows=await searchAllTitles(query,{signal:controller.signal,isCurrent,onProgress:partial=>{
@@ -165,7 +166,7 @@
   $("discovery-retry").onclick=()=>void runTitleSearch();
   document.querySelectorAll("[data-browse-format]").forEach(button=>button.onclick=()=>{discoveryFilter=button.dataset.browseFormat;renderTitleSearch();discoveryInput.placeholder=discoveryFilter==="Film"?"Search movies":"Search series";discoveryInput.focus();});
   $("discovery-manual").onclick=()=>{if(!currentUser)return;openAdd();titleInput.value=discoveryInput.value.trim();titleInput.focus();};
-  document.querySelectorAll("[data-discovery-filter]").forEach(button=>button.onclick=()=>{discoveryFilter=button.dataset.discoveryFilter;renderTitleSearch();});
+  document.querySelectorAll("[data-discovery-filter]").forEach(button=>button.onclick=()=>{discoveryFilter=button.dataset.discoveryFilter;renderTitleSearch();if(typeof recordAppNavigation==="function")recordAppNavigation();});
   discoveryResults.addEventListener("click",event=>{
     const add=event.target.closest("[data-discovery-add]");if(add){addDiscoveryTitle(discoveryRows[Number(add.dataset.discoveryAdd)]);return;}
     const open=event.target.closest("[data-discovery-open]");if(open)showDiscoveryDetail(discoveryRows[Number(open.dataset.discoveryOpen)],open);
