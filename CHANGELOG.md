@@ -1,3 +1,9 @@
+## 2026-10-23 — Add neon-green status and a 24-hour episode grace period
+- Show a neon-green dot when up to date, including newly aired episodes during their first 24 elapsed hours.
+- Only count unwatched episodes as behind after the grace period expires; retain amber for one or two older episodes and red for more than two.
+- Keep existing overdue episodes counted when a new episode arrives, and leave films and unverified schedules unmarked.
+- Update markers at exact release/grace boundaries, including shows without a recurring slot, and keep markers free of visible counts.
+
 ## 2026-10-23 — Add colour-only catch-up markers to scheduled shows
 - Add a small amber dot for one or two released episodes behind and a red dot for more than two, beside show titles in both schedules and release-history/TBA rows.
 - Show no dot when caught up, exclude films and unreleased episodes, and update markers when watch progress changes.

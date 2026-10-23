@@ -10,7 +10,7 @@ const helper=suite.slice(suite.indexOf('function extractFunction'),suite.indexOf
 const {extractFunction}=new Function('html','assert','vm',helper+'\nreturn {extractFunction};')(html,assert,vm);
 function app(){
  const c=vm.createContext({Date,console});
- vm.runInContext(['toMillis','isEpisodeTrackable','normalizeReleasedEpisodeMap','positiveEpisodeMap','releasedEpisodeMap','normalizeWatchedEpisodeMap','legacyWatchedEpisodeMap','watchedEpisodeMap','nextWatchEpisode','calendarRange','calendarEvents','localISODate','weeklyReleasePattern','recurringWeeklyShows','scheduleBehindLevel','scheduleProgressMarker'].map(n=>extractFunction(html,n)).join('\n'),c);return c;
+ vm.runInContext(['toMillis','isEpisodeTrackable','normalizeReleasedEpisodeMap','positiveEpisodeMap','releasedEpisodeMap','normalizeWatchedEpisodeMap','legacyWatchedEpisodeMap','watchedEpisodeMap','nextWatchEpisode','calendarRange','calendarEvents','localISODate','weeklyReleasePattern','recurringWeeklyShows','scheduleEpisodeAirTimes','recurringScheduleDelay','scheduleBehindLevel','scheduleProgressMarker'].map(n=>extractFunction(html,n)).join('\n'),c);return c;
 }
 test('Schedule dots use amber for one or two released episodes behind and red for more than two',()=>{
  const c=app(),released={1:[1,2,3],2:[1,3]},all=Object.entries(released).flatMap(([season,episodes])=>episodes.map(episode=>[season,episode]));
@@ -19,14 +19,14 @@ test('Schedule dots use amber for one or two released episodes behind and red fo
   for(const [season,episode] of all.slice(0,all.length-behind))(watched[season]||=[]).push(episode);
   const item={id:'show',type:'Series',status:'Watched',episodeScheduleVerified:true,releasedEpisodes:released,watchedEpisodes:watched};
   const before=JSON.stringify(item);
-  assert.equal(c.scheduleBehindLevel(item),behind>2?'red':behind?'amber':'');
+  assert.equal(c.scheduleBehindLevel(item),behind>2?'red':behind?'amber':'green');
   assert.equal(JSON.stringify(item),before,'calculating the marker never changes saved progress');
  }
 });
 
 test('Schedule dots ignore films, unknown schedules and unreleased episode totals',()=>{
  const c=app(),item={id:'anime',type:'Anime',episodeScheduleVerified:true,releasedEpisodes:{1:[1,3]},episodeCounts:{1:20},watchedEpisodes:{1:[1,3]}};
- assert.equal(c.scheduleBehindLevel(item),'');
+ assert.equal(c.scheduleBehindLevel(item),'green');
  assert.equal(c.scheduleBehindLevel({...item,watchedEpisodes:{1:[1]}}),'amber');
  assert.equal(c.scheduleBehindLevel({...item,type:'Film',watchedEpisodes:{}}),'');
  assert.equal(c.scheduleBehindLevel({id:'unknown',type:'Series',episodeCounts:{1:20}}),'');
@@ -40,8 +40,53 @@ test('Schedule markers contain no visible count and reuse results for repeated s
  assert.equal(c.scheduleProgressMarker({id:'show'},cache),marker);assert.equal(calls,1);
  assert.ok(marker.includes('data-behind-level="red"')&&marker.includes('role="img"')&&marker.includes('aria-label='));
  assert.ok(marker.endsWith('></span>'),'the dot has no visible text or number');
- c.scheduleBehindLevel=()=>'';
- assert.equal(c.scheduleProgressMarker({id:'caught-up'}),'');
+ c.scheduleBehindLevel=()=>'green';
+ assert.ok(c.scheduleProgressMarker({id:'caught-up'}).includes('aria-label="Up to date"'));
+});
+
+test('New episodes remain green until exactly 24 elapsed hours after airing',()=>{
+ const c=app(),air=new Date('2026-10-23T12:00:00Z').getTime();
+ const episode={season:2,number:5,raw:new Date(air).toISOString()};
+ for(const metadata of [
+  {scheduledEpisodeReleases:[episode]},
+  {recurringWeeklySchedule:{episodes:[episode]}},
+  {airingSeason:2,latestEpisodeNum:5,latestEpisodeDate:episode.raw}
+ ]){
+  const item={type:'Series',episodeScheduleVerified:true,releasedEpisodes:{2:[5]},watchedEpisodes:{},...metadata};
+  assert.equal(c.scheduleBehindLevel(item,new Date(air-1)),'green');
+  assert.equal(c.scheduleBehindLevel(item,new Date(air+86400000-1)),'green');
+  assert.equal(c.scheduleBehindLevel(item,new Date(air+86400000)),'amber');
+  assert.equal(c.scheduleBehindLevel(item,new Date(air+86400000+1)),'amber');
+ }
+});
+
+test('Grace never hides an older backlog and expires for all episodes in a batch',()=>{
+ const c=app(),air=new Date('2026-10-23T12:00:00Z').getTime();
+ const scheduled=[1,2,3].map(number=>({season:2,number,raw:new Date(air).toISOString()}));
+ const item={type:'Anime',episodeScheduleVerified:true,releasedEpisodes:{1:[1],2:[1,2,3]},watchedEpisodes:{1:[1]},scheduledEpisodeReleases:scheduled};
+ assert.equal(c.scheduleBehindLevel(item,new Date(air+3600000)),'green');
+ assert.equal(c.scheduleBehindLevel(item,new Date(air+86400000)),'red');
+ assert.equal(c.scheduleBehindLevel({...item,watchedEpisodes:{}},new Date(air+3600000)),'amber');
+ assert.equal(c.scheduleBehindLevel({...item,releasedEpisodes:{1:[1,2,3],2:[1,2,3]},watchedEpisodes:{}},new Date(air+3600000)),'red');
+});
+
+test('Date-only releases use local noon and daylight-saving changes do not shorten the 24-hour grace',()=>{
+ const c=app(),item={type:'Series',episodeScheduleVerified:true,releasedEpisodes:{1:[1]},watchedEpisodes:{},scheduledEpisodeReleases:[{season:1,number:1,raw:'2026-10-23'}]};
+ const noon=new Date(2026,9,23,12).getTime();
+ assert.equal(c.scheduleBehindLevel(item,new Date(noon+86400000-1)),'green');
+ assert.equal(c.scheduleBehindLevel(item,new Date(noon+86400000)),'amber');
+ item.scheduledEpisodeReleases[0].raw='2026-10-24T20:00:00+01:00';
+ const air=Date.parse(item.scheduledEpisodeReleases[0].raw);
+ assert.equal(c.scheduleBehindLevel(item,new Date(air+86400000-1)),'green');
+ assert.equal(c.scheduleBehindLevel(item,new Date(air+86400000)),'amber');
+ item.scheduledEpisodeReleases[0].raw='not a date';
+ assert.equal(c.scheduleBehindLevel(item,new Date(air)),'amber','missing air times cannot invent a grace period');
+});
+
+test('Marker expiry wakes the schedule even when the show has no selected recurring release',()=>{
+ const c=app(),now=new Date(2026,9,23,12);
+ const item={type:'Series',episodeScheduleVerified:true,releasedEpisodes:{1:[1]},scheduledEpisodeReleases:[{season:1,number:1,raw:new Date(now.getTime()-23*3600000).toISOString()}]};
+ assert.equal(c.recurringScheduleDelay([],now,[item]),3600000);
 });
 
 test('Recurring shows retain an aired episode for exactly 24 hours then advance to the next confirmed episode',()=>{

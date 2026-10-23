@@ -64,10 +64,12 @@
     "number": 224
   },
   "__current": {
-    "title": "Add colour-only catch-up markers to scheduled shows",
+    "title": "Add neon-green status with a 24-hour episode grace period",
     "changes": [
+      "Use neon green when up to date, keeping newly aired episodes green for their first 24 hours before they count as behind.",
+      "After the grace period, show amber for one or two overdue episodes or red for more than two; keep all markers colour-only.",
       "Show a small amber dot when one or two released episodes behind, or a red dot when more than two behind, beside scheduled show titles.",
-      "Keep markers colour-only with no visible count; remove them when caught up and ignore films and unreleased episodes.",
+      "Keep markers colour-only with no visible count, using neon green when caught up and ignoring films and unverified schedules.",
       "Calculate timeline keys once per title, avoid rebuilding hidden Library content, and reuse episode progress maps in statistics.",
       "Apply whole-season watch changes once while preserving episode history, rollback and other-season progress.",
       "Retain unchanged posters and search controls, update film descriptions in place, and avoid repeated missing-poster requests.",

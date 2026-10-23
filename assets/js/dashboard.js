@@ -10,21 +10,44 @@ function nextWatchEpisode(item,releases=releasedEpisodeMap(item),watched=watched
   return null;
 }
 
-function scheduleBehindLevel(item){
+function scheduleEpisodeAirTimes(item,releases=releasedEpisodeMap(item)){
+  const times=new Map(),latestSeason=Number(item.airingSeason)||Math.max(0,...Object.keys(releases).map(Number));
+  const rows=[
+    {season:latestSeason,number:item.latestEpisodeNum,raw:item.latestEpisodeDate},
+    ...(Array.isArray(item.recurringWeeklySchedule?.episodes)?item.recurringWeeklySchedule.episodes:[]),
+    ...(Array.isArray(item.scheduledEpisodeReleases)?item.scheduledEpisodeReleases:[])
+  ];
+  for(const row of rows){
+    const season=Number(row?.season),episode=Number(row?.number),raw=typeof row?.raw==="string"?row.raw:"";
+    if(!Number.isInteger(season)||season<1||!Number.isInteger(episode)||episode<1||!raw)continue;
+    const time=new Date(/^\d{4}-\d{2}-\d{2}$/.test(raw)?raw+"T12:00:00":raw).getTime();
+    if(Number.isFinite(time))times.set(season+":"+episode,time);
+  }
+  return times;
+}
+
+function scheduleBehindLevel(item,now=new Date()){
   if(!isEpisodeTrackable(item))return "";
   const releases=releasedEpisodeMap(item),watched=watchedEpisodeMap(item,releases);
+  if(item.episodeScheduleVerified!==true&&!Object.keys(releases).length)return "";
+  const times=scheduleEpisodeAirTimes(item,releases);
   let behind=0;
   for(const [season,episodes] of Object.entries(releases)){
     const seen=new Set(watched[season]||[]);
-    for(const episode of episodes)if(!seen.has(episode)&&++behind>2)return "red";
+    for(const episode of episodes){
+      if(seen.has(episode))continue;
+      const airTime=times.get(season+":"+episode);
+      if(airTime!==undefined&&airTime+86400000>now.getTime())continue;
+      if(++behind>2)return "red";
+    }
   }
-  return behind?"amber":"";
+  return behind?"amber":"green";
 }
 
 function scheduleProgressMarker(item,markers=new Map()){
   if(markers.has(item.id))return markers.get(item.id);
   const level=scheduleBehindLevel(item);
-  const marker=level?`<span class="release-progress-dot" data-behind-level="${level}" role="img" aria-label="${level==="red"?"More than two released episodes behind":"One or two released episodes behind"}"></span>`:"";
+  const marker=level?`<span class="release-progress-dot" data-behind-level="${level}" role="img" aria-label="${level==="green"?"Up to date":level==="red"?"More than two released episodes behind":"One or two released episodes behind"}"></span>`:"";
   markers.set(item.id,marker);return marker;
 }
 
@@ -174,7 +197,7 @@ function renderRecurringWeeklySchedule(){
   }).join("");
   updateDashboardMarkup(root,`<details class="dashboard-section weekly-releases recurring-weekly-releases" data-dashboard-section="recurring" aria-labelledby="recurring-weekly-title"><summary class="weekly-releases-heading"><div class="recurring-summary-copy"><span class="weekly-eyebrow">MONDAY–SUNDAY</span><h2 id="recurring-weekly-title">Recurring weekly shows</h2><p class="dashboard-note">Tap to expand · device timezone (${esc(DEVICE_TIME_ZONE||Intl.DateTimeFormat().resolvedOptions().timeZone||"UTC")})</p></div><span class="weekly-total">${total}<small>shows</small></span><span class="recurring-dropdown-chevron" aria-hidden="true">⌄</span></summary><div class="release-week-list">${days}</div><p class="weekly-footnote">Shows stay listed. Episodes remain for 24 hours after airing, then advance to the next confirmed episode. Unannounced dates stay TBA; no dates or episode numbers are guessed.</p></details>`);
   if(document.visibilityState==="visible"){
-    recurringWeeklyTimer=setTimeout(renderDashboard,recurringScheduleDelay(rows,now));
+    recurringWeeklyTimer=setTimeout(renderDashboard,recurringScheduleDelay(rows,now,mediaItems));
   }
 }
 document.addEventListener("visibilitychange",()=>{
@@ -182,13 +205,19 @@ document.addEventListener("visibilitychange",()=>{
   else{clearTimeout(recurringWeeklyTimer);recurringWeeklyTimer=null;}
 });
 
-function recurringScheduleDelay(rows,now=new Date()){
+function recurringScheduleDelay(rows,now=new Date(),items=[]){
   const midnight=new Date(now);midnight.setHours(24,0,0,0);
   let deadline=midnight.getTime();
   for(const row of rows){
     if(!row.date)continue;
     for(const time of [row.date.getTime(),row.date.getTime()+86400000]){
       if(time>now.getTime())deadline=Math.min(deadline,time);
+    }
+  }
+  for(const item of items){
+    if(!isEpisodeTrackable(item))continue;
+    for(const airTime of scheduleEpisodeAirTimes(item).values()){
+      for(const time of [airTime,airTime+86400000])if(time>now.getTime())deadline=Math.min(deadline,time);
     }
   }
   return Math.max(1,deadline-now.getTime());

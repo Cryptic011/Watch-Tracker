@@ -36,6 +36,7 @@
 .release-show-title{display:flex;align-items:center;gap:7px;min-width:0}
 .release-show-title>span:first-child{min-width:0;overflow-wrap:anywhere}
 .release-progress-dot{display:inline-block;flex:0 0 8px;width:8px;height:8px;border-radius:50%;background:var(--amber)}
+.release-progress-dot[data-behind-level="green"]{background:#39ff14;box-shadow:0 0 5px #39ff1466}
 .release-progress-dot[data-behind-level="red"]{background:var(--red)}
 .release-episode{font-size:.75rem;color:#b5bdca;line-height:1.35}
 .release-platform{display:flex;align-items:center;gap:5px;min-width:0;margin-top:2px;color:var(--muted);font-size:.7rem;line-height:1.35;overflow-wrap:anywhere}
