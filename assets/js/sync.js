@@ -423,7 +423,8 @@
     if(error?.status===401){
       cloudSyncAuthBlocked=true;
       setSync("Sign in again to resume sync. Your on-device changes are retained.","warn");
-      authPin.value="";showAuth();showMessage("Your session expired. Sign in again with the same account to sync your saved changes.","info");
+      isSignUp=false;updateAuthMode();authEmail.value=currentUser.email||authEmail.value;authPin.value="";
+      showAuth();showMessage("Your session expired. Sign in again with the same account to sync your saved changes.","info");
     }
   }
   function synchronizeCloudLibrary({manual=false}={}){

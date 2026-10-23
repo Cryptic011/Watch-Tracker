@@ -204,7 +204,7 @@ test('Clearing a field to undefined removes its stored value',()=>{
 function autoSyncHarness(extra={}){
  const scheduled=[],statuses=[];
  const app=harness({cloudSyncTimer:null,cloudSyncInFlight:null,cloudSyncFailures:0,cloudSyncAuthBlocked:false,
-  navigator:{onLine:true},document:{visibilityState:'visible',addEventListener(){}},window:{addEventListener(){}},authPin:{value:''},showAuth(){},showMessage(){},
+  navigator:{onLine:true},document:{visibilityState:'visible',addEventListener(){}},window:{addEventListener(){}},authPin:{value:''},authEmail:{value:''},isSignUp:false,updateAuthMode(){},showAuth(){},showMessage(){},
   applyAccount(account){app.currentUser={id:account.id};},loadCacheRecord:async()=>app.cacheDB.records.get('library'),
   setSync:(text,state)=>statuses.push({text,state}),...extra});
  vm.runInContext(['retryPendingCloudSave','cloudSyncRetryDelay','scheduleCloudSync','noteCloudSyncFailure','synchronizeCloudLibrary'].map(declaration).join('\n'),app);
@@ -252,8 +252,9 @@ test('Transient checks back off within a bound and recover without losing the Li
 
 test('Expired sessions stop retrying and retain queued changes for reauthentication',async()=>{
  let shown=0;const items=[{id:'a',title:'Saved locally'}],db=memoryDB({library:{key:'library',userId:'account',items,dirty:true}});
- const {app,scheduled}=autoSyncHarness({cacheDB:db,mediaItems:items,showAuth:()=>shown++,pinApi:async()=>{throw Object.assign(Error('expired'),{status:401});}});
+ const {app,scheduled}=autoSyncHarness({cacheDB:db,mediaItems:items,currentUser:{id:'account',email:'same@example.test'},isSignUp:true,showAuth:()=>shown++,pinApi:async()=>{throw Object.assign(Error('expired'),{status:401});}});
  assert.equal(await app.synchronizeCloudLibrary(),false);assert.equal(app.cloudSyncAuthBlocked,true);assert.equal(shown,1);
+ assert.equal(app.authEmail.value,'same@example.test');assert.equal(app.isSignUp,false);
  assert.equal(await app.synchronizeCloudLibrary(),false);assert.equal(shown,1);assert.equal(db.records.get('library').dirty,true);
  // The actual scheduler refuses auth-blocked, hidden and offline sessions.
  let timers=0;app.setTimeout=()=>{timers++;return 1;};vm.runInContext(declaration('scheduleCloudSync'),app);
