@@ -1,3 +1,7 @@
+## 2026-10-24 — Remove title-popup scrollbars
+- Lock background-page scrolling while a film or series popup is open and restore it automatically on close.
+- Hide the popup scrollbar while keeping long episode lists and details accessible on smaller screens.
+
 ## 2026-10-24 — Reliable automatic cross-device sync
 - Check the account revision every 10 seconds while visible and immediately on focus, return or reconnection; unchanged checks do not download the Library.
 - Record accepted granular writes atomically so a lost acknowledgement cannot repeat an edit over a newer device change.
