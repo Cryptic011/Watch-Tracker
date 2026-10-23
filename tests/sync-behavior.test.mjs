@@ -44,7 +44,7 @@ const persistenceFunctions=["toMillis","canonicalRecordJSON","sameSyncValue","me
 function harness(extra={}){
   const pending=new Set();
   const context=vm.createContext({
-    console:{warn(){},error(){}},structuredClone,setTimeout,clearTimeout,AbortController,
+    console:{warn(){},error(){}},structuredClone,setTimeout,clearTimeout,AbortController,window:{},
     currentUser:{id:"account"},cloudSessionToken:"token",persistenceGeneration:1,
     localSaveSequence:0,cloudBaseItems:[],cloudRevision:0,mediaItems:[],
     latestLocalSnapshot:null,queuedLocalSnapshot:null,queuedCloudSnapshot:null,
@@ -204,7 +204,7 @@ test('Clearing a field to undefined removes its stored value',()=>{
 function autoSyncHarness(extra={}){
  const scheduled=[],statuses=[];
  const app=harness({cloudSyncTimer:null,cloudSyncInFlight:null,cloudSyncFailures:0,cloudSyncAuthBlocked:false,
-  navigator:{onLine:true},document:{visibilityState:'visible',addEventListener(){}},window:{addEventListener(){}},authPin:{value:''},authEmail:{value:''},isSignUp:false,updateAuthMode(){},showAuth(){},showMessage(){},
+  navigator:{onLine:true},document:{visibilityState:'visible',addEventListener(){}},window:{addEventListener(){}},authPin:{value:''},authEmail:{value:''},isSignUp:false,updateAuthMode(){},pauseDialogsForAuth(){},showAuth(){},showMessage(){},
   applyAccount(account){app.currentUser={id:account.id};},loadCacheRecord:async()=>app.cacheDB.records.get('library'),
   setSync:(text,state)=>statuses.push({text,state}),...extra});
  vm.runInContext(['retryPendingCloudSave','cloudSyncRetryDelay','scheduleCloudSync','noteCloudSyncFailure','synchronizeCloudLibrary'].map(declaration).join('\n'),app);
