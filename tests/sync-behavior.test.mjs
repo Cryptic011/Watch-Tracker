@@ -194,3 +194,8 @@ test('Granular saves send only changed fields, watched-episode deltas, creates a
  assert.equal(JSON.stringify(changes).includes('large unchanged artwork'),false);
  assert.deepEqual(copy(c.libraryChangeSet(after,after)),[]);
 });
+
+test('Clearing a field to undefined removes its stored value',()=>{
+ const c=harness(),before=[{id:'title',title:'Title',notes:'old'}],after=[{...before[0],notes:undefined}];
+ const changes=copy(c.libraryChangeSet(before,after));assert.deepEqual(changes,[{id:'title',set:{},unset:['notes'],watched:{}}]);
+});

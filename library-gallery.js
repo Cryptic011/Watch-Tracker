@@ -328,7 +328,7 @@ window.WatchLogGallery=(()=>{
       const manage=event.target.closest('[data-gallery-manage]');
       if(manage){api.manage?.(JSON.parse(manage.dataset.galleryManageIds||'[]'),manage.dataset.galleryManage);return;}
       const cat=event.target.closest('[data-gallery-category]');if(cat){if(typeof saveNavigationPosition==='function')saveNavigationPosition();category=cat.dataset.galleryCategory;api.render();api.navigate?.();host.querySelector('.gallery-back')?.focus();return;}
-      if(event.target.closest('[data-gallery-back]')){if(window.WatchLogNavigation?.back?.())return;if(typeof saveNavigationPosition==='function')saveNavigationPosition();category='';api.render();api.navigate?.();host.querySelector('.gallery-category')?.focus();return;}
+      if(event.target.closest('[data-gallery-back]')){if(typeof saveNavigationPosition==='function')saveNavigationPosition();category='';api.render();api.navigate?.();host.querySelector('.gallery-category')?.focus();return;}
       const target=event.target.closest('[data-gallery-item]');if(target)open(target.dataset.galleryItem,target);
     });}
     let markup;

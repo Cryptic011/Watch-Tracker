@@ -99,7 +99,7 @@ function requestOfflineStatus(){
 }
 if(navigator.serviceWorker){
   navigator.serviceWorker.register('./sw.js',{scope:'./',updateViaCache:'none'}).then(requestOfflineStatus).catch(()=>{$('offline-status').textContent='Offline copy is not ready yet. Try updating it while connected.';});
-  navigator.serviceWorker.addEventListener('message',event=>{if(event.data?.type==='offline-status')$('offline-status').textContent=event.data.ready?'Ready for offline use on this device. Changes save locally and sync when connected.':'Preparing the offline copy. Keep the app open while connected.';});
+  navigator.serviceWorker.addEventListener('message',event=>{if(event.data?.type==='offline-status')$('offline-status').textContent=event.data.ready&&event.data.build===window.WATCHLOG_BUILD?.sha?'Ready for offline use on this device. Changes save locally and sync when connected.':event.data.ready?'A previous offline copy is ready. Update the offline copy to save this version.':'Preparing the offline copy. Keep the app open while connected.';});
   navigator.serviceWorker.addEventListener('controllerchange',requestOfflineStatus);requestOfflineStatus();
 }
 $('refresh-offline-copy').onclick=async()=>{

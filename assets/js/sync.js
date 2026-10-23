@@ -263,7 +263,7 @@
       const set={},unset=[],watched={};
       for(const key of new Set([...Object.keys(old),...Object.keys(item)])){
         if(key==="id"||sameSyncValue(old[key],item[key]))continue;
-        if(!(key in item)){unset.push(key);continue;}
+        if(!(key in item)||item[key]===undefined){unset.push(key);continue;}
         if(key==="watchedEpisodes"&&old.watchedEpisodes&&item.watchedEpisodes){
           for(const season of new Set([...Object.keys(old.watchedEpisodes),...Object.keys(item.watchedEpisodes)])){
             const prior=new Set(old.watchedEpisodes[season]||[]),next=new Set(item.watchedEpisodes[season]||[]);

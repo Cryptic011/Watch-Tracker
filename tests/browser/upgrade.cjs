@@ -29,7 +29,7 @@ function patch(items,changes){
    let offline=false,revision=0,pin='1234',serial=0,code='ABCD-1234-5678-9012-ABCD-1234-5678-9012';
    const account={id:'upgrade-browser',email:'upgrade@example.test',displayName:'Browser test'},tokens=new Set(['initial']),saves=[],errors=[];
    let items=[{id:'show',title:'Offline Show',type:'Series',status:'Watching',episodeScheduleVerified:true,releasedEpisodes:{1:Array.from({length:300},(_,i)=>i+1),2:[1,2,3]},watchedEpisodes:{1:[1]},episodeCounts:{1:300,2:3},verifiedCompletedSeasons:2,seriesReleaseDate:'2020-01-01'}, {id:'film',title:'Unchanged Film',type:'Film',filmReleaseDate:'2020-01-01',status:'Planned'}];
-   await context.addInitScript(({account})=>{localStorage.setItem('watchlog_pin_session_v1',JSON.stringify({token:'initial',account,revision:0}));window.WebSocket=undefined;},{account});
+   await context.addInitScript(({account})=>{if(!localStorage.getItem('watchlog_pin_session_v1'))localStorage.setItem('watchlog_pin_session_v1',JSON.stringify({token:'initial',account,revision:0}));window.WebSocket=undefined;},{account});
    await context.route('https://**/*',async route=>{
     const req=route.request(),headers={'access-control-allow-origin':req.headers().origin||base,'access-control-allow-methods':'POST, GET, OPTIONS','access-control-allow-headers':req.headers()['access-control-request-headers']||'content-type, x-watchlog-session'};
     if(offline)return route.abort('internetdisconnected');
