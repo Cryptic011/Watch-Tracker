@@ -347,15 +347,20 @@
           console.warn(e);
           if(!queuedCloudSnapshot)queuedCloudSnapshot=snapshot;
           saveFailed=true;
-          if(activePersistenceContext(snapshot))setSync("Saved on this device, but cloud sync is pending. Tap Sync Now when online.","warn");
+          if(activePersistenceContext(snapshot))setSync("Saved on this device. Cloud sync is pending; retrying automatically when connected.","warn");
+          noteCloudSyncFailure(e,snapshot);
           return false;
         }
       }
-      markPending(false,processedAccountId);if(String(currentUser?.id||"")===processedAccountId){const conflicts=detectedSyncConflictCount;detectedSyncConflictCount=0;setSync(conflicts?`Synced with ${conflicts} conflicting edit(s); local values were kept. Review the affected titles.`:"Synced. This library is available on your other devices.","ok");}
+      const remaining=String(currentUser?.id||"")===processedAccountId&&localSyncPending();
+      markPending(remaining,processedAccountId);
+      if(remaining){setSync("Saving is still pending on this device; retrying automatically.","warn");return false;}
+      if(String(currentUser?.id||"")===processedAccountId){const conflicts=detectedSyncConflictCount;detectedSyncConflictCount=0;setSync(conflicts?`Synced with ${conflicts} conflicting edit(s); local values were kept. Review the affected titles.`:"Synced. This library is available on your other devices.","ok");}
       return true;
     })().finally(()=>{
       cloudSaveInFlight=null;
       if(queuedCloudSnapshot&&!saveFailed)void queueCloudLibrarySave(queuedCloudSnapshot);
+      scheduleCloudSync(saveFailed||localSyncPending()?cloudSyncRetryDelay():CLOUD_SYNC_INTERVAL_MS);
       setTimeout(()=>applyPendingAppUpdate(),0);
     });
     return cloudSaveInFlight;
@@ -382,7 +387,8 @@
       completion.catch(error=>{
         console.error("Background library save failed",error);
         markPending(true,snapshot.accountId);
-        setSync("Your change is still open, but saving needs attention. Tap Sync Now.","warn");
+        noteCloudSyncFailure(error,snapshot);scheduleCloudSync(cloudSyncRetryDelay());
+        setSync("Your change is still open. Saving needs attention; retrying automatically.","warn");
       });
       /* Report success once the on-device copy is durable. Cloud sync keeps
          running independently and retains its pending retry marker. */
@@ -392,15 +398,83 @@
   }
 
   async function retryPendingCloudSave(){
-    if(!currentUser||!cloudSessionToken||!hasPending()||cloudSaveInFlight)return;
+    if(!currentUser||!cloudSessionToken||cloudSyncAuthBlocked||(!hasPending()&&!localSyncPending())||cloudSaveInFlight)return;
+    const context={accountId:String(currentUser.id),token:cloudSessionToken,generation:persistenceGeneration};
     try{
       if(localSaveInFlight)await localSaveInFlight;
+      if(!activePersistenceContext(context))return;
+      // Retry a failed device write before an older cached copy can upload.
+      if(latestLocalSnapshot&&activePersistenceContext(latestLocalSnapshot))await queueLocalLibrarySave(latestLocalSnapshot);
       const cached=await loadCacheRecord();
+      if(!activePersistenceContext(context))return;
       if(cached?.items)await queueCloudLibrarySave(createLibrarySnapshot(cached.items,{baseItems:Array.isArray(cached.cloudItems)?cached.cloudItems:cloudBaseItems,expectedRevision:Number(cached.cloudRevision??cloudRevision),sequence:Number(cached.localSequence||++localSaveSequence)}));
     }catch(error){console.warn("Automatic cloud retry postponed",error);}
   }
-  window.addEventListener("online",()=>{void retryPendingCloudSave();void refreshLibraryEpisodeMetadata({force:true});});
-  document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"){void refreshPublicMaintenance();void retryPendingCloudSave();void refreshLibraryEpisodeMetadata();}});
+  function localSyncPending(){return Boolean(latestLocalSnapshot&&activePersistenceContext(latestLocalSnapshot)&&latestLocalSnapshot.json!==lastCloudLibraryJSON);}
+  function cloudSyncRetryDelay(){return Math.min(60000,1000*2**Math.min(6,Math.max(0,cloudSyncFailures-1)))+Math.floor(Math.random()*500);}
+  function scheduleCloudSync(delay=CLOUD_SYNC_INTERVAL_MS){
+    clearTimeout(cloudSyncTimer);cloudSyncTimer=null;
+    if(!currentUser||!cloudSessionToken||cloudSyncAuthBlocked||navigator.onLine===false||document.visibilityState==="hidden")return;
+    cloudSyncTimer=setTimeout(()=>{cloudSyncTimer=null;void synchronizeCloudLibrary();},delay);
+  }
+  function noteCloudSyncFailure(error,context){
+    if(!activePersistenceContext(context))return;
+    cloudSyncFailures++;
+    if(error?.status===401){
+      cloudSyncAuthBlocked=true;
+      setSync("Sign in again to resume sync. Your on-device changes are retained.","warn");
+      authPin.value="";showAuth();showMessage("Your session expired. Sign in again with the same account to sync your saved changes.","info");
+    }
+  }
+  function synchronizeCloudLibrary({manual=false}={}){
+    if(cloudSyncInFlight)return cloudSyncInFlight;
+    if(!currentUser||!cloudSessionToken||cloudSyncAuthBlocked||navigator.onLine===false||(!manual&&document.visibilityState==="hidden"))return Promise.resolve(false);
+    const context={accountId:String(currentUser.id),token:cloudSessionToken,generation:persistenceGeneration};
+    cloudSyncInFlight=(async()=>{
+      try{
+        if(manual)setSync("Syncing…","warn");
+        if(localSaveInFlight)await localSaveInFlight;
+        if(cloudSaveInFlight)await cloudSaveInFlight;
+        if(!activePersistenceContext(context))return false;
+        if(hasPending()||queuedCloudSnapshot||localSyncPending())await retryPendingCloudSave();
+        if(!activePersistenceContext(context))return false;
+        if(hasPending()||queuedCloudSnapshot||localSyncPending()){cloudSyncFailures++;return false;}
+        const knownRevision=cloudRevision;
+        const result=await pinApi("load",{knownRevision},context.token);
+        if(!activePersistenceContext(context))return false;
+        if(result.account?.id!==context.accountId)throw new Error("Cloud account did not match this session.");
+        if(result.unchanged===true||(Number(result.revision)===cloudRevision&&sameSyncValue(result.items,cloudBaseItems)&&sameSyncValue(mediaItems,cloudBaseItems))){
+          if(hasPending()||localSaveInFlight||cloudSaveInFlight||queuedCloudSnapshot||localSyncPending())return false;
+          const recovered=cloudSyncFailures>0;
+          cloudSyncFailures=0;
+          if(manual||recovered)setSync("Synced. This library is available on your other devices.","ok");
+          return true;
+        }
+        // Saves can advance the revision while a read is in flight.
+        if(Number(result.revision)<cloudRevision)return true;
+        const conflicts=detectSyncConflicts(cloudBaseItems,mediaItems,result.items);
+        const merged=replayLocalChanges(cloudBaseItems,mediaItems,result.items);
+        const migration=migratePlannedStatuses(merged),cleanup=cleanLibraryRecords(migration.rows);
+        applyAccount(result.account);setCloudBaseline(result.items,result.revision,context.accountId);
+        mediaItems=cleanup.items;render();window.WatchLogGallery?.refreshCurrent?.();
+        const saved=await persistLibrary(mediaItems,{precleaned:true});
+        if(!activePersistenceContext(context))return false;
+        if(!saved){cloudSyncFailures++;return false;}
+        cloudSyncFailures=0;
+        setSync(conflicts.length?`Synced with ${conflicts.length} simultaneous edit conflict(s); your local values were kept. Review the affected titles.`:"Synced. This library is available on your other devices.","ok");
+        return true;
+      }catch(error){
+        noteCloudSyncFailure(error,context);
+        if(activePersistenceContext(context)&&!cloudSyncAuthBlocked)setSync("Could not check cloud changes. Your library is retained; retrying automatically.","warn");
+        return false;
+      }
+    })().finally(()=>{cloudSyncInFlight=null;scheduleCloudSync(cloudSyncFailures?cloudSyncRetryDelay():CLOUD_SYNC_INTERVAL_MS);});
+    return cloudSyncInFlight;
+  }
+  window.addEventListener("online",()=>{scheduleCloudSync(0);void refreshLibraryEpisodeMetadata({force:true});});
+  window.addEventListener("focus",()=>scheduleCloudSync(0));
+  window.addEventListener("offline",()=>{clearTimeout(cloudSyncTimer);cloudSyncTimer=null;});
+  document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"){void refreshPublicMaintenance();scheduleCloudSync(0);void refreshLibraryEpisodeMetadata();}else{clearTimeout(cloudSyncTimer);cloudSyncTimer=null;}});
 
   function commitRefreshedLibrary(){
     const cleanup=cleanLibraryRecords(mediaItems);mediaItems=cleanup.items;
@@ -565,6 +639,7 @@
     setTimeout(()=>{void refreshLibraryEpisodeMetadata({force:true});},0);
     try{await syncExistingBackgroundPush();}catch(error){console.warn("Background reminder sync skipped",error);}
     await refreshMaintenanceAdmin();
+    cloudSyncAuthBlocked=false;cloudSyncFailures=0;scheduleCloudSync(0);
   }
 
   function mergePendingCache(cached,remoteItems,accountId=String(currentUser?.id||"")){
@@ -614,6 +689,7 @@
     const saved=safeReadJSON(PIN_SESSION_KEY,null);if(!saved?.token||!saved?.account?.id)return false;
     cloudSessionToken=saved.token;applyAccount(saved.account);await openCache(currentUser.id);currentProfile=await loadProfile()||currentProfile;
     const cached=await loadCacheRecord();
+    if(cached?.dirty===true)markPending(true);
     localSaveSequence=Math.max(localSaveSequence,Number(cached?.localSequence)||0);
     if(cached?.items)setCloudBaseline(Array.isArray(cached.cloudItems)?cached.cloudItems:cached.items,Number(cached.cloudRevision??saved.revision??0),currentUser.id);
     try{
@@ -628,7 +704,8 @@
         const snapshot=createLibrarySnapshot(mediaItems,{baseItems:remoteItems,expectedRevision:cloudRevision});
         await queueLocalLibrarySave(snapshot);await queueCloudLibrarySave(snapshot);
       }else await saveCache(mediaItems,"",{dirty:false,baseItems:remoteItems,baseRevision:cloudRevision});
-      storePinSession({id:currentUser.id,email:currentProfile.email,displayName:currentProfile.display_name},cloudSessionToken,saved.expiresAt||null,cloudRevision);await enterAccount(mediaItems);return true;
+      const stillPending=hasPending()||Boolean(queuedCloudSnapshot);
+      storePinSession({id:currentUser.id,email:currentProfile.email,displayName:currentProfile.display_name},cloudSessionToken,saved.expiresAt||null,cloudRevision);await enterAccount(mediaItems,stillPending?{syncText:"Saved on this device. Cloud sync is pending; retrying automatically.",syncState:"warn"}:{});return true;
     }catch(e){
       if(e.status===401){localStorage.removeItem(PIN_SESSION_KEY);cloudSessionToken="";currentUser=null;currentProfile=null;return false;}
       if(e.code==="maintenance"||e.maintenance){publicMaintenance={enabled:true,message:e.message||publicMaintenance.message};maintenanceOwnerAccess=false;updateAuthMode();return false;}
@@ -637,7 +714,7 @@
     }
   }
 
-  async function clearUserState(){persistenceGeneration++;mediaItems=[];currentProfile=null;currentUser=null;cloudSessionToken="";queuedLocalSnapshot=null;queuedCloudSnapshot=null;latestLocalSnapshot=null;lastLocalLibraryJSON="";lastCloudLibraryJSON="";lastLocalAccountId="";lastCloudAccountId="";cloudBaseItems=[];cloudRevision=0;localSaveSequence=0;notificationTestSettings?.classList.add("hidden");document.getElementById("private-reminder-history")?.classList.add("hidden");document.getElementById("reminder-history-body")?.replaceChildren();document.getElementById("library-save-status")?.classList.add("hidden");setBackgroundReminderStatus("Sign in to manage background reminders.");if(cacheDB){try{cacheDB.close();}catch(_){}}cacheDB=null;render();}
+  async function clearUserState(){clearTimeout(cloudSyncTimer);cloudSyncTimer=null;cloudSyncAuthBlocked=false;persistenceGeneration++;mediaItems=[];currentProfile=null;currentUser=null;cloudSessionToken="";queuedLocalSnapshot=null;queuedCloudSnapshot=null;latestLocalSnapshot=null;lastLocalLibraryJSON="";lastCloudLibraryJSON="";lastLocalAccountId="";lastCloudAccountId="";cloudBaseItems=[];cloudRevision=0;localSaveSequence=0;notificationTestSettings?.classList.add("hidden");document.getElementById("private-reminder-history")?.classList.add("hidden");document.getElementById("reminder-history-body")?.replaceChildren();document.getElementById("library-save-status")?.classList.add("hidden");setBackgroundReminderStatus("Sign in to manage background reminders.");if(cacheDB){try{cacheDB.close();}catch(_){}}cacheDB=null;render();}
   function showAuth(){authScreen.classList.remove("hidden");}
   function updateAuthMode(){
     hideMessage();authNameGroup.classList.toggle("hidden",!isSignUp);
@@ -671,31 +748,8 @@
   };
 
   syncNowBtn.onclick=async()=>{
-    if(!currentUser||!cloudSessionToken)return;syncNowBtn.disabled=true;setSync("Syncing…","warn");
-    const context={accountId:String(currentUser.id),token:cloudSessionToken,generation:persistenceGeneration};
-    try{
-      /* Finish any edit already being saved before choosing the snapshot to
-         upload or loading cloud state over it. */
-      if(localSaveInFlight)await localSaveInFlight;
-      if(cloudSaveInFlight)await cloudSaveInFlight;
-      const result=await pinApi("load",{},context.token);
-      if(!activePersistenceContext(context))return;
-      /* Editing stays available during the request. Merge the current in-memory
-         edits at response time, and ignore a load older than an acknowledged save. */
-      const revision=Math.max(cloudRevision,Number(result.revision)||0);
-      const original=Number(result.revision)>=cloudRevision?result.items:cloudBaseItems;
-      const conflicts=detectSyncConflicts(cloudBaseItems,mediaItems,original);
-      const merged=replayLocalChanges(cloudBaseItems,mediaItems,original);
-      const migration=migratePlannedStatuses(merged),cleanup=cleanLibraryRecords(migration.rows);
-      applyAccount(result.account);setCloudBaseline(original,revision,currentUser.id);
-      mediaItems=cleanup.items;render();
-      const saved=await persistLibrary(mediaItems,{precleaned:true});
-      if(!activePersistenceContext(context))return;
-      await saveProfile(currentProfile);
-      setSync(saved?(conflicts.length?`Synced. ${conflicts.length} simultaneous edit conflict(s) were detected; your local values were kept. Review the affected titles.`:"Synced. This library is available on your other devices."):"Saved on this device. Cloud sync is still pending.",saved?"ok":"warn");
-      const cleanupMessage=duplicateCleanupMessage(cleanup);if(cleanupMessage)showAppToast(cleanupMessage,"success",6000);
-      void refreshLibraryEpisodeMetadata({force:true});
-    }catch(e){console.error(e);setSync(e.message||"Sync failed.","warn");}
+    syncNowBtn.disabled=true;
+    try{await synchronizeCloudLibrary({manual:true});}
     finally{syncNowBtn.disabled=false;}
   };
 

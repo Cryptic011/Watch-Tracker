@@ -410,6 +410,14 @@ Deno.serve(async (req: Request) => {
     }
 
     if (action === "load") {
+      if(Number.isSafeInteger(body.knownRevision)&&body.knownRevision>=0){
+        const [{data:account,error:aerr},{data:header,error:herr}]=await Promise.all([
+          db.from("watchlog_pin_accounts").select("id,email,display_name").eq("id",session.accountId).single(),
+          db.from("watchlog_pin_library").select("revision").eq("account_id",session.accountId).maybeSingle(),
+        ]);
+        if(aerr||herr)throw aerr||herr;
+        if(Number(header?.revision||0)===body.knownRevision)return json({ok:true,unchanged:true,revision:body.knownRevision,account:{id:account.id,email:account.email,displayName:account.display_name}});
+      }
       const [{ data: account, error: aerr }, library] = await Promise.all([
         db.from("watchlog_pin_accounts").select("id,email,display_name").eq("id", session.accountId).single(),
         readLibrary(session.accountId),

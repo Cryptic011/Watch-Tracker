@@ -215,9 +215,19 @@ window.WatchLogGallery=(()=>{
     }
   }
   function closeDetail(){
-    const notes=dialog?.querySelector('[data-gallery-notes-field]'),item=api?.items?.().find(row=>String(row.id)===dialog?.dataset.item);
-    if(notes&&notes.value.trim()!==String(item?.notes||'').trim()&&!confirm('Discard unsaved notes?'))return false;
+    const notes=dialog?.querySelector('[data-gallery-notes-field]'),editing=dialog?.querySelector('[data-gallery-notes-editor]:not(.hidden)');
+    if(editing&&notes.value.trim()!==dialog._savedNotes&&!confirm('Discard unsaved notes?'))return false;
     dialog?.close();return true;
+  }
+  function refreshCurrent(){
+    if(!dialog?.open||dialog.querySelector('[data-gallery-notes-editor]:not(.hidden)')||dialog.querySelector('[data-gallery-toggle-episode]:disabled,[data-gallery-season]:disabled'))return false;
+    const fresh=api.items().find(row=>String(row.id)===dialog.dataset.item);
+    if(!fresh){dialog.close();return true;}
+    const scroll=dialog.scrollTop,expanded=[...dialog.querySelectorAll('.gallery-season[open]')].map(node=>node.dataset.season),view=dialog.querySelector('[data-gallery-view][aria-selected="true"]')?.dataset.galleryView;
+    detail(fresh);
+    for(const node of dialog.querySelectorAll('.gallery-season')){node.open=expanded.includes(node.dataset.season);if(node.open)dialog._populateSeason(node);}
+    if(view==='details')dialog.querySelector('[data-gallery-view="details"]').click();
+    dialog.scrollTop=scroll;return true;
   }
   function detail(item){
     if(!dialog){
@@ -231,6 +241,7 @@ window.WatchLogGallery=(()=>{
     const show=!isFilm(item),last=api.last(item);
     const watchedTo=show?(last?`S${last.season} E${last.episode}`:'Not started'):(item.status==='Watched'?'Complete':'Not started');
     let savedNotes=String(item.notes||'').trim();
+    dialog._savedNotes=savedNotes;
     const releases=show?(api.released?.(item)||item.releasedEpisodes||{}):{},watched=show?(api.watched?.(item)||item.watchedEpisodes||{}):{};
     const seasons=Object.keys(releases).map(Number).filter(number=>Number.isInteger(number)&&number>0).sort((left,right)=>left-right);
     const next=show?api.next?.(item):null;
@@ -264,13 +275,13 @@ window.WatchLogGallery=(()=>{
       notes.value=savedNotes;notesStatus.textContent='';preview.classList.add('hidden');editor.classList.remove('hidden');
       editor.scrollIntoView({block:'start'});notes.focus({preventScroll:true});
     };
-    cancelNotes.onclick=()=>{editor.classList.add('hidden');preview.classList.toggle('hidden',!savedNotes);menuButton.focus({preventScroll:true});};
+    cancelNotes.onclick=()=>{notes.value=savedNotes;editor.classList.add('hidden');preview.classList.toggle('hidden',!savedNotes);refreshCurrent();dialog.querySelector('[data-gallery-menu]')?.focus({preventScroll:true});};
     saveNotes.onclick=async()=>{
       saveNotes.disabled=true;cancelNotes.disabled=true;saveNotes.textContent='Saving…';notesStatus.textContent='';
       try{
         const value=notes.value.trim();
         if(!await api.saveNotes?.(item.id,value))throw new Error('Save failed');
-        savedNotes=value;preview.querySelector('p').textContent=value;preview.classList.toggle('hidden',!value);editor.classList.add('hidden');
+        savedNotes=value;dialog._savedNotes=value;preview.querySelector('p').textContent=value;preview.classList.toggle('hidden',!value);editor.classList.add('hidden');
         if(value)preview.scrollIntoView({block:'start'});menuButton.focus({preventScroll:true});
       }catch(_){notesStatus.textContent='Notes could not be saved. Your text is still here; please retry.';}
       finally{saveNotes.disabled=false;cancelNotes.disabled=false;saveNotes.textContent='Save notes';}
@@ -347,5 +358,5 @@ window.WatchLogGallery=(()=>{
     if(host._galleryMarkup!==markup){host.innerHTML=markup;host._galleryMarkup=markup;}
     observe(host,rows);
   }
-  return {mount,open,sections,releaseGroups,back,getCategory:()=>category,setCategory:value=>{category=['Film','Series'].includes(value)?value:'';},hasCategory:()=>Boolean(category)};
+  return {mount,open,sections,releaseGroups,back,refreshCurrent,getCategory:()=>category,setCategory:value=>{category=['Film','Series'].includes(value)?value:'';},hasCategory:()=>Boolean(category)};
 })();

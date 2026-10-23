@@ -296,6 +296,7 @@
   }
 
   function openAdd(){
+    mediaForm._baseItem=null;
     clearTimeout(searchTimer);cancelSuggestionProgress();activeCatalogueController?.abort();activeCatalogueController=null;searchRequestId++;editorApplyRevision++;activeTitleSearchKey="";titleSuggestionsWanted=false;editorVerification=null;editorVerificationInFlight=null;hideDuplicateWarning();
     mediaForm.reset();
     resetUKAvailability();
@@ -310,6 +311,7 @@
 
   async function openEdit(id){
     const item=mediaItems.find(x=>String(x.id)===String(id));if(!item)return;
+    mediaForm._baseItem=cloneLibrarySnapshot([item])[0];
     clearTimeout(searchTimer);activeCatalogueController?.abort();activeCatalogueController=null;cancelSuggestionProgress();const editRequestId=++searchRequestId,editApplyRevision=++editorApplyRevision;activeTitleSearchKey="";titleSuggestionsWanted=false;editorVerification=null;editorVerificationInFlight=null;hideDuplicateWarning();
     const shouldApply=()=>editRequestId===searchRequestId&&editApplyRevision===editorApplyRevision&&String($("item-id").value)===String(item.id)&&!modal.classList.contains("hidden");
     $("item-id").value=item.id;$("tvmaze-id").value=item.tvmazeShowId||"";$("imdb-id").value=item.imdbId||"";$("release-year").value=item.releaseYear||"";
@@ -359,7 +361,8 @@
       if(type!=="Film"){
         if(recentVerification){verified=recentVerification;sid=verified.resolvedShowId||sid;}
       }
-      const previous=mediaItems.find(x=>String(x.id)===String(id));
+      const current=mediaItems.find(x=>String(x.id)===String(id));
+      const previous=String(mediaForm._baseItem?.id)===String(id)?mediaForm._baseItem:current;
       const episodeHistory=Array.isArray(previous?.episodeHistory)?previous.episodeHistory:[];
       const numOrNull=x=>$(x).value===""?null:Number.parseInt($(x).value,10);
       const total=type==="Film"?null:($("total-seasons").value?Number($("total-seasons").value):null);
@@ -403,7 +406,8 @@
       }
       const sameTitleSeries=mediaItems.find(x=>String(x.id)!==String(id)&&x.type!=="Film"&&normalizeTitle(x.title)===normalizeTitle(title));
       if(isWeakFilmRecord(item)&&sameTitleSeries)throw new Error(`“${title}” is already saved as a verified series. Choose a verified film result with a year or release date if you mean a separate film.`);
-      if(previous&&sameRecordWithoutUpdateTime(item,previous)){
+      if(previous&&current&&previous!==current)item=mergeRecordChanges(previous,item,current);
+      if(current&&sameRecordWithoutUpdateTime(item,current)){
         closeEditor();showAppToast("No changes to save.","success");return;
       }
       item={...item,updatedAt:nowISO()};

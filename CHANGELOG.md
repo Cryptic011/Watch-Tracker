@@ -1,3 +1,10 @@
+## 2026-10-24 — Reliable automatic cross-device sync
+- Check the account revision every 10 seconds while visible and immediately on focus, return or reconnection; unchanged checks do not download the Library.
+- Retry interrupted uploads automatically with bounded backoff, retain offline edits across reopening, and stop invalid-session retries until sign-in.
+- Merge incoming changes with in-flight edits, preserve notes drafts and keep newer episode ticks when saving an older edit form.
+- Keep save status pending until device and cloud writes are acknowledged; retry failed device writes before sending cached content.
+- Add independent Chromium/WebKit device scenarios for concurrent writes, offline recovery, transient failures, lost acknowledgements and revoked sessions.
+
 ## 2026-10-23 — Granular sync, full offline use, recovery and Library upgrades
 - Store titles in private account-scoped database rows and save only changed fields, episode deltas, additions and deletions through an atomic revision-checked function.
 - Migrate existing Libraries without deleting the legacy compatibility snapshot, and update both account and reminder backends to read canonical title rows.

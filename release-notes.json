@@ -69,7 +69,7 @@
       "Save changed titles and episode deltas to account-scoped database rows with atomic conflict checks.",
       "Reopen the full app offline; retain local edits across reopening and upload them on reconnection.",
       "Create a single-use recovery code in Account & Sync; a PIN reset rotates the code and revokes old sessions.",
-      "Continue Watching lists each started show’s next released episode with one-tap marking and Undo.",
+      "Continue Watching lists each started show\u2019s next released episode with one-tap marking and Undo.",
       "Use shareable page URLs with Back/Forward and restored Library and Search state.",
       "Load episode rows when opening a season; preserve expanded seasons during progress updates.",
       "Organise titles with Favourites, Archive and custom lists without replacing watch status or history.",
@@ -109,7 +109,7 @@
     "number": 274
   },
   "737498912c0ad423cc4de25468de8bc2a79b80a0": {
-    "title": "Weekly Releases opt-out regression test — failed build",
+    "title": "Weekly Releases opt-out regression test \u2014 failed build",
     "changes": [
       "Attempted to add regression coverage for the per-show Hide from Weekly Releases preference.",
       "The build failed because the assertion expected the wrong checkbox selector; corrected by commit 91cd960."
@@ -117,7 +117,7 @@
     "number": 273
   },
   "052cc746bdcbaff93e343a177532b69f7d611a01": {
-    "title": "Add per-show Weekly Releases visibility setting — cancelled build",
+    "title": "Add per-show Weekly Releases visibility setting \u2014 cancelled build",
     "changes": [
       "Added a per-show checkbox to hide a series from Weekly Releases without removing it from the Library.",
       "Kept episode tracking and reminders attached to the existing media record.",
@@ -133,7 +133,7 @@
       "Open the new title page from upcoming releases, Prior Releases, TBA entries, recurring shows and saved search results instead of the old episode tracker or editor.",
       "Keep series on Episodes by default, with Details to the right, and restore focus to the clicked link on close.",
       "Move Recurring weekly shows to a collapsed dropdown at the top of Library home, with keyboard-accessible expansion and preserved open state during updates.",
-      "Add Recurring weekly shows as a separate Monday–Sunday section unaffected by Library filters, search, sorting, or the release-calendar range.",
+      "Add Recurring weekly shows as a separate Monday\u2013Sunday section unaffected by Library filters, search, sorting, or the release-calendar range.",
       "Keep each show listed, hold its aired episode for 24 hours, then advance to the next confirmed episode; retain Next episode TBA when no date is announced.",
       "Save verified recurring patterns across edits, metadata refreshes and reloads, respecting explicit Weekly Releases exclusions and showing device-local dates.",
       "Match Settings categories, Track Sync, and detail panels to the same grey as Changelog, with consistent separators and theme-aware light-mode colours.",
@@ -183,6 +183,15 @@
       "Reuse calendar formatting and grouping work; update recurring schedules at actual release and rollover boundaries.",
       "Remove the document-wide navigation observer and load gallery styles with the initial page styles.",
       "Fix saved-title search navigation and bulk-edit timestamps used by sync."
+    ]
+  },
+  "93d46d35f9dc28d8d434696aa679bd43af91ffa4": {
+    "title": "Granular sync, offline reopening, recovery and Library upgrades",
+    "changes": [
+      "Save changed titles and episode ticks with small, revision-guarded updates.",
+      "Reopen the complete app offline and sync saved device changes after reconnection.",
+      "Create optional single-use recovery codes for forgotten PINs.",
+      "Add Continue Watching, page history, lazy season loading, favourites, Archive and custom lists."
     ]
   }
 }

@@ -130,3 +130,15 @@ test('Reminder copy names each show or film and uses a single reminder heading',
   [{title:'NCIS'},{kind:'episode',season:23,number:2},0,'NCIS — S23 E2 is out now.'],
  ]){const copy=c.reminderCopy(item,event,lead);assert.equal(copy.title,'Watch Logger Reminder');assert.equal(copy.body,body);}
 });
+
+test('Saving an older edit form preserves episode ticks received from another device',async()=>{
+ const base=baseShow(),remote={...base,platform:'Old',curEp:6,lastWatchedEpisode:6,watchedEpisodes:{1:[1,2,3,4,5,6]}};
+ const values={'item-id':'show',title:'Example',type:'Series',status:'Watching','tvmaze-id':'1','cur-season':'1','cur-ep':'5','watched-seasons':'0','total-seasons':'1',platform:'New service'};
+ const nodes=new Map(),$=id=>{if(!nodes.has(id))nodes.set(id,{value:values[id]??''});return nodes.get(id);};
+ const app=frontend({currentUser:{id:'test'},mediaForm:{_baseItem:{...base,platform:'Old'}},saveBtn:{},$,mediaItems:[remote],
+  freshEditorVerification:()=>null,pendingEditorVerification:()=>null,scheduleMetadataRefresh(){},findTrackedDuplicate:()=>null,normalizeTitle:value=>value.toLowerCase(),sameRecordWithoutUpdateTime:()=>false,
+  render(){},closeEditor(){},showAppToast(){},persistLibrary:async()=>{},alert:message=>{throw Error(message);}});
+ vm.runInContext(html.slice(html.indexOf('mediaForm.onsubmit=async e=>{'),html.indexOf('  deleteBtn.onclick=')),app);
+ await app.mediaForm.onsubmit({preventDefault(){}});
+ assert.equal(app.mediaItems[0].platform,'New service');assert.deepEqual(copy(app.mediaItems[0].watchedEpisodes),remote.watchedEpisodes);assert.equal(app.mediaItems[0].curEp,6);
+});
