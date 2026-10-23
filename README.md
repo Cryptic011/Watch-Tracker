@@ -51,7 +51,18 @@ After Pages successfully deploys, `scripts/notify-deployment.mjs` verifies that 
 
 The push-backend migration creates the four private reminder tables and seeds one configuration row. Existing configuration, VAPID keys, and subscriptions are preserved. The first `public_key` request generates VAPID keys. For a new environment, configure a scheduler to POST `{"action":"process"}` to `watchlog-reminders` every minute, with `x-watchlog-cron` set to the configuration row's generated `cron_secret`. Keep that secret in the scheduler's private configuration. Configure the Supabase function secrets `WATCHLOG_OWNER_EMAIL` and `WATCHLOG_GITHUB_TOKEN` for private workflow-status notifications; use a read-only GitHub token with Actions read access, and do not commit either secret to source. The workflow token is never forwarded to Supabase. The migration does not create a scheduled job. Existing installations with manually provisioned tables should compare their schema before applying it: `CREATE TABLE IF NOT EXISTS` does not reconcile existing column or constraint differences.
 
-Run the application checks with `node --test tests/*.test.mjs`. The deployment workflow runs these checks before publishing.
+Use Node.js 24 for local development and tests, matching both CI workflows. Some tests use `node:module`'s `stripTypeScriptTypes`, which is unavailable in Node.js 20. The supported version is declared in `package.json` and `.nvmrc`.
+
+With nvm installed, run these commands from the repository directory:
+
+```sh
+nvm install
+nvm use
+npm ci
+npm test
+```
+
+Without nvm, select a Node.js 24 installation before running `npm ci` and `npm test`. The deployment workflow runs the application checks before publishing.
 
 ## Browser code
 
