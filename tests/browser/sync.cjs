@@ -1,7 +1,7 @@
 const {chromium,webkit}=require('playwright');
 const assert=require('node:assert/strict'),http=require('node:http'),fs=require('node:fs'),path=require('node:path');
 const root=path.resolve(__dirname,'../..'),account={id:'two-device-account',email:'devices@example.test',displayName:'Two devices'};
-let revision=0,serial=0,conflicts=0,barrierRemaining=0,barrier=[],dropToken='',failures=new Map();
+let revision=0,serial=0,conflicts=0,barrierRemaining=0,barrier=[],dropToken='',failures=new Map(),offlineA=false;
 const tokens=new Set(),errors=[],calls=new Map(),receipts=new Map();
 let items=[{id:'show',title:'Two Device Show',type:'Series',status:'Watching',platform:'Original service',episodeScheduleVerified:true,releasedEpisodes:{1:[1,2,3,4,5,6,7,8,9,10]},watchedEpisodes:{1:[1]},episodeCounts:{1:10},verifiedCompletedSeasons:1,totalSeasons:1,curSeason:1,curEp:1,watchedSeasons:0,seriesReleaseDate:'2020-01-01'}, {id:'film',title:'Deletion test',type:'Film',status:'Planned',filmReleaseDate:'2020-01-01',filmReleaseSource:'Manual'}];
 function patch(changes){
@@ -20,6 +20,9 @@ function patch(changes){
 }
 const server=http.createServer(async(req,res)=>{
  try{
+  // Block this device at the actual origin too: worker-owned requests can
+  // bypass the automation network-offline flag while another device stays online.
+  if(offlineA&&String(req.headers.cookie||'').split(';').some(value=>value.trim()==='watchlog-test-device=A')){res.destroy();return;}
   const pathname=new URL(req.url,'http://local').pathname;
   if(pathname.startsWith('/functions/v1/')){
    const chunks=[];for await(const chunk of req)chunks.push(chunk);const body=JSON.parse(Buffer.concat(chunks).toString()||'{}'),token=req.headers['x-watchlog-session'];
@@ -58,6 +61,7 @@ const mark=(page,episode)=>page.evaluate(ep=>toggleEpisodeWatched('show',1,ep),e
  const browsers=await Promise.all([chromium.launch({headless:true}),webkit.launch({headless:true})]);
  try{
   const contexts=await Promise.all(browsers.map(browser=>browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true,serviceWorkers:'allow'})));
+  await Promise.all(contexts.map((context,i)=>context.addCookies([{name:'watchlog-test-device',value:i===0?'A':'B',url:base}])));
   for(const context of contexts){await context.addInitScript(()=>window.WebSocket=undefined);await context.route('https://**/*',route=>route.fulfill({headers:{'access-control-allow-origin':'*'},json:[]}));}
   const observe=page=>page.on('pageerror',error=>errors.push(error.message));let a=await contexts[0].newPage(),b=await contexts[1].newPage();observe(a);observe(b);
   for(const page of [a,b]){await page.goto(base);await page.locator('#auth-email').fill(account.email);await page.locator('#auth-pin').fill('1234');await page.locator('#auth-submit').click();await page.waitForFunction(()=>document.querySelector('#auth-screen').classList.contains('hidden'));await page.waitForFunction(()=>navigator.serviceWorker.controller);}
@@ -73,11 +77,11 @@ const mark=(page,episode)=>page.evaluate(ep=>toggleEpisodeWatched('show',1,ep),e
   await Promise.all([progress(a,[3,4]),progress(b,[3,4])]);assert.ok(conflicts>0);
   console.log('cross-device: concurrent episode writes rebase after a real revision conflict');
 
-  await contexts[0].setOffline(true);await mark(a,5);await a.waitForFunction(()=>!localSaveInFlight&&!cloudSaveInFlight);
+  offlineA=true;await contexts[0].setOffline(true);await mark(a,5);await a.waitForFunction(()=>!localSaveInFlight&&!cloudSaveInFlight);
   await b.evaluate(async()=>{await saveTitleNotes('show','Notes from the other device');await saveTitleOrganisation('show',{favorite:true});mediaItems=mediaItems.filter(item=>item.id!=='film');await persistLibrary(mediaItems,{background:true,precleaned:true});});await mark(b,6);await settled(b);
   await a.close();a=await contexts[0].newPage();observe(a);await a.goto(base+'/#/title/show');await progress(a,[5]);
   assert.equal(show().watchedEpisodes[1].includes(5),false);
-  await contexts[0].setOffline(false);await a.evaluate(()=>window.dispatchEvent(new Event('online')));
+  offlineA=false;await contexts[0].setOffline(false);await a.evaluate(()=>window.dispatchEvent(new Event('online')));
   await Promise.all([progress(a,[5,6]),progress(b,[5,6])]);await Promise.all([settled(a),settled(b)]);
   for(const page of [a,b])assert.equal(await page.evaluate(()=>{const item=mediaItems.find(item=>item.id==='show');return item.notes==='Notes from the other device'&&item.favorite===true&&!mediaItems.some(item=>item.id==='film');}),true);
   console.log('cross-device: offline close/reopen/reconnect retains ticks, remote notes, favourites and deletion');
@@ -96,9 +100,18 @@ const mark=(page,episode)=>page.evaluate(ep=>toggleEpisodeWatched('show',1,ep),e
   await a.evaluate(()=>saveTitleNotes('show','New remote note'));await settled(a);
   await b.waitForFunction(()=>mediaItems.find(item=>item.id==='show').notes==='New remote note',{timeout:25000});
   assert.equal(await b.locator('[data-gallery-notes-field]').inputValue(),'Unsaved draft');await b.locator('[data-gallery-cancel-notes]').click();assert.equal(await b.locator('[data-gallery-notes-preview] p').textContent(),'New remote note');
-  await a.evaluate(()=>openEdit('show'));await mark(b,10);await progress(a,[10]);await a.locator('#platform').fill('New service');await a.locator('#save-btn').click();await settled(a);
+  await a.evaluate(()=>{document.querySelector('.gallery-detail[open]')?.close();return openEdit('show');});await mark(b,10);await progress(a,[10]);await a.locator('#platform').fill('New service');await a.locator('#save-btn').click();await settled(a);
   assert.ok(show().watchedEpisodes[1].includes(10));assert.equal(show().platform,'New service');
+  await b.waitForFunction(()=>mediaItems.find(item=>item.id==='show').platform==='New service',null,{timeout:25000});
   console.log('cross-device: incoming updates retain notes drafts and older forms preserve newer episode progress');
+
+  await b.waitForFunction(()=>!cloudSyncInFlight);
+  await b.evaluate(()=>{Object.defineProperty(document,'visibilityState',{configurable:true,get:()=>'hidden'});document.dispatchEvent(new Event('visibilitychange'));});
+  await a.evaluate(()=>saveTitleOrganisation('show',{favorite:false}));await settled(a);
+  assert.equal(await b.evaluate(()=>mediaItems.find(item=>item.id==='show').favorite),true);
+  await b.evaluate(()=>{Object.defineProperty(document,'visibilityState',{configurable:true,get:()=>'visible'});document.dispatchEvent(new Event('visibilitychange'));});
+  await b.waitForFunction(()=>mediaItems.find(item=>item.id==='show').favorite===false,null,{timeout:5000});
+  console.log('cross-device: returning to a suspended device checks changes immediately');
 
   for(const page of [a,b]){await settled(page);assert.equal(await page.evaluate(async()=>(await loadCacheRecord()).dirty),false);}
   assert.deepEqual(errors,[]);console.log('Chromium ↔ WebKit: independent-device sync suite passed');
