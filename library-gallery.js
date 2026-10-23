@@ -143,8 +143,8 @@ window.WatchLogGallery=(()=>{
   }
   async function changeProgress(item,button,save){
     const section=dialog.querySelector('.gallery-season-list'),expanded=[...dialog.querySelectorAll('.gallery-season[open]')].map(node=>node.dataset.season),scrollTop=dialog.scrollTop;
-    const selector=button.hasAttribute('data-gallery-season')?`[data-gallery-season="${button.dataset.gallerySeason}"]`:`[data-gallery-toggle-episode="${button.dataset.galleryToggleEpisode}"]`;
-    dialog.querySelectorAll('[data-gallery-season],[data-gallery-toggle-episode]').forEach(control=>{control.disabled=true;});
+    const selector=button.hasAttribute('data-gallery-watch-next')?'[data-gallery-watch-next]':button.hasAttribute('data-gallery-season')?`[data-gallery-season="${button.dataset.gallerySeason}"]`:`[data-gallery-toggle-episode="${button.dataset.galleryToggleEpisode}"]`;
+    dialog.querySelectorAll('[data-gallery-season],[data-gallery-toggle-episode],[data-gallery-watch-next]').forEach(control=>{control.disabled=true;});
     try{await save();}
     finally{
       const fresh=api.items().find(row=>String(row.id)===String(item.id));
@@ -152,7 +152,7 @@ window.WatchLogGallery=(()=>{
         detail(fresh);
         for(const node of dialog.querySelectorAll('.gallery-season'))node.open=expanded.includes(node.dataset.season);
         dialog.scrollTop=scrollTop;
-        dialog.querySelector(selector)?.focus({preventScroll:true});
+        (dialog.querySelector(selector)||dialog.querySelector('[data-gallery-view="watch"]'))?.focus({preventScroll:true});
       }
     }
   }
@@ -191,6 +191,7 @@ window.WatchLogGallery=(()=>{
     let savedNotes=String(item.notes||'').trim();
     const releases=show?(api.released?.(item)||item.releasedEpisodes||{}):{},watched=show?(api.watched?.(item)||item.watchedEpisodes||{}):{};
     const seasons=Object.keys(releases).map(Number).filter(number=>Number.isInteger(number)&&number>0).sort((left,right)=>left-right);
+    const next=show?api.next?.(item):null;
     dialog.innerHTML=`<header class="gallery-detail-header"><h2>${esc(item.title)}</h2><div class="gallery-detail-header-actions">
       <button type="button" class="gallery-menu-button" data-gallery-menu aria-label="Title actions" aria-expanded="false">•••</button>
       <button type="button" class="gallery-back" data-gallery-close aria-label="Close details">×</button></div></header>
@@ -204,6 +205,7 @@ window.WatchLogGallery=(()=>{
       <div class="gallery-detail-tabs" role="tablist" aria-label="Title view"><button id="gallery-watch-tab" type="button" role="tab" aria-selected="true" aria-controls="gallery-watch-panel" data-gallery-view="watch">${show?'Episodes':'Overview'}</button><button id="gallery-info-tab" type="button" role="tab" tabindex="-1" aria-selected="false" aria-controls="gallery-info-panel" data-gallery-view="details">Details</button></div>
       <section id="gallery-watch-panel" class="gallery-watch-panel" role="tabpanel" aria-labelledby="gallery-watch-tab" data-gallery-panel="watch">
         ${api.reminder(item,isFilm(item))}
+        ${show?(next?`<button type="button" class="btn btn-primary gallery-watch-next" data-gallery-watch-next>Watch next · S${next.season} E${next.episode}</button>`:seasons.length?'<p class="gallery-caught-up" role="status">All released episodes watched</p>':''):''}
         ${show?`<section class="gallery-season-list"><h3>All Episodes</h3>${seasons.map(season=>seasonRow(item,season,releases,watched)).join('')||'<p class="gallery-empty">No verified released episodes available yet.</p>'}</section>`:''}
         <div class="gallery-detail-copy" data-gallery-watch-summary><strong>${esc(item.status||'Planned')}</strong><p>Watched to - ${esc(watchedTo)}</p><p>Watched on: ${esc(item.platform||'Not specified')}</p></div>
       </section>
@@ -248,6 +250,12 @@ window.WatchLogGallery=(()=>{
       if(!confirm(`Delete ${item.title} from your library?`))return;
       const button=dialog.querySelector('[data-gallery-delete]');button.disabled=true;
       if(await api.remove?.(item.id))dialog.close();else{button.disabled=false;button.textContent='Delete failed — retry';}
+    };
+    const watchNext=dialog.querySelector('[data-gallery-watch-next]');
+    if(watchNext)watchNext.onclick=()=>{
+      const current=api.items().find(row=>String(row.id)===String(item.id));if(!current)return;
+      const candidate=api.next?.(current);if(!candidate){detail(current);return;}
+      return changeProgress(current,watchNext,()=>api.toggleEpisode?.(current.id,candidate.season,candidate.episode));
     };
     dialog.querySelectorAll('[data-gallery-toggle-episode]').forEach(button=>{button.onclick=()=>{
       const [season,episode]=button.dataset.galleryToggleEpisode.split(':').map(Number);

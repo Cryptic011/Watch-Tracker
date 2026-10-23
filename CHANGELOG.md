@@ -1,3 +1,10 @@
+## 2026-10-23 — Add Watch next and simplify Library home
+- Add Watch next to the Episodes page, using the earliest unwatched released episode without requiring a season to be opened.
+- Save through the existing watch-progress flow, prevent duplicate clicks while saving, and preserve expanded seasons and scroll position.
+- Show All released episodes watched when caught up, without offering unreleased episodes or episode actions on films.
+- Keep recurring shows first and Movies/Series beneath them, with Your schedule below as a collapsed, keyboard-accessible dropdown.
+- Preserve both schedules' expanded state during updates and navigation; cover progress and compact home behaviour in both browsers.
+
 ## 2026-10-23 — Open the new title page from every viewing shortcut
 - Route upcoming releases, Prior Releases, TBA entries, recurring weekly shows, and saved-title search shortcuts to the same new title page as Library cards.
 - Open series on Episodes with Details beside it, and films on Overview; keep Edit as a separate explicit action.

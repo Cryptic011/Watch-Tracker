@@ -78,6 +78,7 @@ const server=http.createServer((req,res)=>{
   assert.equal(await page.locator('#discovery-results [data-discovery-add]').first().textContent(),'View in library');
   await page.locator('#discovery-results [data-discovery-add]').first().click();
   assert.equal(await page.getByRole('tab',{name:'Overview',exact:true}).getAttribute('aria-selected'),'true','saved search results open the new film page');
+  assert.equal(await page.locator('[data-gallery-watch-next]').count(),0,'films do not show an episode action');
   assert.equal(await page.locator('#modal').isVisible(),false,'viewing a saved search result is not editing it');
   await page.locator('[data-gallery-close]').click();
   await page.locator('[data-tab="library"]').click();await page.locator('[data-tab="search"]').click();assert.equal(await page.locator('#discovery-query').inputValue(),'Browser Test Film');
@@ -180,6 +181,11 @@ const server=http.createServer((req,res)=>{
   assert.equal(await page.getByRole('tab',{name:'Episodes',exact:true}).getAttribute('aria-selected'),'true');
   assert.equal(await page.locator('[data-gallery-notes-preview]').isVisible(),false);
   assert.equal(await page.locator('[data-gallery-watch-summary]').evaluate(summary=>summary.previousElementSibling.classList.contains('gallery-season-list')),true,'watch summary is below seasons');
+  assert.equal(await page.locator('[data-gallery-watch-next]').textContent(),'Watch next · S1 E1');
+  await page.locator('[data-gallery-watch-next]').click();await page.waitForFunction(()=>!episodeLogBusy.size&&!cloudSaveInFlight);
+  assert.deepEqual(items.find(row=>row.id==='show').watchedEpisodes,{'1':[1,2]});
+  assert.equal(await page.locator('.gallery-season[open]').count(),0,'Watch next needs no expanded season');
+  assert.equal(await page.locator('[data-gallery-watch-next]').textContent(),'Watch next · S1 E3','Watch next advances past already-watched episodes');
   await page.getByRole('tab',{name:'Details',exact:true}).click();
   await page.waitForFunction(()=>document.querySelector('[data-gallery-details]').textContent.includes('official series description'));
   assert.match(await page.locator('[data-gallery-details]').textContent(),/Drama · Action/);
@@ -191,6 +197,7 @@ const server=http.createServer((req,res)=>{
   assert.equal(await page.locator('.gallery-season-list').isVisible(),false);
   await page.getByRole('tab',{name:'Episodes',exact:true}).click();
   await page.locator('.gallery-season summary').first().click();
+  await page.locator('[data-gallery-toggle-episode="1:1"]').click();await page.waitForFunction(()=>!episodeLogBusy.size&&!cloudSaveInFlight);
   await page.locator('[data-gallery-episode="1:1"] img').waitFor({state:'visible'});
   assert.equal(await page.locator('[data-gallery-episode="1:1"] img').getAttribute('src'),'https://static.tvmaze.com/episode-one.jpg');
   await page.locator('[data-gallery-season-art="1"] img').waitFor({state:'visible'});
@@ -228,9 +235,10 @@ const server=http.createServer((req,res)=>{
    await page.screenshot({path:path.join(process.env.BROWSER_SCREENSHOT_DIR,engine.name()+'-tracker-light.png')});
    await page.evaluate(()=>document.documentElement.dataset.theme='dark');
   }
-  await page.locator('[data-gallery-toggle-episode="1:1"]').click();
+  await page.locator('[data-gallery-watch-next]').click();
   await page.waitForFunction(()=>!episodeLogBusy.size&&!cloudSaveInFlight);
   assert.deepEqual(items.find(x=>x.id==='show').watchedEpisodes,{'1':[1,2]});
+  assert.equal(await page.locator('.gallery-season[data-season="1"]').getAttribute('open'),'','Watch next preserves expanded seasons');
   await page.locator('[data-gallery-season="2"]').scrollIntoViewIfNeeded();
   const trackerScroll=await page.locator('.gallery-detail').evaluate(dialog=>dialog.scrollTop);
   await page.locator('[data-gallery-season="2"]').click();
@@ -344,7 +352,16 @@ const server=http.createServer((req,res)=>{
   assert.equal(await recurring.locator('[data-recurring-open="show"]').count(),1);
   assert.match(await recurring.textContent(),/S2 E2/);
   const scheduleText=await recurring.textContent();
+  const calendarDropdown=page.locator('#library-dashboard>details');
+  assert.equal(await calendarDropdown.getAttribute('open'),null,'Your schedule starts collapsed');
+  assert.equal(await page.locator('#library-view').evaluate(home=>{
+   const recurring=home.querySelector('#recurring-weekly-dashboard'),categories=home.querySelector('#media-list'),calendar=home.querySelector('#library-dashboard');
+   return Boolean(recurring.compareDocumentPosition(categories)&Node.DOCUMENT_POSITION_FOLLOWING)&&Boolean(categories.compareDocumentPosition(calendar)&Node.DOCUMENT_POSITION_FOLLOWING);
+  }),true,'home orders recurring shows, Movies/Series, then Your schedule');
+  await calendarDropdown.locator(':scope>summary').focus();await page.keyboard.press('Enter');
+  assert.equal(await page.locator('[data-calendar-range="today"]').isVisible(),true);
   await page.locator('[data-calendar-range="today"]').click();
+  assert.equal(await calendarDropdown.getAttribute('open'),'','range changes keep Your schedule expanded');
   assert.equal(await recurring.textContent(),scheduleText,'calendar range cannot change the recurring schedule');
   await page.locator('[data-gallery-category="Series"]').click();
   await page.locator('[data-filter="Watched"]').click();
@@ -357,6 +374,7 @@ const server=http.createServer((req,res)=>{
   await page.waitForFunction(()=>searchQuery==='');
   await page.locator('[data-filter="All"]').click();await page.locator('#sort-mode').selectOption('current');
   await page.locator('[data-gallery-back]').click();
+  assert.equal(await calendarDropdown.getAttribute('open'),'','returning home preserves Your schedule expansion');
   assert.equal(await recurring.isVisible(),true);
   assert.equal(await recurring.locator('[data-recurring-open="show"]').isVisible(),true,'returning home preserves the expanded dropdown');
   await page.evaluate(()=>{const item=mediaItems.find(row=>row.id==='show');item.platform+=' test';render();item.platform=item.platform.slice(0,-5);render();});
@@ -382,6 +400,13 @@ const server=http.createServer((req,res)=>{
   await page.locator('#library-dashboard [data-dashboard-open="show"]').first().click();
   assert.equal(await page.getByRole('tab',{name:'Episodes',exact:true}).getAttribute('aria-selected'),'true','upcoming releases open the new Episodes page');
   assert.equal(await page.locator('#episode-tracker-modal').isVisible(),false);
+  await page.locator('[data-gallery-watch-next]').click();await page.waitForFunction(()=>!episodeLogBusy.size&&!cloudSaveInFlight);
+  assert.deepEqual(items.find(row=>row.id==='show').watchedEpisodes,{'1':[1,2,3]});
+  for(const season of [1,2]){
+   await page.locator('[data-gallery-season="'+season+'"]').click();await page.waitForFunction(()=>!episodeLogBusy.size&&!cloudSaveInFlight);
+  }
+  assert.equal(await page.locator('[data-gallery-watch-next]').count(),0,'unreleased episodes are never offered by Watch next');
+  assert.equal(await page.locator('.gallery-caught-up').textContent(),'All released episodes watched');
   await page.locator('[data-gallery-close]').click();
   phase='refresh';
   const refreshItemId=await page.evaluate(()=>{mediaItems[0].platform='Saved before refresh';return mediaItems[0].id;});
@@ -394,6 +419,7 @@ const server=http.createServer((req,res)=>{
   assert.equal(items.find(item=>item.id===refreshItemId)?.platform,'Saved before refresh');
   assert.equal(await page.locator('#recurring-weekly-dashboard [data-recurring-open="show"]').count(),1,'recurring membership survives reload');
   assert.equal(await page.locator('#recurring-weekly-dashboard details').getAttribute('open'),null,'reload starts with a compact dropdown');
+  assert.equal(await page.locator('#library-dashboard>details').getAttribute('open'),null,'Your schedule also starts collapsed after reload');
   assert.ok(loads>before);
   // A failed cloud save must leave the current page and edit intact.
   phase='failed save';

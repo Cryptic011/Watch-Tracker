@@ -64,8 +64,10 @@
     "number": 224
   },
   "__current": {
-    "title": "Open the new Episodes and Details page from release links",
+    "title": "Add Watch next and a compact Library home",
     "changes": [
+      "Add Watch next to Episodes to mark the earliest unwatched released episode without opening a season, retaining the existing save and catch-up behaviour.",
+      "Keep recurring shows above Movies and Series, and make Your schedule a collapsed, keyboard-accessible dropdown that preserves its open state.",
       "Open the new title page from upcoming releases, Prior Releases, TBA entries, recurring shows and saved search results instead of the old episode tracker or editor.",
       "Keep series on Episodes by default, with Details to the right, and restore focus to the clicked link on close.",
       "Move Recurring weekly shows to a collapsed dropdown at the top of Library home, with keyboard-accessible expansion and preserved open state during updates.",
