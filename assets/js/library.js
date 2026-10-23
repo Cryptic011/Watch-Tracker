@@ -277,8 +277,8 @@
     const settings=tab==="settings",search=tab==="search";
     libraryView.classList.toggle("hidden",settings||search);settingsView.classList.toggle("hidden",!settings);
     $("discovery-view").classList.toggle("hidden",!search);
-    document.querySelector(".top-nav .search-box").classList.toggle("hidden",search);
-    document.querySelector(".stats-row").classList.toggle("hidden",search);
+    document.querySelector(".top-nav .search-box").classList.toggle("hidden",settings||search);
+    document.querySelector(".stats-row").classList.toggle("hidden",settings||search);
     updateFloatingAddVisibility();
     if(search){activateTitleSearch();return;}
     pauseTitleSearch();

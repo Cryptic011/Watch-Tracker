@@ -1,3 +1,7 @@
+## 2026-10-23 — Keep Settings focused on settings
+- Hide the Library search box and Planned, Watching, and Watched tracking totals on Settings and all its category panels.
+- Restore both controls when returning to Library, and keep the separate Search page's existing layout.
+
 ## 2026-10-23 — Add Watch next and simplify Library home
 - Add Watch next to the Episodes page, using the earliest unwatched released episode without requiring a season to be opened.
 - Save through the existing watch-progress flow, prevent duplicate clicks while saving, and preserve expanded seasons and scroll position.

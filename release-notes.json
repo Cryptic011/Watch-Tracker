@@ -64,33 +64,10 @@
     "number": 224
   },
   "__current": {
-    "title": "Add Watch next and a compact Library home",
+    "title": "Keep Settings focused on settings",
     "changes": [
-      "Add Watch next to Episodes to mark the earliest unwatched released episode without opening a season, retaining the existing save and catch-up behaviour.",
-      "Keep recurring shows above Movies and Series, and make Your schedule a collapsed, keyboard-accessible dropdown that preserves its open state.",
-      "Open the new title page from upcoming releases, Prior Releases, TBA entries, recurring shows and saved search results instead of the old episode tracker or editor.",
-      "Keep series on Episodes by default, with Details to the right, and restore focus to the clicked link on close.",
-      "Move Recurring weekly shows to a collapsed dropdown at the top of Library home, with keyboard-accessible expansion and preserved open state during updates.",
-      "Add Recurring weekly shows as a separate Monday–Sunday section unaffected by Library filters, search, sorting, or the release-calendar range.",
-      "Keep each show listed, hold its aired episode for 24 hours, then advance to the next confirmed episode; retain Next episode TBA when no date is announced.",
-      "Save verified recurring patterns across edits, metadata refreshes and reloads, respecting explicit Weekly Releases exclusions and showing device-local dates.",
-      "Match Settings categories, Track Sync, and detail panels to the same grey as Changelog, with consistent separators and theme-aware light-mode colours.",
-      "Marking any episode watched also marks earlier released episodes in that season only, across every season; other seasons and later episodes stay unchanged.",
-      "Keep unmarking individual and let Undo restore the exact previous season selection, preserving existing progress and gaps.",
-      "Replace the floating management toolbar with one stationary pencil beside the total Series or Movies count, never beside individual list counts or overlapping Add show or film.",
-      "Manage all tracked titles in the selected category regardless of the active filter, with selection feedback inside the management dialog.",
-      "Open Notes visibly from the title menu and save changes with an updated timestamp for sync.",
-      "Show saved Notes below the poster only when notes exist, with the watch summary at the bottom using Watched to - and Watched on:.",
-      "Open series on Episodes and films on Overview, with verified catalogue information under Details to the right.",
-      "Use responsive episode rows with natural thumbnail proportions, readable text, and a right-hand scroll gutter.",
-      "Keep progress changes on dedicated accessible watch buttons, preserving expanded seasons and scroll position after saves.",
-      "Show only artwork attached to the matching episode or season record, with neutral placeholders when artwork is missing.",
-      "Consolidate artwork fetching and gallery styles, and preserve verified images through title edits and metadata refreshes.",
-      "Keep Settings grouped into General, Release Reminders, and Account & Sync, with a working Track Sync shortcut and owner-only Maintenance page.",
-      "Keep Reminders under Release Reminders, readable Prior Releases rows, and Notes, Edit, and Delete in the title menu.",
-      "Use the supplied PNG app icon and dedicated iOS home-screen icon.",
-      "Preserve library export and merge-based restore in Account & Sync.",
-      "Report the actual run number and attempt; gate deployment on application and Chromium/WebKit browser checks, with preinstalled browser dependencies and a ten-minute job limit."
+      "Hide Library search and the Planned, Watching and Watched tracking totals throughout Settings.",
+      "Restore search and totals when returning to Library; preserve the separate Search page layout."
     ]
   },
   "37f6c39e9d0355b1bde705cb3fcb3cda2533119f": {
@@ -141,5 +118,35 @@
       "The deployment run was cancelled before verification; the feature was retained and its test was corrected in later commits."
     ],
     "number": 272
+  },
+  "5fea71a85451ab9d63f9411b55faf456333db173": {
+    "title": "Add Watch next and a compact Library home",
+    "changes": [
+      "Add Watch next to Episodes to mark the earliest unwatched released episode without opening a season, retaining the existing save and catch-up behaviour.",
+      "Keep recurring shows above Movies and Series, and make Your schedule a collapsed, keyboard-accessible dropdown that preserves its open state.",
+      "Open the new title page from upcoming releases, Prior Releases, TBA entries, recurring shows and saved search results instead of the old episode tracker or editor.",
+      "Keep series on Episodes by default, with Details to the right, and restore focus to the clicked link on close.",
+      "Move Recurring weekly shows to a collapsed dropdown at the top of Library home, with keyboard-accessible expansion and preserved open state during updates.",
+      "Add Recurring weekly shows as a separate Monday–Sunday section unaffected by Library filters, search, sorting, or the release-calendar range.",
+      "Keep each show listed, hold its aired episode for 24 hours, then advance to the next confirmed episode; retain Next episode TBA when no date is announced.",
+      "Save verified recurring patterns across edits, metadata refreshes and reloads, respecting explicit Weekly Releases exclusions and showing device-local dates.",
+      "Match Settings categories, Track Sync, and detail panels to the same grey as Changelog, with consistent separators and theme-aware light-mode colours.",
+      "Marking any episode watched also marks earlier released episodes in that season only, across every season; other seasons and later episodes stay unchanged.",
+      "Keep unmarking individual and let Undo restore the exact previous season selection, preserving existing progress and gaps.",
+      "Replace the floating management toolbar with one stationary pencil beside the total Series or Movies count, never beside individual list counts or overlapping Add show or film.",
+      "Manage all tracked titles in the selected category regardless of the active filter, with selection feedback inside the management dialog.",
+      "Open Notes visibly from the title menu and save changes with an updated timestamp for sync.",
+      "Show saved Notes below the poster only when notes exist, with the watch summary at the bottom using Watched to - and Watched on:.",
+      "Open series on Episodes and films on Overview, with verified catalogue information under Details to the right.",
+      "Use responsive episode rows with natural thumbnail proportions, readable text, and a right-hand scroll gutter.",
+      "Keep progress changes on dedicated accessible watch buttons, preserving expanded seasons and scroll position after saves.",
+      "Show only artwork attached to the matching episode or season record, with neutral placeholders when artwork is missing.",
+      "Consolidate artwork fetching and gallery styles, and preserve verified images through title edits and metadata refreshes.",
+      "Keep Settings grouped into General, Release Reminders, and Account & Sync, with a working Track Sync shortcut and owner-only Maintenance page.",
+      "Keep Reminders under Release Reminders, readable Prior Releases rows, and Notes, Edit, and Delete in the title menu.",
+      "Use the supplied PNG app icon and dedicated iOS home-screen icon.",
+      "Preserve library export and merge-based restore in Account & Sync.",
+      "Report the actual run number and attempt; gate deployment on application and Chromium/WebKit browser checks, with preinstalled browser dependencies and a ten-minute job limit."
+    ]
   }
 }

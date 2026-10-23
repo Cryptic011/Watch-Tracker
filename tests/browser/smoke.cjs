@@ -296,10 +296,16 @@ const server=http.createServer((req,res)=>{
   assert.equal(items.length,2);
   // Exercise the Settings menu and each drill-in panel in a mobile browser.
   phase='settings visibility';
+  const assertSettingsOnly=async()=>{
+   for(const selector of ['.top-nav .search-box','.stats-row','#library-view','#discovery-view','#add-btn']){
+    assert.equal(await page.locator(selector).isVisible(),false,selector+' must not be visible in Settings');
+   }
+  };
   await page.locator('[data-tab="settings"]').click();
   await page.waitForFunction(()=>!document.querySelector('#settings-view').classList.contains('hidden')&&document.querySelector('#library-view').classList.contains('hidden'));
   assert.equal(await page.locator('#settings-category-menu').isVisible(),true,'Settings category menu is visible');
   assert.equal(await page.locator('.settings-quick-actions').isVisible(),true,'Track Sync shortcut is visible');
+  await assertSettingsOnly();
   for(const theme of ['dark','light']){
    await page.evaluate(value=>document.documentElement.dataset.theme=value,theme);
    const colours=await page.evaluate(()=>{
@@ -312,11 +318,14 @@ const server=http.createServer((req,res)=>{
   await page.evaluate(()=>document.documentElement.dataset.theme='dark');
   await page.locator('[data-settings-open="general"]').click();
   assert.equal(await page.locator('#appearance-mode').isVisible(),true,'General opens appearance controls');
+  await assertSettingsOnly();
   await page.locator('[data-settings-panel="general"] [data-settings-back]').click();
   await page.locator('[data-settings-open="reminders"]').click();
   assert.equal(await page.locator('#background-reminder-status').isVisible(),true,'Release Reminders opens reminder controls');
+  await assertSettingsOnly();
   await page.locator('[data-settings-panel="reminders"] [data-settings-back]').click();
   await page.locator('[data-settings-open="account"]').click();
+  await assertSettingsOnly();
   for(const selector of ['[data-settings-panel="account"] .profile-card','#sync-now','#logout-btn']){
     assert.ok(await page.locator(selector).count()>=1,selector+' exists in the document');
     assert.equal(await page.locator(selector).first().isVisible(),true,selector+' visible in Account & Sync');
@@ -328,8 +337,17 @@ const server=http.createServer((req,res)=>{
   for(let attempt=0;attempt<100&&loads===loadsBeforeTrackSync;attempt++)await new Promise(resolve=>setTimeout(resolve,50));
   assert.ok(loads>loadsBeforeTrackSync,'Track Sync performs a cloud library load');
   await page.waitForFunction(()=>!document.querySelector('#sync-now').disabled&&document.querySelector('#sync-status').textContent.includes('Synced.'),null,{timeout:10000});
+  await assertSettingsOnly();
+  await page.locator('[data-tab="search"]').click();
+  assert.equal(await page.locator('#discovery-view').isVisible(),true,'Search opens after leaving Settings');
+  assert.equal(await page.locator('.top-nav .search-box').isVisible(),false);
+  assert.equal(await page.locator('.stats-row').isVisible(),false);
+  await page.locator('[data-tab="settings"]').click();
+  await assertSettingsOnly();
   await page.locator('[data-tab="library"]').click();
   await page.waitForFunction(()=>document.querySelector('#settings-view').classList.contains('hidden')&&!document.querySelector('#library-view').classList.contains('hidden'));
+  assert.equal(await page.locator('.top-nav .search-box').isVisible(),true,'Library search returns on Library');
+  assert.equal(await page.locator('.stats-row').isVisible(),true,'Tracking totals return on Library');
   for(const selector of ['.profile-card','#sync-now','#logout-btn','#appearance-mode','#background-reminder-status','#enable-background-reminders']){
     assert.equal(await page.locator(selector).first().isVisible(),false,selector+' must not be visible in Library');
   }
