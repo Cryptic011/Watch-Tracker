@@ -1,10 +1,20 @@
 const {chromium,webkit}=require('playwright');
 const assert=require('node:assert/strict'),http=require('node:http'),fs=require('node:fs'),path=require('node:path');
 const root=path.resolve(__dirname,'../..');
-const server=http.createServer((req,res)=>{
+let handleApi;
+const server=http.createServer(async(req,res)=>{
  const pathname=decodeURIComponent(new URL(req.url,'http://local').pathname),file=path.resolve(root,'.'+(pathname==='/'?'/index.html':pathname));
+ if(pathname.startsWith('/functions/v1/')){
+  const chunks=[];for await(const chunk of req)chunks.push(chunk);
+  const result=await handleApi(pathname,JSON.parse(Buffer.concat(chunks).toString()||'{}'),req.headers['x-watchlog-session']);
+  res.writeHead(result.status||200,{'Content-Type':'application/json'});res.end(JSON.stringify(result.json));return;
+ }
  if(!file.startsWith(root+path.sep)||!fs.existsSync(file)){res.writeHead(404).end();return;}
- const extension=path.extname(file);res.setHeader('Content-Type',({'.js':'text/javascript','.css':'text/css','.html':'text/html','.json':'application/json','.png':'image/png','.webmanifest':'application/manifest+json'})[extension]||'application/octet-stream');res.end(fs.readFileSync(file));
+ let content=fs.readFileSync(file);
+ // Controlled WebKit pages bypass Playwright request routing. Use an actual
+ // local API so the worker and offline network failures are exercised in both engines.
+ if(pathname==='/assets/js/app-core.js')content=content.toString().replaceAll('https://okkwteywtgfsnlrjdyhv.supabase.co/functions/v1/',`http://${req.headers.host}/functions/v1/`);
+ const extension=path.extname(file);res.setHeader('Content-Type',({'.js':'text/javascript','.css':'text/css','.html':'text/html','.json':'application/json','.png':'image/png','.webmanifest':'application/manifest+json'})[extension]||'application/octet-stream');res.end(content);
 });
 function patch(items,changes){
  const map=new Map(items.map(item=>[String(item.id),structuredClone(item)]));
@@ -30,36 +40,35 @@ function patch(items,changes){
    const account={id:'upgrade-browser',email:'upgrade@example.test',displayName:'Browser test'},tokens=new Set(['initial']),saves=[],errors=[];
    let items=[{id:'show',title:'Offline Show',type:'Series',status:'Watching',episodeScheduleVerified:true,releasedEpisodes:{1:Array.from({length:300},(_,i)=>i+1),2:[1,2,3]},watchedEpisodes:{1:[1]},episodeCounts:{1:300,2:3},verifiedCompletedSeasons:2,seriesReleaseDate:'2020-01-01'}, {id:'film',title:'Unchanged Film',type:'Film',filmReleaseDate:'2020-01-01',status:'Planned'}];
    await context.addInitScript(({account})=>{if(!localStorage.getItem('watchlog_pin_session_v1'))localStorage.setItem('watchlog_pin_session_v1',JSON.stringify({token:'initial',account,revision:0}));window.WebSocket=undefined;},{account});
-   await context.route('https://**/*',async route=>{
-    const req=route.request(),headers={'access-control-allow-origin':req.headers().origin||base,'access-control-allow-methods':'POST, GET, OPTIONS','access-control-allow-headers':req.headers()['access-control-request-headers']||'content-type, x-watchlog-session','access-control-max-age':'600'};
-    if(offline)return route.abort('internetdisconnected');
-    if(req.method()==='OPTIONS')return route.fulfill({status:204,headers,body:''});
-    if(!req.url().includes('/functions/v1/watchlog-pin'))return route.fulfill({headers,json:{ok:true,enabled:false,results:[]}});
-    const body=req.postDataJSON(),token=req.headers()['x-watchlog-session'];let data={ok:true};
-    if(body.action==='app_status')return route.fulfill({headers,json:{ok:true,maintenance:false}});
+   handleApi=async(pathname,body,token)=>{
+    if(offline)return {status:503,json:{error:'Offline'}};
+    if(!pathname.endsWith('/watchlog-pin'))return {json:{ok:true,enabled:false,results:[]}};
+    let data={ok:true};
+    if(body.action==='app_status')return {json:{ok:true,maintenance:false}};
     if(body.action==='login'){
-     if(body.pin!==pin)return route.fulfill({status:401,headers,json:{error:'Email or PIN is incorrect.'}});
-     const newToken='session-'+(++serial);tokens.add(newToken);return route.fulfill({headers,json:{ok:true,account,items,revision,sessionToken:newToken}});
+     if(body.pin!==pin)return {status:401,json:{error:'Email or PIN is incorrect.'}};
+     const newToken='session-'+(++serial);tokens.add(newToken);return {json:{ok:true,account,items,revision,sessionToken:newToken}};
     }
     if(body.action==='recover'){
-     if(body.code!==code)return route.fulfill({status:401,headers,json:{error:'Email or recovery code is incorrect.'}});
-     pin=body.pin;tokens.clear();code='REPLACEMENT-CODE-SHOWN-ONCE';return route.fulfill({headers,json:{ok:true,recoveryCode:code}});
+     if(body.code!==code)return {status:401,json:{error:'Email or recovery code is incorrect.'}};
+     pin=body.pin;tokens.clear();code='REPLACEMENT-CODE-SHOWN-ONCE';return {json:{ok:true,recoveryCode:code}};
     }
-    if(!tokens.has(token))return route.fulfill({status:401,headers,json:{code:'session_expired',error:'Session expired.'}});
+    if(!tokens.has(token))return {status:401,json:{code:'session_expired',error:'Session expired.'}};
     if(body.action==='load')data={ok:true,account,items,revision};
     if(body.action==='catalog_search')data={ok:true,results:[]};
     if(body.action==='save'){
      saves.push(body);
-     if(body.expectedRevision!==revision)return route.fulfill({status:409,headers,json:{code:'revision_conflict',items,revision,error:'Conflict'}});
+     if(body.expectedRevision!==revision)return {status:409,json:{code:'revision_conflict',items,revision,error:'Conflict'}};
      items=patch(items,body.changes);revision++;data={ok:true,revision};
     }
     if(body.action==='recovery_generate'){
-     if(body.pin!==pin)return route.fulfill({status:401,headers,json:{error:'PIN is incorrect.'}});
+     if(body.pin!==pin)return {status:401,json:{error:'PIN is incorrect.'}};
      data={ok:true,recoveryCode:code};
     }
     if(body.action==='logout')tokens.delete(token);
-    return route.fulfill({headers,json:data});
-   });
+    return {json:data};
+   };
+   await context.route('https://**/*',route=>offline?route.abort('internetdisconnected'):route.fulfill({headers:{'access-control-allow-origin':'*'},json:{ok:true,enabled:false,results:[]}}));
    const page=await context.newPage();page.on('pageerror',error=>{errors.push(error.message);console.error(engine.name(),error.message);});
    page.on('console',message=>{if(!offline&&['warning','error'].includes(message.type()))console.error(engine.name(),message.text());});
    page.on('requestfailed',request=>{if(!offline)console.error(engine.name(),request.method(),request.url(),request.failure()?.errorText);});
