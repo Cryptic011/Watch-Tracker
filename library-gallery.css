@@ -54,7 +54,10 @@
 .gallery-caption{color:var(--muted);font-size:.82rem;text-align:center;padding:28px 0}
 .gallery-empty{color:var(--muted);padding:20px 0}
 
-.gallery-detail{position:fixed;inset:0;width:100%;height:100dvh;max-width:none;max-height:100dvh;margin:0;padding:0;border:0;border-radius:0;background:var(--bg);color:var(--text);overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable}
+/* Lock the page while a title is open, including native close/reopen paths. */
+html:has(.gallery-detail[open]),body:has(>.gallery-detail[open]){overflow:hidden;overscroll-behavior:none}
+.gallery-detail{position:fixed;inset:0;width:100%;height:100dvh;max-width:none;max-height:100dvh;margin:0;padding:0;border:0;border-radius:0;background:var(--bg);color:var(--text);overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:none}
+.gallery-detail::-webkit-scrollbar{display:none}
 .gallery-detail::backdrop{background:#000b}
 .gallery-detail-header{position:sticky;top:0;z-index:4;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:calc(env(safe-area-inset-top) + 12px) max(26px,env(safe-area-inset-right)) 12px max(18px,env(safe-area-inset-left));background:var(--bg);border-bottom:1px solid var(--border)}
 .gallery-detail-header h2{flex:1;min-width:0;font-size:1.05rem;line-height:1.35;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
