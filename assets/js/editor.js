@@ -396,8 +396,8 @@
       const episodeHistory=Array.isArray(previous?.episodeHistory)?previous.episodeHistory:[];
       const numOrNull=x=>$(x).value===""?null:Number.parseInt($(x).value,10);
       const total=type==="Film"?null:($("total-seasons").value?Number($("total-seasons").value):null);
-      const episodeCounts=type==="Film"?{}:(verified?.episodeCounts||previous?.episodeCounts||{});
-      const airedEpisodeCounts=type==="Film"?{}:(verified?.airedEpisodeCounts||previous?.airedEpisodeCounts||episodeCountsForForm||{});
+      const episodeCounts=type==="Film"?{}:(verified?.episodeScheduleAvailable===true?(verified.episodeCounts||{}):(previous?.episodeCounts||episodeCountsForForm||{}));
+      const airedEpisodeCounts=type==="Film"?{}:(verified?.episodeScheduleAvailable===true?(verified.airedEpisodeCounts||{}):(previous?.airedEpisodeCounts||episodeCountsForForm||{}));
       const curSeason=type==="Film"?null:numOrNull("cur-season");
       const status=$("status").value;
       const watchedDate=status==="Watched"&&previous?.status!=="Watched"?localISODate():(previous?.date||localISODate());
@@ -405,7 +405,7 @@
         ...previous,
         id,title,type,status,hideFromWeeklyReleases:type==="Film"?false:$("hide-from-weekly-releases").checked,tvmazeShowId:type==="Film"?"":(sid||""),imdbId:$("imdb-id").value||requestedImdbId,releaseYear,
         totalSeasons:total,watchedSeasons:type==="Film"?null:numOrNull("watched-seasons"),curSeason,curEp:type==="Film"?null:numOrNull("cur-ep"),
-        currentSeasonEpisodeCount:type==="Film"?null:Number(airedEpisodeCounts?.[curSeason]||0)||null,currentSeasonTotalEpisodes:type==="Film"?null:Number(episodeCounts?.[curSeason]||0)||null,episodeCounts:type==="Film"?{}:episodeCounts,airedEpisodeCounts:type==="Film"?{}:airedEpisodeCounts,releasedEpisodes:type==="Film"?{}:(verified?.releasedEpisodes||previous?.releasedEpisodes||releasedEpisodeMap({type,airedEpisodeCounts,episodeScheduleVerified:true})),episodeImages:type==="Film"?{}:(verified?.episodeScheduleAvailable===true?(verified.episodeImages||{}):(previous?.episodeImages||{})),episodeImagesSource:type==="Film"?"":(verified?.episodeScheduleAvailable===true?"TVMaze":previous?.episodeImagesSource||""),
+        currentSeasonEpisodeCount:type==="Film"?null:Number(airedEpisodeCounts?.[curSeason]||0)||null,currentSeasonTotalEpisodes:type==="Film"?null:Number(episodeCounts?.[curSeason]||0)||null,episodeCounts:type==="Film"?{}:episodeCounts,airedEpisodeCounts:type==="Film"?{}:airedEpisodeCounts,releasedEpisodes:type==="Film"?{}:(verified?.episodeScheduleAvailable===true?(verified.releasedEpisodes||{}):(previous?.releasedEpisodes||releasedEpisodeMap({type,airedEpisodeCounts,episodeScheduleVerified:true}))),episodeImages:type==="Film"?{}:(verified?.episodeScheduleAvailable===true?(verified.episodeImages||{}):(previous?.episodeImages||{})),episodeImagesSource:type==="Film"?"":(verified?.episodeScheduleAvailable===true?"TVMaze":previous?.episodeImagesSource||""),
         seasonImages:type==="Film"?{}:(verified?.episodeScheduleAvailable===true?(verified.seasonImages||{}):(previous?.seasonImages||{})),seasonImagesSource:type==="Film"?"":(verified?.episodeScheduleAvailable===true?"TVMaze":previous?.seasonImagesSource||""),
         scheduledEpisodeReleases:type==="Film"?[]:(verified?.scheduledEpisodeReleases||previous?.scheduledEpisodeReleases||[]),
         recurringWeeklySchedule:type==="Film"?null:(verified?.recurringWeeklySchedule||(String(previous?.tvmazeShowId||"")===String(sid||"")?previous?.recurringWeeklySchedule:null)||null),
