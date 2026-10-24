@@ -20,7 +20,7 @@ const server=http.createServer((req,res)=>{
   const page=await context.newPage(),errors=[];let phase='login';
   page.on('pageerror',error=>{const message=String(error.message||'');const expectedWebKitPinCors=engine.name()==='webkit'&&message.includes('watchlog-pin?forceFunctionRegion=eu-west-1')&&message.includes('access control checks');if(!expectedWebKitPinCors)errors.push(message);console.error(`${engine.name()} [${phase}] page error: ${error.stack||error.message}`);});
   page.on('requestfailed',request=>console.error(`${engine.name()} [${phase}] request failed: ${request.method()} ${new URL(request.url()).pathname} ${request.failure()?.errorText}`));
-  let items=[],revision=0,failSave=false,saves=0,loads=0,changelogRequests=0;
+  let items=[],revision=0,failSave=false,saves=0,loads=0,changelogRequests=0;const catalogQueries=[];
   const account={id:'browser-test',email:'browser@example.test',displayName:'Browser Test'};
   await context.route('**/*',async route=>{
    const req=route.request();
@@ -44,10 +44,10 @@ const server=http.createServer((req,res)=>{
    if(req.url().includes('/functions/v1/watchlog-pin')){
     const body=req.postDataJSON();let data={ok:true};
     if(['login','load'].includes(body.action)){loads++;data={ok:true,account,items,revision,sessionToken:'test-token'};}
-    if(body.action==='catalog_search')data={ok:true,results:[
+    if(body.action==='catalog_search'){catalogQueries.push(String(body.query||'').toLowerCase());data={ok:true,results:[
      {title:'Browser Test Film',format:'Film',source:'imdb',imdbId:'tt1234567',year:'2020',posterUrl:'https://m.media-amazon.com/test.jpg',description:'A detective uncovers a mystery in a quiet coastal town. '.repeat(8)},
      {title:'Browser Test Series',format:'Series',source:'tvmaze',tvmazeId:'12',year:'2021',description:'Investigators work together to solve difficult cases.'},
-    ]};
+    ]};}
     if(body.action==='catalog_details'){
      const series=body.type==='Series',id=series?'tt1234568':'tt1234567',url='https://www.imdb.com/title/'+id+'/';
      data={ok:true,details:{state:'ready',description:series?'An official series description & a second detail.':'A detective uncovers a mystery in a quiet coastal town. '.repeat(8),year:'2020',genres:['Drama','Action'],runtime:series?42:120,rating:8.4,ratingSource:'IMDb',source:'IMDb',sources:[{name:'IMDb',url}],imdbUrl:url}};
@@ -92,14 +92,28 @@ const server=http.createServer((req,res)=>{
   assert.equal(await page.locator('#title').inputValue(),'Browser Test Film');assert.equal(await page.locator('#type').inputValue(),'Film');
   await page.locator('#save-btn').click();await page.waitForFunction(()=>!localSaveInFlight&&!cloudSaveInFlight&&mediaItems.length===1);
   assert.equal(items[0].title,'Browser Test Film');
-  await page.waitForFunction(()=>document.querySelector('[data-discovery-badge]')?.textContent.includes('Already added'));
-  assert.equal(await page.locator('#discovery-results [data-discovery-add]').first().textContent(),'View in library');
-  await page.locator('#discovery-results [data-discovery-add]').first().click();
+  await page.locator('#discovery-library-results [data-library-result]').waitFor();
+  assert.equal(await page.locator('#discovery-results [data-discovery-add]').count(),0,'saved global results move into the Library section');
+  const matchingCatalogRequests=()=>catalogQueries.filter(query=>query==='browser test').length;
+  const beforeLocalSearch=matchingCatalogRequests();
+  await page.locator('#discovery-query').fill('Browser Test');
+  await page.locator('[data-discovery-filter="All"]').click();
+  await page.locator('#discovery-library-results [data-library-result]').waitFor();
+  await page.waitForTimeout(600);
+  assert.equal(matchingCatalogRequests(),beforeLocalSearch,'typing a saved-title match makes no global search requests');
+  assert.equal(await page.locator('#discovery-search-global').isVisible(),true);
+  await page.locator('#discovery-search-global').click();
+  await page.locator('#discovery-results .discovery-title').waitFor();
+  assert.ok(matchingCatalogRequests()>beforeLocalSearch,'global search remains available on request');
+  assert.equal(await page.locator('#discovery-library-results [data-library-result]').count(),1);
+  assert.equal(await page.locator('#discovery-results .discovery-title').count(),1,'the saved film is not duplicated in global results');
+  const groups=await page.locator('#discovery-library,#discovery-global').evaluateAll(nodes=>nodes.map(node=>node.getBoundingClientRect().top));assert.ok(groups[0]<groups[1],'Library matches stay above global results');
+  await page.locator('#discovery-library-results .discovery-actions [data-library-open]').click();
   assert.equal(await page.getByRole('tab',{name:'Overview',exact:true}).getAttribute('aria-selected'),'true','saved search results open the new film page');
   assert.equal(await page.locator('[data-gallery-watch-next]').count(),0,'films do not show an episode action');
   assert.equal(await page.locator('#modal').isVisible(),false,'viewing a saved search result is not editing it');
   await page.locator('[data-gallery-close]').click();
-  await page.locator('[data-tab="library"]').click();await page.locator('[data-tab="search"]').click();assert.equal(await page.locator('#discovery-query').inputValue(),'Browser Test Film');
+  await page.locator('[data-tab="library"]').click();await page.locator('[data-tab="search"]').click();assert.equal(await page.locator('#discovery-query').inputValue(),'Browser Test');
   await page.locator('#discovery-manual').click();await page.locator('#modal').waitFor({state:'visible'});await page.locator('#close-modal').click();
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),true);
   await page.locator('[data-tab="library"]').click();

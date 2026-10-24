@@ -114,3 +114,6 @@ Granular saves have transactional, account-scoped write receipts. The endpoint h
 
 ### Film and series detail sources
 Details use the authenticated `catalog_details` endpoint. IMDb structured metadata is preferred when accessible. Series fall back to the selected TVMaze ID (cross-checked against IMDb); films can use a unique Apple TV catalogue match against the IMDb title and release year. JustWatch fallback requires the exact IMDb identity and film/series format. Source links and rating-provider labels accompany the displayed details. Provider failures have bounded timeouts, do not become successful cache entries, and can be retried. Wikipedia and Wikidata are never queried; the browser policy blocks those connections. No paid metadata subscription is required.
+
+### Library-first search
+The Search page matches saved titles immediately, including title words, platform, IDs and custom lists. It opens saved records directly and works without a global request. Global search runs after a 350 ms pause when there are no local matches in the selected format, or when Search all titles is selected. Library results stay above the streamed catalogue, with saved-title duplicates removed. Full verified descriptions load when a result is opened.

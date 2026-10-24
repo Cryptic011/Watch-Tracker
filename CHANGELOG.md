@@ -1,3 +1,9 @@
+## 2026-10-24 — Search the Library first
+- Show matching saved titles instantly as you type, ranked by title, with direct access to their existing title pages.
+- Search globally automatically when the selected format has no Library match, or on demand with Search all titles.
+- Keep Library matches above streamed global results, remove duplicates, and retain local results during network failures.
+- Load full descriptions on demand instead of prefetching multiple descriptions for every search.
+
 ## 2026-10-24 — Prefer IMDb with verified metadata fallbacks
 - Try IMDb title metadata first, then identity-checked TVMaze, Apple TV and JustWatch descriptions when needed.
 - Show linked sources and label ratings by provider in film and series details; use the same lookup for search popups.

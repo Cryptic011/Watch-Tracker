@@ -12,7 +12,7 @@ function harness(){
     querySelectorAll:()=>[],replaceChildren(){this.innerHTML='';},focus(){this.focused=true;},showModal(){this.open=true;},close(){this.open=false;}});
   const $=id=>{if(!nodes.has(id))nodes.set(id,element());return nodes.get(id);};
   const filters=['All','Film','Series'].map(type=>Object.assign(element(),{dataset:{discoveryFilter:type}}));
-  const c=vm.createContext({URL,AbortController,setTimeout,clearTimeout,console,$,currentUser:{id:'a'},currentTab:'search',
+  const c=vm.createContext({URL,AbortController,setTimeout,clearTimeout,console,$,currentUser:{id:'a'},currentTab:'search',mediaItems:[],
     document:{querySelectorAll:()=>filters},esc:value=>String(value).replace(/[&<>"']/g,x=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[x])),
     findTrackedDuplicate:()=>null,searchAllTitles:async()=>[],openAdd:()=>calls.push('new'),selectSuggestion:item=>calls.push(item.title),openEdit:id=>calls.push('edit:'+id),openMediaRow:id=>calls.push('details:'+id),
     switchTab:tab=>calls.push(tab),titleInput:element()});
@@ -42,15 +42,11 @@ test('Unchanged results do not rebuild posters or focused controls',async()=>{
   $('discovery-query').value='Title';c.searchAllTitles=async()=>[{title:'Title',format:'Series',description:'A story.'}];
   await c.runTitleSearch();await c.runTitleSearch();assert.equal(writes,1);
 });
-test('Film description enrichment updates its placeholder without replacing the results list',async()=>{
-  const {c,$}=harness();let description='';
-  const placeholder={set outerHTML(value){description=value;}};
-  $('discovery-results').querySelector=()=>({querySelector:()=>placeholder});
-  c.fetchDiscoveryDescription=async()=>'&lt;A safe description&gt; &amp; more';
-  c.renderTitleSearch=()=>{throw Error('Description updates must not rebuild the list');};
-  vm.runInContext("discoveryRows=[{title:'Film',format:'Film',imdbId:'tt1234567'}]",c);
-  await c.enrichDiscoveryDescriptions(new AbortController().signal,()=>true);
-  assert.match(description,/&lt;A safe description&gt; &amp; more/);
+test('Global result loading does not prefetch title descriptions',async()=>{
+  const {c,$}=harness();let details=0;
+  c.fetchOfficialTitleDetails=async()=>{details++;return {description:'A synopsis'};};
+  c.searchAllTitles=async()=>[{title:'Film',format:'Film',imdbId:'tt1234567'}];$('discovery-query').value='Film';
+  await c.runTitleSearch();assert.equal(details,0);assert.match($('discovery-results').innerHTML,/Film/);
 });
 test('Provider text is escaped and only allowed HTTPS artwork is rendered',()=>{
   const {c}=harness();const html=c.discoveryCard({title:'<img onerror=evil()>',format:'Film',description:'&lt;script&gt;evil()&lt;/script&gt;',posterUrl:'javascript:evil()'},0);
@@ -110,4 +106,57 @@ test('Retired History and Watchlist tabs are removed and cannot be activated',()
   assert.match(library,/const ALLOWED_BOTTOM_TABS=new Set\(\["library","search","settings"\]\)/);
   assert.match(library,/if\(!ALLOWED_BOTTOM_TABS\.has\(tab\)\)tab="library"/);
   assert.match(library,/label==="history"\|\|label==="watchlist"/);
+});
+
+test('Library matches render immediately on input without any global search',async()=>{
+ const {c,$}=harness();let remote=0;c.searchAllTitles=async()=>{remote++;return [];};
+ c.mediaItems=[{id:'s',title:'Reacher',type:'Series',status:'Watching',platform:'Prime Video',curSeason:2,curEp:3}];
+ $('discovery-query').value='Reach';$('discovery-query').listeners.input();
+ assert.match($('discovery-library-results').innerHTML,/Reacher/);assert.match($('discovery-library-results').innerHTML,/S2 E3/);assert.equal(remote,0);
+ await c.runTitleSearch();assert.equal(remote,0);assert.equal($('discovery-search-global').classList.hidden,false);
+});
+test('Local matching ranks exact titles first and finds accents, platform names and archives',()=>{
+ const {c}=harness();c.mediaItems=[{id:'a',title:'Reacher: Extras',type:'Film'},{id:'b',title:'Reacher',type:'Series'},{id:'c',title:'Amélie',type:'Film',platform:'Cinema',archived:true}];
+ assert.deepEqual(Array.from(c.discoveryLibraryMatches('Reacher'),row=>row.id),['b','a']);
+ assert.equal(c.discoveryLibraryMatches('amelie')[0].id,'c');assert.equal(c.discoveryLibraryMatches('cinema')[0].id,'c');
+});
+test('Global search is optional with local matches, and local cards survive streamed results and failures',async()=>{
+ const {c,$}=harness();c.mediaItems=[{id:'s',title:'Reacher',type:'Series',imdbId:'tt1234567'}];let remote=0,resolve;
+ c.findTrackedDuplicate=row=>row.imdbId==='tt1234567'?c.mediaItems[0]:null;
+ c.searchAllTitles=(_query,{onProgress})=>{remote++;onProgress([{title:'Reacher',format:'Series',imdbId:'tt1234567'}]);return new Promise(r=>resolve=r);};
+ $('discovery-query').value='Reacher';await c.runTitleSearch();assert.equal(remote,0);
+ const pending=c.runTitleSearch({global:true});assert.equal(remote,1);assert.match($('discovery-library-results').innerHTML,/Reacher/);assert.equal($('discovery-results').innerHTML,'');
+ resolve([{title:'Reacher',format:'Series',imdbId:'tt1234567'},{title:'Reacher bonus',format:'Series'}]);await pending;
+ assert.match($('discovery-results').innerHTML,/Reacher bonus/);assert.doesNotMatch($('discovery-results').innerHTML,/tt1234567/);
+ c.searchAllTitles=async()=>{throw Error('Offline');};await c.runTitleSearch({global:true});
+ assert.match($('discovery-library-results').innerHTML,/Reacher/);assert.equal($('discovery-retry').classList.hidden,false);
+});
+test('A missing local match runs global search, while a one-character local query stays offline',async()=>{
+ const {c,$}=harness();let remote=0;c.mediaItems=[{id:'s',title:'Reacher',type:'Series'}];c.searchAllTitles=async()=>{remote++;return [];};
+ $('discovery-query').value='R';await c.runTitleSearch();assert.equal(remote,0);assert.match($('discovery-library-results').innerHTML,/Reacher/);
+ $('discovery-query').value='Unknown';await c.runTitleSearch();assert.equal(remote,1);assert.equal($('discovery-library').classList.hidden,true);
+});
+test('Format filters search globally when that format has no local match',async()=>{
+ const {c,$,filters}=harness();let remote=0;c.mediaItems=[{id:'s',title:'Reacher',type:'Series'}];c.searchAllTitles=async()=>{remote++;return [{title:'Reacher film',format:'Film'}];};
+ $('discovery-query').value='Reacher';await c.runTitleSearch();filters[1].onclick();
+ await new Promise(resolve=>setImmediate(resolve));assert.equal(remote,1);assert.equal($('discovery-library').classList.hidden,true);assert.match($('discovery-results').innerHTML,/Reacher film/);
+});
+test('Opening a local result uses the saved record directly',()=>{
+ const {c,$,calls}=harness();c.mediaItems=[{id:'saved',title:'Reacher',type:'Series'}];
+ $('discovery-library-results').listeners.click({target:{closest:()=>({dataset:{libraryOpen:'saved'}})}});
+ assert.deepEqual(calls,['details:saved']);
+});
+test('A synced library edit updates local matches without starting global requests',async()=>{
+ const {c,$}=harness();let remote=0;c.searchAllTitles=async()=>{remote++;return [];};c.mediaItems=[{id:'s',title:'Reacher',type:'Series'}];
+ $('discovery-query').value='Reacher';await c.runTitleSearch();c.mediaItems[0].title='Reacher updated';c.refreshTitleSearchBadges();
+ assert.match($('discovery-library-results').innerHTML,/Reacher updated/);assert.equal(remote,0);
+});
+
+test('Typing a Library match cancels the old global lookup and ignores its late response',async()=>{
+ const {c,$}=harness();let remote=0,resolve,signal;
+ c.mediaItems=[{id:'s',title:'Reacher',type:'Series'}];c.searchAllTitles=(_query,options)=>{remote++;signal=options.signal;return new Promise(r=>resolve=r);};
+ $('discovery-query').value='Other title';const pending=c.runTitleSearch();
+ $('discovery-query').value='Reach';$('discovery-query').listeners.input();assert.equal(signal.aborted,true);
+ resolve([{title:'Other title',format:'Series'}]);await pending;
+ assert.equal(remote,1);assert.match($('discovery-library-results').innerHTML,/Reacher/);assert.equal($('discovery-results').innerHTML,'');
 });

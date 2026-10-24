@@ -14,3 +14,5 @@
 .discovery-browse button[data-browse-format="Series"]{background:linear-gradient(135deg,#df43f2,#a720d4)}
 .discovery-browse span{position:absolute;right:0;top:-18px;font-size:110px;line-height:1.5;opacity:.18;z-index:-1}.discovery-browse strong{display:block;margin-top:58px;font-size:1.2rem}
 @media(max-width:359px){.discovery-card{grid-template-columns:64px minmax(0,1fr);gap:10px}.discovery-poster{width:64px}.bottom-tabs .tab-btn{font-size:.65rem}.tab-btn.active .tab-icon{padding:4px 12px}}
+
+.discovery-section{margin:0 0 22px}.discovery-section>h3{font-size:1rem;margin:0 2px 12px}.discovery-global-button{display:block;width:100%;min-height:44px;margin-top:16px}
