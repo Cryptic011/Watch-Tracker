@@ -114,7 +114,10 @@ function calendarEvents(items,now=new Date(),days=7){
       const date=new Date(dateOnly?`${candidate.raw}T12:00:00`:candidate.raw);
       if(!Number.isFinite(date.getTime()))continue;
       if(date<start||date>=end)continue;
-      const key=`${item.id}:${candidate.label}:${localISODate(date)}`;
+      // Cross-device duplicates should never produce two identical release
+      // cards while their records are being reconciled.
+      const key=[String(item.title||"").toLowerCase().trim(),String(item.platform||"").toLowerCase().trim(),
+        candidate.label,localISODate(date),date.getTime()].join("|");
       if(seen.has(key))continue;seen.add(key);
       events.push({...candidate,item,date,dateOnly});
     }
@@ -168,7 +171,20 @@ function recurringWeeklyShows(items,now=new Date()){
       result.push({item,day,date:next?.date||null,episodes:batch,state:next?(next.date>now?"upcoming":"released"):"tba"});
     }
   }
-  return result.sort((left,right)=>(left.day+6)%7-(right.day+6)%7||(left.date?.getTime()||Infinity)-(right.date?.getTime()||Infinity)||String(left.item.title).localeCompare(String(right.item.title)));
+  // Suppress duplicate schedule cards even before asynchronous cloud cleanup
+  // finishes. Keep the entry with the stronger provider metadata.
+  const unique=new Map();
+  const quality=item=>Number(Boolean(item.tvmazeShowId))*5+Number(Boolean(item.imdbId))*3+
+    Object.values(item.releasedEpisodes||{}).reduce((total,episodes)=>total+(Array.isArray(episodes)?episodes.length:0),0);
+  for(const row of result){
+    const key=[String(row.item.title||"").toLowerCase().trim(),String(row.item.platform||"").toLowerCase().trim(),
+      row.day,row.date?.getTime()||"tba",row.episodes.map(ep=>`${ep.season}:${ep.number}`).sort().join(",")].join("|");
+    const existing=unique.get(key);
+    if(!existing||quality(row.item)>quality(existing.item))unique.set(key,row);
+  }
+  return [...unique.values()].sort((left,right)=>(left.day+6)%7-(right.day+6)%7||
+    (left.date?.getTime()||Infinity)-(right.date?.getTime()||Infinity)||
+    String(left.item.title).localeCompare(String(right.item.title)));
 }
 function renderRecurringWeeklySchedule(){
   clearTimeout(recurringWeeklyTimer);recurringWeeklyTimer=null;
