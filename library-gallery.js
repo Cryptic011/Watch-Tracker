@@ -120,7 +120,7 @@ window.WatchLogGallery=(()=>{
   function manageButton(items,label){
     return `<button type="button" class="gallery-manage-button" data-gallery-manage="${esc(label)}" data-gallery-manage-ids="${esc(JSON.stringify(items.map(item=>String(item.id))))}" aria-label="Manage ${esc(label.toLowerCase())} titles" title="Manage ${esc(label.toLowerCase())} titles"${items.length?'':' disabled'}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m16 3 5 5M4 20l4-1L21 6a2.8 2.8 0 0 0-4-4L4 15l-1 6Z"/></svg></button>`;
   }
-  function section(title,items,carousel=false){return items.length?`<section class="gallery-section"><h3>${esc(title)}<span class="gallery-count">${items.length}</span></h3><div class="${carousel?'gallery-carousel'+(category==='Film'?' gallery-film-carousel':''):'gallery-grid'}">${items.map(item=>tile(item,carousel)).join('')}</div></section>`:'';}
+  function section(title,items,carousel=false){return items.length?`<section class="gallery-section" data-gallery-section="${esc(title)}"><h3>${esc(title)}<span class="gallery-count">${items.length}</span></h3><div class="${carousel?'gallery-carousel'+(category==='Film'?' gallery-film-carousel':''):'gallery-grid'}">${items.map(item=>tile(item,carousel)).join('')}</div></section>`:'';}
   function paintTrackerImage(container,url,label){
     const placeholder=`<span class="gallery-artwork-placeholder" aria-label="No artwork available">${esc(label)}</span>`;
     if(container._trackerImage===url)return;
@@ -365,13 +365,22 @@ window.WatchLogGallery=(()=>{
       const content=api.filter==='Watched'?releaseGroups(items).map(group=>section(group.year,group.rows)).join(''):section('Upcoming',parts.future,true)+section('Released',parts.released)+section('Date unknown',parts.remaining);
       markup=`<div class="gallery-nav"><button type="button" class="gallery-back" data-gallery-back aria-label="Back to Library">‹</button><h2>${category==='Film'?'Movies':'Series'}</h2><span class="gallery-heading-actions"><span class="gallery-count" data-gallery-total-count aria-label="${tracked.length} tracked ${category==='Film'?'films':'series'}">${tracked.length}</span>${manageButton(tracked,category==='Film'?'Movies':'Series')}</span></div>${content}${items.length?'':'<p class="gallery-empty">No titles match your search or filter.</p>'}`;}
     if(host._galleryMarkup!==markup){
-      // Keep the live collection control and its handlers across gallery renders.
-      if(api.features&&host.contains(api.features))host.before(api.features);
+      // Keep live collection/progress controls, listeners and disclosure state.
+      if(api.features&&host.contains(api.features)){
+        const progress=document.getElementById('continue-watching');
+        if(progress&&host.contains(progress))api.features.append(progress);
+        host.before(api.features);
+      }
       host.innerHTML=markup;host._galleryMarkup=markup;
     }
     if(api.features){
       const heading=host.querySelector('.gallery-nav');
       if(heading&&api.features.previousElementSibling!==heading)heading.after(api.features);
+      const progress=document.getElementById('continue-watching');
+      if(heading&&progress){
+        const anchor=host.querySelector('[data-gallery-section="Upcoming"]')||api.features;
+        if(progress.previousElementSibling!==anchor)anchor.after(progress);
+      }
     }
     observe(host,rows);
   }

@@ -8,6 +8,12 @@
 .dashboard-title:focus-visible,.dashboard-section summary:focus-visible{outline:2px solid var(--blue2);outline-offset:3px}
 .dashboard-section summary{padding:12px 0;cursor:pointer;color:var(--blue2);font-size:.82rem}.calendar-day{border-top:1px solid var(--border);padding:4px 0 8px}
 .dashboard-row .episode-quick-button{flex-shrink:0;min-height:44px}#reminder-history-body{margin-top:12px}
+.continue-watching-section>summary{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:44px;padding:0;list-style:none;color:var(--text);font-size:inherit}
+.continue-watching-section>summary::-webkit-details-marker{display:none}
+.continue-watching-section>summary h2{margin:0}
+.continue-chevron{color:var(--muted);font-size:1.4rem;line-height:1}
+.continue-watching-section[open]>summary{margin-bottom:12px}
+.continue-watching-section[open] .continue-chevron{transform:rotate(180deg)}
 
 /* Weekly releases: compact, date-led schedule designed for narrow mobile screens. */
 .weekly-releases{padding:0!important;overflow:hidden;background:linear-gradient(180deg,#171a21 0%,var(--card) 170px);border-radius:24px!important}
