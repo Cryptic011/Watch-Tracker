@@ -40,18 +40,22 @@ function isIndividualReleasePath(path){
  // Episode/season pages, clips and trailers are not overview sources.
  return segments.some((segment,i)=>/^(?:episodes?|seasons?|clips?|videos?|trailers?|episode-guide|episodeguide|season-[0-9]+|season_[0-9]+|s[0-9]+e[0-9]+|s[0-9]+)$/.test(segment)
    ||(/^s[0-9]+$/.test(segment)&&/^e[0-9]+$/.test(segments[i+1]||""))
-   ||/^(?:episode|season)[-_]?[0-9]+/.test(segment));
+   ||/^(?:episode|season)[-_]?[0-9]+/.test(segment)
+   ||/^(?:episode|season)[-_](?:one|two|three|four|five|six|seven|eight|nine|ten)(?:[-_]|$)/.test(segment));
 }
-function isWholeTitleSynopsis(value){
+function isReleaseSpecificText(value){
+ return /\b(?:(?:season|episode)\s*(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten)|s\d+\s*e\d+)\b/i.test(value)
+   ||/\b(?:this|new|current|upcoming|latest|next|final|previous|first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth)\s+season\b/i.test(value)
+   ||/\b(?:the|this|next|latest|new|previous|upcoming|final|first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth)\s+episode\b/i.test(value)
+   ||/\b(?:season|episode)\s+(?:premiere|finale|recap|guide|trailer)\b/i.test(value);
+}
+function isWholeTitleSynopsis(value,minimumLength=35){
  const description=text(value);
- if(description.length<35)return false;
+ if(description.length<minimumLength)return false;
  // Do not pass plot or press text about a specific season or episode
  // through the overall Show/Film Details panel.
- if(/\b(?:season\s*(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten)|s\d+\s*e\d+|episode\s*\d+)\b/i.test(description))return false;
- if(/\b(?:this|new|current|upcoming|latest|next|final|previous|first|second|third|fourth)\s+season\b/i.test(description))return false;
- if(/\b(?:the|this|next|latest|new|previous|upcoming|final)\s+episode\b/i.test(description))return false;
+ if(isReleaseSpecificText(description))return false;
  if(/^\s*(?:watch|stream|new episodes|all episodes|trailer|preview|recap)\b/i.test(description))return false;
- if(/\b(?:season|episode)\s+(?:premiere|finale|recap|guide|trailer)\b/i.test(description))return false;
  return true;
 }
 function aboutPageDescription(markup,title){
@@ -106,7 +110,7 @@ export function parseFirstPartyDetails(markup,url,{title,type,year}={}){
  // cannot validate an <h1> that actually names an individual season/episode.
  const pageHeadings=[...source.matchAll(/<h1\b[^>]*>([\s\S]*?)<\/h1\s*>/gi)]
    .map(row=>clean(row[1])).filter(Boolean);
- if(pageHeadings.length===1&&/\b(?:season\s*\d+|episode\s*\d+|s\d+\s*e\d+)\b/i.test(pageHeadings[0]))return null;
+ if(pageHeadings.length===1&&isReleaseSpecificText(pageHeadings[0]))return null;
  const types=type==="Film"?["Movie"]:["TVSeries","TVMiniSeries","TVShow"];
  const candidates=structured.filter(row=>[row?.["@type"]].flat().some(kind=>types.includes(kind))&&matchesFirstPartyTitle(row.name,title));
  const identity=candidates.length===1?candidates[0]:null;
@@ -125,7 +129,7 @@ export function parseFirstPartyDetails(markup,url,{title,type,year}={}){
    tags.get("description"),
    tags.get("twitter:description")
  ];
- const description=descriptions.map(value=>text(value)).find(isWholeTitleSynopsis)||"";
+ const description=descriptions.map(value=>text(value)).find(value=>isWholeTitleSynopsis(value))||"";
  if(!description)return null;
  return record({description,year:publishedYear,seasons,
   premiered:/^\d{4}-\d{2}-\d{2}$/.test(published)?published:"",
@@ -144,7 +148,7 @@ export function parseIMDbDetails(html,id,type){
   });
   if(matches.length!==1)return null;
   const row=matches[0],duration=String(row.duration||'').match(/^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/),rating=Number(row.aggregateRating?.ratingValue);
-  return record({description:text(row.description),premiered:/^\d{4}-\d{2}-\d{2}$/.test(row.datePublished||'')?row.datePublished:'',year:yearOf(row.datePublished),genres:[row.genre||[]].flat().filter(v=>typeof v==='string').map(clean).slice(0,15),runtime:duration?Number(duration[1]||0)*60+Number(duration[2]||0)||null:null,rating:Number.isFinite(rating)&&rating>0&&rating<=10?rating:null},'IMDb',imdbURL(id));
+  return record({description:isWholeTitleSynopsis(row.description,1)?text(row.description):"",premiered:/^\d{4}-\d{2}-\d{2}$/.test(row.datePublished||'')?row.datePublished:'',year:yearOf(row.datePublished),genres:[row.genre||[]].flat().filter(v=>typeof v==='string').map(clean).slice(0,15),runtime:duration?Number(duration[1]||0)*60+Number(duration[2]||0)||null:null,rating:Number.isFinite(rating)&&rating>0&&rating<=10?rating:null},'IMDb',imdbURL(id));
 }
 export async function getTitleDetails(input,request=fetch,{useCache=true,tmdbToken=""}={}){
   const type=input.type==='Film'?'Film':input.type==='Series'?'Series':null;
@@ -262,7 +266,7 @@ async function resolveDetails(selected,request,tmdbToken=""){
     if(matches.length!==1)return null;
     const row=matches[0];let link;
     try{link=new URL(row.trackViewUrl);if(link.protocol!=='https:'||!['itunes.apple.com','tv.apple.com'].includes(link.hostname))return null;}catch{return null;}
-    return record({description:text(row.longDescription||row.shortDescription),premiered:String(row.releaseDate||'').slice(0,10),year:yearOf(row.releaseDate),genres:row.primaryGenreName?[clean(row.primaryGenreName)]:[],runtime:row.trackTimeMillis?Math.round(row.trackTimeMillis/60000):null},'Apple TV',link.href);
+    return record({description:isWholeTitleSynopsis(row.longDescription||row.shortDescription,1)?text(row.longDescription||row.shortDescription):"",premiered:String(row.releaseDate||'').slice(0,10),year:yearOf(row.releaseDate),genres:row.primaryGenreName?[clean(row.primaryGenreName)]:[],runtime:row.trackTimeMillis?Math.round(row.trackTimeMillis/60000):null},'Apple TV',link.href);
   }));
   // IMDb is the fallback. Existing first-party descriptions remain untouched;
   // fields IMDb can uniquely supply (such as its rating) may fill gaps.

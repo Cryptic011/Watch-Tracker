@@ -64,8 +64,10 @@
     "number": 224
   },
   "__current": {
-    "title": "Granular sync, offline use, recovery and Library upgrades",
+    "title": "Keep series and film descriptions about the whole title",
     "changes": [
+      "Validate IMDb and Apple TV fallbacks with the same whole-title rules as official broadcaster and studio synopses, rejecting season, episode and trailer text.",
+      "Retain verified title-level facts and source links without requesting Wikipedia, Wikidata or Wikimedia pages.",
       "Save changed titles and episode deltas to account-scoped database rows with atomic conflict checks.",
       "Reopen the full app offline; retain local edits across reopening and upload them on reconnection.",
       "Create a single-use recovery code in Account & Sync; a PIN reset rotates the code and revokes old sessions.",

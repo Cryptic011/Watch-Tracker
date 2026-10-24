@@ -263,6 +263,54 @@ test('Outages are not cached and a later retry can recover',async()=>{
  assert.equal(recovered.description,'An IMDb synopsis.');
  const cached=await getTitleDetails(input,async()=>{throw Error('Should use cache');});assert.equal(cached.source,'IMDb');
 });
+test('IMDb title IDs and types do not exempt season or episode synopses from whole-title validation',()=>{
+ for(const description of [
+  'Season 24 follows the team as a new case threatens their most important investigation.',
+  'The third episode follows a witness whose evidence changes the entire investigation.',
+  'Episode Three reveals a clue that brings the agents closer to the missing investigator.',
+  'Watch the latest trailer for this exciting new adventure in cinemas everywhere.'
+ ]){
+  const result=parseIMDbDetails(ld({description}),imdb,'Film');
+  assert.equal(result.description,'');
+  assert.equal(result.descriptionSource,'');
+  assert.equal(result.ratingSource,'IMDb','verified non-synopsis facts remain available');
+ }
+ const synopsis='A boy befriends an alien.';
+ assert.equal(parseIMDbDetails(ld({description:synopsis}),imdb,'Film').description,synopsis,'short verified whole-film synopses remain valid');
+});
+
+test('A named season or episode page cannot supply a series overview through generic metadata',()=>{
+ const info={title:'NCIS',type:'Series'};
+ const description='A team of naval investigators works together to solve military crimes.';
+ for(const heading of ['NCIS Season One','NCIS Episode Three','NCIS: The third episode']){
+  assert.equal(parseFirstPartyDetails('<title>NCIS | CBS</title><h1>'+heading+'</h1><meta name="description" content="'+description+'">','https://www.cbs.com/shows/ncis/',info),null);
+ }
+ assert.equal(parseFirstPartyDetails('<title>NCIS | CBS</title><h1>NCIS</h1><meta name="description" content="'+description+'">','https://www.cbs.com/shows/ncis/season-one/',info),null);
+});
+
+test('Apple descriptions reject trailers and episode summaries rather than displaying them as film plots',async()=>{
+ for(const description of [
+  'Watch the latest trailer for an exciting mission across the galaxy.',
+  'In episode three the hero discovers the missing passenger and changes course.'
+ ]){
+  const result=await getTitleDetails({...film,source:'apple',externalId:'1'},async url=>{
+   if(url.includes('itunes.apple'))return json({results:[{...apple,longDescription:description}]});
+   return failure();
+  },options);
+  assert.ok(!result.description);
+  assert.equal(result.descriptionSource,'');
+ }
+});
+
+test('An explicitly supplied Wikipedia URL is rejected before any source request',async()=>{
+ const calls=[];
+ const result=await getTitleDetails({...film,officialUrl:'https://en.wikipedia.org/wiki/Inception'},async url=>{
+  calls.push(url);return url.includes('www.imdb.com/title/')?html(ld()):failure();
+ },options);
+ assert.equal(result.description,'An IMDb synopsis.');
+ assert.ok(calls.every(url=>!/(wikipedia|wikidata|wikimedia)/i.test(url)));
+});
+
 test('Unsupported types never cause provider requests',async()=>{
  const result=await getTitleDetails({type:'Game',imdbId:imdb},()=>{throw Error('Unexpected request');},options);assert.equal(result.state,'unmatched');
 });

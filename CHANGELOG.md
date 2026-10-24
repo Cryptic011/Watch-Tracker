@@ -1,3 +1,9 @@
+## 2026-10-24 — Validate whole-title descriptions across every verified fallback
+- Apply whole-series and whole-film synopsis checks to IMDb and Apple TV as well as broadcaster and studio pages.
+- Reject season/episode-specific plots, numbered or named episode headings, and trailer promotions without discarding verified ratings and other title-level facts.
+- Keep short, genuine whole-film descriptions valid and reject supplied Wikipedia URLs without requesting them.
+- Preserve official programme/studio sources first, verified identity matching, and source attribution.
+
 ## 2026-10-24 — Prevent duplicate saved titles
 - Match a shared TVMaze or IMDb identity even when another provider ID is stale, while keeping distinct remakes and franchise entries separate.
 - Open the existing title from search or manual entry instead of saving a second copy.
