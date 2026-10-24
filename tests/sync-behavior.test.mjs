@@ -55,6 +55,7 @@ function harness(extra={}){
     markPending(value,id="account"){if(value)pending.add(id);else pending.delete(id);},
     hasPending:(id="account")=>pending.has(id),
     migratePlannedStatuses:items=>({rows:items}),cleanLibraryRecords:items=>({items}),
+    deduplicateLibrary:items=>({items,removedCount:0,titles:[]}),
     duplicateCleanupMessage:()=>"",showAppToast(){},
     ...extra,
   });
