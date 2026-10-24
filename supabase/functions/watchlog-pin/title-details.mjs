@@ -1,5 +1,6 @@
 /* Public metadata only. A provider must match the selected identity before use. */
 const cache=new Map(),inFlight=new Map(),TTL=6*60*60*1000;
+const SYNOPSIS_VERSION=2;
 const clean=value=>String(value??'').replace(/<[^>]*>/g,' ').replace(/&(?:#(\d+)|#x([0-9a-f]+)|(amp|quot|apos|lt|gt|nbsp));/gi,(all,decimal,hex,name)=>{
   if(name)return {amp:'&',quot:'"',apos:"'",lt:'<',gt:'>',nbsp:' '}[name.toLowerCase()];
   const n=parseInt(decimal||hex,decimal?10:16);return n>0&&n<=0x10ffff?String.fromCodePoint(n):'';
@@ -55,6 +56,9 @@ function isWholeTitleSynopsis(value,minimumLength=35){
  // Do not pass plot or press text about a specific season or episode
  // through the overall Show/Film Details panel.
  if(isReleaseSpecificText(description))return false;
+ // Cast announcements and returning-character promos can describe the current
+ // run without saying "season" anywhere (including CBS's NCIS SEO copy).
+ if(/\b(?:returns?\s+as|(?:is\s+)?back\s+as|reprises?\s+(?:(?:his|her|their|the)\s+)?role|joins?\s+the\s+cast|guest[- ]stars?|guest[- ]starring)\b/i.test(description))return false;
  if(/^\s*(?:watch|stream|new episodes|all episodes|trailer|preview|recap)\b/i.test(description))return false;
  return true;
 }
@@ -63,12 +67,27 @@ function aboutPageDescription(markup,title){
  for(const heading of source.matchAll(/<h([1-4])\b[^>]*>([\s\S]*?)<\/h\1\s*>/gi)){
    if(nameKey(heading[2])!==expected)continue;
    const after=source.slice(heading.index+heading[0].length).split(/<(?:h[1-4]|footer|nav)\b/i)[0].slice(0,7000);
+   // CBS renders its About copy in a div, not a paragraph. Only read the
+   // dedicated copy container beneath this title's exact About heading.
+   const copy=after.match(/<div\b[^>]*\bid\s*=\s*["']js-about-copy["'][^>]*>([\s\S]*?)<\/div\s*>/i)?.[1];
+   if(copy&&isWholeTitleSynopsis(copy))return text(copy);
    for(const p of after.matchAll(/<p\b[^>]*>([\s\S]*?)<\/p\s*>/gi)){
      const description=text(p[1]);
      if(isWholeTitleSynopsis(description))return description;
    }
  }
  return "";
+}
+function distributorDescription(markup,site,title){
+ if(site.host!=="paramountglobalcontent.com")return "";
+ const headings=[...markup.matchAll(/<h[12]\b[^>]*>([\s\S]*?)<\/h[12]\s*>/gi)].map(row=>nameKey(row[1]));
+ if(!headings.includes(nameKey(title)))return "";
+ // The distributor has a truncated teaser and a separate full synopsis. Do
+ // not import cast lists, footer text, or the "Show More" control.
+ const body=markup.match(/<div\b[^>]*\bclass\s*=\s*["'][^"']*\bfull-synopsis\b[^"']*["'][^>]*>([\s\S]*?)<\/div\s*>/i)?.[1];
+ const paragraphs=[...(body||"").matchAll(/<p\b[^>]*>([\s\S]*?)<\/p\s*>/gi)].map(row=>text(row[1])).filter(Boolean);
+ const description=paragraphs.join("\n\n");
+ return isWholeTitleSynopsis(description)?description:"";
 }
 function firstPartyURL(value){
  try{
@@ -99,7 +118,8 @@ export function parseFirstPartyDetails(markup,url,{title,type,year}={}){
  }
  const titleTag=clean(source.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i)?.[1]);
  const heading=clean(source.match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/i)?.[1]);
- const titles=[tags.get("og:title"),tags.get("twitter:title"),titleTag,heading].filter(Boolean);
+ const distributorTitle=site.host==="paramountglobalcontent.com"?clean(source.match(/<h2\b[^>]*>([\s\S]*?)<\/h2\s*>/i)?.[1]):"";
+ const titles=[tags.get("og:title"),tags.get("twitter:title"),titleTag,heading,distributorTitle].filter(Boolean);
  const structured=[];
  for(const match of source.matchAll(/<script\b[^>]*type\s*=\s*["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script\s*>/gi)){
   try{const json=JSON.parse(match[1]);for(const row of Array.isArray(json)?json:[json]){
@@ -123,8 +143,9 @@ export function parseFirstPartyDetails(markup,url,{title,type,year}={}){
  const count=Number(typeof identity?.numberOfSeasons==="object"?identity.numberOfSeasons?.value:identity?.numberOfSeasons);
  const seasons=type==="Series"&&Number.isInteger(count)&&count>0&&count<=300?count:null;
  const descriptions=[
-   identity?.description,
+   distributorDescription(source,site,title),
    aboutPageDescription(source,title),
+   identity?.description,
    tags.get("og:description"),
    tags.get("description"),
    tags.get("twitter:description")
@@ -212,7 +233,12 @@ async function resolveDetails(selected,request,tmdbToken=""){
     // CBS has a separate verified About page with its full programme synopsis.
     if(nameKey(show.network?.name)==='cbs'||nameKey(show.webChannel?.name)==='cbs'){
       const slug=clean(show.name).toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
-      if(slug)pages.unshift('https://www.cbs.com/shows/'+slug+'/about/');
+      if(slug){
+        pages.unshift('https://www.cbs.com/shows/'+slug+'/about/');
+        // The CBS page may contain only current-run promotional copy. The
+        // programme distributor publishes a separate series-wide synopsis.
+        pages.push('https://www.paramountglobalcontent.com/title/'+slug);
+      }
     }
     return show;
   });
@@ -272,5 +298,5 @@ async function resolveDetails(selected,request,tmdbToken=""){
   // fields IMDb can uniquely supply (such as its rating) may fill gaps.
   if(!id)await attempt(identity);
   if(id)add(await attempt(async()=>parseIMDbDetails(await get(imdbURL(id),true),id,selected.type)));
-  return {...(result||{sources:[]}),imdbId:id,imdbUrl:id?imdbURL(id):'',state:result?.description?'ready':result?'partial':id||selected.tvmazeId||selected.appleId?'unavailable':'unmatched'};
+  return {...(result||{sources:[]}),synopsisVersion:SYNOPSIS_VERSION,synopsisScope:selected.type==='Series'?'series':'film',imdbId:id,imdbUrl:id?imdbURL(id):'',state:result?.description?'ready':result?'partial':id||selected.tvmazeId||selected.appleId?'unavailable':'unmatched'};
 }

@@ -106,7 +106,7 @@ test('Every gateway first-party source renders its description and exact-host at
  vm.runInContext('const METADATA_CACHE_TTL_MS=21600000,titleDetailsCache=new Map();'+functions('cachedMetadataRequest','fetchOfficialTitleDetails','titleDetailsSourceLinks'),context);
  for(const [host,name] of Object.entries(firstParty)){
   const url='https://'+host+'/title/example';
-  returned={state:'ready',source:name,descriptionSource:name,description:'An official whole-title synopsis.',sources:[{name,url}]};
+  returned={state:'ready',synopsisVersion:2,synopsisScope:'film',source:name,descriptionSource:name,description:'An official whole-title synopsis.',sources:[{name,url}]};
   const result=await context.fetchOfficialTitleDetails({title:host,type:'Film'});
   assert.equal(result.description,returned.description,name);
   assert.match(context.titleDetailsSourceLinks(result),new RegExp(host.replaceAll('.','\\.')),host);
@@ -120,7 +120,7 @@ test('Every gateway first-party source renders its description and exact-host at
 
 test('Frontend requests canonical series metadata for Anime without changing its library format',async()=>{
  const item={title:'Anime Example',type:'Anime',imdbId:'tt1234567'};let payload;
- const context=vm.createContext({console,pinApi:async(_action,input)=>{payload=input;return{details:{state:'ready',source:'IMDb',description:'A verified anime series synopsis.'}};}});
+ const context=vm.createContext({console,pinApi:async(_action,input)=>{payload=input;return{details:{state:'ready',synopsisVersion:2,synopsisScope:'series',source:'IMDb',description:'A verified anime series synopsis.'}};}});
  vm.runInContext('const METADATA_CACHE_TTL_MS=21600000,titleDetailsCache=new Map();'+functions('cachedMetadataRequest','fetchOfficialTitleDetails'),context);
  assert.equal((await context.fetchOfficialTitleDetails(item)).state,'ready');
  assert.equal(payload.type,'Series');assert.equal(item.type,'Anime');

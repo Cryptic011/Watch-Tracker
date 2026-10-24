@@ -174,17 +174,20 @@
   async function fetchOfficialTitleDetails(item){
     const format=item.type||item.format;
     const payload={title:item.title,type:format==="Anime"?"Series":format,imdbId:item.imdbId||(item.source==="imdb"?item.externalId:""),tvmazeShowId:item.tvmazeShowId||item.tvmazeId,year:item.releaseYear||item.year,source:item.source,externalId:item.externalId,platform:item.platform||"",officialUrl:item.officialUrl||item.officialSite||""};
-    const key=JSON.stringify(payload);
+    const key="whole-title-v2:"+JSON.stringify(payload);
     return cachedMetadataRequest(titleDetailsCache,key,async()=>{
       try{
         const response=await pinApi("catalog_details",payload);
-        // Keep the exact official source names aligned with the details gateway.
+        // Require the current whole-title policy, so an old gateway or cache
+        // cannot reintroduce a season promo into the series overview.
         const details=response.details||{};
         const permitted=source=>["IMDb","Apple TV","CBS","Paramount+","NBC","ABC","FOX","FX","HBO","Max","Disney+","Disney","Hulu","Netflix","Prime Video","Peacock","STARZ","Showtime","AMC","AMC+","The CW","PBS","BBC","ITV","ITVX","Channel 4","Sky","NOW","Crunchyroll","A&E","Freeform","Adult Swim","USA Network","BET","Warner Bros.","Universal","Paramount Pictures","Sony Pictures","20th Century Studios","Marvel","Lionsgate","Focus Features","Discovery+","TNT","TBS","Paramount Global Content","Paramount Press Express","Netflix Media Center"].includes(String(source||""));
         const rejected=["source","descriptionSource","ratingSource"].some(field=>details[field]&&!permitted(details[field]));
-        if(!rejected&&details.description)return details;
+        const scope=payload.type==="Series"?"series":"film";
+        const currentSynopsis=details.synopsisVersion===2&&details.synopsisScope===scope;
+        if(!rejected&&details.description&&currentSynopsis)return details;
         titleDetailsCache.delete(key);
-        if(!rejected&&details.sources?.length)return details;
+        if(!rejected&&details.sources?.length)return {...details,description:"",descriptionSource:"",state:"partial"};
       }catch(_) {titleDetailsCache.delete(key);}
       // If the verified-details service is offline, do not silently replace
       // IMDb/official text with TVMaze's unverified editorial summary.

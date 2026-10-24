@@ -27,6 +27,7 @@ const server=http.createServer((req,res)=>{
      const body=req.postDataJSON();let result={ok:true};
      if(['login','load'].includes(body.action))result={ok:true,account,items,revision,sessionToken:'catalogue-token'};
      if(body.action==='uk_availability')result={ok:true,state:'available',source:'JustWatch',providers:[{name:'Netflix',type:'flatrate'}]};
+     if(body.action==='catalog_details')result={ok:true,details:{state:'ready',synopsisVersion:2,synopsisScope:body.type==='Series'?'series':'film',source:'IMDb',descriptionSource:'IMDb',description:'An official whole-title synopsis of Example.',sources:[{name:'IMDb',url:'https://www.imdb.com/title/tt1234567/'}]}};
      if(body.action==='save'){
       for(const change of body.changes||[]){
        const index=items.findIndex(item=>item.id===change.id);
