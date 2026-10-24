@@ -82,8 +82,9 @@ async function resolveDetails(selected,request){
     }
     if(used)for(const source of details.sources||[])if(!result.sources.some(row=>row.url===source.url))result.sources.push(source);
   };
-  // The film distributor's own listing is the next authoritative source.
-  // For series, use an exact IMDb-linked catalogue description instead.
+  // When IMDb lacks a film synopsis, a uniquely matched Apple TV publisher
+  // listing can fill the missing description. Series remain IMDb-only unless
+  // a verified first-party programme source is available.
   if(!result?.description&&selected.type==='Film')add(await attempt(async()=>{
     const match=await attempt(identity);
     if(!selected.appleId&&(!match?.title||!match.year))return null;
@@ -93,16 +94,6 @@ async function resolveDetails(selected,request){
     const row=matches[0];let link;
     try{link=new URL(row.trackViewUrl);if(link.protocol!=='https:'||!['itunes.apple.com','tv.apple.com'].includes(link.hostname))return null;}catch{return null;}
     return record({description:text(row.longDescription||row.shortDescription),premiered:String(row.releaseDate||'').slice(0,10),year:yearOf(row.releaseDate),genres:row.primaryGenreName?[clean(row.primaryGenreName)]:[],runtime:row.trackTimeMillis?Math.round(row.trackTimeMillis/60000):null},'Apple TV',link.href);
-  }));
-  if(!result?.description&&id&&(canonical?.title||selected.title))add(await attempt(async()=>{
-    const query='query($title: String!) { popularTitles(country: GB, first: 20, filter: {searchQuery: $title}) { edges { node { objectType content(country: GB, language: en) { title originalReleaseYear shortDescription externalIds { imdbId } fullPath } } } } }';
-    const data=await get('https://apis.justwatch.com/graphql',false,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query,variables:{title:canonical?.title||selected.title}})});
-    if(data.errors?.length)return null;
-    const matches=(data.data?.popularTitles?.edges||[]).map(row=>row.node).filter(row=>row.objectType===(selected.type==='Film'?'MOVIE':'SHOW')&&row.content?.externalIds?.imdbId===id);
-    if(matches.length!==1)return null;
-    const content=matches[0].content;if(!text(content.shortDescription)||!/^\/(?!\/)/.test(content.fullPath||''))return null;
-    const url=new URL(content.fullPath,'https://www.justwatch.com');if(url.hostname!=='www.justwatch.com'||url.protocol!=='https:')return null;
-    return record({description:text(content.shortDescription),year:yearOf(content.originalReleaseYear)},'JustWatch',url.href);
   }));
   return {...(result||{sources:[]}),imdbId:id,imdbUrl:id?imdbURL(id):'',state:result?.description?'ready':result?'partial':id||selected.tvmazeId||selected.appleId?'unavailable':'unmatched'};
 }

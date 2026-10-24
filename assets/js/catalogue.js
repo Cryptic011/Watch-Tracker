@@ -177,9 +177,14 @@
     return cachedMetadataRequest(titleDetailsCache,key,async()=>{
       try{
         const response=await pinApi("catalog_details",payload);
-        if(response.details?.description){return response.details;}
+        // Drop legacy or stale third-party editorial information outright;
+        // only IMDb and an official Apple TV listing may supply title details.
+        const details=response.details||{};
+        const permitted=source=>["IMDb","Apple TV"].includes(String(source||""));
+        const rejected=["source","descriptionSource","ratingSource"].some(field=>details[field]&&!permitted(details[field]));
+        if(!rejected&&details.description)return details;
         titleDetailsCache.delete(key);
-        if(response.details?.sources?.length)return response.details;
+        if(!rejected&&details.sources?.length)return details;
       }catch(_) {titleDetailsCache.delete(key);}
       // If the verified-details service is offline, do not silently replace
       // IMDb/official text with TVMaze's unverified editorial summary.
@@ -190,7 +195,7 @@
     const sources=[...(details.sources||[])];
     if(details.imdbUrl&&!sources.some(row=>row.url===details.imdbUrl))sources.push({name:"View on IMDb",url:details.imdbUrl});
     return sources.flatMap(row=>{
-      try{const url=new URL(row.url);if(url.protocol!=="https:"||!['www.imdb.com','imdb.com','www.tvmaze.com','tvmaze.com','www.justwatch.com','itunes.apple.com','tv.apple.com'].includes(url.hostname))return [];return [`<a href="${esc(url.href)}" target="_blank" rel="noopener noreferrer">${esc(row.name)}</a>`];}catch{return [];}
+      try{const url=new URL(row.url);if(url.protocol!=="https:"||!['www.imdb.com','imdb.com','itunes.apple.com','tv.apple.com'].includes(url.hostname))return [];return [`<a href="${esc(url.href)}" target="_blank" rel="noopener noreferrer">${esc(row.name)}</a>`];}catch{return [];}
     }).join(" · ");
   }
 
