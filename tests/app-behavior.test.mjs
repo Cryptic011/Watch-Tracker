@@ -481,7 +481,7 @@ test("TVMaze identity verification rejects nonmatching series even if the franch
 
 test("Duplicate cleanup merges released episodes and watched progress without dropping history",()=>{
   const api=loadFunctions([
-    "normalizeTitle","mediaIdentityKind","identityReleaseYear","itemsAreDuplicate","positiveEpisodeMap",
+    "normalizeTitle","mediaIdentityKind","identityReleaseYear","itemsAreDuplicate","isEpisodeTrackable","positiveEpisodeMap",
     "normalizeReleasedEpisodeMap","mergeEpisodeCountMaps","mergeEpisodeHistories","duplicateRecordQuality",
     "mergeDuplicateItems","deduplicateLibrary"
   ],`
