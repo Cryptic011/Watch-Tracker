@@ -311,3 +311,21 @@ test('Watch statistics count saved films and logged released episodes without mu
  assert.deepEqual(JSON.parse(JSON.stringify(c.watchStatistics(items))),{libraryCount:5,filmsWatched:1,episodesWatched:4,showsInProgress:1,showsCompleted:2});
  assert.equal(JSON.stringify(items),before,'statistics do not mutate saved records');
 });
+
+test("Identical series episode entries render once across distinct sync record IDs",()=>{
+  const c=app();
+  const episodes=[
+    {season:1,number:1,raw:"2026-10-15T20:00:00Z"},
+    {season:1,number:2,raw:"2026-10-22T20:00:00Z"}
+  ];
+  const first={id:"duplicate-a",title:"Example: City",platform:"CBS",type:"Series",
+    tvmazeShowId:"123",releasedEpisodes:{1:[1]},scheduledEpisodeReleases:episodes,
+    recurringWeeklySchedule:c.weeklyReleasePattern(episodes)};
+  const second={...first,id:"duplicate-b",imdbId:"tt0123456"};
+  const now=new Date("2026-10-21T12:00:00Z");
+  const recurring=c.recurringWeeklyShows([first,second],now);
+  assert.equal(recurring.length,1);
+  assert.equal(recurring[0].item.id,"duplicate-b");
+  const calendar=c.calendarEvents([first,second],now,7);
+  assert.equal(calendar.events.length,1);
+});
