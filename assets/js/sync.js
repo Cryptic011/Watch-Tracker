@@ -27,19 +27,12 @@
     return appRefreshInFlight;
   }
 
-  let librarySaveStatusTimer=null;
   function setSync(text,state="ok"){
-    clearTimeout(librarySaveStatusTimer);librarySaveStatusTimer=null;
     const visibleText=/^(Syncing|Saving)/i.test(text)?`Syncing · ${text}`:state==="warn"?`Needs attention · ${text}`:`Synced · ${text}`;
     syncStatus.textContent=visibleText;syncDot.className=`sync-dot ${state==="ok"?"ok":state==="warn"?"warn":""}`;
     const quick=document.getElementById("quick-sync-status");
     const quickLabel=quick?.querySelector?.("span");
     if(quick&&quickLabel){const pending=/^(Syncing|Saving)/i.test(text),attention=state==="warn"&&!pending;quick.dataset.state=pending?"syncing":attention?"attention":"ok";quickLabel.textContent=pending?"Syncing":attention?"Needs attention":"Synced";}
-    const visible=document.getElementById("library-save-status");
-    if(visible){
-      visible.textContent=visibleText;visible.dataset.state=state;visible.classList.toggle("hidden",!currentUser);
-      if(currentUser&&state==="ok")librarySaveStatusTimer=setTimeout(()=>{visible.classList.add("hidden");librarySaveStatusTimer=null;},3000);
-    }
   }
 
   async function readLegacyLocalSnapshotById(id){

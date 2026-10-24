@@ -1,3 +1,7 @@
+## 2026-10-24 — Remove duplicate Library sync prompt
+- Remove the extra sync banner between the weekly schedule and Movies/Series.
+- Keep the header sync status and detailed Account & Sync information, including pending-save and error states.
+
 ## 2026-10-24 — Simplify Library home
 - Move Collections beneath the heading inside Movies and Series, with category-specific custom lists.
 - Move Continue Watching into Series, respecting the collection, search and watch-status filters.

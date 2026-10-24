@@ -171,14 +171,16 @@ test('Calendar includes every batch episode, deduplicates next episode, preserve
  const c=app(),now=new Date(2026,8,20,18),items=[{id:'s',title:'Show',type:'Series',airingSeason:1,nextEpisodeNum:2,nextEpisodeDate:'2026-09-21T20:00:00',scheduledEpisodeReleases:[{season:1,number:2,raw:'2026-09-21T20:00:00'},{season:1,number:3,raw:'2026-09-21T20:00:00'}]},{id:'f',title:'Film',type:'Film',filmReleaseDate:'2026-09-20'},{id:'out',title:'Outside',type:'Film',filmReleaseDate:'2026-09-27'},{id:'tba',title:'Unknown',type:'Film',status:'Planned',releaseYear:'2027'}];
  const result=c.calendarEvents(items,now);assert.equal(result.events.length,3);assert.equal(result.events[0].dateOnly,true);assert.equal(result.unknown.length,1);
 });
-test('Library save indicator uses the persistence status and hides for signed-out users',()=>{
- const timers=new Map();let nextTimer=0;
- const element={classList:{toggle(name,value){this.hidden=value},add(){this.hidden=true}},dataset:{}},c=vm.createContext({document:{getElementById:()=>element},syncStatus:{},syncDot:{},currentUser:{id:'me'},librarySaveStatusTimer:null,setTimeout:(fn,ms)=>{assert.equal(ms,3000);timers.set(++nextTimer,fn);return nextTimer;},clearTimeout:id=>timers.delete(id)});
- vm.runInContext(extractFunction(html,'setSync'),c);c.setSync('Saved on this device · Syncing to cloud…','warn');assert.equal(element.dataset.state,'warn');assert.match(element.textContent,/Syncing/);
- c.setSync('Synced','ok');assert.equal(element.dataset.state,'ok');assert.equal(element.classList.hidden,false);timers.values().next().value();assert.equal(element.classList.hidden,true);timers.clear();
- c.setSync('Synced','ok');c.setSync('Sync pending','warn');assert.equal(timers.size,0);assert.equal(element.classList.hidden,false);
- c.currentUser=null;c.setSync('');assert.equal(element.classList.hidden,true);
+test('Sync feedback stays in the header without a duplicate Library banner',()=>{
+ const label={textContent:''},quick={dataset:{},querySelector:()=>label};
+ const c=vm.createContext({document:{getElementById:id=>{assert.equal(id,'quick-sync-status');return quick;}},syncStatus:{},syncDot:{}});
+ vm.runInContext(extractFunction(html,'setSync'),c);
+ c.setSync('Syncing your changes…','warn');assert.equal(label.textContent,'Syncing');assert.equal(quick.dataset.state,'syncing');
+ c.setSync('Synced. This library is available on your other devices.','ok');assert.equal(label.textContent,'Synced');assert.equal(quick.dataset.state,'ok');
+ c.setSync('Offline. Changes are saved on this device.','warn');assert.equal(label.textContent,'Needs attention');assert.equal(quick.dataset.state,'attention');assert.match(c.syncStatus.textContent,/Offline/);
+ assert.doesNotMatch(fs.readFileSync(new URL('../index.html',import.meta.url),'utf8'),/id="library-save-status"/);
 });
+
 const backend=stripTypeScriptTypes(fs.readFileSync(new URL('../supabase/functions/watchlog-reminders/index.ts',import.meta.url),'utf8').replace(/^import[\s\S]*?;\n/gm,''));
 async function requestHistory({session=true,owner=false}={}){
  const reads=[],filters=[];let handler;

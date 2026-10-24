@@ -1,5 +1,3 @@
-.library-save-status{margin-bottom:14px;padding:10px 12px;border:1px solid var(--border);border-radius:12px;color:var(--green);font-size:.78rem;line-height:1.4}
-.library-save-status[data-state="warn"]{color:var(--amber)}
 .dashboard-section{margin:0 0 20px;padding:16px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius)}
 .dashboard-section h2{font-size:1.1rem;margin:0 0 10px}.dashboard-section h3{font-size:.85rem;margin:12px 0 6px}
 .dashboard-note,.calendar-day p{font-size:.78rem;color:var(--muted);line-height:1.5;margin:7px 0}
