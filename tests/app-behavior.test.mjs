@@ -416,3 +416,46 @@ test("Reminders belong to Release Reminders and open in a dialog", () => {
   assert.match(core, /document\.querySelector\('#settings-view \[data-settings-panel="reminders"\]'\)\?\.appendChild\(reminderActivitySection\)/);
   assert.doesNotMatch(core, /settingsView\.appendChild\(reminderActivitySection\)/);
 });
+
+
+test("Matching TVMaze identities suppress duplicate series even when legacy IMDb IDs differ", () => {
+  const api=loadFunctions(["normalizeTitle","mediaIdentityKind","identityReleaseYear","itemsAreDuplicate","findTrackedDuplicate"]);
+  const old={id:"ncis-1",type:"Series",title:"NCIS: New York",tvmazeShowId:"99001",imdbId:"tt1111111",releaseYear:"2026"};
+  const duplicate={id:"ncis-2",type:"Series",title:"NCIS: New York",tvmazeShowId:"99001",imdbId:"tt2222222",releaseYear:"2026"};
+  const separate={...duplicate,tvmazeShowId:"99002"};
+  assert.equal(api.itemsAreDuplicate(old,duplicate),true);
+  assert.equal(api.findTrackedDuplicate(duplicate,[old])?.id,"ncis-1");
+  assert.equal(api.itemsAreDuplicate(old,separate),false);
+});
+
+test("Recently refreshed historical shows with empty episode lists are retried", () => {
+  const api=loadFunctions(["isEpisodeTrackable","positiveEpisodeMap","normalizeReleasedEpisodeMap","toMillis","seriesMetadataRefreshCandidate"],`
+    const metadataRefreshAttemptAt=new Map();
+    const SERIES_REFRESH_RETRY_MS=30000;
+    const SERIES_METADATA_STALE_MS=86400000;
+  `);
+  const now=new Date("2026-10-24T12:00:00Z").getTime();
+  const ncis={id:"ncis",type:"Series",title:"NCIS",tvmazeShowId:"60",releaseYear:"2003",
+    totalSeasons:23,seriesReleaseDate:"2003-09-23",latestEpisodeDate:"2026-10-21",
+    episodeScheduleVerified:true,releasedEpisodes:{},metadataUpdatedAt:"2026-10-24T11:59:00Z"};
+  assert.ok(api.seriesMetadataRefreshCandidate(ncis,now),"empty historical schedules need repair");
+  assert.equal(api.seriesMetadataRefreshCandidate({...ncis,releasedEpisodes:{1:[1]}},now),null);
+});
+
+test("Unverified empty episode responses never delete existing watched history", () => {
+  const api=loadFunctions(["isEpisodeTrackable","positiveEpisodeMap","normalizeReleasedEpisodeMap","toMillis","releasedEpisodeMap","sanitizeUnreleasedEpisodeProgress"]);
+  const item={type:"Series",title:"NCIS",episodeScheduleVerified:true,releasedEpisodes:{},
+    airedEpisodeCounts:{1:20},curSeason:1,curEp:3,watchedEpisodes:{1:[1,2,3]},
+    episodeHistory:[{season:1,episode:3,kind:"mark"}]};
+  assert.equal(api.sanitizeUnreleasedEpisodeProgress(item),item);
+});
+
+test("Verified TVMaze episode recovery uses documented embedded fallback", () => {
+  const catalogue=fs.readFileSync(path.join(root,"assets/js/catalogue.js"),"utf8");
+  assert.match(catalogue,/\?embed=episodes/);
+  assert.match(catalogue,/Array\.isArray\(embedded\?\._embedded\?\.episodes\)/);
+  assert.match(catalogue,/const episodeAvailable=episodes\.length>0/);
+  const gallery=fs.readFileSync(path.join(root,"library-gallery.js"),"utf8");
+  assert.match(gallery,/data-gallery-retry-episodes/);
+  assert.match(gallery,/api\.refreshEpisodes\?\.\(item/);
+});
