@@ -309,7 +309,7 @@ window.WatchLogGallery=(()=>{
     const retryEpisodes=dialog.querySelector('[data-gallery-retry-episodes]');
     if(retryEpisodes)retryEpisodes.onclick=async()=>{
       retryEpisodes.disabled=true;retryEpisodes.textContent='Checking episode sources…';
-      const updated=await api.refreshEpisodes?.(item,true).catch(()=>false);
+      const updated=await Promise.resolve(api.refreshEpisodes?.(item,true)).catch(()=>false);
       if(!updated&&retryEpisodes.isConnected){retryEpisodes.disabled=false;retryEpisodes.textContent='Retry episode lookup';}
     };
     const watchNext=dialog.querySelector('[data-gallery-watch-next]');
