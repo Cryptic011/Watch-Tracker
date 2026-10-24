@@ -200,10 +200,15 @@
   function tvMazeShowMatchesSelection(show,title,{imdbId="",year=""}={}){
     if(!show?.name)return false;
     const candidateImdbId=String(show?.externals?.imdb||"");
-    if(imdbId&&candidateImdbId)return candidateImdbId===String(imdbId);
-    if(normalizeTitle(show.name)!==normalizeTitle(title))return false;
+    const exactTitle=normalizeTitle(show.name)===normalizeTitle(title);
+    if(!exactTitle)return false;
     const candidateYear=String(show?.premiered?.slice?.(0,4)||"");
-    return !year||!candidateYear||candidateYear===String(year);
+    if(year&&candidateYear&&candidateYear!==String(year))return false;
+    // Permit repairing an old mismatched IMDb link only if the selected
+    // TVMaze entry independently agrees on both the exact name and year.
+    if(imdbId&&candidateImdbId&&candidateImdbId!==String(imdbId))
+      return Boolean(year&&candidateYear&&candidateYear===String(year));
+    return true;
   }
 
   async function fetchTVMazeSeasonSnapshot(showId,fallbackShow={}){
@@ -214,8 +219,18 @@
     ]);
     const seasonsRaw=seasonResult.status==="fulfilled"&&Array.isArray(seasonResult.value)?seasonResult.value:[];
     const show=showResult.status==="fulfilled"?showResult.value:fallbackShow;
-    const episodes=episodeResult.status==="fulfilled"&&Array.isArray(episodeResult.value)?episodeResult.value:[];
-    const seasonAvailable=seasonResult.status==="fulfilled",showAvailable=showResult.status==="fulfilled",episodeAvailable=episodeResult.status==="fulfilled"&&Array.isArray(episodeResult.value);
+    let episodes=episodeResult.status==="fulfilled"&&Array.isArray(episodeResult.value)?episodeResult.value:[];
+    const seasonAvailable=seasonResult.status==="fulfilled",showAvailable=showResult.status==="fulfilled";
+    // TVMaze supports embedding its full episode list. Retry that verified
+    // endpoint if the separate episode request failed or came back empty.
+    if(!episodes.length){
+      try{
+        const embedded=await fetchJSONWithTimeout(`https://api.tvmaze.com/shows/${encodeURIComponent(showId)}?embed=episodes`,{credentials:"omit"},25000);
+        if(String(embedded?.id)===String(showId)&&Array.isArray(embedded?._embedded?.episodes)&&embedded._embedded.episodes.length)episodes=embedded._embedded.episodes;
+      }catch(error){console.warn("TVMaze embedded episode fallback unavailable",error);}
+    }
+    const started=Boolean(show?.premiered&&new Date(`${show.premiered}T00:00:00`).getTime()<Date.now());
+    const episodeAvailable=episodes.length>0||(episodeResult.status==="fulfilled"&&Array.isArray(episodeResult.value)&&!started);
     return {
       tvAvailable:seasonAvailable||showAvailable||episodeAvailable,
       episodeScheduleAvailable:episodeAvailable,show,
@@ -458,7 +473,14 @@
     try{
       const rows=await searchTVMaze(title),norm=normalizeTitle(title),wantedPlatform=normalizeTitle(platform);
       let shows=(Array.isArray(rows)?rows:[]).map(item=>({id:item.tvmazeId||item.externalId,name:item.title,premiered:item.year?`${item.year}-01-01`:"",externals:{imdb:item.imdbId||""},network:item.platform?{name:item.platform}:null,webChannel:null,status:item.status||"",updated:item.updated||0}));
-      if(imdbId){const exact=shows.find(show=>String(show?.externals?.imdb||"")===String(imdbId));if(exact)return exact;shows=shows.filter(show=>!show?.externals?.imdb);if(!shows.length)return null;}
+      if(imdbId){
+        const exact=shows.find(show=>String(show?.externals?.imdb||"")===String(imdbId));
+        if(exact)return exact;
+        const titleAndYear=shows.filter(show=>year&&normalizeTitle(show.name)===norm&&show.premiered?.slice?.(0,4)===String(year));
+        if(titleAndYear.length===1)return titleAndYear[0];
+        shows=shows.filter(show=>!show?.externals?.imdb);
+        if(!shows.length)return null;
+      }
       const candidates=shows.map(show=>{
         const candidateTitle=normalizeTitle(show.name||""),candidateImdb=String(show?.externals?.imdb||""),candidateYear=show.premiered?.slice?.(0,4)||"";
         const candidatePlatform=normalizeTitle(show.network?.name||show.webChannel?.name||"");
