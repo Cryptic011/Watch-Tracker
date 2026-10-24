@@ -1,3 +1,8 @@
+## 2026-10-24 — Simplify Library home
+- Move Collections beneath the heading inside Movies and Series, with category-specific custom lists.
+- Move Continue Watching into Series, respecting the collection, search and watch-status filters.
+- Keep Library home free of collection/progress controls and clear hidden collection filters when returning home.
+
 ## 2026-10-24 — Remove title-popup scrollbars
 - Lock background-page scrolling while a film or series popup is open and restore it automatically on close.
 - Hide the popup scrollbar while keeping long episode lists and details accessible on smaller screens.
