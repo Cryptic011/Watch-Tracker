@@ -411,7 +411,9 @@
         currentSeasonEpisodeCount:type==="Film"?null:Number(airedEpisodeCounts?.[curSeason]||0)||null,currentSeasonTotalEpisodes:type==="Film"?null:Number(episodeCounts?.[curSeason]||0)||null,episodeCounts:type==="Film"?{}:episodeCounts,airedEpisodeCounts:type==="Film"?{}:airedEpisodeCounts,releasedEpisodes:type==="Film"?{}:(verified?.episodeScheduleAvailable===true?(verified.releasedEpisodes||{}):(previous?.releasedEpisodes||releasedEpisodeMap({type,airedEpisodeCounts,episodeScheduleVerified:true}))),episodeImages:type==="Film"?{}:(verified?.episodeScheduleAvailable===true?(verified.episodeImages||{}):(previous?.episodeImages||{})),episodeImagesSource:type==="Film"?"":(verified?.episodeScheduleAvailable===true?"TVMaze":previous?.episodeImagesSource||""),
         seasonImages:type==="Film"?{}:(verified?.episodeScheduleAvailable===true?(verified.seasonImages||{}):(previous?.seasonImages||{})),seasonImagesSource:type==="Film"?"":(verified?.episodeScheduleAvailable===true?"TVMaze":previous?.seasonImagesSource||""),
         scheduledEpisodeReleases:type==="Film"?[]:(verified?.scheduledEpisodeReleases||previous?.scheduledEpisodeReleases||[]),
-        recurringWeeklySchedule:type==="Film"?null:(verified?.recurringWeeklySchedule||(String(previous?.tvmazeShowId||"")===String(sid||"")?previous?.recurringWeeklySchedule:null)||null),
+        recurringWeeklySchedule:type==="Film"?null:(verified?.episodeScheduleAvailable===true
+          ?(verified.recurringWeeklySchedule||null)
+          :(String(previous?.tvmazeShowId||"")===String(sid||"")?previous?.recurringWeeklySchedule:null)),
         episodeScheduleVerified:type==="Film"?false:(verified?.episodeScheduleAvailable===true||previous?.episodeScheduleVerified===true),
         airingSeason:type==="Film"?null:numOrNull("airing-season"),latestEpisodeNum:type==="Film"?null:numOrNull("latest-episode-num"),latestEpisodeTitle:type==="Film"?"":$("latest-episode-title").value||"",
         latestEpisodeDate:type==="Film"?"":(verified?.latestEpisodeDate||previous?.latestEpisodeDate||""),seriesReleaseDate:type==="Film"?"":(verified?.seriesReleaseDate||previous?.seriesReleaseDate||""),

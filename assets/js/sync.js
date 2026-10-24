@@ -563,7 +563,7 @@
           episodeCounts,airedEpisodeCounts,releasedEpisodes,episodeImages:scheduleVerified?(result.episodeImages||{}):(current.episodeImages||{}),episodeImagesSource:scheduleVerified?"TVMaze":current.episodeImagesSource||"",episodeScheduleVerified:scheduleVerified||current.episodeScheduleVerified===true,
           seasonImages:scheduleVerified?(result.seasonImages||{}):(current.seasonImages||{}),seasonImagesSource:scheduleVerified?"TVMaze":current.seasonImagesSource||"",
           scheduledEpisodeReleases:scheduleVerified?(result.scheduledEpisodeReleases||[]):(current.scheduledEpisodeReleases||[]),
-          recurringWeeklySchedule:result.recurringWeeklySchedule||current.recurringWeeklySchedule||null,
+          recurringWeeklySchedule:scheduleVerified?(result.recurringWeeklySchedule||null):(current.recurringWeeklySchedule||null),
           airingSeason:scheduleVerified?(airing?.season??null):current.airingSeason,
           latestEpisodeNum:scheduleVerified?(airing?.latestEpisode??null):current.latestEpisodeNum,
           latestEpisodeTitle:scheduleVerified?(airing?.latestEpisodeTitle||""):(current.latestEpisodeTitle||""),

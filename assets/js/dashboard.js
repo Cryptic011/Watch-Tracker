@@ -163,12 +163,16 @@ function recurringWeeklyShows(items,now=new Date()){
     const pattern=weeklyReleasePattern(rows);
     const days=[...new Set((Array.isArray(stored?.days)?stored.days:pattern?.days||[]).filter(day=>Number.isInteger(day)&&day>=0&&day<7))];
     const episodes=[...new Map((pattern?.episodes||rows).filter(row=>row&&Number.isInteger(Number(row.season))&&Number(row.season)>0&&Number.isInteger(Number(row.number))&&Number(row.number)>0).map(row=>[row.season+":"+row.number,row])).values()];
-    const dated=episodes.map(row=>({...row,date:new Date(/^\d{4}-\d{2}-\d{2}$/.test(row.raw)?row.raw+"T12:00:00":row.raw)})).sort((left,right)=>left.date-right.date);
+    const dated=episodes.map(row=>({...row,date:new Date(/^\d{4}-\d{2}-\d{2}$/.test(row.raw)?row.raw+"T12:00:00":row.raw)}))
+      .filter(row=>Number.isFinite(row.date.getTime())).sort((left,right)=>left.date-right.date);
     for(const day of days){
       const releases=dated.filter(row=>row.date.getDay()===day);
       const next=releases.find(row=>row.date.getTime()+86400000>now.getTime());
-      const batch=next?releases.filter(row=>row.date.getTime()===next.date.getTime()):[];
-      result.push({item,day,date:next?.date||null,episodes:batch,state:next?(next.date>now?"upcoming":"released"):"tba"});
+      // A previous broadcast weekday never establishes an unannounced return.
+      // Without a confirmed dated release, this show does not occupy a day.
+      if(!next)continue;
+      const batch=releases.filter(row=>row.date.getTime()===next.date.getTime());
+      result.push({item,day,date:next.date,episodes:batch,state:next.date>now?"upcoming":"released"});
     }
   }
   // Suppress duplicate schedule cards even before asynchronous cloud cleanup
@@ -182,8 +186,14 @@ function recurringWeeklyShows(items,now=new Date()){
     const existing=unique.get(key);
     if(!existing||quality(row.item)>quality(existing.item))unique.set(key,row);
   }
+  // Sort each weekday by the displayed local broadcast clock (01:00 before
+  // 17:00), not by which future week has the first known episode. A date-only
+  // announcement has no broadcast time and belongs after timed releases.
+  const clockMinutes=row=>row.date&&row.episodes.length&&!/^\d{4}-\d{2}-\d{2}$/.test(String(row.episodes[0].raw||""))
+    ?row.date.getHours()*60+row.date.getMinutes():Infinity;
   return [...unique.values()].sort((left,right)=>(left.day+6)%7-(right.day+6)%7||
-    (left.date?.getTime()||Infinity)-(right.date?.getTime()||Infinity)||
+    clockMinutes(left)-clockMinutes(right)||
+    left.date.getTime()-right.date.getTime()||
     String(left.item.title).localeCompare(String(right.item.title)));
 }
 function renderRecurringWeeklySchedule(){
@@ -211,7 +221,7 @@ function renderRecurringWeeklySchedule(){
       return `<button type="button" class="release-card recurring-release-card" data-recurring-open="${esc(row.item.id)}"><span class="release-time">${esc(time)}</span><span class="release-card-copy"><strong class="release-show-title"><span>${esc(row.item.title)}</span>${scheduleProgressMarker(row.item,progressMarkers)}</strong><span class="release-episode">${esc(episode)} · ${esc(date)}</span><span class="release-state-badge" data-release-state="${row.state}">${row.state==="released"?"Released · last 24 hours":row.state==="upcoming"?"Upcoming":"Awaiting next episode"}</span><span class="release-platform">${esc(row.item.platform||"Platform not saved")}</span></span><span class="release-chevron" aria-hidden="true">›</span></button>`;
     }).join(""):'<p class="release-empty">No recurring shows</p>'}</section>`;
   }).join("");
-  updateDashboardMarkup(root,`<details class="dashboard-section weekly-releases recurring-weekly-releases" data-dashboard-section="recurring" aria-labelledby="recurring-weekly-title"><summary class="weekly-releases-heading"><div class="recurring-summary-copy"><span class="weekly-eyebrow">MONDAY–SUNDAY</span><h2 id="recurring-weekly-title">Recurring weekly shows</h2><p class="dashboard-note">Tap to expand · device timezone (${esc(DEVICE_TIME_ZONE||Intl.DateTimeFormat().resolvedOptions().timeZone||"UTC")})</p></div><span class="weekly-total">${total}<small>shows</small></span><span class="recurring-dropdown-chevron" aria-hidden="true">⌄</span></summary><div class="release-week-list">${days}</div><p class="weekly-footnote">Shows stay listed. Episodes remain for 24 hours after airing, then advance to the next confirmed episode. Unannounced dates stay TBA; no dates or episode numbers are guessed.</p></details>`);
+  updateDashboardMarkup(root,`<details class="dashboard-section weekly-releases recurring-weekly-releases" data-dashboard-section="recurring" aria-labelledby="recurring-weekly-title"><summary class="weekly-releases-heading"><div class="recurring-summary-copy"><span class="weekly-eyebrow">MONDAY–SUNDAY</span><h2 id="recurring-weekly-title">Recurring weekly shows</h2><p class="dashboard-note">Tap to expand · device timezone (${esc(DEVICE_TIME_ZONE||Intl.DateTimeFormat().resolvedOptions().timeZone||"UTC")})</p></div><span class="weekly-total">${total}<small>shows</small></span><span class="recurring-dropdown-chevron" aria-hidden="true">⌄</span></summary><div class="release-week-list">${days}</div><p class="weekly-footnote">Only confirmed dated releases appear here. Episodes remain for 24 hours after airing. Historical broadcast weekdays do not confirm a future episode.</p></details>`);
   if(document.visibilityState==="visible"){
     recurringWeeklyTimer=setTimeout(renderDashboard,recurringScheduleDelay(rows,now,mediaItems));
   }

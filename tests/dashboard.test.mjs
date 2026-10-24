@@ -100,12 +100,36 @@ test('Recurring shows retain an aired episode for exactly 24 hours then advance 
  assert.equal(JSON.stringify(item),before,'display rollover never edits the saved library');
 });
 
-test('Recurring membership survives past the last known air date with no invented episode or date',()=>{
+test('Unannounced returns never occupy recurring weekdays, even with historical patterns',()=>{
  const c=app(),episodes=[8,15,22].map((day,index)=>({season:1,number:index+1,raw:new Date(2026,9,day,20).toISOString()}));
- const item={id:'pause',title:'On a break',type:'Anime',recurringWeeklySchedule:c.weeklyReleasePattern(episodes),scheduledEpisodeReleases:[]};
- const rows=c.recurringWeeklyShows([item],new Date(2027,0,1));
- assert.equal(rows.length,1);assert.equal(rows[0].day,4);assert.equal(rows[0].state,'tba');
- assert.equal(rows[0].date,null);assert.equal(rows[0].episodes.length,0);
+ const item={id:'pause',title:'On a break',type:'Anime',recurringWeeklySchedule:c.weeklyReleasePattern(episodes),scheduledEpisodeReleases:[],nextEpisodeNum:4,nextEpisodeDate:""};
+ const past=new Date(2027,0,1),original=JSON.stringify(item);
+ assert.equal(c.recurringWeeklyShows([item],past).length,0,'no announced date means no weekday slot');
+ assert.equal(c.recurringWeeklyShows([{...item,nextEpisodeDate:'invalid'}],past).length,0);
+ assert.equal(c.recurringWeeklyShows([{...item,recurringWeeklySchedule:{days:[2],episodes}}],past).length,0,'a historical Tuesday cannot be treated as next Tuesday');
+ assert.equal(JSON.stringify(item),original,'rendering never edits saved metadata');
+});
+
+test('Recurring releases sort by displayed local clock time, even across different future weeks',()=>{
+ const c=app(),make=(id,days,hour)=>({id,title:id,type:'Series',scheduledEpisodeReleases:days.map((day,index)=>({season:1,number:index+1,raw:new Date(2026,9,day,hour).toISOString()}))});
+ const evening=make('17:00 show',[8,15,22],17);
+ const overnight=make('01:00 show',[1,8,29],1);
+ const dateOnly={id:'unknown-time',title:'Date-only show',type:'Series',
+  scheduledEpisodeReleases:[8,15,22].map((day,index)=>({season:1,number:index+1,raw:'2026-10-'+String(day).padStart(2,'0')}))};
+ const rows=c.recurringWeeklyShows([evening,dateOnly,overnight],new Date(2026,9,20,12));
+ assert.deepEqual(JSON.parse(JSON.stringify(rows.map(row=>row.item.id))),['01:00 show','17:00 show','unknown-time']);
+ assert.deepEqual(JSON.parse(JSON.stringify(rows.map(row=>row.day))),[4,4,4]);
+ assert.equal(rows[0].date.getHours(),1);
+ assert.equal(rows[1].date.getHours(),17);
+ assert.equal(rows[0].date>rows[1].date,true,'broadcast times must outrank dates from different weeks');
+});
+
+test('A confirmed release is visible until exactly 24 hours after airing, then vanishes without another date',()=>{
+ const c=app(),episodes=[8,15,22].map((day,index)=>({season:1,number:index+1,raw:new Date(2026,9,day,20).toISOString()}));
+ const item={id:'finite',title:'Finite series',type:'Series',recurringWeeklySchedule:c.weeklyReleasePattern(episodes)};
+ const air=new Date(2026,9,22,20).getTime();
+ assert.equal(c.recurringWeeklyShows([item],new Date(air+86400000-1))[0].state,'released');
+ assert.equal(c.recurringWeeklyShows([item],new Date(air+86400000)).length,0);
 });
 
 test('Recurring weekdays always sort Monday to Sunday and exclude films, one-off releases and explicitly hidden shows',()=>{
@@ -134,7 +158,7 @@ test('Official weekly patterns and stored schedules persist through refreshes an
  assert.equal(catalogue.split('weeklyReleasePattern(schedule.episodes.map(').length-1,2);
  assert.ok(catalogue.includes('recurringWeeklySchedule:ended?null:')&&catalogue.includes('recurringWeeklySchedule:tvEnded?null:'));
  assert.match(fs.readFileSync(new URL('../assets/js/editor.js',import.meta.url),'utf8'),/recurringWeeklySchedule:type==="Film"\?null/);
- assert.match(fs.readFileSync(new URL('../assets/js/sync.js',import.meta.url),'utf8'),/recurringWeeklySchedule:result.recurringWeeklySchedule\|\|current.recurringWeeklySchedule\|\|null/);
+ assert.match(fs.readFileSync(new URL('../assets/js/sync.js',import.meta.url),'utf8'),/recurringWeeklySchedule:scheduleVerified\?\(result.recurringWeeklySchedule\|\|null\)/);
 });
 
 test('Calendar shows the selected week remainder and Upcoming from today through the 29th',()=>{
