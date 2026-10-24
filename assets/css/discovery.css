@@ -1,3 +1,5 @@
+/* Keep iOS from stretching the search page into blank space at either end. */
+html:has(#discovery-view:not(.hidden)),body:has(#discovery-view:not(.hidden)){overscroll-behavior-y:none}
 .discovery-heading{margin:4px 0 20px}.discovery-heading h2{font-size:1.6rem;letter-spacing:-.5px}.discovery-heading p{color:var(--muted);font-size:.9rem;line-height:1.5;margin-top:6px}
 .discovery-label{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
 .discovery-search{display:flex;gap:8px;padding:6px;background:var(--card);border:1px solid var(--border);border-radius:14px}.discovery-search input{min-width:0;flex:1;background:transparent;border:0;font-size:16px;padding:10px}.discovery-search button{border:0;border-radius:9px;background:var(--blue);color:#fff;padding:10px 14px;font-weight:700;cursor:pointer}

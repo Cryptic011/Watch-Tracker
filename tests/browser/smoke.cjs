@@ -82,6 +82,22 @@ const server=http.createServer((req,res)=>{
   await page.locator('[data-browse-format="Film"]').click();assert.equal(await page.locator('#discovery-query').inputValue(),'');
   await page.locator('[data-discovery-filter="All"]').click();await page.locator('#discovery-query').fill('Browser Test Film');
   await page.locator('#discovery-results .discovery-title').first().waitFor();
+  // iOS keeps the keyboard open until the search input actually loses focus.
+  await page.locator('#discovery-query').focus();
+  await page.evaluate(()=>document.querySelector('#discovery-form').requestSubmit());
+  assert.equal(await page.locator('#discovery-query').evaluate(input=>input===document.activeElement),false,'submitting search ends keyboard entry');
+  await page.locator('#discovery-query').focus();
+  await page.evaluate(()=>renderTitleSearch());
+  assert.equal(await page.locator('#discovery-query').evaluate(input=>input===document.activeElement),true,'result updates do not interrupt typing');
+  await page.evaluate(()=>{
+   const target=document.querySelector('#discovery-results');
+   for(const [name,y] of [['touchstart',300],['touchmove',260]]){
+    const event=new Event(name,{bubbles:true});Object.defineProperty(event,'touches',{value:[{clientX:100,clientY:y}]});target.dispatchEvent(event);
+   }
+  });
+  assert.equal(await page.locator('#discovery-query').evaluate(input=>input===document.activeElement),false,'browsing results dismisses keyboard entry');
+  assert.equal(await page.locator('#discovery-query').inputValue(),'Browser Test Film','dismissal preserves the search');
+  assert.equal(await page.evaluate(()=>getComputedStyle(document.documentElement).overscrollBehaviorY),'none','search suppresses viewport rubber banding');
   await page.locator('[data-discovery-filter="Series"]').click();assert.equal(await page.locator('#discovery-results .discovery-title').count(),1);
   await page.locator('[data-discovery-filter="Film"]').click();
   await page.locator('#discovery-results summary').first().click();assert.equal(await page.locator('#discovery-results details').first().getAttribute('open'),'');

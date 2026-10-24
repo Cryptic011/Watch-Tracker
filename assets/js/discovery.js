@@ -5,6 +5,24 @@
   let discoveryDetailItem=null,discoveryReturnFocus=null,discoveryGlobalRequestedQuery="",discoveryGlobalCompleteQuery="";
   const discoveryInput=$("discovery-query"),discoveryResults=$("discovery-results"),discoveryStatus=$("discovery-status"),discoveryDialog=$("discovery-detail");
 
+  function dismissTitleSearchKeyboard(){
+    if(document.activeElement===discoveryInput)discoveryInput.blur();
+  }
+  // End text entry when the user starts browsing. Blurring on scroll itself
+  // would also react to iOS moving the viewport as its keyboard opens.
+  let discoveryTouchStart=null;
+  $("discovery-view").addEventListener("touchstart",event=>{
+    discoveryTouchStart=currentTab==="search"&&document.activeElement===discoveryInput&&event.touches.length===1&&!event.target.closest('input,textarea,[contenteditable="true"]')
+      ?{x:event.touches[0].clientX,y:event.touches[0].clientY}:null;
+  },{passive:true});
+  $("discovery-view").addEventListener("touchmove",event=>{
+    if(!discoveryTouchStart)return;
+    if(event.touches.length!==1){discoveryTouchStart=null;return;}
+    const dx=Math.abs(event.touches[0].clientX-discoveryTouchStart.x),dy=Math.abs(event.touches[0].clientY-discoveryTouchStart.y);
+    if(dy>=12&&dy>dx){discoveryTouchStart=null;dismissTitleSearchKeyboard();}
+  },{passive:true});
+  for(const name of ["touchend","touchcancel"])$("discovery-view").addEventListener(name,()=>{discoveryTouchStart=null;},{passive:true});
+
   function discoveryImage(value){
     try{const url=new URL(value);return url.protocol==="https:"&&(/^(?:static\.tvmaze\.com|m\.media-amazon\.com|images-na\.ssl-images-amazon\.com)$/.test(url.hostname)||/^[a-z0-9.-]+\.mzstatic\.com$/.test(url.hostname))?url.href:"";}catch(_){return"";}
   }
@@ -88,6 +106,7 @@
     else discoveryStatus.textContent=discoveryGlobalCompleteQuery===discoveryQuery?"No matching titles. Try another spelling or choose All.":"No matches in your library. Search all titles to find more.";
   }
   function pauseTitleSearch(){
+    dismissTitleSearchKeyboard();discoveryTouchStart=null;
     clearTimeout(discoveryTimer);discoveryTimer=null;discoveryController?.abort();discoveryController=null;discoveryRequest++;discoveryLoading=false;
     if(discoveryDialog.open)discoveryDialog.close();
   }
@@ -140,13 +159,14 @@
 
   function addDiscoveryTitle(item){
     if(!item||!currentUser)return;
+    dismissTitleSearchKeyboard();
     if(discoveryDialog.open)discoveryDialog.close();
     const duplicate=discoveryDuplicate(item);
     if(duplicate){openMediaRow(duplicate.id);return;}
     openAdd();void selectSuggestion(item);
   }
   function showDiscoveryDetail(item,trigger){
-    if(!item)return;discoveryDetailItem=item;discoveryReturnFocus=trigger;
+    if(!item)return;dismissTitleSearchKeyboard();discoveryDetailItem=item;discoveryReturnFocus=trigger;
     $("discovery-detail-title").textContent=item.title;
     $("discovery-detail-body").innerHTML=`<div class="discovery-detail-intro">${discoveryPoster(item)}<div><p class="discovery-meta">${esc([item.year,item.format,item.detail].filter(Boolean).join(" · "))}</p>${discoveryDuplicate(item)?'<p class="discovery-added">✓ Already added</p>':""}</div></div><p class="discovery-full-description">${esc(discoveryDescription(item)||"Checking verified sources…")}</p><p data-discovery-detail-source>${discoveryAttribution(item)}</p><button type="button" class="btn btn-primary btn-full" id="discovery-detail-add">${discoveryDuplicate(item)?"View in library":"Add to library"}</button>`;
     wireDiscoveryImages($("discovery-detail-body"));
@@ -164,17 +184,17 @@
     discoveryLoading=discoveryQuery.length>=2&&!discoveryLibraryMatches().length;renderTitleSearch();
     if(discoveryLoading)discoveryTimer=setTimeout(()=>void runTitleSearch(),350);
   });
-  $("discovery-form").addEventListener("submit",event=>{event.preventDefault();void runTitleSearch();});
-  $("discovery-retry").onclick=()=>void runTitleSearch({global:true});
-  $("discovery-search-global").onclick=()=>void runTitleSearch({global:true});
-  $("discovery-library-results").addEventListener("click",event=>{const button=event.target.closest("[data-library-open]");if(button&&mediaItems.some(item=>String(item.id)===button.dataset.libraryOpen))openMediaRow(button.dataset.libraryOpen,button);});
+  $("discovery-form").addEventListener("submit",event=>{event.preventDefault();dismissTitleSearchKeyboard();void runTitleSearch();});
+  $("discovery-retry").onclick=()=>{dismissTitleSearchKeyboard();void runTitleSearch({global:true});};
+  $("discovery-search-global").onclick=()=>{dismissTitleSearchKeyboard();void runTitleSearch({global:true});};
+  $("discovery-library-results").addEventListener("click",event=>{const button=event.target.closest("[data-library-open]");if(button&&mediaItems.some(item=>String(item.id)===button.dataset.libraryOpen)){dismissTitleSearchKeyboard();openMediaRow(button.dataset.libraryOpen,button);}});
   document.querySelectorAll("[data-browse-format]").forEach(button=>button.onclick=()=>{discoveryFilter=button.dataset.browseFormat;renderTitleSearch();discoveryInput.placeholder=discoveryFilter==="Film"?"Search movies":"Search series";discoveryInput.focus();});
   $("discovery-manual").onclick=()=>{if(!currentUser)return;openAdd();titleInput.value=discoveryInput.value.trim();titleInput.focus();};
-  document.querySelectorAll("[data-discovery-filter]").forEach(button=>button.onclick=()=>{discoveryFilter=button.dataset.discoveryFilter;renderTitleSearch();if(discoveryInput.value.trim().length>=2&&!discoveryLoading&&discoveryGlobalCompleteQuery!==discoveryQuery&&!discoveryLibraryMatches().length)void runTitleSearch();if(typeof recordAppNavigation==="function")recordAppNavigation();});
+  document.querySelectorAll("[data-discovery-filter]").forEach(button=>button.onclick=()=>{dismissTitleSearchKeyboard();discoveryFilter=button.dataset.discoveryFilter;renderTitleSearch();if(discoveryInput.value.trim().length>=2&&!discoveryLoading&&discoveryGlobalCompleteQuery!==discoveryQuery&&!discoveryLibraryMatches().length)void runTitleSearch();if(typeof recordAppNavigation==="function")recordAppNavigation();});
   discoveryResults.addEventListener("click",event=>{
     const add=event.target.closest("[data-discovery-add]");if(add){addDiscoveryTitle(discoveryRows[Number(add.dataset.discoveryAdd)]);return;}
     const open=event.target.closest("[data-discovery-open]");if(open)showDiscoveryDetail(discoveryRows[Number(open.dataset.discoveryOpen)],open);
   });
   $("discovery-close").onclick=()=>discoveryDialog.close();
   discoveryDialog.addEventListener("click",event=>{if(event.target===discoveryDialog)discoveryDialog.close();});
-  discoveryDialog.addEventListener("close",()=>{if(discoveryReturnFocus?.isConnected)discoveryReturnFocus.focus();discoveryReturnFocus=null;});
+  discoveryDialog.addEventListener("close",()=>{if(discoveryReturnFocus?.isConnected)discoveryReturnFocus.focus({preventScroll:true});discoveryReturnFocus=null;});

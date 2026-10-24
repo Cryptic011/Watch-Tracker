@@ -1,3 +1,8 @@
+## 2026-10-24 — Stabilise iPhone search scrolling
+- Dismiss the search keyboard when submitting, swiping vertically through results, opening a title, changing filters or leaving Search.
+- Keep the keyboard available while typing and during background result updates; preserve the query and normal result scrolling.
+- Suppress elastic overscroll on Search and restore preview focus without moving the page.
+
 ## 2026-10-24 — Search the Library first
 - Show matching saved titles instantly as you type, ranked by title, with direct access to their existing title pages.
 - Search globally automatically when the selected format has no Library match, or on demand with Search all titles.

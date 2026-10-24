@@ -9,7 +9,7 @@ function harness(){
   const element=()=>({value:'',textContent:'',innerHTML:'',dataset:{},attributes:{},open:false,
     classList:{hidden:false,add(){this.hidden=true;},toggle(_name,value){this.hidden=value;}},
     listeners:{},addEventListener(name,fn){this.listeners[name]=fn;},setAttribute(name,value){this.attributes[name]=value;},
-    querySelectorAll:()=>[],replaceChildren(){this.innerHTML='';},focus(){this.focused=true;},showModal(){this.open=true;},close(){this.open=false;}});
+    querySelectorAll:()=>[],replaceChildren(){this.innerHTML='';},focus(){this.focused=true;},blur(){this.focused=false;},showModal(){this.open=true;},close(){this.open=false;}});
   const $=id=>{if(!nodes.has(id))nodes.set(id,element());return nodes.get(id);};
   const filters=['All','Film','Series'].map(type=>Object.assign(element(),{dataset:{discoveryFilter:type}}));
   const c=vm.createContext({URL,AbortController,setTimeout,clearTimeout,console,$,currentUser:{id:'a'},currentTab:'search',mediaItems:[],
@@ -159,4 +159,44 @@ test('Typing a Library match cancels the old global lookup and ignores its late 
  $('discovery-query').value='Reach';$('discovery-query').listeners.input();assert.equal(signal.aborted,true);
  resolve([{title:'Other title',format:'Series'}]);await pending;
  assert.equal(remote,1);assert.match($('discovery-library-results').innerHTML,/Reacher/);assert.equal($('discovery-results').innerHTML,'');
+});
+
+test('Submitting search dismisses text entry while automatic results keep typing focused',async()=>{
+ const {c,$}=harness(),input=$('discovery-query');let prevented=false,blurred=0;
+ c.document.activeElement=input;input.blur=()=>{blurred++;c.document.activeElement=null;};input.value='NCIS';
+ c.mediaItems=[{id:'ncis',title:'NCIS',type:'Series'}];
+ input.listeners.input();assert.equal(blurred,0,'typing and local results retain focus');
+ c.refreshTitleSearchBadges();assert.equal(blurred,0,'background sync does not dismiss typing');
+ $('discovery-form').listeners.submit({preventDefault(){prevented=true;}});
+ assert.equal(prevented,true);assert.equal(blurred,1);assert.equal(input.value,'NCIS');
+ assert.match($('discovery-library-results').innerHTML,/NCIS/);
+});
+
+test('A vertical results swipe dismisses the keyboard without cancelling native scrolling',()=>{
+ const {c,$}=harness(),input=$('discovery-query'),view=$('discovery-view');let blurred=0;
+ c.document.activeElement=input;input.blur=()=>{blurred++;c.document.activeElement=null;};
+ const touch=(x,y)=>({touches:[{clientX:x,clientY:y}],target:{closest:()=>null},preventDefault(){throw Error('Native scrolling must remain available');}});
+ view.listeners.touchstart(touch(100,300));view.listeners.touchmove(touch(103,294));assert.equal(blurred,0,'small movements remain taps');
+ view.listeners.touchmove(touch(104,270));assert.equal(blurred,1);
+ view.listeners.touchmove(touch(104,240));assert.equal(blurred,1,'dismiss once per gesture');
+});
+
+test('Input selection, horizontal gestures, pinch zoom and cancelled touches keep typing focused',()=>{
+ const {c,$}=harness(),input=$('discovery-query'),view=$('discovery-view');let blurred=0;
+ c.document.activeElement=input;input.blur=()=>blurred++;
+ const touch=(x,y,editable=false)=>({touches:[{clientX:x,clientY:y}],target:{closest:()=>editable?input:null}});
+ view.listeners.touchstart(touch(100,300,true));view.listeners.touchmove(touch(100,200));
+ view.listeners.touchstart(touch(100,300));view.listeners.touchmove(touch(140,298));view.listeners.touchend();
+ view.listeners.touchstart(touch(100,300));view.listeners.touchmove({touches:[{},{}]});view.listeners.touchmove(touch(100,200));
+ view.listeners.touchstart(touch(100,300));view.listeners.touchcancel();view.listeners.touchmove(touch(100,200));
+ assert.equal(blurred,0);
+});
+
+test('Leaving search and opening saved results dismiss the keyboard without clearing the query',()=>{
+ const {c,$,calls}=harness(),input=$('discovery-query');let blurred=0;
+ input.value='NCIS';input.blur=()=>{blurred++;c.document.activeElement=null;};c.document.activeElement=input;
+ c.pauseTitleSearch();assert.equal(blurred,1);assert.equal(input.value,'NCIS');
+ c.document.activeElement=input;c.mediaItems=[{id:'ncis',title:'NCIS',type:'Series'}];
+ $('discovery-library-results').listeners.click({target:{closest:()=>({dataset:{libraryOpen:'ncis'}})}});
+ assert.equal(blurred,2);assert.deepEqual(calls,['details:ncis']);
 });
