@@ -459,3 +459,22 @@ test("Verified TVMaze episode recovery uses documented embedded fallback", () =>
   assert.match(gallery,/data-gallery-retry-episodes/);
   assert.match(gallery,/api\.refreshEpisodes\?\.\(item/);
 });
+
+test("IMDb cross-check never attaches a near-match ID to a different selected programme",async()=>{
+  const api=loadFunctions(["normalizeTitle","imdbSeriesCrossCheck"],`
+    async function searchIMDbOne(){return [{title:"A Different Show",format:"Series",imdbId:"tt9999999",year:"2026"}];}
+    function bestIMDbSeriesMatch(rows){return rows[0];}
+  `);
+  const result=await api.imdbSeriesCrossCheck("Selected Show",{year:"2026"});
+  assert.equal(result.confirmed,null);
+  assert.equal(result.imdbId,"");
+  assert.equal(result.match,null);
+});
+
+test("TVMaze identity verification rejects nonmatching series even if the franchise is related",()=>{
+  const api=loadFunctions(["normalizeTitle","tvMazeShowMatchesSelection"]);
+  const show={name:"NCIS: Other City",premiered:"2026-10-01",externals:{imdb:"tt1234567"}};
+  assert.equal(api.tvMazeShowMatchesSelection(show,"NCIS",{year:"2026"}),false);
+  assert.equal(api.tvMazeShowMatchesSelection(show,"NCIS: Other City",{year:"2025"}),false);
+  assert.equal(api.tvMazeShowMatchesSelection(show,"NCIS: Other City",{year:"2026"}),true);
+});
