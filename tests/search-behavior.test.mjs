@@ -191,3 +191,14 @@ test("Global search merges cross-provider copies only when stable identity agree
   assert.ok(rows.some(row=>row.imdbId==="tt9288030"&&row.tvmazeId==="600"));
   assert.ok(rows.some(row=>row.imdbId==="tt9288031"&&row.tvmazeId==="601"));
 });
+
+test("Global catalogue does not offer individual TV episodes as films",async()=>{
+  const api=searchHarness(async()=>({results:[
+    {title:"Reacher",source:"tvmaze",format:"Series",tvmazeId:"100",year:"2022"},
+    {title:"Reacher: Episode 1",source:"imdb",format:"Film",detail:"TV Episode",imdbId:"tt1234567",year:"2022"}
+  ]}));
+  api.setActive("Reacher");
+  const rows=await api.searchAllTitles("Reacher");
+  assert.equal(rows.length,1);
+  assert.equal(rows[0].format,"Series");
+});
