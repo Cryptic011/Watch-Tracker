@@ -83,6 +83,65 @@ test('Official page content must match the exact title and be from a trusted bro
 });
 
 
+
+test('Season-specific official descriptions cannot populate whole-show details',async()=>{
+ const season='<html><head><meta property="og:title" content="NCIS | CBS">'+
+   '<meta name="description" content="In season 24, the team investigates a new mystery while Tony returns."></head>'+
+   '<body><h1>NCIS</h1></body></html>';
+ assert.equal(parseFirstPartyDetails(season,'https://www.cbs.com/shows/ncis/about/',{title:'NCIS',type:'Series',year:'2003'}),null);
+ const episode='<meta property="og:title" content="NCIS | CBS">'+
+   '<meta property="og:description" content="When Torres finds a mysterious clue, he follows an assassin in episode 3.">';
+ assert.equal(parseFirstPartyDetails(episode,'https://www.cbs.com/shows/ncis/',{title:'NCIS',type:'Series'}),null);
+ assert.equal(parseFirstPartyDetails('<h1>NCIS Season 24</h1><meta property="og:title" content="NCIS">'+
+   '<meta name="description" content="A general-looking description meant for a specific season.">',
+   'https://www.cbs.com/shows/ncis/',{title:'NCIS',type:'Series'}),null);
+});
+test('Season and episode URLs can never masquerade as programme or film overviews',()=>{
+ const generic='<meta property="og:title" content="NCIS | CBS"><meta name="description" content="NCIS follows Naval Criminal Investigative Service agents worldwide.">';
+ for(const url of [
+   'https://www.cbs.com/shows/ncis/episodes/',
+   'https://www.cbs.com/shows/ncis/season-24/',
+   'https://www.cbs.com/shows/ncis/season/24/',
+   'https://www.cbs.com/shows/ncis/episode-4/',
+   'https://www.netflix.com/title/123/episodes/'
+ ])assert.equal(parseFirstPartyDetails(generic,url,{title:'NCIS',type:'Series'}),null,url);
+ const film='<meta property="og:title" content="Example - Paramount Pictures"><meta name="description" content="Example follows a fictional expedition through space and time.">';
+ assert.equal(parseFirstPartyDetails(film,'https://www.paramountpictures.com/movies/example/trailers/',{title:'Example',type:'Film'}),null);
+});
+test('A show-level About paragraph takes priority over seasonal promotional metadata',()=>{
+ const html='<title>NCIS | CBS</title><meta property="og:title" content="NCIS | CBS">'+
+   '<meta property="og:description" content="Season 24 of NCIS features an action-packed special premiere.">'+
+   '<h1>About NCIS</h1><p>NCIS follows an investigative team handling crimes involving the United States Navy and Marine Corps.</p>'+
+   '<h2>Season 24</h2><p>Season 24 begins with a surprising new case.</p>';
+ const details=parseFirstPartyDetails(html,'https://www.cbs.com/shows/ncis/about/',{title:'NCIS',type:'Series'});
+ assert.equal(details?.description,'NCIS follows an investigative team handling crimes involving the United States Navy and Marine Corps.');
+ assert.equal(details?.source,'CBS');
+});
+test('An overall release synopsis is retained when a season synopsis is rejected, with IMDb fallback',async()=>{
+ const id='tt0364845',urls=[];
+ const result=await getTitleDetails({title:'NCIS',type:'Series',imdbId:id,
+  officialUrl:'https://www.cbs.com/shows/ncis/about/'},async url=>{
+  urls.push(url);
+  if(url.includes('cbs.com'))return html('<title>NCIS | CBS</title><meta name="description" content="Season 24 tells the story of an exciting new assignment.">');
+  if(url.includes('/title/'+id+'/'))return html('<script type="application/ld+json">'+JSON.stringify({
+   '@type':'TVSeries',url:'https://www.imdb.com/title/'+id+'/',
+   description:'A team of special agents investigates criminal cases connected to Navy and Marine personnel.',
+   aggregateRating:{ratingValue:7.9}})+'</script>');
+  return failure();
+ },options);
+ assert.equal(result.source,'IMDb');
+ assert.match(result.description,/team of special agents/);
+ assert.ok(urls.indexOf('https://www.cbs.com/shows/ncis/about/')<urls.indexOf('https://www.imdb.com/title/'+id+'/'));
+});
+test('Official studio film metadata cannot use a trailer or sequel-specific plot',()=>{
+ const site='https://www.paramountpictures.com/movies/example';
+ const title={title:'Example',type:'Film'};
+ assert.equal(parseFirstPartyDetails('<title>Example - Paramount Pictures</title>'+
+ '<meta name="description" content="In the next episode, the hero returns to save his crew.">',site,title),null);
+ assert.equal(parseFirstPartyDetails('<title>Example Part Two - Paramount Pictures</title>'+
+ '<meta name="description" content="The second film follows a new expedition on another world.">',site,title),null);
+});
+
 test('Official page redirects to a third-party host are rejected before parsing',async()=>{
  const result=await getTitleDetails({title:'NCIS',type:'Series',imdbId:'tt0364845',
   officialUrl:'https://www.cbs.com/shows/ncis/about/'},async url=>{

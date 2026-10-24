@@ -29,14 +29,48 @@ const FIRST_PARTY=new Map(Object.entries({
  "paramountpictures.com":"Paramount Pictures","sonypictures.com":"Sony Pictures",
  "20thcenturystudios.com":"20th Century Studios","marvel.com":"Marvel",
  "lionsgate.com":"Lionsgate","focusfeatures.com":"Focus Features",
- "discoveryplus.com":"Discovery+","tntdrama.com":"TNT","tbs.com":"TBS"
+ "discoveryplus.com":"Discovery+","tntdrama.com":"TNT","tbs.com":"TBS",
+ "paramountglobalcontent.com":"Paramount Global Content",
+ "paramountpressexpress.com":"Paramount Press Express",
+ "media.netflix.com":"Netflix Media Center"
 }));
+function isIndividualReleasePath(path){
+ const segments=String(path||"").toLowerCase().split("/").filter(Boolean);
+ // A network's /shows/title/ homepage or /about/ page is series-level.
+ // Episode/season pages, clips and trailers are not overview sources.
+ return segments.some((segment,i)=>/^(?:episodes?|seasons?|clips?|videos?|trailers?|episode-guide|episodeguide|season-[0-9]+|season_[0-9]+|s[0-9]+e[0-9]+|s[0-9]+)$/.test(segment)
+   ||(/^s[0-9]+$/.test(segment)&&/^e[0-9]+$/.test(segments[i+1]||""))
+   ||/^(?:episode|season)[-_]?[0-9]+/.test(segment));
+}
+function isWholeTitleSynopsis(value){
+ const description=text(value);
+ if(description.length<35)return false;
+ // Do not pass plot or press text about a specific season or episode
+ // through the overall Show/Film Details panel.
+ if(/\b(?:season\s*(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten)|s\d+\s*e\d+|episode\s*\d+)\b/i.test(description))return false;
+ if(/\b(?:this|new|current|upcoming|latest|next|final|previous|first|second|third|fourth)\s+season\b/i.test(description))return false;
+ if(/^\s*(?:watch|stream|new episodes|all episodes|trailer|preview|recap)\b/i.test(description))return false;
+ if(/\b(?:season|episode)\s+(?:premiere|finale|recap|guide|trailer)\b/i.test(description))return false;
+ return true;
+}
+function aboutPageDescription(markup,title){
+ const source=String(markup||""),expected="about "+nameKey(title);
+ for(const heading of source.matchAll(/<h([1-4])\b[^>]*>([\s\S]*?)<\/h\1\s*>/gi)){
+   if(nameKey(heading[2])!==expected)continue;
+   const after=source.slice(heading.index+heading[0].length).split(/<(?:h[1-4]|footer|nav)\b/i)[0].slice(0,7000);
+   for(const p of after.matchAll(/<p\b[^>]*>([\s\S]*?)<\/p\s*>/gi)){
+     const description=text(p[1]);
+     if(isWholeTitleSynopsis(description))return description;
+   }
+ }
+ return "";
+}
 function firstPartyURL(value){
  try{
    const u=new URL(String(value||""));
    if(u.protocol!=="https:"||u.username||u.password||u.port)return null;
    const host=u.hostname.toLowerCase().replace(/^www\./,""),name=FIRST_PARTY.get(host);
-   if(!name||/\/(?:login|sign-in|signin|account|register|search)(?:\/|$)/i.test(u.pathname))return null;
+   if(!name||isIndividualReleasePath(u.pathname)||/\/(?:login|sign-in|signin|account|register|search)(?:\/|$)/i.test(u.pathname))return null;
    u.hash="";return{url:u.href,name,host};
  }catch{return null;}
 }
@@ -67,14 +101,26 @@ export function parseFirstPartyDetails(markup,url,{title,type,year}={}){
    structured.push(row);if(Array.isArray(row?.["@graph"]))structured.push(...row["@graph"]);
   }}catch{}
  }
+ // Require a programme-wide title match. A homepage's generic OG title
+ // cannot validate an <h1> that actually names an individual season/episode.
+ const pageHeadings=[...source.matchAll(/<h1\b[^>]*>([\s\S]*?)<\/h1\s*>/gi)]
+   .map(row=>clean(row[1])).filter(Boolean);
+ if(pageHeadings.length===1&&/\b(?:season\s*\d+|episode\s*\d+|s\d+\s*e\d+)\b/i.test(pageHeadings[0]))return null;
  const types=type==="Film"?["Movie"]:["TVSeries","TVMiniSeries","TVShow"];
  const candidates=structured.filter(row=>[row?.["@type"]].flat().some(kind=>types.includes(kind))&&matchesFirstPartyTitle(row.name,title));
  const identity=candidates.length===1?candidates[0]:null;
  if(!identity&&!titles.some(name=>matchesFirstPartyTitle(name,title)))return null;
  const published=String(identity?.datePublished||""),publishedYear=yearOf(published);
  if(year&&publishedYear&&String(year)!==publishedYear)return null;
- const description=text(identity?.description||tags.get("og:description")||tags.get("description")||tags.get("twitter:description"));
- if(description.length<35)return null;
+ const descriptions=[
+   identity?.description,
+   aboutPageDescription(source,title),
+   tags.get("og:description"),
+   tags.get("description"),
+   tags.get("twitter:description")
+ ];
+ const description=descriptions.map(value=>text(value)).find(isWholeTitleSynopsis)||"";
+ if(!description)return null;
  return record({description,year:publishedYear,
   premiered:/^\d{4}-\d{2}-\d{2}$/.test(published)?published:"",
   genres:[identity?.genre||[]].flat().filter(x=>typeof x==="string").map(clean).slice(0,15)
@@ -124,8 +170,8 @@ async function resolveDetails(selected,request,tmdbToken=""){
     return asText?response.text():response.json();
   };
   const attempt=async task=>{try{return await task();}catch{return null;}};
-  // Editorial title information is resolved from IMDb before any fallback.
-  // TVMaze is reserved for episode/schedule information elsewhere in the app.
+  // Official series/film overview pages are resolved before the IMDb fallback.
+  // TVMaze only locates verified programme identity and publisher URLs.
   let id=selected.imdbId,canonical=null;
   const identity=async()=>{
     if(canonical)return canonical;
