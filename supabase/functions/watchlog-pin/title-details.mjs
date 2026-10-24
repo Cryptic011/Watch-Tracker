@@ -115,6 +115,12 @@ async function resolveDetails(selected,request){
     const remaining=deadline-Date.now();if(remaining<100)throw Error('Details deadline reached');
     const response=await request(url,{...init,signal:AbortSignal.timeout(Math.min(3000,remaining)),headers:{'User-Agent':'WatchedLogger/1.0 (title metadata)','Accept':asText?'text/html':'application/json',...(init.headers||{})}});
     if(!response.ok)throw Error('Metadata source unavailable');
+    // Never follow a platform redirect to a third-party or unrelated host
+    // and continue to attribute the HTML to the original broadcaster.
+    if(asText&&firstPartyURL(url)&&response.url){
+      const initial=firstPartyURL(url),final=firstPartyURL(response.url);
+      if(!final||final.host!==initial.host)throw Error('Unofficial redirect rejected');
+    }
     return asText?response.text():response.json();
   };
   const attempt=async task=>{try{return await task();}catch{return null;}};

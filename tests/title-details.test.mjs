@@ -52,6 +52,17 @@ test('Official page content must match the exact title and be from a trusted bro
  assert.equal(parseFirstPartyDetails('<title>NCIS</title><meta name="description" content="A very detailed but untrusted synopsis from an aggregator.">','http://www.cbs.com/shows/ncis/',info),null);
 });
 
+
+test('Official page redirects to a third-party host are rejected before parsing',async()=>{
+ const result=await getTitleDetails({title:'NCIS',type:'Series',imdbId:'tt0364845',
+  officialUrl:'https://www.cbs.com/shows/ncis/about/'},async url=>{
+  if(url.includes('cbs.com'))return{ok:true,url:'https://www.justwatch.com/tv/ncis',
+    text:async()=>'<h1>NCIS</h1><meta name="description" content="A false source description on a redirected aggregator website.">'};
+  return failure();
+ },options);
+ assert.equal(result.description,undefined);assert.deepEqual(result.sources,[]);
+});
+
 test('Series details never use TVMaze synopses or ratings when IMDb is unavailable',async()=>{
  const calls=[],result=await getTitleDetails({title:'Show',type:'Series',imdbId:'tt0903747',tvmazeShowId:'169'},async url=>{
   calls.push(url);if(url.includes('api.tvmaze.com'))throw Error('TVMaze must not be a details source');
@@ -60,7 +71,10 @@ test('Series details never use TVMaze synopses or ratings when IMDb is unavailab
  assert.equal(result.description,undefined);assert.equal(result.rating,undefined);
  assert.equal(result.state,'unavailable');assert.deepEqual(result.sources,[]);
  assert.equal(result.imdbUrl,'https://www.imdb.com/title/tt0903747/');
- assert.equal(calls[0],'https://www.imdb.com/title/tt0903747/');
+ assert.deepEqual(calls,[
+   'https://api.tvmaze.com/shows/169',
+   'https://www.imdb.com/title/tt0903747/'
+ ],'the series locator is tried first, then IMDb if no official page is available');
  assert.ok(calls.every(url=>!url.includes('justwatch')));
 });
 test('A TVMaze response with the wrong IMDb ID cannot supply a same-name remake description',async()=>{
