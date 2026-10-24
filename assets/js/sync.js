@@ -520,7 +520,7 @@
         if(verificationPromise){
           try{result=await verificationPromise;}catch(_){}
         }
-        if(!result)result=await verifiedSeasonData(seed.tvmazeShowId||"",seed.title,{imdbId:seed.imdbId||"",year:seed.releaseYear||"",platform:seed.platform||""});
+        if(!result)result=await verifiedSeasonData(seed.tvmazeShowId||"",seed.title,{imdbId:seed.imdbId||"",year:seed.releaseYear||String(seed.seriesReleaseDate||"").slice(0,4)||"",platform:seed.platform||""});
       }
 
       const index=mediaItems.findIndex(item=>String(item.id)===id),current=mediaItems[index];
@@ -595,7 +595,17 @@
     const nextEpisodeTime=toMillis(item.nextEpisodeDate),nextSeasonTime=toMillis(item.nextSeasonDate);
     const dueTimes=[nextEpisodeTime,nextSeasonTime].filter(time=>time>0&&time<=now);
     const due=dueTimes.length>0;
-    const refreshedAt=toMillis(item.metadataUpdatedAt),missingReleaseDate=!item.latestEpisodeDate&&!item.seriesReleaseDate,stale=!Object.prototype.hasOwnProperty.call(item,"releasedEpisodes")||missingReleaseDate||!refreshedAt||now-refreshedAt>=SERIES_METADATA_STALE_MS;
+    const released=normalizeReleasedEpisodeMap(item.releasedEpisodes||{});
+    const hasReleases=Object.keys(released).length>0;
+    const announcedStart=Number(String(item.seriesReleaseDate||"").slice(0,4)||item.releaseYear||0);
+    const historicallyAired=Object.keys(positiveEpisodeMap(item.airedEpisodeCounts)).length>0||
+      Number(item.curSeason||0)>0||Number(item.curEp||0)>0||
+      (Number(item.totalSeasons||0)>0&&announcedStart>0&&announcedStart<new Date(now).getFullYear());
+    // A verified flag with an empty episode list for an established programme
+    // is incomplete metadata, not proof that the programme has no releases.
+    const missingHistoricalEpisodes=historicallyAired&&!hasReleases;
+    const refreshedAt=toMillis(item.metadataUpdatedAt),missingReleaseDate=!item.latestEpisodeDate&&!item.seriesReleaseDate,
+      stale=missingHistoricalEpisodes||!Object.prototype.hasOwnProperty.call(item,"releasedEpisodes")||missingReleaseDate||!refreshedAt||now-refreshedAt>=SERIES_METADATA_STALE_MS;
     if(!due&&!stale)return null;
     const statusScore=item.status==="Watching"?30:item.status==="Planned"?20:10;
     const dueTime=due?Math.min(...dueTimes):Number.POSITIVE_INFINITY;
