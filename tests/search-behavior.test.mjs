@@ -166,3 +166,28 @@ test("Already cancelled callers cannot receive cached results or start new reque
   await assert.rejects(api.searchAllTitles("Reacher", { signal: controller.signal }), isCancelled);
   assert.equal(api.titleSearchInFlight.size, 0);
 });
+
+test("Global search retains distinct same-name series instead of merging conflicting source identities",async()=>{
+  const api=searchHarness(async()=>({results:[
+    {title:"North Star",format:"Series",source:"tvmaze",tvmazeId:"100",imdbId:"tt0001001",year:"2026"},
+    {title:"North Star",format:"Series",source:"tvmaze",tvmazeId:"200",imdbId:"tt0002002",year:"2026"},
+    {title:"North Star",format:"Film",source:"imdb",imdbId:"tt0003003",year:"2026"}
+  ]}));
+  api.setActive("North Star");
+  const rows=await api.searchAllTitles("North Star");
+  assert.equal(rows.length,3);
+  assert.equal(rows.filter(row=>row.format==="Series").length,2);
+});
+
+test("Global search merges cross-provider copies only when stable identity agrees",async()=>{
+  const api=searchHarness(async()=>({results:[
+    {title:"Reacher",format:"Series",source:"imdb",imdbId:"tt9288030",year:"2022"},
+    {title:"Reacher",format:"Series",source:"tvmaze",imdbId:"tt9288030",tvmazeId:"600",year:"2022",description:"Official series listing"},
+    {title:"Reacher",format:"Series",source:"tvmaze",imdbId:"tt9288031",tvmazeId:"601",year:"2022"}
+  ]}));
+  api.setActive("Reacher");
+  const rows=await api.searchAllTitles("Reacher");
+  assert.equal(rows.length,2);
+  assert.ok(rows.some(row=>row.imdbId==="tt9288030"&&row.tvmazeId==="600"));
+  assert.ok(rows.some(row=>row.imdbId==="tt9288031"&&row.tvmazeId==="601"));
+});
