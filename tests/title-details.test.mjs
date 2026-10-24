@@ -16,13 +16,16 @@ test('IMDb is preferred and only structured data for the exact identity and form
  assert.equal(parseIMDbDetails(ld({'@type':'TVSeries'}),imdb,'Film'),null);
  assert.equal(parseIMDbDetails(ld({url:'https://www.imdb.com.evil.example/title/'+imdb+'/'}),imdb,'Film'),null);
 });
-test('A blocked IMDb request falls back to the selected TVMaze series and labels its rating',async()=>{
- const result=await getTitleDetails({title:'Show',type:'Series',imdbId:'tt0903747',tvmazeShowId:'169'},async url=>{
-  if(url.endsWith('/seasons'))return json([{number:1},{number:2},{number:0}]);
-  if(url.includes('api.tvmaze.com'))return json({id:169,name:'Show',externals:{imdb:'tt0903747'},summary:'<p>TVMaze &amp; verified series.</p>',genres:['Drama'],rating:{average:9.2}});
+test('Series details never use TVMaze synopses or ratings when IMDb is unavailable',async()=>{
+ const calls=[],result=await getTitleDetails({title:'Show',type:'Series',imdbId:'tt0903747',tvmazeShowId:'169'},async url=>{
+  calls.push(url);if(url.includes('api.tvmaze.com'))throw Error('TVMaze must not be a details source');
   return failure();
  },options);
- assert.equal(result.description,'TVMaze & verified series.');assert.equal(result.seasons,2);assert.equal(result.ratingSource,'TVMaze');assert.equal(result.source,'TVMaze');assert.equal(result.imdbUrl,'https://www.imdb.com/title/tt0903747/');
+ assert.equal(result.description,undefined);assert.equal(result.rating,undefined);
+ assert.equal(result.state,'unavailable');assert.deepEqual(result.sources,[]);
+ assert.equal(result.imdbUrl,'https://www.imdb.com/title/tt0903747/');
+ assert.equal(calls[0],'https://www.imdb.com/title/tt0903747/');
+ assert.ok(!calls.some(url=>url.includes('tvmaze')));
 });
 test('A TVMaze response with the wrong IMDb ID cannot supply a same-name remake description',async()=>{
  const result=await getTitleDetails({title:'Twin',type:'Series',tvmazeShowId:'12',imdbId:'tt1111111'},async url=>url.includes('api.tvmaze.com')?json({id:12,name:'Twin',externals:{imdb:'tt2222222'},summary:'Wrong remake'}):failure(),options);
@@ -52,13 +55,36 @@ test('Metadata never requests Wikimedia sources',async()=>{
  const calls=[];await getTitleDetails(film,async url=>{calls.push(url);return failure();},options);
  assert.ok(calls.length>0);assert.ok(calls.every(url=>!/(?:wikipedia|wikidata|wikimedia)\.org/i.test(url)));
 });
-test('Missing fields are filled from fallbacks while keeping IMDb facts and field provenance',async()=>{
- const result=await getTitleDetails({title:'Series',type:'Series',imdbId:imdb,tvmazeShowId:'12'},async url=>{
+test('Exact IMDb-linked fallback fills a missing series description without replacing IMDb ratings',async()=>{
+ const calls=[],result=await getTitleDetails({title:'Series',type:'Series',imdbId:imdb,tvmazeShowId:'12'},async url=>{
+  calls.push(url);
   if(url.includes('imdb.com/title'))return html(ld({'@type':'TVSeries',description:'',aggregateRating:{ratingValue:8.8}}));
-  if(url.endsWith('/seasons'))return json([{number:1}]);
-  return json({id:12,externals:{imdb},summary:'Fallback series synopsis',rating:{average:6.2},language:'English'});
+  if(url.includes('justwatch'))return json({data:{popularTitles:{edges:[{node:{objectType:'SHOW',content:{
+    title:'Series',originalReleaseYear:2010,shortDescription:'Exact-identity series synopsis.',
+    externalIds:{imdbId:imdb},fullPath:'/uk/tv-series/series'}}}]}}});
+  return failure();
  },options);
- assert.equal(result.description,'Fallback series synopsis');assert.equal(result.descriptionSource,'TVMaze');assert.equal(result.rating,8.8);assert.equal(result.ratingSource,'IMDb');assert.deepEqual(result.sources.map(row=>row.name),['IMDb','TVMaze']);
+ assert.equal(result.description,'Exact-identity series synopsis.');
+ assert.equal(result.descriptionSource,'JustWatch');assert.equal(result.rating,8.8);
+ assert.equal(result.ratingSource,'IMDb');assert.deepEqual(result.sources.map(row=>row.name),['IMDb','JustWatch']);
+ assert.ok(!calls.some(url=>url.includes('tvmaze')),'TVMaze must not be requested for an existing IMDb ID');
+});
+test('A selected TVMaze ID only resolves a matching IMDb identity, never its description',async()=>{
+ const id='tt0903747',calls=[],input={title:'Show',type:'Series',tvmazeShowId:'169'};
+ const result=await getTitleDetails(input,async url=>{
+  calls.push(url);
+  if(url.includes('media-imdb'))return failure();
+  if(url.endsWith('/shows/169'))return json({id:169,name:'Show',premiered:'2020-01-01',externals:{imdb:id},
+    summary:'TVMaze editorial text that must never appear',rating:{average:9.1}});
+  if(url.endsWith('/title/'+id+'/'))return html('<script type="application/ld+json">'+JSON.stringify({
+    '@type':'TVSeries',url:'https://www.imdb.com/title/'+id+'/',description:'The IMDb programme synopsis.',
+    datePublished:'2020-01-01',aggregateRating:{ratingValue:8.1}})+'</script>');
+  return failure();
+ },options);
+ assert.equal(result.imdbId,id);assert.equal(result.description,'The IMDb programme synopsis.');
+ assert.equal(result.source,'IMDb');assert.equal(result.rating,8.1);
+ assert.ok(calls.find(url=>url.includes('/shows/169')));
+ assert.ok(!JSON.stringify(result).includes('TVMaze editorial'));
 });
 test('Outages are not cached and a later retry can recover',async()=>{
  const input={...film,imdbId:'tt0000001'},failed=await getTitleDetails(input,async()=>failure());

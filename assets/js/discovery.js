@@ -55,7 +55,7 @@
   }
   function discoveryAttribution(item){
     if(typeof titleDetailsSourceLinks==="function"){
-      const details=item.verifiedDetails||{sources:item.source==="tvmaze"&&item.tvmazeId?[{name:"TVMaze",url:`https://www.tvmaze.com/shows/${item.tvmazeId}`}]:item.source==="apple"&&item.storeUrl?[{name:"Apple TV",url:item.storeUrl}]:[]};
+      const details=item.verifiedDetails||{sources:item.source==="apple"&&item.storeUrl?[{name:"Apple TV",url:item.storeUrl}]:item.imdbId?[{name:"IMDb",url:`https://www.imdb.com/title/${item.imdbId}/`}]:[]};
       const links=titleDetailsSourceLinks(details);if(links)return `<span class="discovery-source">Sources: ${links}</span>`;
     }
     return "";

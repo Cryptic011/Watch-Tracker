@@ -112,8 +112,8 @@
       const index=[...candidates].find(number=>suggestionsShareIdentity(rows[number],scored));
       if(index===undefined){const number=rows.length;rows.push(scored);indexKeys(scored,number);continue;}
       const existing=rows[index],sources=Array.from(new Set([...(existing.sources||[existing.source]),item.source]));
-      const preferNew=(item.format==="Film"&&item.source==="imdb"&&existing.source!=="imdb")||
-        (item.format==="Series"&&item.source==="tvmaze"&&existing.source!=="tvmaze")||scored.score>existing.score;
+      const preferNew=(item.source==="imdb"&&existing.source!=="imdb")||
+        (existing.source!=="imdb"&&scored.score>existing.score);
       const base=preferNew?scored:existing,other=preferNew?existing:scored;
       const merged={
         ...base,sources,

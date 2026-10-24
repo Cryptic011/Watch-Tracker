@@ -181,11 +181,8 @@
         titleDetailsCache.delete(key);
         if(response.details?.sources?.length)return response.details;
       }catch(_) {titleDetailsCache.delete(key);}
-      // The browser can still read the exact TVMaze identity if the gateway is offline.
-      if(payload.type==="Series"){
-        const details=(await fetchOfficialTrackerArtwork({...item,type:"Series",tvmazeShowId:payload.tvmazeShowId,imdbId:payload.imdbId})).details||{};
-        if(details.description)return {...details,imdbUrl:/^tt\d+$/.test(payload.imdbId||"")?`https://www.imdb.com/title/${payload.imdbId}/`:""};
-      }
+      // If the verified-details service is offline, do not silently replace
+      // IMDb/official text with TVMaze's unverified editorial summary.
       return {state:"unavailable",sources:[],imdbUrl:/^tt\d+$/.test(payload.imdbId||"")?`https://www.imdb.com/title/${payload.imdbId}/`:""};
     });
   }

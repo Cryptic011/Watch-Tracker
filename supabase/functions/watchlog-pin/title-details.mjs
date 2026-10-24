@@ -48,21 +48,9 @@ async function resolveDetails(selected,request){
     return asText?response.text():response.json();
   };
   const attempt=async task=>{try{return await task();}catch{return null;}};
-  let id=selected.imdbId,tv=null,canonical=null;
-  if(selected.type==='Series')tv=await attempt(async()=>{
-    let show;
-    if(selected.tvmazeId)show=await get('https://api.tvmaze.com/shows/'+selected.tvmazeId);
-    else if(id)show=await get('https://api.tvmaze.com/lookup/shows?imdb='+id);
-    else if(selected.title&&selected.year){
-      const rows=await get('https://api.tvmaze.com/search/shows?q='+encodeURIComponent(selected.title));
-      const matches=(Array.isArray(rows)?rows:[]).map(row=>row.show).filter(row=>nameKey(row?.name)===nameKey(selected.title)&&yearOf(row?.premiered)===selected.year);
-      if(matches.length===1)show=matches[0];
-    }
-    if(!show?.id||(selected.tvmazeId&&String(show.id)!==selected.tvmazeId)||(id&&show.externals?.imdb!==id))return null;
-    if(!id)id=imdbID(show.externals?.imdb);
-    const seasons=await attempt(()=>get('https://api.tvmaze.com/shows/'+show.id+'/seasons'));
-    return record({description:text(show.summary),premiered:show.premiered||'',year:yearOf(show.premiered),genres:Array.isArray(show.genres)?show.genres.map(clean):[],status:clean(show.status),rating:typeof show.rating?.average==='number'?show.rating.average:null,runtime:show.averageRuntime||show.runtime||null,language:clean(show.language),seasons:Array.isArray(seasons)?seasons.filter(row=>Number(row.number)>0).length:null},'TVMaze','https://www.tvmaze.com/shows/'+show.id);
-  });
+  // Editorial title information is resolved from IMDb before any fallback.
+  // TVMaze is reserved for episode/schedule information elsewhere in the app.
+  let id=selected.imdbId,canonical=null;
   const identity=async()=>{
     if(canonical)return canonical;
     if(!selected.title&&!id)return null;
@@ -76,6 +64,14 @@ async function resolveDetails(selected,request){
     canonical={title:clean(matches[0].l),year:yearOf(matches[0].y)};id=matches[0].id;return canonical;
   };
   if(!id)await attempt(identity);
+  // A selected TVMaze ID can supply the linked IMDb identifier only when the
+  // actual series identity matches. Never import its synopsis or rating.
+  if(!id&&selected.type==='Series'&&selected.tvmazeId)await attempt(async()=>{
+    const show=await get('https://api.tvmaze.com/shows/'+selected.tvmazeId);
+    if(String(show?.id)!==selected.tvmazeId||nameKey(show?.name)!==nameKey(selected.title)||
+      (selected.year&&yearOf(show?.premiered)!==selected.year))return null;
+    id=imdbID(show?.externals?.imdb);return id||null;
+  });
   let result=id?await attempt(async()=>parseIMDbDetails(await get(imdbURL(id),true),id,selected.type)):null;
   const add=details=>{
     if(!details)return;
@@ -86,7 +82,8 @@ async function resolveDetails(selected,request){
     }
     if(used)for(const source of details.sources||[])if(!result.sources.some(row=>row.url===source.url))result.sources.push(source);
   };
-  add(tv);
+  // The film distributor's own listing is the next authoritative source.
+  // For series, use an exact IMDb-linked catalogue description instead.
   if(!result?.description&&selected.type==='Film')add(await attempt(async()=>{
     const match=await attempt(identity);
     if(!selected.appleId&&(!match?.title||!match.year))return null;
