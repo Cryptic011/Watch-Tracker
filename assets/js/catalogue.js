@@ -476,6 +476,14 @@
 
   async function exactTVMazeShow(title,{imdbId="",year="",platform=""}={}){
     try{
+      // Resolve the selected IMDb title directly before searching names.
+      // This is safer for remakes, international titles and franchise variants.
+      if(/^tt\d{5,12}$/.test(String(imdbId||""))){
+        try{
+          const identified=await fetchJSONWithTimeout(`https://api.tvmaze.com/lookup/shows?imdb=${encodeURIComponent(imdbId)}`,{credentials:"omit"});
+          if(identified?.id&&tvMazeShowMatchesSelection(identified,title,{imdbId,year}))return identified;
+        }catch(_){}
+      }
       const rows=await searchTVMaze(title),norm=normalizeTitle(title),wantedPlatform=normalizeTitle(platform);
       let shows=(Array.isArray(rows)?rows:[]).map(item=>({id:item.tvmazeId||item.externalId,name:item.title,premiered:item.year?`${item.year}-01-01`:"",externals:{imdb:item.imdbId||""},network:item.platform?{name:item.platform}:null,webChannel:null,status:item.status||"",updated:item.updated||0}));
       if(imdbId){
