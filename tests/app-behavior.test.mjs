@@ -478,3 +478,51 @@ test("TVMaze identity verification rejects nonmatching series even if the franch
   assert.equal(api.tvMazeShowMatchesSelection(show,"NCIS: Other City",{year:"2025"}),false);
   assert.equal(api.tvMazeShowMatchesSelection(show,"NCIS: Other City",{year:"2026"}),true);
 });
+
+test("Duplicate cleanup merges released episodes and watched progress without dropping history",()=>{
+  const api=loadFunctions([
+    "normalizeTitle","mediaIdentityKind","identityReleaseYear","itemsAreDuplicate","positiveEpisodeMap",
+    "normalizeReleasedEpisodeMap","mergeEpisodeCountMaps","mergeEpisodeHistories","duplicateRecordQuality",
+    "mergeDuplicateItems","deduplicateLibrary"
+  ],`
+    function toMillis(value){return Date.parse(value||"")||0;}
+    function nowISO(){return "2026-10-24T12:00:00Z";}
+    function uuid(){return "generated-id";}
+    function watchedSortTime(item){return toMillis(item.date);}
+    function upcomingSortInfo(){return {rank:0,time:Infinity};}
+    function watchedEpisodeMap(item){return item.watchedEpisodes||{};}
+    function normalizeWatchedEpisodeMap(map,releases){
+      const output={};
+      for(const [season,episodes] of Object.entries(map||{})){
+        const available=new Set(Array.isArray(releases?.[season])?releases[season]:Array.from({length:Number(releases?.[season]||0)},(_,i)=>i+1));
+        const filtered=episodes.filter(episode=>available.has(episode));
+        if(filtered.length)output[season]=filtered;
+      }
+      return output;
+    }
+    function highestWatchedEpisode(map){
+      const pairs=Object.entries(map||{}).flatMap(([season,episodes])=>episodes.map(episode=>({season:Number(season),episode})));
+      return pairs.sort((a,b)=>b.season-a.season||b.episode-a.episode)[0]||null;
+    }
+    function fullyWatchedSeasonCount(){return 0;}
+    function migratePlannedStatuses(rows){return {rows};}
+  `);
+  const a={id:"series-a",title:"Test Series",type:"Series",status:"Watching",
+    tvmazeShowId:"600",imdbId:"tt1000000",episodeScheduleVerified:true,
+    releasedEpisodes:{1:[1,2,3]},watchedEpisodes:{1:[1,2]},
+    episodeHistory:[{id:"event-a",kind:"mark",season:1,episode:2,watchedAt:"2026-10-21T12:00:00Z"}],
+    updatedAt:"2026-10-22T12:00:00Z"};
+  const b={id:"series-b",title:"Test Series",type:"Series",status:"Watching",
+    tvmazeShowId:"600",imdbId:"tt2000000",episodeScheduleVerified:true,
+    releasedEpisodes:{},watchedEpisodes:{1:[3]},
+    episodeHistory:[{id:"event-b",kind:"mark",season:1,episode:3,watchedAt:"2026-10-23T12:00:00Z"}],
+    updatedAt:"2026-10-23T12:00:00Z"};
+  const output=api.deduplicateLibrary([a,b]);
+  assert.equal(output.items.length,1);
+  assert.equal(output.removedCount,1);
+  const item=output.items[0];
+  assert.deepEqual(JSON.parse(JSON.stringify(item.releasedEpisodes)),{1:[1,2,3]});
+  assert.deepEqual(JSON.parse(JSON.stringify(item.watchedEpisodes)),{1:[1,2,3]});
+  assert.equal(item.episodeHistory.length,2);
+  assert.deepEqual(a.watchedEpisodes,{1:[1,2]});
+});
