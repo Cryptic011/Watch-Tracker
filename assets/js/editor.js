@@ -97,6 +97,9 @@
     };
     for(const item of results.flat()){
       if(!item?.title||!["Film","Series"].includes(item.format))continue;
+      // IMDb search includes individual TV episodes under a default film
+      // classification. These must never become standalone library titles.
+      if(item.source==="imdb"&&/\b(?:tv\s*episode|television\s*episode|podcast\s*episode)\b/i.test(String(item.detail||"")))continue;
       const itemImdbId=String(item.imdbId||(item.source==="imdb"?item.externalId:"")||"");
       const scored={...item,imdbId:itemImdbId,tvmazeId:item.tvmazeId||(item.source==="tvmaze"?item.externalId:""),score:suggestionScore(item,query),sources:[item.source]};
       const format=String(scored.format||""),name=normalizeTitle(scored.title),year=String(scored.year||"");
