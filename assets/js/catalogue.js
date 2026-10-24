@@ -200,6 +200,7 @@
   function tvMazeShowMatchesSelection(show,title,{imdbId="",year=""}={}){
     if(!show?.name)return false;
     const candidateImdbId=String(show?.externals?.imdb||"");
+    if(imdbId&&candidateImdbId&&candidateImdbId===String(imdbId))return true;
     const exactTitle=normalizeTitle(show.name)===normalizeTitle(title);
     if(!exactTitle)return false;
     const candidateYear=String(show?.premiered?.slice?.(0,4)||"");
@@ -680,7 +681,13 @@
       const combined={};
       for(const map of [watchedEpisodeMap(a,hasVerifiedReleases?combinedReleases:airedEpisodeCounts),watchedEpisodeMap(b,hasVerifiedReleases?combinedReleases:airedEpisodeCounts)])
         for(const [season,episodes] of Object.entries(map||{}))combined[season]=[...new Set([...(combined[season]||[]),...(episodes||[])])].sort((x,y)=>x-y);
-      merged.watchedEpisodes=normalizeWatchedEpisodeMap(combined,hasVerifiedReleases?combinedReleases:airedEpisodeCounts);
+      const releaseLimits=hasVerifiedReleases?combinedReleases:airedEpisodeCounts;
+      if(!Object.keys(releaseLimits).length){
+        // Keep offline watch ticks when both providers have temporarily empty lists.
+        for(const source of [a.watchedEpisodes,b.watchedEpisodes])for(const [season,episodes] of Object.entries(source||{}))
+          if(Number(season)>0)combined[season]=[...new Set([...(combined[season]||[]),...(Array.isArray(episodes)?episodes:[]).map(Number).filter(ep=>Number.isInteger(ep)&&ep>0)])].sort((x,y)=>x-y);
+      }
+      merged.watchedEpisodes=Object.keys(releaseLimits).length?normalizeWatchedEpisodeMap(combined,releaseLimits):combined;
       const highest=highestWatchedEpisode(merged.watchedEpisodes);
       if(highest&&highest.season*10000+highest.episode>Number(merged.curSeason||0)*10000+Number(merged.curEp||0)){merged.curSeason=highest.season;merged.curEp=highest.episode;}
       merged.watchedSeasons=Math.max(Number(merged.watchedSeasons||0),fullyWatchedSeasonCount(merged,merged.watchedEpisodes,airedEpisodeCounts));
