@@ -1,3 +1,9 @@
+## 2026-10-24 — Replace cast-return promos with whole-series overviews
+- Reject cast-return announcements even when they contain no season or episode number.
+- Read dedicated programme About text before SEO metadata and use the verified distributor's full synopsis when a CBS page only promotes the current run.
+- Version and scope verified synopses so older gateway responses cannot return cached season blurbs to the Details panel.
+- Keep programme identity checks, source attribution and IMDb fallback; never import Wikipedia text.
+
 ## 2026-10-24 — Validate whole-title descriptions across every verified fallback
 - Apply whole-series and whole-film synopsis checks to IMDb and Apple TV as well as broadcaster and studio pages.
 - Reject season/episode-specific plots, numbered or named episode headings, and trailer promotions without discarding verified ratings and other title-level facts.

@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import {getTitleDetails,parseIMDbDetails,parseFirstPartyDetails} from '../supabase/functions/watchlog-pin/title-details.mjs';
 const imdb='tt1375666',film={title:'Inception',type:'Film',imdbId:imdb,year:'2010'};
 const ld=(fields={})=>'<script type="application/ld+json">'+JSON.stringify({'@type':'Movie',url:'https://www.imdb.com/title/'+imdb+'/',description:'An IMDb synopsis.',datePublished:'2010-07-16',genre:['Action','Sci-Fi'],duration:'PT2H28M',aggregateRating:{ratingValue:8.8},...fields})+'</script>';
@@ -8,6 +9,7 @@ const html=value=>({ok:true,text:async()=>value});
 const failure=()=>({ok:false,status:503});
 const options={useCache:false};
 const suggestion={id:imdb,l:'Inception',y:2010,qid:'movie'};
+const fixture=name=>fs.readFileSync(new URL('./fixtures/'+name,import.meta.url),'utf8');
 const apple={trackId:1,kind:'feature-movie',trackName:'Inception',releaseDate:'2010-07-16',longDescription:'Apple film synopsis.',trackViewUrl:'https://tv.apple.com/gb/movie/inception/umc.test',trackTimeMillis:8880000,primaryGenreName:'Sci-Fi'};
 test('IMDb is preferred and only structured data for the exact identity and format is accepted',async()=>{
  const calls=[],result=await getTitleDetails(film,async url=>{calls.push(url);return html(ld());},options);
@@ -116,6 +118,38 @@ test('A show-level About paragraph takes priority over seasonal promotional meta
  const details=parseFirstPartyDetails(html,'https://www.cbs.com/shows/ncis/about/',{title:'NCIS',type:'Series'});
  assert.equal(details?.description,'NCIS follows an investigative team handling crimes involving the United States Navy and Marine Corps.');
  assert.equal(details?.source,'CBS');
+});
+test('The live CBS NCIS cast-return promo is rejected even without a season number',()=>{
+ const site='https://www.cbs.com/shows/ncis/about/',input={title:'NCIS',type:'Series'};
+ assert.equal(parseFirstPartyDetails(fixture('ncis-cbs-about.html'),site,input),null);
+ const variants=['Michael Weatherly returns as Tony DiNozzo, joining the team as they tackle Navy crimes and personal challenges.',
+  'Michael Weatherly is back as Tony DiNozzo as the investigators tackle a dangerous assignment.',
+  'A returning actor reprises his role in a thrilling adventure for the whole team.'];
+ for(const description of variants)assert.equal(parseFirstPartyDetails('<title>NCIS | CBS</title><meta name="description" content="'+description+'">',site,input),null);
+});
+test('The dedicated CBS About div wins over generic structured and SEO descriptions',()=>{
+ const description='NCIS follows a team of investigators solving crimes connected to the Navy and Marine Corps.';
+ const page='<title>NCIS | CBS</title><script type="application/ld+json">'+JSON.stringify({'@type':'TVSeries',name:'NCIS',description:'Investigators handle difficult cases.'})+'</script>'+
+  '<h1>About NCIS</h1><div class="about__copy" id="js-about-copy">'+description+'</div>';
+ assert.equal(parseFirstPartyDetails(page,'https://www.cbs.com/shows/ncis/about/',{title:'NCIS',type:'Series'}).description,description);
+});
+test('A distributor fallback uses the full matching series synopsis, never its teaser or cast list',async()=>{
+ const urls=[],id='tt0364845',site='https://www.paramountglobalcontent.com/title/ncis',page=fixture('ncis-distributor.html');
+ const result=await getTitleDetails({title:'NCIS',type:'Series',imdbId:id,year:'2003'},async url=>{
+  urls.push(url);
+  if(url.includes('api.tvmaze.com'))return json({id:60,name:'NCIS',premiered:'2003-09-23',externals:{imdb:id},network:{name:'CBS'},officialSite:'https://www.cbs.com/shows/ncis/'});
+  if(url.includes('cbs.com'))return html(fixture('ncis-cbs-about.html'));
+  if(url===site)return html(page);
+  return failure();
+ },options);
+ assert.equal(result.source,'Paramount Global Content');assert.equal(result.descriptionSource,result.source);
+ assert.match(result.description,/NCIS \(Naval Criminal Investigative Service\) follows a team/);
+ assert.match(result.description,/crimes with Navy or Marine Corps ties\.$/);
+ assert.doesNotMatch(result.description,/returns as|Show More|Show Less|\.\.\./);
+ assert.equal(result.synopsisScope,'series');assert.equal(result.synopsisVersion,2);
+ assert.equal(result.sources[0].url,site);
+ assert.equal(parseFirstPartyDetails(page.replace('>NCIS</h2>','>NCIS: Sydney</h2>'),site,{title:'NCIS',type:'Series'}),null);
+ assert.ok(urls.includes(site));
 });
 test('An overall release synopsis is retained when a season synopsis is rejected, with IMDb fallback',async()=>{
  const id='tt0364845',urls=[];
