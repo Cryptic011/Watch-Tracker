@@ -569,10 +569,15 @@
   function itemsAreDuplicate(a,b){
     if(!a?.title||!b?.title||mediaIdentityKind(a)!==mediaIdentityKind(b))return false;
     const aImdb=String(a.imdbId||"").trim().toLowerCase(),bImdb=String(b.imdbId||"").trim().toLowerCase();
+    // Canonical TVMaze identity takes precedence over conflicting legacy IMDb IDs.
+    if(mediaIdentityKind(a)==="series"){
+      const aMaze=String(a.tvmazeShowId||"").trim(),bMaze=String(b.tvmazeShowId||"").trim();
+      if(aMaze&&bMaze&&aMaze===bMaze)return true;
+    }
     if(aImdb&&bImdb)return aImdb===bImdb;
     if(mediaIdentityKind(a)==="series"){
       const aMaze=String(a.tvmazeShowId||"").trim(),bMaze=String(b.tvmazeShowId||"").trim();
-      if(aMaze&&bMaze)return aMaze===bMaze;
+      if(aMaze&&bMaze)return false;
     }
     if(normalizeTitle(a.title)!==normalizeTitle(b.title))return false;
     const aYear=identityReleaseYear(a),bYear=identityReleaseYear(b);
@@ -616,6 +621,12 @@
     const primary=duplicateRecordQuality(a)>duplicateRecordQuality(b)?a:duplicateRecordQuality(b)>duplicateRecordQuality(a)?b:recent;
     const secondary=primary===a?b:a,filled=(...values)=>values.find(value=>value!==null&&value!==undefined&&String(value).trim()!=="")??"";
     const episodeCounts=mergeEpisodeCountMaps(a.episodeCounts,b.episodeCounts),airedEpisodeCounts=mergeEpisodeCountMaps(a.airedEpisodeCounts,b.airedEpisodeCounts);
+    // A fresh but empty duplicate must not erase already verified episodes.
+    const verifiedRecords=[a,b].filter(row=>row.episodeScheduleVerified===true);
+    const combinedReleases={};
+    for(const row of verifiedRecords)for(const [season,episodes] of Object.entries(normalizeReleasedEpisodeMap(row.releasedEpisodes||{})))
+      combinedReleases[season]=[...new Set([...(combinedReleases[season]||[]),...episodes])].sort((x,y)=>x-y);
+    const hasVerifiedReleases=Object.keys(combinedReleases).length>0;
     const history=mergeEpisodeHistories(a.episodeHistory,b.episodeHistory);
     const statusRank={Saved:1,Planned:1,Watching:2,Watched:3};
     const status=(statusRank[a.status]||0)>(statusRank[b.status]||0)?a.status:(statusRank[b.status]||0)>(statusRank[a.status]||0)?b.status:(recent.status||"Planned");
@@ -630,7 +641,10 @@
       totalSeasons:mediaIdentityKind(primary)==="film"?null:Math.max(Number(a.totalSeasons||0),Number(b.totalSeasons||0))||null,
       watchedSeasons:mediaIdentityKind(primary)==="film"?null:Math.max(Number(a.watchedSeasons||0),Number(b.watchedSeasons||0)),
       curSeason:mediaIdentityKind(primary)==="film"?null:(Number(progress.curSeason||0)||null),curEp:mediaIdentityKind(primary)==="film"?null:(Number(progress.curEp||0)||null),
-      episodeCounts,airedEpisodeCounts,episodeHistory:history,
+      episodeCounts,airedEpisodeCounts,
+      releasedEpisodes:hasVerifiedReleases?combinedReleases:(primary.releasedEpisodes||secondary.releasedEpisodes||{}),
+      episodeScheduleVerified:hasVerifiedReleases||(verifiedRecords.length>0&&!Object.keys(positiveEpisodeMap(airedEpisodeCounts)).length),
+      episodeHistory:history,
       createdAt:[a.createdAt,b.createdAt].filter(Boolean).sort((x,y)=>toMillis(x)-toMillis(y))[0]||primary.createdAt||nowISO(),
       updatedAt:aTime>=bTime?(a.updatedAt||a.date||nowISO()):(b.updatedAt||b.date||nowISO()),
       date:watchedSortTime(a)>=watchedSortTime(b)?(a.date||b.date):(b.date||a.date),
@@ -642,8 +656,9 @@
     };
     if(isEpisodeTrackable(merged)){
       const combined={};
-      for(const map of [watchedEpisodeMap(a,airedEpisodeCounts),watchedEpisodeMap(b,airedEpisodeCounts)])for(const [season,episodes] of Object.entries(map||{}))combined[season]=[...new Set([...(combined[season]||[]),...(episodes||[])])].sort((x,y)=>x-y);
-      merged.watchedEpisodes=normalizeWatchedEpisodeMap(combined,airedEpisodeCounts);
+      for(const map of [watchedEpisodeMap(a,hasVerifiedReleases?combinedReleases:airedEpisodeCounts),watchedEpisodeMap(b,hasVerifiedReleases?combinedReleases:airedEpisodeCounts)])
+        for(const [season,episodes] of Object.entries(map||{}))combined[season]=[...new Set([...(combined[season]||[]),...(episodes||[])])].sort((x,y)=>x-y);
+      merged.watchedEpisodes=normalizeWatchedEpisodeMap(combined,hasVerifiedReleases?combinedReleases:airedEpisodeCounts);
       const highest=highestWatchedEpisode(merged.watchedEpisodes);
       if(highest&&highest.season*10000+highest.episode>Number(merged.curSeason||0)*10000+Number(merged.curEp||0)){merged.curSeason=highest.season;merged.curEp=highest.episode;}
       merged.watchedSeasons=Math.max(Number(merged.watchedSeasons||0),fullyWatchedSeasonCount(merged,merged.watchedEpisodes,airedEpisodeCounts));
