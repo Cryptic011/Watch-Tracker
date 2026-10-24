@@ -44,6 +44,36 @@ test('Official film pages win over IMDb when a verified studio URL is supplied',
  assert.equal(data.description,'Paramount Pictures official synopsis of Example and the international mission.');
  assert.deepEqual(calls,[url,'https://www.imdb.com/title/'+id+'/']);
 });
+
+test('An IMDb-matched film finds its real studio page without copying TMDb editorial text',async()=>{
+ const id='tt1234567',site='https://www.paramountpictures.com/movies/example',calls=[];
+ const data=await getTitleDetails({title:'Example',type:'Film',imdbId:id,year:'2025'},async(url,init)=>{
+  calls.push(url);
+  if(url.includes('api.themoviedb.org/3/find/')){
+    assert.equal(init.headers.Authorization,'Bearer example-token');
+    return json({movie_results:[{id:42,title:'Example',release_date:'2025-06-15',overview:'Not an official synopsis'}]});
+  }
+  if(url.endsWith('/movie/42'))return json({id:42,imdb_id:id,title:'Example',release_date:'2025-06-15',homepage:site,overview:'Not an official synopsis'});
+  if(url===site)return html('<h1>Example</h1><meta property="og:description" content="This is the verified studio homepage summary for the film Example.">');
+  return failure();
+ },{useCache:false,tmdbToken:'example-token'});
+ assert.equal(data.description,'This is the verified studio homepage summary for the film Example.');
+ assert.equal(data.source,'Paramount Pictures');
+ assert.ok(!JSON.stringify(data).includes('Not an official synopsis'));
+ assert.ok(calls.indexOf(site)<calls.indexOf('https://www.imdb.com/title/'+id+'/'));
+});
+test('A homepage from the wrong movie or untrusted host cannot supply title details',async()=>{
+ const called=[],id='tt1234567';
+ const result=await getTitleDetails({title:'Example',type:'Film',imdbId:id,year:'2025'},async url=>{
+  called.push(url);
+  if(url.includes('api.themoviedb.org/3/find/'))return json({movie_results:[{id:42,title:'Example',release_date:'2025-06-15'}]});
+  if(url.endsWith('/movie/42'))return json({id:42,imdb_id:'tt9999999',title:'Example',release_date:'2025-06-15',homepage:'https://www.paramountpictures.com/movies/example'});
+  return failure();
+ },{useCache:false,tmdbToken:'example-token'});
+ assert.equal(result.description,undefined);
+ assert.ok(!called.some(url=>url.includes('paramountpictures.com')),'a mismatched IMDb film never reaches the studio URL');
+});
+
 test('Official page content must match the exact title and be from a trusted broadcaster',async()=>{
  const page='<title>NCIS: Sydney on CBS</title><meta name="description" content="An unrelated official description about another NCIS show entirely.">';
  const info={title:'NCIS',type:'Series',year:'2003'};

@@ -405,7 +405,7 @@ Deno.serve(async (req: Request) => {
 
     if (action === "catalog_details") {
       if (!new Set(["Film", "Series"]).has(body.type)) return json({ error: "Choose a film or series.", code: "invalid_type" }, 400);
-      const details = await getTitleDetails(body);
+      const details = await getTitleDetails(body,fetch,{tmdbToken:Deno.env.get("TMDB_API_READ_TOKEN")||""});
       return json({ ok: true, details });
     }
 

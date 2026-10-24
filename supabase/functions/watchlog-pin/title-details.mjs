@@ -94,14 +94,14 @@ export function parseIMDbDetails(html,id,type){
   const row=matches[0],duration=String(row.duration||'').match(/^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/),rating=Number(row.aggregateRating?.ratingValue);
   return record({description:text(row.description),premiered:/^\d{4}-\d{2}-\d{2}$/.test(row.datePublished||'')?row.datePublished:'',year:yearOf(row.datePublished),genres:[row.genre||[]].flat().filter(v=>typeof v==='string').map(clean).slice(0,15),runtime:duration?Number(duration[1]||0)*60+Number(duration[2]||0)||null:null,rating:Number.isFinite(rating)&&rating>0&&rating<=10?rating:null},'IMDb',imdbURL(id));
 }
-export async function getTitleDetails(input,request=fetch,{useCache=true}={}){
+export async function getTitleDetails(input,request=fetch,{useCache=true,tmdbToken=""}={}){
   const type=input.type==='Film'?'Film':input.type==='Series'?'Series':null;
   if(!type)return {state:'unmatched',sources:[]};
   const selected={type,title:clean(input.title).slice(0,160),year:yearOf(input.year||input.releaseYear),imdbId:imdbID(input.imdbId),tvmazeId:numericID(input.tvmazeShowId||input.tvmazeId),appleId:input.source==='apple'?numericID(input.externalId):'',platform:clean(input.platform).slice(0,80),officialUrl:firstPartyURL(input.officialUrl||input.officialSite)?.url||''};
   const key=JSON.stringify(selected),cached=cache.get(key);
   if(useCache&&cached?.expires>Date.now())return structuredClone(cached.value);
   if(useCache&&inFlight.has(key))return structuredClone(await inFlight.get(key));
-  const task=resolveDetails(selected,request);
+  const task=resolveDetails(selected,request,tmdbToken);
   if(useCache)inFlight.set(key,task);
   try{
     const value=await task;
@@ -109,7 +109,7 @@ export async function getTitleDetails(input,request=fetch,{useCache=true}={}){
     return structuredClone(value);
   }finally{if(inFlight.get(key)===task)inFlight.delete(key);}
 }
-async function resolveDetails(selected,request){
+async function resolveDetails(selected,request,tmdbToken=""){
   const deadline=Date.now()+16000;
   const get=async(url,asText=false,init={})=>{
     const remaining=deadline-Date.now();if(remaining<100)throw Error('Details deadline reached');
@@ -160,6 +160,27 @@ async function resolveDetails(selected,request){
     }
     return show;
   });
+  // TMDb is used only to locate the studio's first-party film homepage.
+  // Its editorial synopsis, ratings and release claims are never imported.
+  // Require an exact IMDb identity and film title/year before trusting a link.
+  if(selected.type==='Film'&&tmdbToken){
+    if(!id)await attempt(identity);
+    if(id)await attempt(async()=>{
+      const authorization={headers:{Authorization:'Bearer '+tmdbToken}};
+      const hits=await get('https://api.themoviedb.org/3/find/'+encodeURIComponent(id)+'?external_source=imdb_id',false,authorization);
+      const found=(Array.isArray(hits.movie_results)?hits.movie_results:[]).filter(movie=>
+        Number.isInteger(Number(movie?.id))&&Number(movie.id)>0&&
+        nameKey(movie.title||movie.original_title)===nameKey(selected.title)&&
+        (!selected.year||yearOf(movie.release_date)===selected.year));
+      if(found.length!==1)return null;
+      const movie=await get('https://api.themoviedb.org/3/movie/'+Number(found[0].id),false,authorization);
+      if(imdbID(movie?.imdb_id)!==id||nameKey(movie.title||movie.original_title)!==nameKey(selected.title)||
+        (selected.year&&yearOf(movie.release_date)!==selected.year))return null;
+      const homepage=firstPartyURL(movie.homepage);
+      if(homepage)pages.push(homepage.url);
+      return homepage;
+    });
+  }
   let result=null;
   for(const candidate of [...new Set(pages)].slice(0,3)){
     const site=firstPartyURL(candidate);if(!site)continue;
