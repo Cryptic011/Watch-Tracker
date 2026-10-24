@@ -79,7 +79,10 @@ function workerHarness(episodes,options={}){
     sendPush:async(_sub,_config,payload)=>deliveries.push(payload),finishDelivery:async()=>{},sha256:async value=>value});
   const asyncNames=["readLibraries","refreshServerEpisodeSchedules","processPlannedReminders"];
   const names=["episodeUtcValue","episodeReleaseTime","buildServerEpisodeSchedule","zonedLocalToUtc","scheduledEventTime","serverScheduleRefreshDue",...asyncNames,"plannedEvent","reminderEvents","reminderCopy"];
-  vm.runInContext("const EPISODE_SCHEDULE_REFRESH_MS=21600000;\n"+names.map(name=>(asyncNames.includes(name)?"async ":"")+extractFunction(backend,name)).join("\n"),context);
+  // extractFunction retains the declaration's own async keyword. Do not
+  // prepend it again: "async async function" fails to parse before any
+  // reminder-worker regression tests can execute.
+  vm.runInContext("const EPISODE_SCHEDULE_REFRESH_MS=21600000;\n"+names.map(name=>extractFunction(backend,name)).join("\n"),context);
   return{context,deliveries,setTime:value=>clock=Date.parse(value),setStatus:value=>library.items[0].status=value,getLibrary:()=>library,getCalls:()=>calls,
     run:()=>context.processPlannedReminders([{account_id:"a",time_zone:"Europe/London"}],{})};
 }
