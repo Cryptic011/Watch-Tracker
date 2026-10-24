@@ -95,9 +95,6 @@ function patch(items,changes){
    await page.locator('[data-continue-mark="show"]').click();
    await page.waitForFunction(()=>!cloudSaveInFlight&&!localSaveInFlight&&!queuedCloudSnapshot).catch(async error=>{console.error(engine.name(),'first-save state',await page.evaluate(()=>({cloud:!!cloudSaveInFlight,local:!!localSaveInFlight,queued:!!queuedCloudSnapshot,revision:cloudRevision,status:document.querySelector('#sync-status')?.textContent})),{saves:saves.length});throw error;});
    assert.deepEqual(items[0].watchedEpisodes[1],[1,2]);
-   await page.locator('[data-filter="Watched"]').click();
-   assert.equal(await page.locator('#continue-watching').isVisible(),false,'Continue Watching respects the status filter');
-   await page.locator('[data-filter="All"]').click();
    await page.locator('[data-gallery-item="show"]').click();
    await page.waitForFunction(()=>location.hash.startsWith('#/title/show'));
    assert.equal(await page.locator('.gallery-episode-row').count(),0,'closed seasons do not build episode rows');
@@ -117,6 +114,9 @@ function patch(items,changes){
    assert.equal(await page.locator('.gallery-episode-row').count(),0,'deep links retain lazy season loading');
    await page.locator('[data-gallery-close]').click();await page.waitForFunction(()=>location.hash.startsWith('#/library'));
    await page.locator('[data-gallery-category="Series"]').click();
+   await page.locator('[data-filter="Watched"]').click();
+   assert.equal(await page.locator('#continue-watching').isVisible(),false,'Continue Watching respects the status filter');
+   await page.locator('[data-filter="All"]').click();
    await page.locator('#library-collection-select').selectOption('favourites');
    assert.equal(await page.locator('[data-gallery-total-count]').textContent(),'1');
    await page.locator('[data-gallery-back]').click();await page.waitForFunction(()=>location.hash==='#/library');
