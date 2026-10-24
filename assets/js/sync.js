@@ -560,7 +560,7 @@
           watchedSeasons,curSeason:curSeason||null,curEp:curEp||null,
           currentSeasonEpisodeCount:curSeason?Number(airedEpisodeCounts[curSeason]||0)||null:null,
           currentSeasonTotalEpisodes:curSeason?Number(episodeCounts[curSeason]||0)||null:null,
-          episodeCounts,airedEpisodeCounts,releasedEpisodes,episodeImages:scheduleVerified?(result.episodeImages||{}):(current.episodeImages||{}),episodeImagesSource:scheduleVerified?"TVMaze":current.episodeImagesSource||"",episodeScheduleVerified:scheduleVerified,
+          episodeCounts,airedEpisodeCounts,releasedEpisodes,episodeImages:scheduleVerified?(result.episodeImages||{}):(current.episodeImages||{}),episodeImagesSource:scheduleVerified?"TVMaze":current.episodeImagesSource||"",episodeScheduleVerified:scheduleVerified||current.episodeScheduleVerified===true,
           seasonImages:scheduleVerified?(result.seasonImages||{}):(current.seasonImages||{}),seasonImagesSource:scheduleVerified?"TVMaze":current.seasonImagesSource||"",
           scheduledEpisodeReleases:scheduleVerified?(result.scheduledEpisodeReleases||[]):(current.scheduledEpisodeReleases||[]),
           recurringWeeklySchedule:result.recurringWeeklySchedule||current.recurringWeeklySchedule||null,
