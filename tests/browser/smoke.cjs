@@ -281,8 +281,9 @@ const server=http.createServer((req,res)=>{
   await page.waitForFunction(()=>document.querySelector('[data-gallery-details]').textContent.includes('official series description'));
   assert.match(await page.locator('[data-gallery-details]').textContent(),/Drama · Action/);
   assert.match(await page.locator('[data-gallery-details]').textContent(),/8\.4\/10/);
-  assert.equal(await page.locator('[data-gallery-details] a[href="https://www.imdb.com/title/tt1234568/"]').count(),1,'series details link to their source');
-  assert.match(await page.locator('[data-gallery-details]').textContent(),/IMDb rating/);
+  assert.equal(await page.locator('[data-gallery-details] a[href="https://www.tvmaze.com/shows/12"]').count(),1,'series details link to their TVMaze source');
+  assert.equal(await page.locator('[data-gallery-details] a[href="https://www.imdb.com/title/tt1234568/"]').count(),1,'series details retain the optional IMDb link');
+  assert.match(await page.locator('[data-gallery-details]').textContent(),/TVMaze rating/);
   if(process.env.BROWSER_SCREENSHOT_DIR){
    fs.mkdirSync(process.env.BROWSER_SCREENSHOT_DIR,{recursive:true});
    await page.screenshot({path:path.join(process.env.BROWSER_SCREENSHOT_DIR,engine.name()+'-details.png')});
