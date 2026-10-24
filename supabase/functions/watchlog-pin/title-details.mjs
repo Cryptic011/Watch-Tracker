@@ -1,6 +1,6 @@
 /* Public metadata only. A provider must match the selected identity before use. */
 const cache=new Map(),inFlight=new Map(),TTL=6*60*60*1000;
-const SYNOPSIS_VERSION=2;
+const SYNOPSIS_VERSION=3;
 const clean=value=>String(value??'').replace(/<[^>]*>/g,' ').replace(/&(?:#(\d+)|#x([0-9a-f]+)|(amp|quot|apos|lt|gt|nbsp));/gi,(all,decimal,hex,name)=>{
   if(name)return {amp:'&',quot:'"',apos:"'",lt:'<',gt:'>',nbsp:' '}[name.toLowerCase()];
   const n=parseInt(decimal||hex,decimal?10:16);return n>0&&n<=0x10ffff?String.fromCodePoint(n):'';
@@ -201,8 +201,8 @@ async function resolveDetails(selected,request,tmdbToken=""){
     return asText?response.text():response.json();
   };
   const attempt=async task=>{try{return await task();}catch{return null;}};
-  // Official series/film overview pages are resolved before the IMDb fallback.
-  // TVMaze only locates verified programme identity and publisher URLs.
+  // Series use TVMaze's show-level record, never an episode or season summary.
+  // Film overviews retain the existing studio/IMDb lookup.
   let id=selected.imdbId,canonical=null;
   const identity=async()=>{
     if(canonical)return canonical;
@@ -216,19 +216,32 @@ async function resolveDetails(selected,request,tmdbToken=""){
     if(matches.length!==1)return null;
     canonical={title:clean(matches[0].l),year:yearOf(matches[0].y)};id=matches[0].id;return canonical;
   };
-  // A TVMaze identity record can point to the broadcaster's actual web page,
-  // but its synopsis and rating are never used as editorial title details.
+  let seriesDetails=null;
   const pages=[];
   if(selected.officialUrl)pages.push(selected.officialUrl);
-  if(selected.type==='Series'&&(selected.tvmazeId||id))await attempt(async()=>{
-    const url=selected.tvmazeId?'https://api.tvmaze.com/shows/'+selected.tvmazeId:
-      'https://api.tvmaze.com/lookup/shows?imdb='+encodeURIComponent(id);
-    const show=await get(url);
+  if(selected.type==='Series')await attempt(async()=>{
+    const url=selected.tvmazeId?'https://api.tvmaze.com/shows/'+selected.tvmazeId:id?
+      'https://api.tvmaze.com/lookup/shows?imdb='+encodeURIComponent(id):
+      'https://api.tvmaze.com/search/shows?q='+encodeURIComponent(selected.title);
+    const data=await get(url);
+    const matches=Array.isArray(data)?data.map(row=>row.show).filter(show=>nameKey(show?.name)===nameKey(selected.title)&&(!selected.year||yearOf(show?.premiered)===selected.year)):[];
+    const show=Array.isArray(data)?matches.length===1?matches[0]:null:data;
     if(!show?.id||(selected.tvmazeId&&String(show.id)!==selected.tvmazeId)||
       (id&&show.externals?.imdb&&show.externals.imdb!==id)||
       !matchesFirstPartyTitle(show.name,selected.title)||
-      (selected.year&&yearOf(show.premiered)&&yearOf(show.premiered)!==selected.year))return null;
+      (!selected.tvmazeId&&!id&&selected.year&&yearOf(show.premiered)&&yearOf(show.premiered)!==selected.year))return null;
     if(!id)id=imdbID(show.externals?.imdb);
+    const description=String(show.summary||'').split(/<\/p\s*>/i).map(text).filter(Boolean).join('\n\n');
+    if(description){
+      const seasons=await attempt(()=>get('https://api.tvmaze.com/shows/'+show.id+'/seasons'));
+      seriesDetails=record({description,premiered:/^\d{4}-\d{2}-\d{2}$/.test(show.premiered||'')?show.premiered:'',
+        year:yearOf(show.premiered),genres:Array.isArray(show.genres)?show.genres.map(clean):[],
+        status:clean(show.status),language:clean(show.language),runtime:Number(show.averageRuntime||show.runtime)||null,
+        rating:typeof show.rating?.average==='number'?show.rating.average:null,
+        seasons:Array.isArray(seasons)?seasons.filter(row=>Number(row.number)>0).length:null
+      },'TVMaze','https://www.tvmaze.com/shows/'+show.id);
+      return show;
+    }
     if(firstPartyURL(show.officialSite))pages.push(show.officialSite);
     // CBS has a separate verified About page with its full programme synopsis.
     if(nameKey(show.network?.name)==='cbs'||nameKey(show.webChannel?.name)==='cbs'){
@@ -242,6 +255,7 @@ async function resolveDetails(selected,request,tmdbToken=""){
     }
     return show;
   });
+  if(seriesDetails)return {...seriesDetails,synopsisVersion:SYNOPSIS_VERSION,synopsisScope:'series',imdbId:id,imdbUrl:id?imdbURL(id):'',state:'ready'};
   // TMDb is used only to locate the studio's first-party film homepage.
   // Its editorial synopsis, ratings and release claims are never imported.
   // Require an exact IMDb identity and film title/year before trusting a link.

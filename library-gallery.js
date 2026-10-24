@@ -199,7 +199,7 @@ window.WatchLogGallery=(()=>{
       if(target!==dialog.querySelector('[data-gallery-details]'))return;
       const decoder=document.createElement('textarea');
       decoder.innerHTML=String(details.description||'').replace(/<[^>]*>/g,' ');
-      const description=decoder.value.replace(/\s+/g,' ').trim();
+      const description=decoder.value.replace(/[^\S\n]+/g,' ').trim();
       const facts=[
         ['Release date',details.premiered?api.date(new Date(details.premiered+'T12:00:00')):details.year||''],
         ['Genres',Array.isArray(details.genres)?details.genres.join(' · '):''],

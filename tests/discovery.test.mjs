@@ -88,13 +88,13 @@ test('Film description enrichment uses the verified gateway and never makes dire
   assert.equal(calls[0].imdbId,'tt1234567');assert.equal(calls[0].type,'Film');assert.equal(item.verifiedDetails.source,'IMDb');
   const controller=new AbortController();controller.abort();assert.equal(await c.fetchDiscoveryDescription(item,controller.signal),'');assert.equal(calls.length,1);
 });
-test('Catalogue gateway excludes TVMaze series summaries but retains official film descriptions',async()=>{
+test('Catalogue gateway includes TVMaze show summaries alongside film descriptions',async()=>{
   const backend=fs.readFileSync(new URL('../supabase/functions/watchlog-pin/index.ts',import.meta.url),'utf8');
   const part=stripTypeScriptTypes(backend.slice(backend.indexOf('function catalogText('),backend.indexOf('async function readMaintenance(')));
   const c=vm.createContext({URL,AbortController,setTimeout,clearTimeout,catalogCache:new Map(),CATALOG_TIMEOUT_MS:1000,CATALOG_CACHE_MS:60000,MAX_CATALOG_RESULTS_PER_SOURCE:30,
     fetch:async url=>({ok:true,json:async()=>url.includes('tvmaze')?[{show:{id:1,name:'Reacher',summary:'<p>Jack <b>Reacher</b> investigates.</p>',image:{medium:'https://static.tvmaze.com/poster.jpg'}}}]:url.includes('itunes')?{results:[{trackName:'Film',longDescription:'Full film plot',artworkUrl100:'https://is1-ssl.mzstatic.com/image/100x100bb.jpg'}]}:{d:[]}})});
   vm.runInContext(part,c);const rows=await c.searchCatalog('Reacher','gb');
-  assert.equal(rows.find(r=>r.format==='Series').description,undefined,'TVMaze synopsis cannot masquerade as official title details');
+  assert.match(rows.find(r=>r.format==='Series').description,/Jack.*Reacher.*investigates/);
   assert.equal(rows.find(r=>r.format==='Film').description,'Full film plot');
   assert.match(rows.find(r=>r.format==='Film').posterUrl,/400x600bb.jpg$/);
 });

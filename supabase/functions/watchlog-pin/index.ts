@@ -144,8 +144,7 @@ async function searchCatalog(query: string, country: string) {
         year: /^\d{4}/.test(String(show?.premiered || "")) ? String(show.premiered).slice(0, 4) : "",
         releaseDate: "", platform: catalogText(show?.network?.name || show?.webChannel?.name, 100),
         detail: catalogText(show?.type || "Series", 64), status: catalogText(show?.status, 32),
-        // TVMaze is used for series discovery and episode identity, not
-        // editorial plot descriptions. Those are loaded from IMDb first.
+        description: catalogText(show.summary,8000),
         posterUrl: /^https:\/\/static\.tvmaze\.com\//.test(String(show?.image?.medium || show?.image?.original || "")) ? String(show.image.medium || show.image.original).slice(0, 2000) : "",
         updated: Number.isFinite(Number(show?.updated)) ? Number(show.updated) : 0,
       });

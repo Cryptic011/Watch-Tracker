@@ -146,7 +146,7 @@ test('A distributor fallback uses the full matching series synopsis, never its t
  assert.match(result.description,/NCIS \(Naval Criminal Investigative Service\) follows a team/);
  assert.match(result.description,/crimes with Navy or Marine Corps ties\.$/);
  assert.doesNotMatch(result.description,/returns as|Show More|Show Less|\.\.\./);
- assert.equal(result.synopsisScope,'series');assert.equal(result.synopsisVersion,2);
+ assert.equal(result.synopsisScope,'series');assert.equal(result.synopsisVersion,3);
  assert.equal(result.sources[0].url,site);
  assert.equal(parseFirstPartyDetails(page.replace('>NCIS</h2>','>NCIS: Sydney</h2>'),site,{title:'NCIS',type:'Series'}),null);
  assert.ok(urls.includes(site));
@@ -216,9 +216,9 @@ test('Official page redirects to a third-party host are rejected before parsing'
  assert.equal(result.description,undefined);assert.deepEqual(result.sources,[]);
 });
 
-test('Series details never use TVMaze synopses or ratings when IMDb is unavailable',async()=>{
+test('A TVMaze outage leaves series details unavailable when all fallbacks fail',async()=>{
  const calls=[],result=await getTitleDetails({title:'Show',type:'Series',imdbId:'tt0903747',tvmazeShowId:'169'},async url=>{
-  calls.push(url);if(url.includes('api.tvmaze.com'))throw Error('TVMaze must not be a details source');
+  calls.push(url);if(url.includes('api.tvmaze.com'))throw Error('TVMaze temporarily unavailable');
   return failure();
  },options);
  assert.equal(result.description,undefined);assert.equal(result.rating,undefined);
@@ -273,22 +273,51 @@ test('Metadata never requests Wikimedia sources',async()=>{
  const calls=[];await getTitleDetails(film,async url=>{calls.push(url);return failure();},options);
  assert.ok(calls.length>0);assert.ok(calls.every(url=>!/(?:wikipedia|wikidata|wikimedia)\.org/i.test(url)));
 });
-test('A selected TVMaze ID only resolves a matching IMDb identity, never its description',async()=>{
+test('A selected TVMaze show supplies its overview and labelled rating before IMDb',async()=>{
  const id='tt0903747',calls=[],input={title:'Show',type:'Series',tvmazeShowId:'169'};
  const result=await getTitleDetails(input,async url=>{
   calls.push(url);
   if(url.includes('media-imdb'))return failure();
   if(url.endsWith('/shows/169'))return json({id:169,name:'Show',premiered:'2020-01-01',externals:{imdb:id},
-    summary:'TVMaze editorial text that must never appear',rating:{average:9.1}});
+    summary:'The TVMaze whole-series programme synopsis.',rating:{average:9.1}});
   if(url.endsWith('/title/'+id+'/'))return html('<script type="application/ld+json">'+JSON.stringify({
     '@type':'TVSeries',url:'https://www.imdb.com/title/'+id+'/',description:'The IMDb programme synopsis.',
     datePublished:'2020-01-01',aggregateRating:{ratingValue:8.1}})+'</script>');
   return failure();
  },options);
- assert.equal(result.imdbId,id);assert.equal(result.description,'The IMDb programme synopsis.');
- assert.equal(result.source,'IMDb');assert.equal(result.rating,8.1);
+ assert.equal(result.imdbId,id);assert.equal(result.description,'The TVMaze whole-series programme synopsis.');
+ assert.equal(result.source,'TVMaze');assert.equal(result.rating,9.1);assert.equal(result.ratingSource,'TVMaze');
  assert.ok(calls.find(url=>url.includes('/shows/169')));
- assert.ok(!JSON.stringify(result).includes('TVMaze editorial'));
+ assert.ok(!calls.some(url=>url.includes('imdb.com/title')),'a complete TVMaze overview does not wait for IMDb');
+});
+test('TVMaze whole-show details work across Origins, Chicago Fire and other series',async()=>{
+ for(const [title,maze,imdb,premiered] of [
+  ['NCIS: Origins',73811,'tt30796986','2024-10-14'],['Chicago Fire',59,'tt2261391','2012-10-10'],
+  ['NCIS',60,'tt0364845','2003-09-23'],['Chicago P.D.',56,'tt2805096','2014-01-08'],['NCIS: Sydney',60547,'tt18258908','2023-11-10']
+ ]){
+  const calls=[],show={id:maze,name:title,externals:{imdb},premiered,
+   summary:'<p>A whole-show premise about <b>'+title+'</b>.</p><p>The team faces difficult decisions together.</p>',
+   genres:['Drama'],language:'English',status:'Running',runtime:42,rating:{average:8.2}};
+  const result=await getTitleDetails({title,type:'Series',tvmazeShowId:String(maze),imdbId:imdb,year:'2026'},async url=>{
+   calls.push(url);return json(url.endsWith('/seasons')?[{number:0},{number:1},{number:2}]:show);
+  },options);
+  assert.equal(result.source,'TVMaze');assert.equal(result.premiered,premiered,'stored current-season years do not override the original premiere');
+  assert.equal(result.seasons,2);assert.equal(result.ratingSource,'TVMaze');assert.equal(result.runtime,42);
+  assert.match(result.description,/\n\nThe team/);assert.doesNotMatch(result.description,/<[^>]*>/);
+  assert.deepEqual(calls,['https://api.tvmaze.com/shows/'+maze,'https://api.tvmaze.com/shows/'+maze+'/seasons']);
+ }
+});
+test('TVMaze title-only discovery requires a unique exact title and matches the original year',async()=>{
+ const make=(id,year)=>({id,name:'Twin',premiered:year+'-01-01',summary:'<p>A complete series synopsis about two families and their intertwined lives.</p>'});
+ const lookup=rows=>async url=>url.includes('/search/shows')?json(rows.map(show=>({show}))):failure();
+ const ambiguous=await getTitleDetails({title:'Twin',type:'Series'},lookup([make(1,'1990'),make(2,'2020')]),options);
+ assert.equal(ambiguous.description,undefined);
+ const selected=await getTitleDetails({title:'Twin',type:'Series',year:'2020'},lookup([make(1,'1990'),make(2,'2020')]),options);
+ assert.equal(selected.source,'TVMaze');assert.equal(selected.year,'2020');assert.equal(selected.sources[0].url,'https://www.tvmaze.com/shows/2');
+});
+test('A season-list outage does not discard a usable TVMaze show synopsis',async()=>{
+ const result=await getTitleDetails({title:'Show',type:'Series',tvmazeShowId:'12'},async url=>url.endsWith('/seasons')?failure():json({id:12,name:'Show',summary:'<p>The full programme follows a team investigating mysterious events.</p>'}),options);
+ assert.equal(result.source,'TVMaze');assert.equal(result.state,'ready');assert.equal(result.seasons,null);
 });
 test('Outages are not cached and a later retry can recover',async()=>{
  const input={...film,imdbId:'tt0000001'},failed=await getTitleDetails(input,async()=>failure());

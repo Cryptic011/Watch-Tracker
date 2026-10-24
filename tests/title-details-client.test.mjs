@@ -14,7 +14,7 @@ function harness(responses){
 }
 const item={title:'NCIS',type:'Series',imdbId:'tt0364845'};
 const url='https://www.paramountglobalcontent.com/title/ncis';
-const valid={source:'Paramount Global Content',descriptionSource:'Paramount Global Content',description:'NCIS follows a team investigating crimes with Navy or Marine Corps ties.',sources:[{name:'Paramount Global Content',url}],synopsisVersion:2,synopsisScope:'series',state:'ready'};
+const valid={source:'Paramount Global Content',descriptionSource:'Paramount Global Content',description:'NCIS follows a team investigating crimes with Navy or Marine Corps ties.',sources:[{name:'Paramount Global Content',url}],synopsisVersion:3,synopsisScope:'series',state:'ready'};
 
 test('Legacy season-promo responses are hidden and never cached as a successful overview',async()=>{
  const old={source:'CBS',description:'Michael Weatherly returns as Tony DiNozzo, joining the team as they tackle Navy crimes and personal challenges.',sources:[{name:'CBS',url:'https://www.cbs.com/shows/ncis/'}],state:'ready'};
@@ -32,4 +32,10 @@ test('The verified distributor synopsis and its attribution survive the client b
  const api=harness([valid]);assert.equal((await api.get(item)).description,valid.description);
  assert.match(api.links(valid),/https:\/\/www\.paramountglobalcontent\.com\/title\/ncis/);
  assert.equal(api.links({...valid,sources:[{name:'Fake',url:'https://paramountglobalcontent.com.evil.test/title/ncis'}]}),'');
+});
+test('TVMaze series descriptions and their labelled attribution reach the Details panel',async()=>{
+ const details={...valid,source:'TVMaze',descriptionSource:'TVMaze',ratingSource:'TVMaze',rating:8.2,sources:[{name:'TVMaze',url:'https://www.tvmaze.com/shows/59'}]};
+ const api=harness([details]);assert.equal((await api.get(item)).description,valid.description);
+ assert.match(api.links(details),/https:\/\/www\.tvmaze\.com\/shows\/59/);
+ assert.equal(api.links({sources:[{name:'Fake',url:'https://www.tvmaze.com.evil.test/shows/59'}]}),'');
 });
