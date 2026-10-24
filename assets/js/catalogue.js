@@ -733,6 +733,9 @@ function sanitizeUnreleasedEpisodeProgress(item){
   if(!isEpisodeTrackable(item)||!item)return item;
   const aired=positiveEpisodeMap(item.airedEpisodeCounts),releases=releasedEpisodeMap(item);
   if(item.episodeScheduleVerified!==true)return item;
+  // A failed episode lookup must never delete previously saved watch progress.
+  if(!Object.keys(releases).length&&(Object.keys(aired).length||Number(item.curSeason||0)>0||
+      Number(item.curEp||0)>0||Object.keys(item.watchedEpisodes||{}).length))return item;
   const watchedEpisodes=normalizeWatchedEpisodeMap(Object.prototype.hasOwnProperty.call(item,"watchedEpisodes")?item.watchedEpisodes:legacyWatchedEpisodeMap({...item,episodeScheduleVerified:true},releases),releases);
   const highest=highestWatchedEpisode(watchedEpisodes);
   let curSeason=Math.max(0,Number(item.curSeason||0)),curEp=Math.max(0,Number(item.curEp||0));
