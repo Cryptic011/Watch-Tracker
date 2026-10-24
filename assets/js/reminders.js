@@ -157,7 +157,7 @@
   async function pinApi(action,payload={},token=cloudSessionToken,preparedBody="",externalSignal=null){
     const headers={"Content-Type":"application/json"};
     if(token)headers["X-WatchLog-Session"]=token;
-    const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),action==="uk_availability"?20000:CLOUD_REQUEST_TIMEOUT_MS);
+    const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),["uk_availability","catalog_details"].includes(action)?20000:CLOUD_REQUEST_TIMEOUT_MS);
     const abortFromExternal=()=>controller.abort();
     if(externalSignal){if(externalSignal.aborted)controller.abort();else externalSignal.addEventListener("abort",abortFromExternal,{once:true});}
     try{

@@ -81,16 +81,16 @@ test('Search is immediately after Library and artwork/update connections are all
   assert.deepEqual([...html.matchAll(/class="tab-btn[^"]*" data-tab="([^"]+)"/g)].map(m=>m[1]),['library','search','settings']);
   assert.match(html,/connect-src[^;]*wss:\/\/okkwteywtgfsnlrjdyhv\.supabase\.co/);
   assert.match(html,/img-src[^;]*https:\/\/\*\.mzstatic\.com/);
+  assert.doesNotMatch(html.match(/connect-src[^;]*/)[0],/(?:wikipedia|wikidata|wikimedia)/i);
 });
-test('Film descriptions use the exact IMDb identity and reject same-name remakes',async()=>{
-  for(const match of [true,false]){
-    const {c}=harness();c.AbortSignal=AbortSignal;const calls=[];
-    c.fetch=async url=>{calls.push(String(url));return {ok:true,json:async()=>url.searchParams.get('action')==='wbsearchentities'?{search:[{id:'Q1'}]}:url.searchParams.get('action')==='wbgetentities'?{entities:{Q1:{claims:{P345:[{mainsnak:{datavalue:{value:match?'tt1234567':'tt9999999'}}}]},sitelinks:{enwiki:{title:'Example (film)'}}}}}:{query:{pages:{1:{extract:'A mystery unfolds in a coastal town.'}}}}};};
-    const item={title:'Example',format:'Film',imdbId:'tt1234567'};
-    const description=await c.fetchDiscoveryDescription(item,new AbortController().signal);
-    assert.equal(description,match?'A mystery unfolds in a coastal town.':'');assert.equal(calls.length,match?3:2);
-    if(match)assert.match(c.discoveryAttribution(item),/en.wikipedia.org\/wiki\/Example/);
-  }
+test('Film description enrichment uses the verified gateway and never makes direct Wikipedia requests',async()=>{
+  const {c}=harness(),calls=[];
+  c.fetch=()=>{throw Error('No direct external description requests');};
+  c.fetchOfficialTitleDetails=async item=>{calls.push(item);return {description:'A verified film synopsis.',source:'IMDb',sources:[{name:'IMDb',url:'https://www.imdb.com/title/tt1234567/'}]};};
+  const item={title:'Example',format:'Film',imdbId:'tt1234567'};
+  assert.equal(await c.fetchDiscoveryDescription(item,new AbortController().signal),'A verified film synopsis.');
+  assert.equal(calls[0].imdbId,'tt1234567');assert.equal(calls[0].type,'Film');assert.equal(item.verifiedDetails.source,'IMDb');
+  const controller=new AbortController();controller.abort();assert.equal(await c.fetchDiscoveryDescription(item,controller.signal),'');assert.equal(calls.length,1);
 });
 test('Catalogue gateway returns series summaries and film descriptions with safe posters',async()=>{
   const backend=fs.readFileSync(new URL('../supabase/functions/watchlog-pin/index.ts',import.meta.url),'utf8');

@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.112.4";
 import { getUKAvailability } from "./uk-availability.mjs";
+import { getTitleDetails } from "./title-details.mjs";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -398,6 +399,12 @@ Deno.serve(async (req: Request) => {
       } catch (_) {
         return json({ error: "UK availability could not be checked. Try again shortly.", code: "availability_unavailable" }, 503);
       }
+    }
+
+    if (action === "catalog_details") {
+      if (!new Set(["Film", "Series"]).has(body.type)) return json({ error: "Choose a film or series.", code: "invalid_type" }, 400);
+      const details = await getTitleDetails(body);
+      return json({ ok: true, details });
     }
 
     if (action === "catalog_search") {

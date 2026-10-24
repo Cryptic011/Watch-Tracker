@@ -303,7 +303,7 @@
     $("watched-seasons").value="0";$("status").value="Planned";
     $("item-id").value="";$("tvmaze-id").value="";$("imdb-id").value="";$("release-year").value="";filmReleaseSource.value="";$("hide-from-weekly-releases").checked=false;
     clearAiringFields();configureProgressOptions({highest:null,episodeCounts:{},latestAired:null},{season:0,episode:0});
-    if(seasonVerifyNote)seasonVerifyNote.textContent="IMDb, TVMaze and Wikipedia are checked for announced seasons.";
+    if(seasonVerifyNote)seasonVerifyNote.textContent="Series identity is checked with IMDb; episode and season data comes from TVMaze.";
     if(filmVerifyNote)filmVerifyNote.textContent="Films and series are checked through multiple sources.";
     $("modal-title").textContent="Log Title";deleteBtn.classList.add("hidden");
     seriesSection.style.display="flex";upcomingSection.style.display="flex";filmSection.style.display="none";modal.classList.remove("hidden");

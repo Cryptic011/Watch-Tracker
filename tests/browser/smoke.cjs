@@ -48,6 +48,10 @@ const server=http.createServer((req,res)=>{
      {title:'Browser Test Film',format:'Film',source:'imdb',imdbId:'tt1234567',year:'2020',posterUrl:'https://m.media-amazon.com/test.jpg',description:'A detective uncovers a mystery in a quiet coastal town. '.repeat(8)},
      {title:'Browser Test Series',format:'Series',source:'tvmaze',tvmazeId:'12',year:'2021',description:'Investigators work together to solve difficult cases.'},
     ]};
+    if(body.action==='catalog_details'){
+     const series=body.type==='Series',id=series?'tt1234568':'tt1234567',url='https://www.imdb.com/title/'+id+'/';
+     data={ok:true,details:{state:'ready',description:series?'An official series description & a second detail.':'A detective uncovers a mystery in a quiet coastal town. '.repeat(8),year:'2020',genres:['Drama','Action'],runtime:series?42:120,rating:8.4,ratingSource:'IMDb',source:'IMDb',sources:[{name:'IMDb',url}],imdbUrl:url}};
+    }
     if(body.action==='save'){
      if(failSave)return route.fulfill({status:503,headers,json:{error:'Offline'}});
      if(body.items)items=body.items;
@@ -82,6 +86,7 @@ const server=http.createServer((req,res)=>{
   await page.locator('[data-discovery-filter="Film"]').click();
   await page.locator('#discovery-results summary').first().click();assert.equal(await page.locator('#discovery-results details').first().getAttribute('open'),'');
   await page.locator('#discovery-results .discovery-title').first().click();await page.locator('#discovery-detail').waitFor({state:'visible'});
+  await page.locator('[data-discovery-detail-source] a[href="https://www.imdb.com/title/tt1234567/"]').waitFor();
   assert.ok((await page.locator('.discovery-full-description').textContent()).length>100);
   await page.locator('#discovery-detail-add').click();await page.locator('#modal').waitFor({state:'visible'});
   assert.equal(await page.locator('#title').inputValue(),'Browser Test Film');assert.equal(await page.locator('#type').inputValue(),'Film');
@@ -119,6 +124,7 @@ const server=http.createServer((req,res)=>{
   assert.equal(await page.getByRole('tab',{name:'Overview',exact:true}).getAttribute('aria-selected'),'true');
   await page.getByRole('tab',{name:'Details',exact:true}).click();
   await page.waitForFunction(()=>document.querySelector('[data-gallery-details]').textContent.includes('coastal town'));
+  assert.equal(await page.locator('[data-gallery-details] a[href="https://www.imdb.com/title/tt1234567/"]').count(),1,'film details show their actual source');
   await page.locator('[data-gallery-close]').click();
   await page.locator('[data-filter="All"]').click();await page.locator('[data-gallery-back]').click();
   await page.evaluate(()=>openEdit(mediaItems[0].id));await page.locator('#platform').fill('Cinema');await page.locator('#save-btn').click();
@@ -203,6 +209,8 @@ const server=http.createServer((req,res)=>{
   await page.waitForFunction(()=>document.querySelector('[data-gallery-details]').textContent.includes('official series description'));
   assert.match(await page.locator('[data-gallery-details]').textContent(),/Drama · Action/);
   assert.match(await page.locator('[data-gallery-details]').textContent(),/8\.4\/10/);
+  assert.equal(await page.locator('[data-gallery-details] a[href="https://www.imdb.com/title/tt1234568/"]').count(),1,'series details link to their source');
+  assert.match(await page.locator('[data-gallery-details]').textContent(),/IMDb rating/);
   if(process.env.BROWSER_SCREENSHOT_DIR){
    fs.mkdirSync(process.env.BROWSER_SCREENSHOT_DIR,{recursive:true});
    await page.screenshot({path:path.join(process.env.BROWSER_SCREENSHOT_DIR,engine.name()+'-details.png')});

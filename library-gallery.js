@@ -204,10 +204,12 @@ window.WatchLogGallery=(()=>{
         ['Release date',details.premiered?api.date(new Date(details.premiered+'T12:00:00')):details.year||''],
         ['Genres',Array.isArray(details.genres)?details.genres.join(' · '):''],
         ['Seasons',details.seasons||''],['Status',details.status||''],
-        ['Rating',Number.isFinite(details.rating)?details.rating+'/10':''],
+        [details.ratingSource?details.ratingSource+' rating':'Rating',Number.isFinite(details.rating)?details.rating+'/10':''],
         ['Runtime',details.runtime?details.runtime+' min':''],['Language',details.language||'']
       ].filter(([,value])=>value!=='');
-      target.innerHTML=`<h3>About ${esc(item.title)}</h3><p>${esc(description||'A description isn’t available for this title yet.')}</p>${facts.length?`<dl>${facts.map(([label,value])=>`<div><dt>${esc(label)}</dt><dd>${esc(value)}</dd></div>`).join('')}</dl>`:''}${details.source?`<small>Source: ${esc(details.source)}</small>`:''}`;
+      const sources=api.sourceLinks?.(details)||esc(details.source||'');
+      target.innerHTML=`<h3>About ${esc(item.title)}</h3><p>${esc(description||'A verified description is temporarily unavailable.')}</p>${facts.length?`<dl>${facts.map(([label,value])=>`<div><dt>${esc(label)}</dt><dd>${esc(value)}</dd></div>`).join('')}</dl>`:''}${sources?`<small>Sources: ${sources}</small>`:''}${!description?'<button type="button" class="btn btn-secondary" data-gallery-retry-details>Retry</button>':''}`;
+      const retry=target.querySelector('[data-gallery-retry-details]');if(retry)retry.onclick=()=>loadTitleDetails(item);
     }catch(_){
       if(target!==dialog.querySelector('[data-gallery-details]'))return;
       target.innerHTML='<p>Details are temporarily unavailable.</p><button type="button" class="btn btn-secondary" data-gallery-retry-details>Retry</button>';

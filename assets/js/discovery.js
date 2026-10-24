@@ -3,7 +3,6 @@
   let discoveryRows=[],discoveryFilter="All",discoveryQuery="",discoveryOwner="";
   let discoveryRequest=0,discoveryController=null,discoveryTimer=null,discoveryLoading=false,discoveryError=false;
   let discoveryDetailItem=null,discoveryReturnFocus=null;
-  const discoveryDescriptionCache=new Map();
   const discoveryInput=$("discovery-query"),discoveryResults=$("discovery-results"),discoveryStatus=$("discovery-status"),discoveryDialog=$("discovery-detail");
 
   function discoveryImage(value){
@@ -20,7 +19,11 @@
     return findTrackedDuplicate({title:item.title,type:item.format,imdbId:item.imdbId||(item.source==="imdb"?item.externalId:""),tvmazeShowId:item.tvmazeId||(item.source==="tvmaze"?item.externalId:""),releaseYear:item.year});
   }
   function discoveryAttribution(item){
-    return /^https:\/\/en\.wikipedia\.org\/wiki\//.test(item.descriptionUrl||"")?`<a class="discovery-source" href="${esc(item.descriptionUrl)}" target="_blank" rel="noopener noreferrer">Description from Wikipedia</a>`:"";
+    if(typeof titleDetailsSourceLinks==="function"){
+      const details=item.verifiedDetails||{sources:item.source==="tvmaze"&&item.tvmazeId?[{name:"TVMaze",url:`https://www.tvmaze.com/shows/${item.tvmazeId}`}]:item.source==="apple"&&item.storeUrl?[{name:"Apple TV",url:item.storeUrl}]:[]};
+      const links=titleDetailsSourceLinks(details);if(links)return `<span class="discovery-source">Sources: ${links}</span>`;
+    }
+    return "";
   }
   function discoveryPoster(item){
     const image=discoveryImage(item.posterUrl),initials=String(item.title||"?").split(/\s+/).slice(0,2).map(word=>word[0]).join("");
@@ -89,25 +92,10 @@
     }finally{if(discoveryController===controller)discoveryController=null;}
   }
   async function fetchDiscoveryDescription(item,signal){
-    const imdbId=String(item.imdbId||(item.source==="imdb"?item.externalId:"")||"");
-    if(item.format!=="Film"||!/^tt\d+$/.test(imdbId))return"";
-    if(discoveryDescriptionCache.has(imdbId)){const cached=discoveryDescriptionCache.get(imdbId);item.descriptionUrl=cached.url;return cached.description;}
-    const request=async(base,params)=>{
-      const url=new URL(base);Object.entries({...params,format:"json",origin:"*"}).forEach(([key,value])=>url.searchParams.set(key,String(value)));
-      const response=await fetch(url,{signal:AbortSignal.any([signal,AbortSignal.timeout(6000)])});
-      if(!response.ok)throw Error("Description unavailable");return response.json();
-    };
-    const search=await request("https://www.wikidata.org/w/api.php",{action:"wbsearchentities",search:item.title,language:"en",type:"item",limit:6});
-    const ids=(search.search||[]).map(row=>row.id).filter(id=>/^Q\d+$/.test(id));if(!ids.length)return"";
-    const data=await request("https://www.wikidata.org/w/api.php",{action:"wbgetentities",ids:ids.join("|"),props:"claims|sitelinks",sitefilter:"enwiki"});
-    // Never borrow a synopsis from a same-name remake. Require the exact IMDb
-    // identity before following that entity's English Wikipedia article.
-    const entity=Object.values(data.entities||{}).find(row=>(row.claims?.P345||[]).some(claim=>claim.rank!=="deprecated"&&claim.mainsnak?.datavalue?.value===imdbId));
-    const title=entity?.sitelinks?.enwiki?.title;if(!title)return"";
-    const article=await request("https://en.wikipedia.org/w/api.php",{action:"query",prop:"extracts",exintro:1,explaintext:1,titles:title,redirects:1});
-    const description=String(Object.values(article.query?.pages||{}).find(page=>page.missing===undefined)?.extract||"").slice(0,8000);
-    if(description){item.descriptionUrl="https://en.wikipedia.org/wiki/"+encodeURIComponent(title.replace(/ /g,"_"));discoveryDescriptionCache.set(imdbId,{description,url:item.descriptionUrl});if(discoveryDescriptionCache.size>80)discoveryDescriptionCache.delete(discoveryDescriptionCache.keys().next().value);}
-    return description;
+    if(signal?.aborted||typeof fetchOfficialTitleDetails!=="function")return "";
+    const details=await fetchOfficialTitleDetails({...item,type:item.format});
+    if(details.description&&!signal?.aborted){item.verifiedDetails=details;return details.description;}
+    return "";
   }
   async function enrichDiscoveryDescriptions(signal,isCurrent){
     const queue=discoveryRows.filter(item=>item.format==="Film"&&!discoveryDescription(item)).slice(0,6);
@@ -117,12 +105,12 @@
         try{
           const description=await fetchDiscoveryDescription(item,signal);
           if(description&&isCurrent()){
-            item.description=description;item.descriptionSource="Wikipedia";
+            item.description=description;item.descriptionSource=item.verifiedDetails?.descriptionSource||item.verifiedDetails?.source||"";
             const index=discoveryRows.indexOf(item),row=discoveryResults.querySelector(`[data-discovery-row="${index}"]`);
             const placeholder=row?.querySelector('.discovery-unavailable');
             if(placeholder){placeholder.outerHTML=discoveryDescriptionMarkup(item);discoveryResults._discoveryMarkup=null;}
             if(discoveryDialog.open&&discoveryDetailItem===item){
-              const paragraph=$("discovery-detail-body").querySelector(".discovery-full-description");if(paragraph){paragraph.textContent=description;const citation=document.createElement("p");citation.innerHTML=discoveryAttribution(item);paragraph.after(citation);}
+              const paragraph=$("discovery-detail-body").querySelector(".discovery-full-description");if(paragraph){paragraph.textContent=description;const citation=$("discovery-detail-body").querySelector('[data-discovery-detail-source]');if(citation)citation.innerHTML=discoveryAttribution(item);}
             }
           }
         }catch(_){} // Missing metadata must not prevent selecting or adding.
@@ -152,10 +140,16 @@
   function showDiscoveryDetail(item,trigger){
     if(!item)return;discoveryDetailItem=item;discoveryReturnFocus=trigger;
     $("discovery-detail-title").textContent=item.title;
-    $("discovery-detail-body").innerHTML=`<div class="discovery-detail-intro">${discoveryPoster(item)}<div><p class="discovery-meta">${esc([item.year,item.format,item.detail].filter(Boolean).join(" · "))}</p>${discoveryDuplicate(item)?'<p class="discovery-added">✓ Already added</p>':""}</div></div><p class="discovery-full-description">${esc(discoveryDescription(item)||"A description isn’t available for this title yet.")}</p>${discoveryAttribution(item)}<button type="button" class="btn btn-primary btn-full" id="discovery-detail-add">${discoveryDuplicate(item)?"View in library":"Add to library"}</button>`;
+    $("discovery-detail-body").innerHTML=`<div class="discovery-detail-intro">${discoveryPoster(item)}<div><p class="discovery-meta">${esc([item.year,item.format,item.detail].filter(Boolean).join(" · "))}</p>${discoveryDuplicate(item)?'<p class="discovery-added">✓ Already added</p>':""}</div></div><p class="discovery-full-description">${esc(discoveryDescription(item)||"Checking verified sources…")}</p><p data-discovery-detail-source>${discoveryAttribution(item)}</p><button type="button" class="btn btn-primary btn-full" id="discovery-detail-add">${discoveryDuplicate(item)?"View in library":"Add to library"}</button>`;
     wireDiscoveryImages($("discovery-detail-body"));
     $("discovery-detail-add").onclick=()=>addDiscoveryTitle(discoveryDetailItem);
     discoveryDialog.showModal();
+    if(typeof fetchOfficialTitleDetails==="function")void fetchOfficialTitleDetails({...item,type:item.format}).then(details=>{
+      if(!discoveryDialog.open||discoveryDetailItem!==item)return;
+      if(details.description){item.description=details.description;item.verifiedDetails=details;}
+      const body=$("discovery-detail-body");body.querySelector('.discovery-full-description').textContent=discoveryDescription(item)||"A verified description is temporarily unavailable.";
+      body.querySelector('[data-discovery-detail-source]').innerHTML=discoveryAttribution(item);
+    }).catch(()=>{});
   }
   discoveryInput.addEventListener("input",()=>{
     clearTimeout(discoveryTimer);discoveryController?.abort();discoveryRequest++;discoveryRows=[];discoveryQuery=discoveryInput.value.trim();discoveryError=false;

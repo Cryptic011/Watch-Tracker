@@ -89,6 +89,7 @@ html:has(.gallery-detail[open]),body:has(>.gallery-detail[open]){overflow:hidden
 .gallery-info-panel dl{display:grid;gap:12px;margin-top:20px}
 .gallery-info-panel dl>div{display:grid;grid-template-columns:minmax(90px,30%) minmax(0,1fr);gap:12px;padding-top:12px;border-top:1px solid var(--border)}
 .gallery-info-panel dt,.gallery-info-panel small{color:var(--muted)}
+.gallery-info-panel a{color:var(--blue2);text-decoration:underline;text-underline-offset:3px}
 .gallery-info-panel small{display:block;margin-top:18px}
 .gallery-watch-next{display:block;width:calc(100% - 32px);min-height:48px;margin:16px;white-space:normal;line-height:1.4}
 .gallery-caught-up{margin:16px;color:var(--muted);font-size:.88rem;line-height:1.4}

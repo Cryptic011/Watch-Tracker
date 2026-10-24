@@ -1,3 +1,9 @@
+## 2026-10-24 — Prefer IMDb with verified metadata fallbacks
+- Try IMDb title metadata first, then identity-checked TVMaze, Apple TV and JustWatch descriptions when needed.
+- Show linked sources and label ratings by provider in film and series details; use the same lookup for search popups.
+- Remove Wikipedia and Wikidata lookups, references and browser connections from all metadata paths.
+- Reject mismatched remakes and ambiguous matches; retry unsuccessful lookups without caching failures.
+
 ## 2026-10-24 — Remove duplicate Library sync prompt
 - Remove the extra sync banner between the weekly schedule and Movies/Series.
 - Keep the header sync status and detailed Account & Sync information, including pending-save and error states.

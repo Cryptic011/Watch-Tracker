@@ -8,9 +8,6 @@
   function dateOnlyInput(v){return v?`${v}T12:00`:"";}
   async function imdbVerify(title,season,premiereDate){if(!IMDB_VERIFY_ENDPOINT)return{confirmed:null};try{const u=new URL(IMDB_VERIFY_ENDPOINT,location.href);u.searchParams.set("title",title);u.searchParams.set("season",String(season));if(premiereDate)u.searchParams.set("premiereDate",premiereDate);return await fetchJSONWithTimeout(u.toString());}catch(_){return{confirmed:null};}}
 
-  const WIKIPEDIA_API = "https://en.wikipedia.org/w/api.php";
-  const WIKIDATA_API = "https://www.wikidata.org/w/api.php";
-  const wikidataRequestCache = new Map();
   const METADATA_CACHE_TTL_MS=6*60*60*1000;
   function cachedMetadataRequest(cache,key,task){
     const existing=cache.get(key);
@@ -21,269 +18,6 @@
     cache.set(key,entry);
     while(cache.size>60)cache.delete(cache.keys().next().value);
     return entry.promise;
-  }
-
-  async function wikidataApi(params){
-    const query={...params,format:"json",origin:"*"};
-    const key=JSON.stringify(Object.keys(query).sort().reduce((o,k)=>(o[k]=query[k],o),{}));
-    return cachedMetadataRequest(wikidataRequestCache,key,async()=>{
-      const u=new URL(WIKIDATA_API);
-      Object.entries(query).forEach(([k,v])=>u.searchParams.set(k,String(v)));
-      return fetchJSONWithTimeout(u.toString(),{credentials:"omit",cache:"no-store"});
-    });
-  }
-  const wikiRequestCache = new Map();
-  const ORDINAL_SEASON_WORDS = {
-    first:1,second:2,third:3,fourth:4,fifth:5,sixth:6,seventh:7,eighth:8,ninth:9,tenth:10,
-    eleventh:11,twelfth:12,thirteenth:13,fourteenth:14,fifteenth:15,sixteenth:16,seventeenth:17,
-    eighteenth:18,nineteenth:19,twentieth:20
-  };
-
-  async function wikipediaApi(params){
-    const query={...params,format:"json",origin:"*"};
-    const key=JSON.stringify(Object.keys(query).sort().reduce((o,k)=>(o[k]=query[k],o),{}));
-    return cachedMetadataRequest(wikiRequestCache,key,async()=>{
-      const u=new URL(WIKIPEDIA_API);
-      Object.entries(query).forEach(([k,v])=>u.searchParams.set(k,String(v)));
-      return fetchJSONWithTimeout(u.toString(),{credentials:"omit",cache:"no-store"});
-    });
-  }
-
-  function cleanWikiValue(value){
-    return String(value||"")
-      .replace(/<ref\b[^>]*>[\s\S]*?<\/ref>/gi," ")
-      .replace(/<ref\b[^/>]*\/>/gi," ")
-      .replace(/<!--([\s\S]*?)-->/g," ")
-      .replace(/\[\[[^\]|]+\|([^\]]+)\]\]/g,"$1")
-      .replace(/\[\[([^\]]+)\]\]/g,"$1")
-      .replace(/'{2,3}/g,"")
-      .replace(/&nbsp;/gi," ")
-      .replace(/\s+/g," ")
-      .trim();
-  }
-
-  function parseWikipediaSeasonCount(wikitext){
-    /* Horizontal whitespace only is intentional. Using \s here can cross the
-       newline from an empty num_seasons field and read num_episodes instead. */
-    const match=String(wikitext||"").match(/\|[ \t]*(?:num_seasons|num_series)[ \t]*=[ \t]*([^\n\r]*)/i);
-    if(!match)return null;
-    const cleaned=cleanWikiValue(match[1]);
-    const numberMatch=cleaned.match(/\b(\d{1,2})\b/);
-    if(!numberMatch)return null;
-    const n=Number(numberMatch[1]);
-    return n>=1&&n<=99?n:null;
-  }
-
-  function extractWikipediaAnnouncedSeasons(wikitext){
-    const raw=String(wikitext||"")
-      .replace(/<ref\b[^>]*>[\s\S]*?<\/ref>/gi," ")
-      .replace(/<ref\b[^/>]*\/>/gi," ")
-      .replace(/<!--([\s\S]*?)-->/g," ");
-    const evidence=new Set();
-    const relevant=raw.split(/\n|(?<=[.!?])\s+/).filter(line=>
-      /\b(season|series)\b/i.test(line)&&
-      /\b(renewed|renewal|commissioned|ordered|announced|upcoming|scheduled|premiere|premieres|premiering|return|returning|will air|will be released|set to)\b/i.test(line)
-    );
-    for(const line of relevant){
-      let m;
-      const numericPatterns=[
-        /\b(?:season|series)\s*(\d{1,2})\b/gi,
-        /\b(\d{1,2})(?:st|nd|rd|th)\s+(?:season|series)\b/gi
-      ];
-      for(const rx of numericPatterns){while((m=rx.exec(line)))evidence.add(Number(m[1]));}
-      for(const [word,n] of Object.entries(ORDINAL_SEASON_WORDS)){
-        const rx=new RegExp(`\\b${word}\\s+(?:season|series)\\b`,`i`);
-        if(rx.test(line))evidence.add(n);
-      }
-    }
-    return Array.from(evidence).filter(n=>Number.isFinite(n)&&n>=1&&n<=99).sort((a,b)=>a-b);
-  }
-
-  function validISODate(year,month,day){
-    const y=Number(year),m=Number(month),d=Number(day);
-    if(!Number.isInteger(y)||!Number.isInteger(m)||!Number.isInteger(d)||m<1||m>12||d<1||d>31)return "";
-    const check=new Date(Date.UTC(y,m-1,d));
-    if(check.getUTCFullYear()!==y||check.getUTCMonth()!==m-1||check.getUTCDate()!==d)return "";
-    const pad=n=>String(n).padStart(2,"0");
-    return String(y).padStart(4,"0")+"-"+pad(m)+"-"+pad(d);
-  }
-
-  function wikipediaFieldValue(wikitext,field){
-    const text=String(wikitext||"");
-    const match=new RegExp("\\|\\s*"+field+"\\s*=","i").exec(text);
-    if(!match)return "";
-    let start=match.index+match[0].length;
-    while(/\s/.test(text[start]||"")&&text[start]!=="\n"&&text[start]!=="\r")start++;
-    if(text.slice(start,start+2)==="{{"){
-      let depth=0;
-      for(let i=start;i<text.length-1;i++){
-        const pair=text.slice(i,i+2);
-        if(pair==="{{"){depth++;i++;continue;}
-        if(pair==="}}"){depth--;i++;if(depth===0)return text.slice(start,i+1);}
-      }
-    }
-    const end=text.slice(start).search(/[\n\r]/);
-    return end<0?text.slice(start):text.slice(start,start+end);
-  }
-
-  function wikipediaDateFromWikitext(wikitext){
-    const text=String(wikitext||"");
-    const fields=["first_aired","original_release","released","release_date","premiere","first_release"];
-    const values=fields.map(field=>wikipediaFieldValue(text,field)).filter(Boolean);
-    for(const value of values){
-      let template=value.match(/\{\{\s*film date\b([\s\S]*?)\}\}/i);
-      let m=template?.[1]?.match(/(?:^|\|)\s*(19\d{2}|20\d{2})\s*\|\s*(\d{1,2})\s*\|\s*(\d{1,2})(?=\s*(?:\||$))/i);
-      if(m){const iso=validISODate(m[1],m[2],m[3]);if(iso)return iso;}
-      m=value.match(/\{\{\s*(?:start date(?: and age)?|dts|date)\b[\s\S]*?(?:^|\|)\s*(\d{4})\s*\|\s*(\d{1,2})\s*\|\s*(\d{1,2})/i);
-      if(m){const iso=validISODate(m[1],m[2],m[3]);if(iso)return iso;}
-      m=value.match(/\b(20\d{2}|19\d{2})-(\d{2})-(\d{2})\b/);
-      if(m){const iso=validISODate(m[1],m[2],m[3]);if(iso)return iso;}
-      const cleaned=cleanWikiValue(value).replace(/\{\{[^{}]*\}\}/g," ");
-      const datePatterns=[
-        /\b(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},?\s+\d{4}\b/i,
-        /\b\d{1,2}\s+(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{4}\b/i
-      ];
-      for(const datePattern of datePatterns){
-        const hit=cleaned.match(datePattern);
-        if(hit){
-          const parsed=new Date(hit[0]);
-          if(!Number.isNaN(parsed.getTime())){
-            const iso=validISODate(parsed.getFullYear(),parsed.getMonth()+1,parsed.getDate());
-            if(iso)return iso;
-          }
-        }
-      }
-    }
-    return null;
-  }
-
-  function wikipediaLooksFuture(wikitext){
-    return /\b(upcoming|scheduled to premiere|scheduled for release|set to premiere|will premiere|will be released|to be released|renewed for|commissioned for|ordered for)\b/i.test(String(wikitext||""));
-  }
-
-  async function wikipediaWikitext(pageTitle){
-    if(!pageTitle)return null;
-    try{
-      const data=await wikipediaApi({action:"parse",page:pageTitle,prop:"wikitext",redirects:1});
-      return {title:data?.parse?.title||pageTitle,wikitext:data?.parse?.wikitext?.["*"]||""};
-    }catch(_){return null;}
-  }
-
-  function wikipediaSeriesCandidateScore(candidate,title){
-    const a=normalizeTitle(candidate),b=normalizeTitle(title);
-    if(!a||!b)return 0;
-    let score=0;
-    if(a===b)score+=100;
-    if(a.startsWith(b)||b.startsWith(a))score+=55;
-    const tokens=titleTokens(title),candTokens=new Set(titleTokens(candidate));
-    score+=tokens.filter(t=>candTokens.has(t)).length*10;
-    if(/\b(tv|television) series\b/i.test(candidate))score+=35;
-    return score;
-  }
-
-  function wikipediaSeriesTitleMatches(candidate,title){
-    const page=normalizeTitle(candidate),wanted=normalizeTitle(title);
-    if(!page||!wanted)return false;
-    if(page===wanted)return true;
-    if(!page.startsWith(`${wanted} `))return false;
-    const suffix=page.slice(wanted.length).trim();
-    return /^(?:(?:19|20)\d{2}\s+)?(?:(?:american|british|english|canadian|australian|new zealand|indian|japanese|korean|french|german|spanish|italian|irish)\s+)?(?:tv|television|web|streaming)\s+(?:series|programme|program|serial|miniseries)$/.test(suffix);
-  }
-
-  async function wikipediaFindSeriesPage(title){
-    const searches=[title,`\"${title}\" television series`,`\"${title}\" TV series`];
-    const candidateTitles=[];
-    for(const q of searches){
-      try{
-        const data=await wikipediaApi({action:"query",list:"search",srsearch:q,srnamespace:0,srlimit:6,srprop:""});
-        for(const row of data?.query?.search||[])if(row?.title&&!candidateTitles.includes(row.title))candidateTitles.push(row.title);
-      }catch(_){}
-      if(candidateTitles.some(candidate=>wikipediaSeriesCandidateScore(candidate,title)>=90&&wikipediaSeriesTitleMatches(candidate,title)))break;
-    }
-    candidateTitles.sort((a,b)=>wikipediaSeriesCandidateScore(b,title)-wikipediaSeriesCandidateScore(a,title));
-    for(const pageTitle of candidateTitles.slice(0,10)){
-      if(!wikipediaSeriesTitleMatches(pageTitle,title))continue;
-      const page=await wikipediaWikitext(pageTitle);
-      if(!page)continue;
-      if(/\{\{\s*Infobox television/i.test(page.wikitext)||/\|\s*(?:num_seasons|num_series)\s*=/i.test(page.wikitext))return page;
-    }
-    return null;
-  }
-
-  async function wikipediaFindSeasonPage(title,seasonNumber){
-    const variants=[
-      `${title} season ${seasonNumber}`,
-      `${title} (season ${seasonNumber})`,
-      `${title} series ${seasonNumber}`,
-      `${title} (series ${seasonNumber})`
-    ];
-    try{
-      const data=await wikipediaApi({action:"query",prop:"info",redirects:1,titles:variants.join("|")});
-      const pages=Object.values(data?.query?.pages||{}).filter(p=>p&&!Object.prototype.hasOwnProperty.call(p,"missing")&&p.title);
-      for(const p of pages){
-        const page=await wikipediaWikitext(p.title);
-        if(page&&(/\{\{\s*Infobox television season/i.test(page.wikitext)||new RegExp(`\\b(?:season|series)\\s*${seasonNumber}\\b`,`i`).test(page.title)))return page;
-      }
-    }catch(_){}
-    for(const q of [`\"${title}\" \"season ${seasonNumber}\"`,`\"${title}\" \"series ${seasonNumber}\"`]){
-      try{
-        const data=await wikipediaApi({action:"query",list:"search",srsearch:q,srnamespace:0,srlimit:6,srprop:""});
-        const rows=(data?.query?.search||[]).filter(r=>new RegExp(`\\b(?:season|series)\\s*${seasonNumber}\\b`,`i`).test(r.title||""));
-        rows.sort((a,b)=>wikipediaSeriesCandidateScore(b.title,title)-wikipediaSeriesCandidateScore(a.title,title));
-        for(const row of rows.slice(0,3)){
-          const page=await wikipediaWikitext(row.title);
-          if(page&&(/\{\{\s*Infobox television season/i.test(page.wikitext)||new RegExp(`\\b(?:season|series)\\s*${seasonNumber}\\b`,`i`).test(page.title)))return page;
-        }
-      }catch(_){}
-    }
-    return null;
-  }
-
-  async function wikipediaSeasonData(title,{tvHighest=null,tvLatestAired=null,tvStatus=""}={}){
-    const seriesPage=await wikipediaFindSeriesPage(title);
-    if(!seriesPage)return {available:false,highest:null,latestAired:null,upcoming:null,known:new Set(),pageTitle:null,ended:false};
-    const count=parseWikipediaSeasonCount(seriesPage.wikitext);
-    const rawAnnounced=extractWikipediaAnnouncedSeasons(seriesPage.wikitext);
-    const baseline=Math.max(tvHighest||0,tvLatestAired||0,count||0);
-    const ended=String(tvStatus||"").toLowerCase()==="ended";
-    const announcementCeiling=ended?baseline:(baseline?baseline+1:(rawAnnounced.length?Math.min(...rawAnnounced):1));
-    const announced=rawAnnounced.filter(n=>n<=announcementCeiling);
-    const known=new Set();
-    if(count)for(let n=1;n<=count;n++)known.add(n);
-    announced.forEach(n=>known.add(n));
-    let highest=ended&&tvHighest?Math.max(tvHighest||0,count||0)||null:Math.max(tvHighest||0,count||0,...announced,0)||null;
-    let latestAired=tvLatestAired;
-    const baseMax=Math.max(highest||0,tvHighest||0,tvLatestAired||0);
-    const start=tvLatestAired!==null&&tvLatestAired!==undefined?Math.max(1,tvLatestAired+1):Math.max(1,baseMax-1);
-    const end=tvLatestAired!==null&&tvLatestAired!==undefined?start:Math.min(Math.max(baseMax+1,start),start+2);
-    const pageChecks=[];
-    if(!ended)for(let n=start;n<=end;n++)pageChecks.push(wikipediaFindSeasonPage(title,n).then(page=>({n,page})));
-    const pages=await Promise.all(pageChecks);
-    const futureCandidates=[];
-    const now=Date.now();
-    for(const {n,page} of pages){
-      if(!page||n>Math.max(baseline+1,start))continue;
-      known.add(n);highest=Math.max(highest||0,n);
-      const premiereDate=wikipediaDateFromWikitext(page.wikitext);
-      const premiereTime=premiereDate?new Date(`${premiereDate}T23:59:59`).getTime():0;
-      if(premiereTime&&premiereTime<=now){
-        if(tvLatestAired===null||tvLatestAired===undefined||n<=tvLatestAired)latestAired=Math.max(latestAired||0,n);
-        else if(announced.includes(n)||wikipediaLooksFuture(page.wikitext))futureCandidates.push({number:n,premiereDate:null,source:"Wikipedia",pageTitle:page.title});
-        continue;
-      }
-      if((premiereTime&&premiereTime>now)||announced.includes(n)||wikipediaLooksFuture(page.wikitext)){
-        futureCandidates.push({number:n,premiereDate:premiereDate||null,source:"Wikipedia",pageTitle:page.title});
-      }
-    }
-    if(!ended){
-      for(const n of announced){
-        if((latestAired===null||latestAired===undefined||n>latestAired)&&!futureCandidates.some(c=>c.number===n)){
-          futureCandidates.push({number:n,premiereDate:null,source:"Wikipedia",pageTitle:seriesPage.title});
-        }
-      }
-    }
-    const upcoming=ended?null:futureCandidates.filter(c=>latestAired===null||latestAired===undefined||c.number>latestAired).sort((a,b)=>a.number-b.number||Boolean(b.premiereDate)-Boolean(a.premiereDate))[0]||null;
-    return {available:true,highest:highest||null,latestAired:latestAired||null,upcoming,known,pageTitle:seriesPage.title,ended,rawAnnounced,announced};
   }
 
   function episodeAirTime(episode){
@@ -424,7 +158,7 @@
       const artwork={details:{
         description:String(show.summary||""),premiered:show.premiered||"",genres:Array.isArray(show.genres)?show.genres:[],
         status:show.status||"",rating:Number.isFinite(show.rating?.average)?show.rating.average:null,
-        runtime:show.averageRuntime||show.runtime||null,language:show.language||"",source:"TVMaze"
+        runtime:show.averageRuntime||show.runtime||null,language:show.language||"",source:"TVMaze",sourceUrl:`https://www.tvmaze.com/shows/${show.id}`,sources:[{name:"TVMaze",url:`https://www.tvmaze.com/shows/${show.id}`}],ratingSource:"TVMaze"
       }};
       if(results[0].status==="fulfilled"&&Array.isArray(results[0].value))artwork.episodeImages=officialEpisodeImageMap(results[0].value,show.image);
       if(results[1].status==="fulfilled"&&Array.isArray(results[1].value)){
@@ -436,14 +170,31 @@
     });
   }
 
+  const titleDetailsCache=new Map();
   async function fetchOfficialTitleDetails(item){
-    if(item.type!=="Film")return (await fetchOfficialTrackerArtwork(item)).details||{};
-    const rows=await searchCatalogBatch(item.imdbId||item.title);
-    const matches=(Array.isArray(rows)?rows:[]).filter(row=>row.format==="Film"&&(item.imdbId?row.imdbId===item.imdbId:normalizeTitle(row.title)===normalizeTitle(item.title)&&(!item.releaseYear||String(row.year)===String(item.releaseYear))));
-    const identities=new Set(matches.map(row=>row.imdbId||row.externalId||row.title));
-    if(identities.size!==1)return {};
-    const match=matches.find(row=>row.description)||matches[0];
-    return {description:match.description||"",year:match.year||"",source:match.source==="imdb"?"IMDb":match.source==="apple"?"Apple TV":""};
+    const payload={title:item.title,type:item.type||item.format,imdbId:item.imdbId||(item.source==="imdb"?item.externalId:""),tvmazeShowId:item.tvmazeShowId||item.tvmazeId,year:item.releaseYear||item.year,source:item.source,externalId:item.externalId};
+    const key=JSON.stringify(payload);
+    return cachedMetadataRequest(titleDetailsCache,key,async()=>{
+      try{
+        const response=await pinApi("catalog_details",payload);
+        if(response.details?.description){return response.details;}
+        titleDetailsCache.delete(key);
+        if(response.details?.sources?.length)return response.details;
+      }catch(_) {titleDetailsCache.delete(key);}
+      // The browser can still read the exact TVMaze identity if the gateway is offline.
+      if(payload.type==="Series"){
+        const details=(await fetchOfficialTrackerArtwork({...item,type:"Series",tvmazeShowId:payload.tvmazeShowId,imdbId:payload.imdbId})).details||{};
+        if(details.description)return {...details,imdbUrl:/^tt\d+$/.test(payload.imdbId||"")?`https://www.imdb.com/title/${payload.imdbId}/`:""};
+      }
+      return {state:"unavailable",sources:[],imdbUrl:/^tt\d+$/.test(payload.imdbId||"")?`https://www.imdb.com/title/${payload.imdbId}/`:""};
+    });
+  }
+  function titleDetailsSourceLinks(details){
+    const sources=[...(details.sources||[])];
+    if(details.imdbUrl&&!sources.some(row=>row.url===details.imdbUrl))sources.push({name:"View on IMDb",url:details.imdbUrl});
+    return sources.flatMap(row=>{
+      try{const url=new URL(row.url);if(url.protocol!=="https:"||!['www.imdb.com','imdb.com','www.tvmaze.com','tvmaze.com','www.justwatch.com','itunes.apple.com','tv.apple.com'].includes(url.hostname))return [];return [`<a href="${esc(url.href)}" target="_blank" rel="noopener noreferrer">${esc(row.name)}</a>`];}catch{return [];}
+    }).join(" · ");
   }
 
   function tvMazeShowMatchesSelection(show,title,{imdbId="",year=""}={}){
@@ -522,31 +273,20 @@
       try{onProgress(tvMazeSeasonResult(resolvedShowId,show,schedule,{imdbId:expectedImdbId,tvAvailable,episodeScheduleAvailable}));}
       catch(e){console.warn("TVMaze preview could not be displayed",e);}
     }
-    const wikiPromise=wikipediaSeasonData(title,{tvHighest,tvLatestAired,tvStatus:show?.status||""}).catch(e=>{console.warn("Wikipedia season verification unavailable",e);return{available:false,highest:null,latestAired:null,upcoming:null,known:new Set()};});
     const tvImdbIdentityConfirmed=Boolean(imdbId&&tvImdbId&&String(imdbId)===tvImdbId);
     const imdbPromise=tvImdbIdentityConfirmed
       ? Promise.resolve({available:true,confirmed:true,imdbId:expectedImdbId,match:null})
       : imdbSeriesCrossCheck(title,{imdbId:expectedImdbId,year:year||show?.premiered?.slice?.(0,4)||""}).catch(e=>{console.warn("IMDb series cross-check unavailable",e);return{available:false,confirmed:null,imdbId:expectedImdbId,match:null};});
-    const [wiki,imdb]=await Promise.all([wikiPromise,imdbPromise]);
+    const imdb=await imdbPromise;
 
     const tvEnded=tvAvailable&&String(show?.status||"").toLowerCase()==="ended"&&!schedule.nextEpisode;
-    /* Wikipedia may know the next renewal before TVMaze, but it must not leap
-       several seasons beyond a matched episode schedule. When TVMaze already
-       includes a future season, it is the ceiling; otherwise Wikipedia may add
-       the single next announced season. */
-    const wikiCeiling=tvAvailable&&tvHighest?tvHighest+(schedule.upcomingSeason?0:1):Number.POSITIVE_INFINITY;
-    const boundedWikiHighest=Number.isFinite(Number(wiki.highest))?Math.min(Number(wiki.highest),wikiCeiling):0;
-    const highest=tvEnded&&tvHighest?tvHighest:(Math.max(tvHighest||0,boundedWikiHighest||0)||null);
-    const latestAired=tvAvailable&&tvLatestAired!==null?tvLatestAired:(Number.isFinite(Number(wiki.latestAired))?Number(wiki.latestAired):null);
+    const highest=tvHighest||null;
+    const latestAired=tvAvailable?tvLatestAired:null;
     const currentEpisode=tvAvailable?schedule.currentEpisode:null;
-    const known=new Set([...schedule.known,...(wiki.known||[])].filter(n=>(!tvEnded||!tvHighest||Number(n)<=tvHighest)&&Number(n)<=wikiCeiling));
-    const candidates=[];
-    if(!tvEnded&&schedule.upcomingSeason)candidates.push({number:Number(schedule.upcomingSeason.number),premiereDate:schedule.upcomingSeason.premiereDate||schedule.nextEpisode?.airdate||null,source:"TVMaze",raw:schedule.upcomingSeason});
-    if(!tvEnded&&wiki.upcoming&&Number(wiki.upcoming.number)<=wikiCeiling)candidates.push({...wiki.upcoming,number:Number(wiki.upcoming.number)});
-    let upcoming=candidates.filter(c=>Number.isFinite(c.number)&&(latestAired===null||c.number>latestAired)).sort((a,b)=>a.number-b.number||Boolean(b.premiereDate)-Boolean(a.premiereDate))[0]||null;
+    const known=new Set([...schedule.known].filter(n=>!tvEnded||!tvHighest||Number(n)<=tvHighest));
+    let upcoming=!tvEnded&&schedule.upcomingSeason?{number:Number(schedule.upcomingSeason.number),premiereDate:schedule.upcomingSeason.premiereDate||schedule.nextEpisode?.airdate||null,source:"TVMaze",raw:schedule.upcomingSeason}:null;
+    if(upcoming&&latestAired!==null&&upcoming.number<=latestAired)upcoming=null;
     if(upcoming){
-      const same=candidates.filter(c=>c.number===upcoming.number);
-      if(same.length>1){const dated=same.find(c=>c.source==="TVMaze"&&c.premiereDate)||same.find(c=>c.premiereDate)||same[0];upcoming={...dated,source:"TVMaze + Wikipedia"};}
       const endpointCheck=await imdbVerify(title,upcoming.number,upcoming.premiereDate||"");
       if(endpointCheck?.confirmed===false)upcoming=null;
       if(endpointCheck?.confirmed===true&&Number.isFinite(Number(endpointCheck.seasonNumber))&&Number(endpointCheck.seasonNumber)!==upcoming?.number)upcoming=null;
@@ -554,7 +294,6 @@
     const sources=[];
     if(imdb?.confirmed===true)sources.push("IMDb");
     if(tvAvailable)sources.push("TVMaze");
-    if(wiki.available)sources.push("Wikipedia");
     const resolvedImdbId=imdb?.imdbId||expectedImdbId||"";
     return {
       highest,latestAired,currentEpisode,latestEpisodeDate:episodeReleaseTimestamp(schedule.currentEpisodeRow),seriesReleaseDate:show?.premiered||"",completedSeasons:schedule.completedSeasons,upcoming,nextEpisode:schedule.nextEpisode,airing:schedule.airing,episodeImages:officialEpisodeImageMap(schedule.episodes,show?.image),episodeImagesSource:"TVMaze",seasonImages:officialSeasonImageMap(schedule.seasons),seasonImagesSource:"TVMaze",
@@ -631,7 +370,7 @@
     $("next-episode-date").value=episodeLocalInput(next);
     if(result?.provisional){airingNote.textContent="TVMaze episode schedule loaded. Cross-checking the remaining sources…";return;}
     const checked=result.imdbConfirmed?"Matched to IMDb; ":"";
-    airingNote.textContent=`${checked}episode dates checked with TVMaze and season information cross-checked with Wikipedia.`;
+    airingNote.textContent=`${checked}episode dates and season information checked with TVMaze.`;
   }
 
   function updateSeasonVerifyNote(result){
@@ -639,8 +378,8 @@
     if(result?.provisional){
       const date=result.upcoming?.premiereDate?` Premiere: ${formatLocalDate(result.upcoming.premiereDate)}.`:"";
       seasonVerifyNote.textContent=result.upcoming
-        ? `TVMaze confirms Season ${result.upcoming.number}.${date} Cross-checking IMDb and Wikipedia…`
-        : "TVMaze schedule loaded. Cross-checking IMDb and Wikipedia…";
+        ? `TVMaze confirms Season ${result.upcoming.number}.${date} Cross-checking IMDb…`
+        : "TVMaze schedule loaded. Cross-checking IMDb…";
       return;
     }
     const checked=result?.imdbConfirmed?"IMDb identity matched. ":"";
@@ -1265,150 +1004,6 @@ function duplicateCleanupMessage(cleanup){
     return Number.isFinite(t)&&t>Date.now();
   }
 
-  function wikidataTimeToISO(time,precision=11){
-    if(Number(precision)<11)return "";
-    const match=String(time||"").match(/^\+?(\d{4})-(\d{2})-(\d{2})T/);
-    return match?validISODate(match[1],match[2],match[3]):"";
-  }
-
-  function wikidataClaimString(statement){
-    const value=statement?.mainsnak?.datavalue?.value;
-    return typeof value==="string"?value:"";
-  }
-
-  function wikidataIMDbId(entity){
-    return (entity?.claims?.P345||[]).map(wikidataClaimString).find(Boolean)||"";
-  }
-
-  function wikidataFutureReleaseDates(entity){
-    return Array.from(new Set((entity?.claims?.P577||[])
-      .filter(statement=>statement?.rank!=="deprecated")
-      .map(statement=>{
-        const value=statement?.mainsnak?.datavalue?.value;
-        return wikidataTimeToISO(value?.time,value?.precision);
-      })
-      .filter(isFutureDateOnly))).sort();
-  }
-
-  async function wikidataFilmReleaseData(title,{year="",imdbId=""}={}){
-    const search=await wikidataApi({
-      action:"wbsearchentities",
-      search:title,
-      language:"en",
-      uselang:"en",
-      type:"item",
-      limit:12
-    });
-    const ids=(search?.search||[]).map(item=>item?.id).filter(Boolean);
-    if(!ids.length)return {available:false,date:"",entityId:"",imdbId:"",imdbMatched:false};
-    const data=await wikidataApi({
-      action:"wbgetentities",
-      ids:ids.join("|"),
-      props:"labels|descriptions|aliases|claims",
-      languages:"en",
-      languagefallback:1
-    });
-    const wanted=titleTokens(title);
-    const candidates=[];
-    for(const entity of Object.values(data?.entities||{})){
-      if(!entity||entity.missing!==undefined)continue;
-      const label=entity?.labels?.en?.value||"";
-      const aliases=(entity?.aliases?.en||[]).map(alias=>alias?.value||"").filter(Boolean);
-      const names=[label,...aliases];
-      const bestName=names.sort((a,b)=>suggestionScore({title:b,format:"Film",year,source:"wikidata"},title)-suggestionScore({title:a,format:"Film",year,source:"wikidata"},title))[0]||label;
-      const normalized=normalizeTitle(bestName);
-      const normalizedTitle=normalizeTitle(title);
-      const got=new Set(titleTokens(bestName));
-      const overlap=wanted.filter(token=>got.has(token)).length;
-      if(normalized!==normalizedTitle&&!normalized.includes(normalizedTitle)&&!normalizedTitle.includes(normalized)&&overlap<Math.max(1,Math.ceil(wanted.length*.75)))continue;
-      const dates=wikidataFutureReleaseDates(entity);
-      if(!dates.length)continue;
-      const entityImdb=wikidataIMDbId(entity);
-      const description=String(entity?.descriptions?.en?.value||"");
-      let score=suggestionScore({title:bestName,format:"Film",year:dates[0]?.slice(0,4)||"",source:"wikidata"},title);
-      if(normalized===normalizedTitle)score+=1400;
-      if(/\b(film|movie)\b/i.test(description))score+=350;
-      if(year&&dates.some(date=>date.startsWith(String(year)+"-")))score+=450;
-      if(imdbId&&entityImdb===imdbId)score+=2500;
-      else if(imdbId&&entityImdb&&entityImdb!==imdbId)score-=1600;
-      candidates.push({entity,date:dates[0],imdbId:entityImdb,score});
-    }
-    candidates.sort((a,b)=>b.score-a.score);
-    const best=candidates[0];
-    if(!best)return {available:false,date:"",entityId:"",imdbId:"",imdbMatched:false};
-    return {
-      available:true,
-      date:best.date,
-      entityId:best.entity.id||"",
-      imdbId:best.imdbId||"",
-      imdbMatched:Boolean(imdbId&&best.imdbId===imdbId)
-    };
-  }
-
-  function wikipediaImdbId(wikitext){
-    const m=String(wikitext||"").match(/\|\s*imdb_id\s*=\s*(?:tt)?(\d{5,12})/i);
-    return m?`tt${m[1]}`:"";
-  }
-
-  function wikipediaFilmCandidateScore(pageTitle,title,year=""){
-    const a=normalizeTitle(String(pageTitle||"").replace(/\s*\([^)]*film[^)]*\)\s*$/i,""));
-    const b=normalizeTitle(title);
-    let score=0;
-    if(a===b)score+=500;
-    else if(a.startsWith(b)||b.startsWith(a))score+=220;
-    const wanted=new Set(titleTokens(title));
-    const got=new Set(titleTokens(pageTitle));
-    score+=Array.from(wanted).filter(t=>got.has(t)).length*45;
-    if(/\bfilm\b/i.test(pageTitle))score+=100;
-    if(year&&new RegExp(`\\b${String(year).replace(/[^0-9]/g,"")}\\b`).test(pageTitle))score+=180;
-    return score;
-  }
-
-  async function wikipediaFindFilmPage(title,{year="",imdbId=""}={}){
-    const variants=[];
-    if(year)variants.push(`${title} (${year} film)`);
-    variants.push(`${title} (film)`,title);
-    const candidates=[];
-    try{
-      const data=await wikipediaApi({action:"query",prop:"info",redirects:1,titles:variants.join("|")});
-      for(const page of Object.values(data?.query?.pages||{})){
-        if(page?.title&&!Object.prototype.hasOwnProperty.call(page,"missing")&&!candidates.includes(page.title))candidates.push(page.title);
-      }
-    }catch(_){}
-    for(const q of [year?`"${title}" ${year} film`:null,`"${title}" film`,title].filter(Boolean)){
-      try{
-        const data=await wikipediaApi({action:"query",list:"search",srsearch:q,srnamespace:0,srlimit:8,srprop:""});
-        for(const row of data?.query?.search||[])if(row?.title&&!candidates.includes(row.title))candidates.push(row.title);
-      }catch(_){}
-      if(candidates.length>=12)break;
-    }
-    const pages=[];
-    for(const pageTitle of candidates.slice(0,12)){
-      const page=await wikipediaWikitext(pageTitle);
-      if(!page||!/\{\{\s*Infobox film/i.test(page.wikitext))continue;
-      const pageImdb=wikipediaImdbId(page.wikitext);
-      let score=wikipediaFilmCandidateScore(page.title,title,year);
-      if(imdbId&&pageImdb===imdbId)score+=1200;
-      else if(imdbId&&pageImdb&&pageImdb!==imdbId)score-=500;
-      pages.push({...page,imdbId:pageImdb,score});
-    }
-    pages.sort((a,b)=>b.score-a.score);
-    return pages[0]||null;
-  }
-
-  async function wikipediaFilmReleaseData(title,{year="",imdbId=""}={}){
-    const page=await wikipediaFindFilmPage(title,{year,imdbId});
-    if(!page)return {available:false,date:"",pageTitle:"",imdbId:"",imdbMatched:false};
-    const date=wikipediaDateFromWikitext(page.wikitext)||"";
-    return {
-      available:true,
-      date,
-      pageTitle:page.title,
-      imdbId:page.imdbId||"",
-      imdbMatched:Boolean(imdbId&&page.imdbId===imdbId)
-    };
-  }
-
   function bestIMDbFilmMatch(rows,title,imdbId=""){
     const films=(rows||[]).filter(x=>x?.format==="Film"&&x.title);
     if(imdbId){const byId=films.find(x=>x.externalId===imdbId);if(byId)return byId;}
@@ -1440,26 +1035,13 @@ function duplicateCleanupMessage(cleanup){
     const expectedYear=imdbMatch?.year||"";
     const appleMatch=bestAppleFilmMatch(appleRows,title,expectedYear);
 
-    const [wikiResult,wikidataResult]=await Promise.allSettled([
-      wikipediaFilmReleaseData(title,{year:expectedYear,imdbId:resolvedImdbId}),
-      wikidataFilmReleaseData(title,{year:expectedYear,imdbId:resolvedImdbId})
-    ]);
-    const wiki=wikiResult.status==="fulfilled"?wikiResult.value:{available:false,date:"",imdbMatched:false};
-    const wikidata=wikidataResult.status==="fulfilled"?wikidataResult.value:{available:false,date:"",imdbMatched:false};
-
     const appleDate=isFutureDateOnly(appleMatch?.releaseDate)?appleMatch.releaseDate:"";
-    const wikiDate=isFutureDateOnly(wiki.date)?wiki.date:"";
-    const wikidataDate=isFutureDateOnly(wikidata.date)?wikidata.date:"";
     const seedFuture=isFutureDateOnly(seedDate)?seedDate:"";
     const sources=[];
     if(imdbMatch)sources.push("IMDb");
     if(appleMatch)sources.push("Apple Movies");
-    if(wiki.available)sources.push("Wikipedia");
-    if(wikidata.available)sources.push("Wikidata");
 
     const records=[
-      wikidataDate?{date:wikidataDate,source:"Wikidata",priority:50+(wikidata.imdbMatched?30:0)}:null,
-      wikiDate?{date:wikiDate,source:"Wikipedia",priority:40+(wiki.imdbMatched?30:0)}:null,
       appleDate?{date:appleDate,source:"Apple Movies",priority:30}:null,
       seedFuture?{date:seedFuture,source:seedSource||"Film catalogue",priority:10}:null
     ].filter(Boolean);
@@ -1474,20 +1056,16 @@ function duplicateCleanupMessage(cleanup){
     const winner=ranked[0];
     const date=winner?.date||"";
     let source=winner?Array.from(new Set(winner.records.map(record=>record.source))).join(" + "):"";
-    if(date===wikidataDate&&wikidata.imdbMatched&&!source.includes("IMDb"))source+=" + IMDb";
-    else if(date===wikiDate&&wiki.imdbMatched&&!source.includes("IMDb"))source+=" + IMDb";
     const conflict=ranked.length>1;
 
     return {
       date,
       source,
       sources:Array.from(new Set(sources)),
-      imdbId:resolvedImdbId||wikidata.imdbId||wiki.imdbId||"",
+      imdbId:resolvedImdbId||"",
       year:expectedYear,
       conflict,
-      appleDate,
-      wikiDate,
-      wikidataDate
+      appleDate
     };
   }
 
