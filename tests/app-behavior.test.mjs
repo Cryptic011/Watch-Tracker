@@ -48,7 +48,7 @@ function extractFunction(source, name) {
     if (char === '"') { state = "double"; continue; }
     if (char === "`") { state = "template"; continue; }
     if (char === "{") depth++;
-    if (char === "}" && --depth === 0) return source.slice(start, index + 1);
+    if (char === "}" && --depth === 0) return source.slice(source.slice(start-6,start)==="async "?start-6:start, index + 1);
   }
   throw new Error(`Could not extract ${name}`);
 }
