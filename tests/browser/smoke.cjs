@@ -46,7 +46,7 @@ const server=http.createServer((req,res)=>{
     if(['login','load'].includes(body.action)){loads++;data={ok:true,account,items,revision,sessionToken:'test-token'};}
     if(body.action==='catalog_search'){catalogQueries.push(String(body.query||'').toLowerCase());data={ok:true,results:[
      {title:'Browser Test Film',format:'Film',source:'imdb',imdbId:'tt1234567',year:'2020',posterUrl:'https://m.media-amazon.com/test.jpg',description:'A detective uncovers a mystery in a quiet coastal town. '.repeat(8)},
-     {title:'Browser Test Series',format:'Series',source:'tvmaze',tvmazeId:'12',year:'2021',description:'Investigators work together to solve difficult cases.'},
+     {title:'Browser Test Series',format:'Series',source:'tvmaze',tvmazeId:'12',imdbId:'tt7654321',year:'2021',description:'Investigators work together to solve difficult cases.'},
     ]};}
     if(body.action==='catalog_details'){
      const series=body.type==='Series',id=series?'tt1234568':'tt1234567',url='https://www.imdb.com/title/'+id+'/';
@@ -570,6 +570,18 @@ const server=http.createServer((req,res)=>{
   await page.locator('[data-gallery-close]').click();
   assert.equal(await recurringMarker().getAttribute('data-behind-level'),'green','watching released episodes makes the recurring marker green');
   assert.equal(await page.locator('#library-dashboard [data-dashboard-open="show"] .release-progress-dot').first().getAttribute('data-behind-level'),'green','watching released episodes makes the release-calendar marker green');
+  phase='duplicate prevention';
+  await page.locator('[data-tab="search"]').click();await page.locator('[data-discovery-filter="Series"]').click();
+  await page.locator('#discovery-query').fill('Browser Test Series');
+  await page.locator('#discovery-library-results [data-library-result="show"]').waitFor();
+  assert.equal(await page.locator('#discovery-results [data-discovery-add]').count(),0,'a shared TVMaze ID is saved even when the catalogue IMDb ID differs');
+  await page.locator('[data-tab="library"]').click();
+  const beforeDuplicate=await page.evaluate(()=>mediaItems.length),beforeDuplicateSaves=saves;
+  await page.evaluate(()=>{openAdd();titleInput.value='Test Series';typeSelect.value='Series';$('tvmaze-id').value='12';$('imdb-id').value='tt7654321';$('release-year').value='2021';});
+  await page.locator('#save-btn').click();await page.locator('#duplicate-warning').waitFor({state:'visible'});
+  assert.equal(await page.evaluate(()=>mediaItems.length),beforeDuplicate);assert.equal(saves,beforeDuplicateSaves,'duplicate form submissions do not write to the cloud');
+  await page.locator('#open-duplicate').click();await page.locator('.gallery-detail[open]').waitFor();
+  await page.locator('[data-gallery-close]').click();
   phase='refresh';
   const refreshItemId=await page.evaluate(()=>{mediaItems[0].platform='Saved before refresh';return mediaItems[0].id;});
   const before=loads;const reload=page.waitForEvent('load');await page.locator('#refresh-app').click();await reload;

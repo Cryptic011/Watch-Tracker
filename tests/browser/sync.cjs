@@ -1,7 +1,7 @@
 const {chromium,webkit}=require('playwright');
 const assert=require('node:assert/strict'),http=require('node:http'),fs=require('node:fs'),path=require('node:path');
 const root=path.resolve(__dirname,'../..'),account={id:'two-device-account',email:'devices@example.test',displayName:'Two devices'};
-let revision=0,serial=0,conflicts=0,barrierRemaining=0,barrier=[],dropToken='',failures=new Map(),offlineA=false;
+let revision=0,serial=0,conflicts=0,barrierRemaining=0,barrier=[],dropToken='',failures=new Map(),offlineA=false,introducedDuplicate;
 const tokens=new Set(),errors=[],calls=new Map(),receipts=new Map();
 let items=[{id:'show',title:'Two Device Show',type:'Series',status:'Watching',platform:'Original service',episodeScheduleVerified:true,releasedEpisodes:{1:[1,2,3,4,5,6,7,8,9,10]},watchedEpisodes:{1:[1]},episodeCounts:{1:10},verifiedCompletedSeasons:1,totalSeasons:1,curSeason:1,curEp:1,watchedSeasons:0,seriesReleaseDate:'2020-01-01'}, {id:'film',title:'Deletion test',type:'Film',status:'Planned',filmReleaseDate:'2020-01-01',filmReleaseSource:'Manual'}];
 function patch(changes){
@@ -40,7 +40,9 @@ const server=http.createServer(async(req,res)=>{
     const requestKey=JSON.stringify({expectedRevision:body.expectedRevision,changes:body.changes});
     if(receipts.has(requestKey))return reply({ok:true,revision:receipts.get(requestKey),replayed:true});
     if(body.expectedRevision!==revision){conflicts++;return reply({code:'revision_conflict',error:'Conflict',items,revision},409);}
-    assert.ok(!('items' in body)&&Array.isArray(body.changes));patch(body.changes);receipts.set(requestKey,revision);
+    assert.ok(!('items' in body)&&Array.isArray(body.changes));
+    const duplicate=introducedDuplicate(items,body.changes);if(duplicate)return reply({code:'duplicate_title',error:'Already tracked',items,revision,duplicateId:duplicate.duplicateId},409);
+    patch(body.changes);receipts.set(requestKey,revision);
     if(dropToken===token){dropToken='';res.destroy();return;}
     return reply({ok:true,revision});
    }
@@ -57,6 +59,7 @@ const settled=page=>page.waitForFunction(()=>!localSaveInFlight&&!cloudSaveInFli
 const progress=(page,episodes)=>page.waitForFunction(episodes=>episodes.every(ep=>mediaItems.find(item=>item.id==='show')?.watchedEpisodes?.[1]?.includes(ep)),episodes,{timeout:25000});
 const mark=(page,episode)=>page.evaluate(ep=>toggleEpisodeWatched('show',1,ep),episode);
 (async()=>{
+ ({introducedDuplicate}=await import('../../supabase/functions/watchlog-pin/duplicate-titles.mjs'));
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const base=`http://127.0.0.1:${server.address().port}`;
  const browsers=await Promise.all([chromium.launch({headless:true}),webkit.launch({headless:true})]);
  try{
@@ -119,6 +122,15 @@ const mark=(page,episode)=>page.evaluate(ep=>toggleEpisodeWatched('show',1,ep),e
   await b.waitForFunction(()=>mediaItems.find(item=>item.id==='show').favorite===false,null,{timeout:5000});
   console.log('cross-device: returning to a suspended device checks changes immediately');
 
+  await Promise.all([a,b].map(page=>page.evaluate(()=>synchronizeCloudLibrary())));
+  barrierRemaining=2;
+  await Promise.all([a,b].map((page,index)=>page.evaluate(async index=>{
+   mediaItems.push({id:'duplicate-'+index,title:'Duplicate merge audit',type:'Series',status:'Watching',tvmazeShowId:'5000',imdbId:index?'tt2222222':'tt1111111',releaseYear:'2020',episodeScheduleVerified:true,releasedEpisodes:{1:[1,2,3,4]},airedEpisodeCounts:{1:4},episodeCounts:{1:4},watchedEpisodes:{1:[index+1]},curSeason:1,curEp:index+1,watchedSeasons:0,totalSeasons:1,verifiedCompletedSeasons:1,notes:index?'Second device note':'First device note',createdAt:index?'2026-10-24T00:00:00Z':'2026-10-23T00:00:00Z',updatedAt:new Date().toISOString(),metadataUpdatedAt:new Date().toISOString()});
+   await persistLibrary(mediaItems,{precleaned:true});render();
+  },index)));
+  for(const page of [a,b])await page.waitForFunction(()=>{const rows=mediaItems.filter(row=>row.tvmazeShowId==='5000');return rows.length===1&&rows[0].watchedEpisodes?.[1]?.includes(1)&&rows[0].watchedEpisodes?.[1]?.includes(2);},null,{timeout:25000});
+  const duplicates=items.filter(row=>row.tvmazeShowId==='5000');assert.equal(duplicates.length,1);assert.equal(duplicates[0].id,'duplicate-0');assert.match(duplicates[0].notes,/First device note/);assert.match(duplicates[0].notes,/Second device note/);
+  console.log('cross-device: simultaneous duplicate creates retain one title and merge both devices’ progress and notes');
   for(const page of [a,b]){await settled(page);assert.equal(await page.evaluate(async()=>(await loadCacheRecord()).dirty),false);}
   assert.deepEqual(errors,[]);console.log('Chromium ↔ WebKit: independent-device sync suite passed');
  }finally{await Promise.all(browsers.map(browser=>browser.close()));}

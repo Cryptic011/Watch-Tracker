@@ -2,6 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.112.4";
 import { getUKAvailability } from "./uk-availability.mjs";
 import { getTitleDetails } from "./title-details.mjs";
+import { introducedDuplicate, mayChangeTitleIdentity } from "./duplicate-titles.mjs";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -464,6 +465,15 @@ Deno.serve(async (req: Request) => {
       for(const change of changes){
         if(change.watched!==undefined&&(change.watched===null||Array.isArray(change.watched)||typeof change.watched!=="object"||Object.entries(change.watched).some(([season,delta]:[string,any])=>!/^[1-9][0-9]*$/.test(season)||!delta||!positiveArray(delta.add)||!positiveArray(delta.remove))))return json({error:"Invalid episode changes."},400);
         if(change.unset!==undefined&&(!Array.isArray(change.unset)||change.unset.some((key:any)=>typeof key!=="string"||key==="id")))return json({error:"Invalid removed fields."},400);
+      }
+      if(mayChangeTitleIdentity(changes)){
+        const current=await readLibrary(session.accountId);
+        // A stale request must still reach the receipt RPC: it may be a retry
+        // of a write that already committed and lost its HTTP acknowledgement.
+        if(Number(current.revision)===body.expectedRevision){
+          const duplicate=introducedDuplicate(current.items,changes);
+          if(duplicate)return json({error:`“${duplicate.title}” is already in your library.`,code:"duplicate_title",duplicateId:duplicate.duplicateId,...current},409);
+        }
       }
       const requestHash=await sha256(JSON.stringify({expectedRevision:body.expectedRevision,changes}));
       const {data:saved,error}=await db.rpc("watchlog_patch_library_once",{p_account:session.accountId,p_revision:body.expectedRevision,p_changes:changes,p_request_hash:requestHash});

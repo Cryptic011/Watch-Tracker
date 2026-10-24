@@ -1,3 +1,9 @@
+## 2026-10-24 — Prevent duplicate saved titles
+- Match a shared TVMaze or IMDb identity even when another provider ID is stale, while keeping distinct remakes and franchise entries separate.
+- Open the existing title from search or manual entry instead of saving a second copy.
+- Reject duplicate cloud additions and merge concurrent device additions without losing watched episodes, history, notes or lists.
+- Keep the original record during cleanup and preserve reminder preferences and available artwork.
+
 ## 2026-10-24 — Stabilise iPhone search scrolling
 - Dismiss the search keyboard when submitting, swiping vertically through results, opening a title, changing filters or leaving Search.
 - Keep the keyboard available while typing and during background result updates; preserve the query and normal result scrolling.

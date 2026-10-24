@@ -281,9 +281,9 @@
         await acknowledgeCloudSnapshot(snapshot,outgoing,result);
         return result;
       }catch(error){
-        if(error?.code!=="revision_conflict"||!Array.isArray(error.items)||!Number.isSafeInteger(Number(error.revision))||attempt===2)throw error;
+        if(!["revision_conflict","duplicate_title"].includes(error?.code)||!Array.isArray(error.items)||!Number.isSafeInteger(Number(error.revision))||attempt===2)throw error;
         detectedSyncConflictCount+=detectSyncConflicts(outgoing.baseItems,outgoing.items,error.items).length;
-        const merged=replayLocalChanges(outgoing.baseItems,outgoing.items,error.items);
+        const merged=deduplicateLibrary(replayLocalChanges(outgoing.baseItems,outgoing.items,error.items)).items;
         outgoing=createLibrarySnapshot(merged,{...outgoing,sequence:snapshot.sequence,baseItems:error.items,expectedRevision:Number(error.revision)});
       }
     }

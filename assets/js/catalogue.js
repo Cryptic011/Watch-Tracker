@@ -609,16 +609,13 @@
   function itemsAreDuplicate(a,b){
     if(!a?.title||!b?.title||mediaIdentityKind(a)!==mediaIdentityKind(b))return false;
     const aImdb=String(a.imdbId||"").trim().toLowerCase(),bImdb=String(b.imdbId||"").trim().toLowerCase();
-    // Canonical TVMaze identity takes precedence over conflicting legacy IMDb IDs.
+    if(aImdb&&bImdb&&aImdb===bImdb)return true;
     if(mediaIdentityKind(a)==="series"){
       const aMaze=String(a.tvmazeShowId||"").trim(),bMaze=String(b.tvmazeShowId||"").trim();
       if(aMaze&&bMaze&&aMaze===bMaze)return true;
+      if(aImdb&&bImdb||aMaze&&bMaze)return false;
     }
-    if(aImdb&&bImdb)return aImdb===bImdb;
-    if(mediaIdentityKind(a)==="series"){
-      const aMaze=String(a.tvmazeShowId||"").trim(),bMaze=String(b.tvmazeShowId||"").trim();
-      if(aMaze&&bMaze)return false;
-    }
+    if(aImdb&&bImdb)return false;
     if(normalizeTitle(a.title)!==normalizeTitle(b.title))return false;
     const aYear=identityReleaseYear(a),bYear=identityReleaseYear(b);
     if(aYear&&bYear&&aYear!==bYear)return false;
@@ -660,6 +657,10 @@
     const aTime=toMillis(a.updatedAt||a.date),bTime=toMillis(b.updatedAt||b.date),recent=aTime>=bTime?a:b;
     const primary=duplicateRecordQuality(a)>duplicateRecordQuality(b)?a:duplicateRecordQuality(b)>duplicateRecordQuality(a)?b:recent;
     const secondary=primary===a?b:a,filled=(...values)=>values.find(value=>value!==null&&value!==undefined&&String(value).trim()!=="")??"";
+    const aCreated=toMillis(a.createdAt),bCreated=toMillis(b.createdAt),keeper=aCreated&&bCreated?(aCreated<=bCreated?a:b):primary;
+    const metadata=toMillis(a.metadataUpdatedAt||a.serverScheduleUpdatedAt)>=toMillis(b.metadataUpdatedAt||b.serverScheduleUpdatedAt)?a:b;
+    const sharedMaze=mediaIdentityKind(a)==="series"&&a.tvmazeShowId&&String(a.tvmazeShowId)===String(b.tvmazeShowId);
+    const identity=sharedMaze&&metadata.episodeScheduleVerified===true?metadata:primary;
     const episodeCounts=mergeEpisodeCountMaps(a.episodeCounts,b.episodeCounts),airedEpisodeCounts=mergeEpisodeCountMaps(a.airedEpisodeCounts,b.airedEpisodeCounts);
     // A fresh but empty duplicate must not erase already verified episodes.
     const verifiedRecords=[a,b].filter(row=>row.episodeScheduleVerified===true);
@@ -675,8 +676,17 @@
     const upcoming=aUpcoming.rank>bUpcoming.rank?a:bUpcoming.rank>aUpcoming.rank?b:(aUpcoming.time<=bUpcoming.time?a:b);
     let merged={
       ...secondary,...primary,
-      id:String(primary.id||secondary.id||uuid()),title:filled(primary.title,secondary.title),type:primary.type||secondary.type||"Series",status,
-      imdbId:filled(primary.imdbId,secondary.imdbId),tvmazeShowId:filled(primary.tvmazeShowId,secondary.tvmazeShowId),releaseYear:filled(primary.releaseYear,secondary.releaseYear),
+      id:String(keeper.id||primary.id||secondary.id||uuid()),title:filled(primary.title,secondary.title),type:primary.type||secondary.type||"Series",status,
+      imdbId:filled(identity.imdbId,primary.imdbId,secondary.imdbId),tvmazeShowId:filled(primary.tvmazeShowId,secondary.tvmazeShowId),releaseYear:filled(primary.releaseYear,secondary.releaseYear),
+      notes:[...new Set([primary.notes,secondary.notes].flatMap(value=>String(value||"").split(/\n{2,}/).map(part=>part.trim())).filter(Boolean))].join("\n\n"),
+      favorite:a.favorite===true||b.favorite===true,archived:a.archived===true&&b.archived===true,
+      lists:[...new Set([...(Array.isArray(a.lists)?a.lists:[]),...(Array.isArray(b.lists)?b.lists:[])])],
+      hideFromWeeklyReleases:a.hideFromWeeklyReleases===true||b.hideFromWeeklyReleases===true,
+      seasonImages:{...(secondary.seasonImages||{}),...(primary.seasonImages||{})},
+      episodeImages:Object.fromEntries([...new Set([...Object.keys(secondary.episodeImages||{}),...Object.keys(primary.episodeImages||{})])].map(season=>[season,{...(secondary.episodeImages?.[season]||{}),...(primary.episodeImages?.[season]||{})}])),
+      recurringWeeklySchedule:metadata.recurringWeeklySchedule||primary.recurringWeeklySchedule||secondary.recurringWeeklySchedule||null,
+      metadataUpdatedAt:filled(metadata.metadataUpdatedAt,primary.metadataUpdatedAt,secondary.metadataUpdatedAt),
+      serverScheduleUpdatedAt:filled(metadata.serverScheduleUpdatedAt,primary.serverScheduleUpdatedAt,secondary.serverScheduleUpdatedAt),
       platform:filled(recent.platform,primary.platform,secondary.platform),
       totalSeasons:mediaIdentityKind(primary)==="film"?null:Math.max(Number(a.totalSeasons||0),Number(b.totalSeasons||0))||null,
       watchedSeasons:mediaIdentityKind(primary)==="film"?null:Math.max(Number(a.watchedSeasons||0),Number(b.watchedSeasons||0)),
@@ -687,7 +697,7 @@
       episodeHistory:history,
       createdAt:[a.createdAt,b.createdAt].filter(Boolean).sort((x,y)=>toMillis(x)-toMillis(y))[0]||primary.createdAt||nowISO(),
       updatedAt:aTime>=bTime?(a.updatedAt||a.date||nowISO()):(b.updatedAt||b.date||nowISO()),
-      date:watchedSortTime(a)>=watchedSortTime(b)?(a.date||b.date):(b.date||a.date),
+      date:(statusRank[a.status]||0)>(statusRank[b.status]||0)?(a.date||b.date):(statusRank[b.status]||0)>(statusRank[a.status]||0)?(b.date||a.date):watchedSortTime(a)>=watchedSortTime(b)?(a.date||b.date):(b.date||a.date),
       latestEpisodeDate:filled(recent.latestEpisodeDate,primary.latestEpisodeDate,secondary.latestEpisodeDate),seriesReleaseDate:filled(primary.seriesReleaseDate,secondary.seriesReleaseDate),
       nextEpisodeNum:upcoming.nextEpisodeNum??null,nextEpisodeTitle:upcoming.nextEpisodeTitle||"",nextEpisodeDate:upcoming.nextEpisodeDate||"",
       nextSeasonNum:upcoming.nextSeasonNum||"",nextSeasonDate:upcoming.nextSeasonDate||"",
