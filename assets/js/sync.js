@@ -363,8 +363,10 @@
   function persistLibrary(items,{background=false,precleaned=false}={}){
     const source=Array.isArray(items)?items:[];
     const migration=migratePlannedStatuses(source);
+    // Fast-path writes must still enforce unique title identity. Otherwise a
+    // search add, backup restore or second device can reintroduce duplicates.
     const cleanup=precleaned
-      ? {items:migration.rows,removedCount:0,repairedCount:0,titles:[]}
+      ? {...deduplicateLibrary(migration.rows),repairedCount:0}
       : cleanLibraryRecords(migration.rows);
     if(items===mediaItems)mediaItems=cleanup.items;
     items=cleanup.items;
@@ -789,9 +791,11 @@
       if(file.size>10*1024*1024)throw new Error("Backup file is larger than 10 MB.");
       const backup=JSON.parse(await file.text());
       if(backup?.format!=="watchlog-library-backup"||backup.version!==1||!Array.isArray(backup.items)||backup.items.some(item=>!item||typeof item.title!=="string"||!item.title.trim()))throw new Error("This is not a supported Watched Logger backup.");
-      const before=mediaItems.length;mediaItems=mergeLibraries(mediaItems,backup.items);render();
+      const before=mediaItems.length;
+      mediaItems=cleanLibraryRecords(mergeLibraries(mediaItems,backup.items)).items;
+      render();
       await persistLibrary(mediaItems,{background:true,precleaned:true});
-      if(status)status.textContent=`Restored backup by merging ${backup.items.length} item(s) with your existing ${before}; saved on this device and queued to sync.`;
+      if(status)status.textContent=`Restored backup and checked duplicates from ${backup.items.length} imported item(s); ${mediaItems.length} unique titles are saved on this device and queued to sync (previously ${before}).`;
     }catch(error){if(status)status.textContent=error.message||"Could not restore this backup.";}
   });
 
