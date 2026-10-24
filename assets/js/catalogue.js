@@ -455,7 +455,8 @@
       onProgress:preview=>{
         if(pending){pending.resolvedShowId=String(preview.resolvedShowId||"");pending.resolvedImdbId=String(preview.imdbId||"");}
         if(!canApply())return;
-        applySeasonDataResult(preview,{preserveProgress:true,remember:false});
+        if(preview.episodeScheduleAvailable===true||!preserveProgress)
+          applySeasonDataResult(preview,{preserveProgress:true,remember:false});
       }
     });
     pending={type:"Series",title:normalizeTitle(title),imdbId:String(imdbId||""),showId:String(showId||""),resolvedImdbId:"",resolvedShowId:"",year:String(year||""),platform:normalizeTitle(platform),promise};
@@ -463,7 +464,10 @@
     try{
       const result=await promise;
       pending.resolvedShowId=String(result.resolvedShowId||pending.resolvedShowId||"");pending.resolvedImdbId=String(result.imdbId||pending.resolvedImdbId||"");
-      if(canApply())applySeasonDataResult(result,{preserveProgress:true,remember:true});
+      // An outage or mismatched provider must not reset the editor's existing
+      // season selection and saved watch progress.
+      if(canApply()&&(result.episodeScheduleAvailable===true||!preserveProgress))
+        applySeasonDataResult(result,{preserveProgress:true,remember:true});
       return result;
     }finally{
       if(editorVerificationInFlight===pending)editorVerificationInFlight=null;
