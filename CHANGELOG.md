@@ -11,6 +11,12 @@
 - Accept supported official Netflix/Paramount sources with verified attribution and load Anime details as series metadata.
 - Gate publishing on new unit, PostgreSQL and Chromium/WebKit regressions, including two tabs sharing device storage.
 
+## 2026-10-24 — Use TVMaze for whole-series details
+- Load series overviews directly from the matching TVMaze show record across saved titles and search.
+- Include the original premiere, genres, language, runtime, status and clearly labelled TVMaze rating; preserve synopsis paragraphs.
+- Match by saved TVMaze/IMDb identity, or a unique title/year match, and retain fallback sources when TVMaze is unavailable.
+- Invalidate older synopsis caches so the previous broadcaster promotions cannot persist.
+
 ## 2026-10-24 — Replace cast-return promos with whole-series overviews
 - Reject cast-return announcements even when they contain no season or episode number.
 - Read dedicated programme About text before SEO metadata and use the verified distributor's full synopsis when a CBS page only promotes the current run.

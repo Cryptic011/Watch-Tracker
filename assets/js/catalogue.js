@@ -174,23 +174,22 @@
   async function fetchOfficialTitleDetails(item){
     const format=item.type||item.format;
     const payload={title:item.title,type:format==="Anime"?"Series":format,imdbId:item.imdbId||(item.source==="imdb"?item.externalId:""),tvmazeShowId:item.tvmazeShowId||item.tvmazeId,year:item.releaseYear||item.year,source:item.source,externalId:item.externalId,platform:item.platform||"",officialUrl:item.officialUrl||item.officialSite||""};
-    const key="whole-title-v2:"+JSON.stringify(payload);
+    const key="whole-title-v3:"+JSON.stringify(payload);
     return cachedMetadataRequest(titleDetailsCache,key,async()=>{
       try{
         const response=await pinApi("catalog_details",payload);
         // Require the current whole-title policy, so an old gateway or cache
         // cannot reintroduce a season promo into the series overview.
         const details=response.details||{};
-        const permitted=source=>["IMDb","Apple TV","CBS","Paramount+","NBC","ABC","FOX","FX","HBO","Max","Disney+","Disney","Hulu","Netflix","Prime Video","Peacock","STARZ","Showtime","AMC","AMC+","The CW","PBS","BBC","ITV","ITVX","Channel 4","Sky","NOW","Crunchyroll","A&E","Freeform","Adult Swim","USA Network","BET","Warner Bros.","Universal","Paramount Pictures","Sony Pictures","20th Century Studios","Marvel","Lionsgate","Focus Features","Discovery+","TNT","TBS","Paramount Global Content","Paramount Press Express","Netflix Media Center"].includes(String(source||""));
+        const permitted=source=>["TVMaze","IMDb","Apple TV","CBS","Paramount+","NBC","ABC","FOX","FX","HBO","Max","Disney+","Disney","Hulu","Netflix","Prime Video","Peacock","STARZ","Showtime","AMC","AMC+","The CW","PBS","BBC","ITV","ITVX","Channel 4","Sky","NOW","Crunchyroll","A&E","Freeform","Adult Swim","USA Network","BET","Warner Bros.","Universal","Paramount Pictures","Sony Pictures","20th Century Studios","Marvel","Lionsgate","Focus Features","Discovery+","TNT","TBS","Paramount Global Content","Paramount Press Express","Netflix Media Center"].includes(String(source||""));
         const rejected=["source","descriptionSource","ratingSource"].some(field=>details[field]&&!permitted(details[field]));
         const scope=payload.type==="Series"?"series":"film";
-        const currentSynopsis=details.synopsisVersion===2&&details.synopsisScope===scope;
+        const currentSynopsis=details.synopsisVersion===3&&details.synopsisScope===scope;
         if(!rejected&&details.description&&currentSynopsis)return details;
         titleDetailsCache.delete(key);
         if(!rejected&&details.sources?.length)return {...details,description:"",descriptionSource:"",state:"partial"};
       }catch(_) {titleDetailsCache.delete(key);}
-      // If the verified-details service is offline, do not silently replace
-      // IMDb/official text with TVMaze's unverified editorial summary.
+      // Leave unavailable lookups retryable rather than caching empty details.
       return {state:"unavailable",sources:[],imdbUrl:/^tt\d+$/.test(payload.imdbId||"")?`https://www.imdb.com/title/${payload.imdbId}/`:""};
     });
   }
@@ -198,7 +197,7 @@
     const sources=[...(details.sources||[])];
     if(details.imdbUrl&&!sources.some(row=>row.url===details.imdbUrl))sources.push({name:"View on IMDb",url:details.imdbUrl});
     return sources.flatMap(row=>{
-      try{const url=new URL(row.url),host=url.hostname.replace(/^www\./,"");if(url.protocol!=="https:"||url.username||url.password||url.port||!['imdb.com','itunes.apple.com','tv.apple.com','cbs.com','paramountplus.com','nbc.com','abc.com','fox.com','fxnetworks.com','hbo.com','max.com','disneyplus.com','disney.com','hulu.com','netflix.com','primevideo.com','peacocktv.com','starz.com','showtime.com','amc.com','amcplus.com','thecw.com','pbs.org','bbc.co.uk','bbc.com','itv.com','itvx.com','channel4.com','sky.com','nowtv.com','crunchyroll.com','aetv.com','freeform.com','adultswim.com','usanetwork.com','bet.com','warnerbros.com','universalpictures.com','paramountpictures.com','sonypictures.com','20thcenturystudios.com','marvel.com','lionsgate.com','focusfeatures.com','discoveryplus.com','tntdrama.com','tbs.com','paramountglobalcontent.com','paramountpressexpress.com','media.netflix.com'].includes(host))return [];return [`<a href="${esc(url.href)}" target="_blank" rel="noopener noreferrer">${esc(row.name)}</a>`];}catch{return [];}
+      try{const url=new URL(row.url),host=url.hostname.replace(/^www\./,"");if(url.protocol!=="https:"||url.username||url.password||url.port||!['tvmaze.com','imdb.com','itunes.apple.com','tv.apple.com','cbs.com','paramountplus.com','nbc.com','abc.com','fox.com','fxnetworks.com','hbo.com','max.com','disneyplus.com','disney.com','hulu.com','netflix.com','primevideo.com','peacocktv.com','starz.com','showtime.com','amc.com','amcplus.com','thecw.com','pbs.org','bbc.co.uk','bbc.com','itv.com','itvx.com','channel4.com','sky.com','nowtv.com','crunchyroll.com','aetv.com','freeform.com','adultswim.com','usanetwork.com','bet.com','warnerbros.com','universalpictures.com','paramountpictures.com','sonypictures.com','20thcenturystudios.com','marvel.com','lionsgate.com','focusfeatures.com','discoveryplus.com','tntdrama.com','tbs.com','paramountglobalcontent.com','paramountpressexpress.com','media.netflix.com'].includes(host))return [];return [`<a href="${esc(url.href)}" target="_blank" rel="noopener noreferrer">${esc(row.name)}</a>`];}catch{return [];}
     }).join(" · ");
   }
 

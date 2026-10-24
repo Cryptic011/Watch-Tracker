@@ -18,3 +18,5 @@ html:has(#discovery-view:not(.hidden)),body:has(#discovery-view:not(.hidden)){ov
 @media(max-width:359px){.discovery-card{grid-template-columns:64px minmax(0,1fr);gap:10px}.discovery-poster{width:64px}.bottom-tabs .tab-btn{font-size:.65rem}.tab-btn.active .tab-icon{padding:4px 12px}}
 
 .discovery-section{margin:0 0 22px}.discovery-section>h3{font-size:1rem;margin:0 2px 12px}.discovery-global-button{display:block;width:100%;min-height:44px;margin-top:16px}
+
+.discovery-full-description{white-space:pre-line}

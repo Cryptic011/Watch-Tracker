@@ -126,3 +126,6 @@ html:has(.gallery-detail[open]),body:has(>.gallery-detail[open]){overflow:hidden
 @media(min-width:700px){.gallery-home{grid-template-columns:1fr 1fr}.gallery-category{min-height:230px}.gallery-grid{grid-template-columns:repeat(5,minmax(0,1fr));gap:28px 16px}}
 @media(max-width:360px){.gallery-season-list{padding-inline:12px}.gallery-season>summary{padding:12px;gap:10px}.gallery-season-episodes{padding:0 12px 8px}.gallery-episode-row{grid-template-columns:76px minmax(0,1fr) 44px;gap:10px}.gallery-season-label strong{font-size:.95rem}}
 @media(max-width:350px){.gallery-category{min-height:175px}.gallery-tile strong{font-size:.75rem}.gallery-tile small{font-size:.68rem}}
+
+/* Preserve the paragraph breaks in full show summaries. */
+.gallery-info-panel [data-gallery-details]>p{white-space:pre-line}

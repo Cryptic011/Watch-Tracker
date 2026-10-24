@@ -50,7 +50,7 @@ const server=http.createServer((req,res)=>{
     ]};}
     if(body.action==='catalog_details'){
      const series=body.type==='Series',id=series?'tt1234568':'tt1234567',url='https://www.imdb.com/title/'+id+'/';
-     data={ok:true,details:{state:'ready',synopsisVersion:2,synopsisScope:series?'series':'film',description:series?'An official series description & a second detail.':'A detective uncovers a mystery in a quiet coastal town. '.repeat(8),year:'2020',genres:['Drama','Action'],runtime:series?42:120,rating:8.4,ratingSource:'IMDb',source:'IMDb',sources:[{name:'IMDb',url}],imdbUrl:url}};
+     data={ok:true,details:{state:'ready',synopsisVersion:3,synopsisScope:series?'series':'film',description:series?'An official series description & a second detail.':'A detective uncovers a mystery in a quiet coastal town. '.repeat(8),year:'2020',genres:['Drama','Action'],runtime:series?42:120,rating:8.4,ratingSource:series?'TVMaze':'IMDb',source:series?'TVMaze':'IMDb',sources:[{name:series?'TVMaze':'IMDb',url:series?'https://www.tvmaze.com/shows/12':url}],imdbUrl:url}};
     }
     if(body.action==='save'){
      if(failSave)return route.fulfill({status:503,headers,json:{error:'Offline'}});
@@ -281,8 +281,9 @@ const server=http.createServer((req,res)=>{
   await page.waitForFunction(()=>document.querySelector('[data-gallery-details]').textContent.includes('official series description'));
   assert.match(await page.locator('[data-gallery-details]').textContent(),/Drama · Action/);
   assert.match(await page.locator('[data-gallery-details]').textContent(),/8\.4\/10/);
-  assert.equal(await page.locator('[data-gallery-details] a[href="https://www.imdb.com/title/tt1234568/"]').count(),1,'series details link to their source');
-  assert.match(await page.locator('[data-gallery-details]').textContent(),/IMDb rating/);
+  assert.equal(await page.locator('[data-gallery-details] a[href="https://www.tvmaze.com/shows/12"]').count(),1,'series details link to their TVMaze source');
+  assert.equal(await page.locator('[data-gallery-details] a[href="https://www.imdb.com/title/tt1234568/"]').count(),1,'series details retain the optional IMDb link');
+  assert.match(await page.locator('[data-gallery-details]').textContent(),/TVMaze rating/);
   if(process.env.BROWSER_SCREENSHOT_DIR){
    fs.mkdirSync(process.env.BROWSER_SCREENSHOT_DIR,{recursive:true});
    await page.screenshot({path:path.join(process.env.BROWSER_SCREENSHOT_DIR,engine.name()+'-details.png')});
