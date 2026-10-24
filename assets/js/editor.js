@@ -66,32 +66,59 @@
     return (Array.isArray(items)?items:[]).slice(0,limit);
   }
 
+  function suggestionsShareIdentity(a,b){
+    if(!a||!b||a.format!==b.format)return false;
+    const imdbA=String(a.imdbId||""),imdbB=String(b.imdbId||""),
+      mazeA=String(a.tvmazeId||""),mazeB=String(b.tvmazeId||"");
+    // A canonical provider ID establishes identity even if another source
+    // supplied outdated title/year metadata.
+    if(mazeA&&mazeB&&mazeA===mazeB)return true;
+    if(imdbA&&imdbB&&imdbA===imdbB)return true;
+    if(mazeA&&mazeB&&mazeA!==mazeB)return false;
+    if(imdbA&&imdbB&&imdbA!==imdbB)return false;
+    if(normalizeTitle(a.title)!==normalizeTitle(b.title))return false;
+    const yearA=String(a.year||""),yearB=String(b.year||"");
+    // Do not merge unrelated remakes with the same name, or invent an
+    // authoritative ID when one of the catalogues omitted the year.
+    return Boolean(yearA&&yearB&&yearA===yearB)||(!yearA&&!yearB);
+  }
+
   function dedupeAndRankSuggestions(results,query){
-    const byKey=new Map(),titleIndex=new Map();
+    const rows=[],byImdb=new Map(),byMaze=new Map(),byTitle=new Map();
+    const addIndex=(map,key,index)=>{
+      if(!key)return;
+      const list=map.get(key)||new Set();list.add(index);map.set(key,list);
+    };
+    const indexKeys=(row,index)=>{
+      const format=String(row.format||""),
+        imdb=String(row.imdbId||""),maze=String(row.tvmazeId||""),
+        title=normalizeTitle(row.title),year=String(row.year||"");
+      addIndex(byImdb,imdb?`${format}:${imdb}`:"",index);
+      addIndex(byMaze,maze?`${format}:${maze}`:"",index);
+      addIndex(byTitle,title?`${format}:${title}:${year}`:"",index);
+    };
     for(const item of results.flat()){
-      if(!item?.title)continue;
+      if(!item?.title||!["Film","Series"].includes(item.format))continue;
       const itemImdbId=String(item.imdbId||(item.source==="imdb"?item.externalId:"")||"");
-      const titleKey=`${normalizeTitle(item.title)}|${item.format}|${item.year||""}`;
-      const imdbKey=itemImdbId?`imdb:${itemImdbId}|${item.format}`:"";
-      let key=imdbKey||titleKey;
-      const titleMapped=titleIndex.get(titleKey);
-      if(!byKey.has(key)&&titleMapped){
-        const prior=byKey.get(titleMapped),priorImdbId=String(prior?.imdbId||(prior?.source==="imdb"?prior?.externalId:"")||"");
-        if(!itemImdbId||!priorImdbId||itemImdbId===priorImdbId)key=titleMapped;
-      }
-      const scored={...item,imdbId:itemImdbId||item.imdbId||"",tvmazeId:item.tvmazeId||(item.source==="tvmaze"?item.externalId:""),score:suggestionScore(item,query),sources:[item.source]};
-      const existing=byKey.get(key);
-      if(!existing){byKey.set(key,scored);if(!titleIndex.has(titleKey))titleIndex.set(titleKey,key);continue;}
-      const sources=Array.from(new Set([...(existing.sources||[existing.source]),item.source]));
+      const scored={...item,imdbId:itemImdbId,tvmazeId:item.tvmazeId||(item.source==="tvmaze"?item.externalId:""),score:suggestionScore(item,query),sources:[item.source]};
+      const format=String(scored.format||""),name=normalizeTitle(scored.title),year=String(scored.year||"");
+      const candidates=new Set();
+      for(const set of [
+        byImdb.get(itemImdbId?`${format}:${itemImdbId}`:""),
+        byMaze.get(scored.tvmazeId?`${format}:${scored.tvmazeId}`:""),
+        byTitle.get(`${format}:${name}:${year}`)
+      ])for(const index of set||[])candidates.add(index);
+      const index=[...candidates].find(number=>suggestionsShareIdentity(rows[number],scored));
+      if(index===undefined){const number=rows.length;rows.push(scored);indexKeys(scored,number);continue;}
+      const existing=rows[index],sources=Array.from(new Set([...(existing.sources||[existing.source]),item.source]));
       const preferNew=(item.format==="Film"&&item.source==="imdb"&&existing.source!=="imdb")||
-                      (item.format==="Series"&&item.source==="tvmaze"&&existing.source!=="tvmaze")||
-                      scored.score>existing.score;
+        (item.format==="Series"&&item.source==="tvmaze"&&existing.source!=="tvmaze")||scored.score>existing.score;
       const base=preferNew?scored:existing,other=preferNew?existing:scored;
-      byKey.set(key,{
-        ...base,
-        sources,
-        imdbId:base.imdbId||other.imdbId||"",
+      const merged={
+        ...base,sources,
+        imdbId:(base.tvmazeId&&base.imdbId?base.imdbId:"")||(other.tvmazeId&&other.imdbId?other.imdbId:"")||base.imdbId||other.imdbId||"",
         tvmazeId:base.tvmazeId||other.tvmazeId||"",
+        year:base.year||other.year||"",
         posterUrl:base.posterUrl||other.posterUrl||"",
         description:base.description||other.description||"",
         storeUrl:base.storeUrl||other.storeUrl,
@@ -100,11 +127,10 @@
         platform:base.platform||other.platform||"",
         status:base.status||other.status||"",
         updated:Math.max(Number(base.updated||0),Number(other.updated||0))
-      });
+      };
+      rows[index]=merged;indexKeys(merged,index);
     }
-    const ranked=Array.from(byKey.values())
-      .sort((a,b)=>b.score-a.score||Number(b.year||0)-Number(a.year||0)||a.title.localeCompare(b.title));
-    return balancedSuggestions(ranked,60);
+    return balancedSuggestions(rows.sort((a,b)=>b.score-a.score||Number(b.year||0)-Number(a.year||0)||a.title.localeCompare(b.title)),60);
   }
 
   let activeSuggestions=[];
