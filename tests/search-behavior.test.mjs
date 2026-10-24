@@ -190,6 +190,8 @@ test("Global search merges cross-provider copies only when stable identity agree
   assert.equal(rows.length,2);
   assert.ok(rows.some(row=>row.imdbId==="tt9288030"&&row.tvmazeId==="600"));
   assert.ok(rows.some(row=>row.imdbId==="tt9288031"&&row.tvmazeId==="601"));
+  assert.equal(rows.find(row=>row.imdbId==="tt9288030").source,"imdb","IMDb wins source attribution for series");
+  assert.equal(rows.find(row=>row.imdbId==="tt9288030").description,"","old TVMaze plot text is never inherited");
 });
 
 test("Global catalogue does not offer individual TV episodes as films",async()=>{

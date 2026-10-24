@@ -101,7 +101,9 @@
       // classification. These must never become standalone library titles.
       if(item.source==="imdb"&&/\b(?:tv\s*episode|television\s*episode|podcast\s*episode)\b/i.test(String(item.detail||"")))continue;
       const itemImdbId=String(item.imdbId||(item.source==="imdb"?item.externalId:"")||"");
-      const scored={...item,imdbId:itemImdbId,tvmazeId:item.tvmazeId||(item.source==="tvmaze"?item.externalId:""),score:suggestionScore(item,query),sources:[item.source]};
+      // TVMaze descriptions are not editorial title sources, even when a
+      // stale gateway cache supplies one. Keep its show ID for episode data.
+      const scored={...item,description:item.source==="tvmaze"?"":(item.description||""),imdbId:itemImdbId,tvmazeId:item.tvmazeId||(item.source==="tvmaze"?item.externalId:""),score:suggestionScore(item,query),sources:[item.source]};
       const format=String(scored.format||""),name=normalizeTitle(scored.title),year=String(scored.year||"");
       const candidates=new Set();
       for(const set of [
