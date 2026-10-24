@@ -573,7 +573,7 @@
           nextSeasonNum:upcoming?.number??(scheduleVerified?"":current.nextSeasonNum),
           nextSeasonDate:upcoming?(result?.nextEpisode&&Number(result.nextEpisode.season)===Number(upcoming.number)?episodeReleaseTimestamp(result.nextEpisode):(upcoming.premiereDate||"")):(scheduleVerified?"":(current.nextSeasonDate||"")),
           verifiedCompletedSeasons:scheduleVerified&&Number.isFinite(Number(result?.completedSeasons))?Number(result.completedSeasons):current.verifiedCompletedSeasons,
-          ...(Object.prototype.hasOwnProperty.call(current,"watchedEpisodes")?{watchedEpisodes:normalizeWatchedEpisodeMap(current.watchedEpisodes,releasedEpisodes)}:{}),
+          ...(Object.prototype.hasOwnProperty.call(current,"watchedEpisodes")?{watchedEpisodes:scheduleVerified?normalizeWatchedEpisodeMap(current.watchedEpisodes,releasedEpisodes):current.watchedEpisodes}:{}),
           metadataUpdatedAt:scheduleVerified?nowISO():(current.metadataUpdatedAt||"")
         };
       }
