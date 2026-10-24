@@ -24,20 +24,25 @@ function memoryDB(initial){
     running=true;
     setImmediate(()=>{
       const tx=queue.shift();
+      tx.records=new Map([...records].map(([key,value])=>[key,copy(value)]));
+      if(tx.mode==='readwrite'&&db.failNextWrite){
+        db.failNextWrite=false;tx.error=Error('Interrupted device transaction');tx.onabort?.();running=false;run();return;
+      }
       while(tx.operations.length)tx.operations.shift()();
+      if(tx.mode==='readwrite'){records.clear();for(const [key,value] of tx.records)records.set(key,value);}
       tx.oncomplete?.();running=false;run();
     });
   };
-  return{
-    records,
-    transaction(){
-      const tx={operations:[],objectStore:()=>({
-        get(key){const request={};tx.operations.push(()=>{request.result=records.has(key)?copy(records.get(key)):undefined;request.onsuccess?.();});return request;},
-        put(value){const saved=copy(value);tx.operations.push(()=>records.set(saved.key,saved));},
+  const db={
+    records,failNextWrite:false,
+    transaction(_store,mode){
+      const tx={mode,operations:[],objectStore:()=>({
+        get(key){const request={};tx.operations.push(()=>{request.result=tx.records.has(key)?copy(tx.records.get(key)):undefined;request.onsuccess?.();});return request;},
+        put(value){const saved=copy(value);tx.operations.push(()=>tx.records.set(saved.key,saved));},
       })};
       queue.push(tx);run();return tx;
     },
-  };
+  };return db;
 }
 
 const persistenceFunctions=["toMillis","canonicalRecordJSON","sameSyncValue","mergeEpisodeSetChanges","mergeEpisodeHistory","mergeRecordChanges","detectSyncConflicts","activePersistenceContext","setCloudBaseline","saveCache","cachePut","cacheGet","cloneLibrarySnapshot","createLibrarySnapshot","replayLocalChanges","acknowledgeCloudSnapshot","acknowledgeCachedSnapshot","libraryChangeSet","uploadCloudLibrary","queueLocalLibrarySave","queueCloudLibrarySave","persistLibrary","mergePendingCache","localSyncPending"];
@@ -46,7 +51,7 @@ function harness(extra={}){
   const context=vm.createContext({
     console:{warn(){},error(){}},structuredClone,setTimeout,clearTimeout,AbortController,window:{},
     currentUser:{id:"account"},cloudSessionToken:"token",persistenceGeneration:1,
-    localSaveSequence:0,cloudBaseItems:[],cloudRevision:0,mediaItems:[],
+    localSaveSequence:0,LOCAL_WRITER_ID:'test-tab',cacheDB:null,cloudBaseItems:[],cloudRevision:0,mediaItems:[],
     latestLocalSnapshot:null,queuedLocalSnapshot:null,queuedCloudSnapshot:null,
     localSaveInFlight:null,cloudSaveInFlight:null,lastCloudAccountId:"",lastLocalAccountId:"",
     lastCloudLibraryJSON:"",lastLocalLibraryJSON:"",CLOUD_SAVE_COALESCE_MS:0,
@@ -279,4 +284,131 @@ test('A failed device write cannot upload an older cached copy and is retried be
  assert.equal(await app.synchronizeCloudLibrary(),false);assert.equal(writes.length,0);assert.equal(db.records.get('library').items[0].notes,'old');
  app.queueLocalLibrarySave=save;assert.equal(await app.synchronizeCloudLibrary(),true);
  assert.equal(writes.length,1);assert.equal(writes[0].changes[0].set.notes,'new');assert.equal(db.records.get('library').items[0].notes,'new');assert.equal(db.records.get('library').dirty,false);
+});
+
+test('A tab with a larger private sequence uploads the other tab\'s durable pending edit',async()=>{
+ const base=[{id:'s',title:'Show',notes:'old'}],edited=[{...base[0],notes:'saved in tab A'}];
+ const db=memoryDB({library:{key:'library',userId:'account',items:edited,json:JSON.stringify(edited),cloudItems:base,cloudRevision:0,dirty:true,localSequence:1,localWriter:'A',localRevision:11}});
+ const writes=[];const {app}=autoSyncHarness({cacheDB:db,mediaItems:base,cloudBaseItems:base,localSaveSequence:10,lastLocalLibraryJSON:JSON.stringify(base),lastLocalAccountId:'account',lastCloudLibraryJSON:JSON.stringify(base),lastCloudAccountId:'account',pinApi:async(_action,_payload,_token,body)=>{writes.push(JSON.parse(body));return {ok:true,revision:1};}});
+ app.latestLocalSnapshot=app.createLibrarySnapshot(base,{sequence:10});app.markPending(true);
+ await app.retryPendingCloudSave();
+ assert.equal(writes.length,1);assert.equal(writes[0].changes[0].set.notes,'saved in tab A');
+ assert.equal(db.records.get('library').items[0].notes,'saved in tab A');assert.equal(db.records.get('library').dirty,false);assert.equal(app.hasPending(),false);
+});
+
+test('Two tabs merge durable field edits atomically and a later unrelated edit cannot undo the other tab',async()=>{
+ const base=[{id:'s',title:'Show',notes:'old',favorite:false,platform:'Old service'}],db=memoryDB({library:{key:'library',userId:'account',items:base,cloudItems:base,cloudRevision:0,dirty:false}});
+ const a=harness({cacheDB:db,cloudBaseItems:base,mediaItems:copy(base),LOCAL_WRITER_ID:'A',localSaveSequence:20});
+ const b=harness({cacheDB:db,cloudBaseItems:base,mediaItems:copy(base),LOCAL_WRITER_ID:'B'});
+ a.mediaItems[0].notes='A note';b.mediaItems[0].favorite=true;
+ await Promise.all([a.queueLocalLibrarySave(a.createLibrarySnapshot(a.mediaItems)),b.queueLocalLibrarySave(b.createLibrarySnapshot(b.mediaItems))]);
+ assert.equal(db.records.get('library').items[0].notes,'A note');assert.equal(db.records.get('library').items[0].favorite,true);
+ assert.equal(db.records.get('library').localRevision,2);
+ a.mediaItems[0].platform='A service';await a.queueLocalLibrarySave(a.createLibrarySnapshot(a.mediaItems));
+ b.mediaItems[0].favorite=false;await b.queueLocalLibrarySave(b.createLibrarySnapshot(b.mediaItems));
+ a.mediaItems[0].notes='A second note';await a.queueLocalLibrarySave(a.createLibrarySnapshot(a.mediaItems));
+ const saved=db.records.get('library');assert.equal(saved.items[0].notes,'A second note');assert.equal(saved.items[0].platform,'A service');assert.equal(saved.items[0].favorite,false);
+ assert.equal(saved.localRevision,5);assert.equal(saved.dirty,true);
+});
+
+test('Coalescing three saves behind a blocked device write retains changes from every queued save',async()=>{
+ const base=[{id:'s',title:'Show',notes:'old',favorite:false,platform:'old'}],db=memoryDB({library:{key:'library',userId:'account',items:base,cloudItems:base,cloudRevision:0,dirty:false}});
+ const c=harness({cacheDB:db,mediaItems:copy(base),cloudBaseItems:base});let release,calls=0;
+ const blocked=new Promise(resolve=>release=resolve),save=c.saveCache;
+ c.saveCache=async(...args)=>{if(++calls===1)await blocked;return save(...args);};
+ c.mediaItems[0].notes='first saved change';const first=c.queueLocalLibrarySave(c.createLibrarySnapshot(c.mediaItems));
+ c.mediaItems[0].favorite=true;c.queueLocalLibrarySave(c.createLibrarySnapshot(c.mediaItems));
+ c.mediaItems[0].platform='third saved change';c.queueLocalLibrarySave(c.createLibrarySnapshot(c.mediaItems));
+ release();await first;
+ assert.equal(calls,2,'the middle write is coalesced');
+ assert.deepEqual(db.records.get('library').items,[{...base[0],notes:'first saved change',favorite:true,platform:'third saved change'}]);
+});
+
+test('A rebased queued save does not turn accepted remote fields into new local edits',async()=>{
+ const base=[{id:'s',title:'Show',notes:'old',favorite:false,platform:'old'}],first=[{...base[0],notes:'local note'}],accepted=[{...first[0],platform:'accepted remote platform'}];
+ const db=memoryDB({library:{key:'library',userId:'account',items:first,cloudItems:base,cloudRevision:0,dirty:true}}),c=harness({cacheDB:db,mediaItems:first,cloudBaseItems:base});
+ const sent=c.createLibrarySnapshot(first);c.latestLocalSnapshot=sent;
+ const waiting=c.createLibrarySnapshot([{...first[0],favorite:true}]);c.latestLocalSnapshot=waiting;c.queuedLocalSnapshot=waiting;c.mediaItems=copy(waiting.items);
+ await c.acknowledgeCloudSnapshot(sent,{...sent,items:accepted,json:JSON.stringify(accepted)},{revision:1});
+ const other=harness({cacheDB:db,cloudBaseItems:accepted,cloudRevision:1,LOCAL_WRITER_ID:'other'});
+ await other.saveCache([{...accepted[0],platform:'newer shared platform'}],'',{dirty:true,baseItems:accepted,baseRevision:1,localBaseItems:accepted});
+ await c.queueLocalLibrarySave(waiting);
+ assert.equal(db.records.get('library').items[0].platform,'newer shared platform');assert.equal(db.records.get('library').items[0].favorite,true);
+});
+
+test('Acknowledgement preserves another writer with a smaller counter and queues its edit',async()=>{
+ const base=[{id:'s',title:'Show',notes:'old'}],edited=[{...base[0],notes:'other tab edit'}];
+ const db=memoryDB({library:{key:'library',userId:'account',items:edited,cloudItems:base,cloudRevision:0,dirty:true,localSequence:1,localWriter:'A'}});
+ const b=harness({cacheDB:db,cloudBaseItems:base,mediaItems:base,localSaveSequence:10,LOCAL_WRITER_ID:'B'}),sent=b.createLibrarySnapshot(base,{sequence:10});
+ b.latestLocalSnapshot=sent;await b.acknowledgeCloudSnapshot(sent,sent,{revision:1});
+ assert.equal(db.records.get('library').items[0].notes,'other tab edit');assert.equal(db.records.get('library').dirty,true);
+ assert.equal(b.mediaItems[0].notes,'other tab edit');assert.equal(b.queuedCloudSnapshot.items[0].notes,'other tab edit');assert.equal(b.hasPending(),true);
+});
+
+test('A clean cloud read cannot replace another tab\'s dirty cache',async()=>{
+ const base=[{id:'s',title:'Show',notes:'old',platform:'old'}],edited=[{...base[0],notes:'other tab edit'}],remote=[{...base[0],platform:'remote platform'}];
+ const db=memoryDB({library:{key:'library',userId:'account',items:edited,cloudItems:base,cloudRevision:0,dirty:true}}),c=harness({cacheDB:db,cloudBaseItems:base});
+ await c.saveCache(remote,'',{dirty:false,baseItems:remote,baseRevision:1});
+ assert.equal(db.records.get('library').items[0].notes,'other tab edit');assert.equal(db.records.get('library').items[0].platform,'remote platform');assert.equal(db.records.get('library').dirty,true);
+});
+
+function legacyHarness(db,{offline=false}={}){
+ const legacy=[{id:'legacy',title:'Imported film',type:'Film',notes:'Keep my notes'}],remote={items:[],revision:0};let collections=0;
+ const c=harness({cacheDB:db,currentProfile:{email:'user@example.test',display_name:'User'},normalizeEmail:value=>String(value).trim().toLowerCase(),uuid:()=> 'generated',
+  openCache:async()=>db,loadCacheRecord:async()=>db.records.get('library'),saveProfile:async()=>{},storePinSession(){},enterAccount:async items=>{c.mediaItems=items;},
+  applyAccount:account=>{c.currentUser={id:account.id,email:account.email};},
+  collectPreviousLocalItems:async()=>{collections++;return copy(legacy);},
+  pinApi:async(action)=>{if(action==='login')return {ok:true,account:{id:'account',email:'user@example.test'},items:copy(remote.items),revision:remote.revision,sessionToken:'token'};if(offline)throw Error('Offline');remote.items=copy(c.queuedCloudSnapshot?.items||c.latestLocalSnapshot.items);return {ok:true,revision:++remote.revision};}});
+ vm.runInContext(['mergeLibraries','establishCloudSession','loginPinAccount'].map(declaration).join('\n'),c);
+ return {c,remote,collections:()=>collections};
+}
+
+test('Legacy import is consumed once and a deleted title stays deleted on the next sign-in',async()=>{
+ const db=memoryDB({}),first=legacyHarness(db);
+ await first.c.loginPinAccount('user@example.test','1234');if(first.c.cloudSaveInFlight)await first.c.cloudSaveInFlight;
+ assert.equal(first.collections(),1);assert.equal(db.records.get('legacy-migration-v1').userId,'account');assert.equal(db.records.get('library').dirty,false);
+ await first.c.saveCache([],'',{dirty:false,baseItems:[],baseRevision:2});
+ const second=legacyHarness(db);second.remote.revision=2;await second.c.loginPinAccount('user@example.test','1234');
+ assert.equal(second.collections(),0);assert.deepEqual(copy(second.c.mediaItems),[]);
+});
+
+test('Upgrading an existing PIN cache does not resurrect titles deleted before migration markers existed',async()=>{
+ const db=memoryDB({library:{key:'library',userId:'account',items:[],cloudItems:[],cloudRevision:3,dirty:false}}),upgraded=legacyHarness(db);
+ upgraded.remote.revision=3;await upgraded.c.loginPinAccount('user@example.test','1234');
+ assert.equal(upgraded.collections(),0);assert.deepEqual(copy(upgraded.c.mediaItems),[]);assert.equal(db.records.get('legacy-migration-v1').userId,'account');
+});
+
+test('An interrupted cloud migration retains its durable import without importing it twice',async()=>{
+ const db=memoryDB({}),first=legacyHarness(db,{offline:true});
+ await first.c.loginPinAccount('user@example.test','1234');if(first.c.cloudSaveInFlight)await first.c.cloudSaveInFlight;
+ assert.equal(db.records.get('library').dirty,true);assert.ok(db.records.get('legacy-migration-v1'));
+ const resumed=legacyHarness(db);await resumed.c.loginPinAccount('user@example.test','1234');if(resumed.c.cloudSaveInFlight)await resumed.c.cloudSaveInFlight;
+ assert.equal(resumed.collections(),0);assert.equal(resumed.c.mediaItems[0].notes,'Keep my notes');assert.equal(db.records.get('library').dirty,false);
+});
+
+test('A clean sign-in discovers and uploads an edit saved by another tab during account setup',async()=>{
+ const base=[{id:'s',title:'Show',notes:'old'}],edited=[{...base[0],notes:'other tab during sign-in'}],db=memoryDB({library:{key:'library',userId:'account',items:base,cloudItems:base,cloudRevision:0,dirty:false},'legacy-migration-v1':{key:'legacy-migration-v1',userId:'account'}});
+ const opened=legacyHarness(db);opened.remote.items=base;
+ const other=harness({cacheDB:db,cloudBaseItems:base,LOCAL_WRITER_ID:'other'});
+ opened.c.saveProfile=async()=>{await other.saveCache(edited,'',{dirty:true,baseItems:base,localBaseItems:base});};
+ await opened.c.loginPinAccount('user@example.test','1234');if(opened.c.cloudSaveInFlight)await opened.c.cloudSaveInFlight;
+ assert.equal(opened.remote.items[0].notes,'other tab during sign-in');assert.equal(db.records.get('library').dirty,false);assert.equal(opened.c.hasPending(),false);
+});
+
+test('An interrupted device transaction cannot consume a legacy import before its data is durable',async()=>{
+ const db=memoryDB({}),first=legacyHarness(db);db.failNextWrite=true;
+ await assert.rejects(first.c.loginPinAccount('user@example.test','1234'),/Interrupted device transaction/);
+ assert.equal(db.records.get('library'),undefined);assert.equal(db.records.get('legacy-migration-v1'),undefined);
+ const retried=legacyHarness(db);await retried.c.loginPinAccount('user@example.test','1234');if(retried.c.cloudSaveInFlight)await retried.c.cloudSaveInFlight;
+ assert.equal(retried.collections(),1);assert.equal(db.records.get('library').items[0].notes,'Keep my notes');assert.ok(db.records.get('legacy-migration-v1'));
+});
+
+test('A dirty shared cache is retried even if the pending-storage flag was never written',async()=>{
+ const base=[{id:'s',title:'Show',notes:'old'}],edited=[{...base[0],notes:'durable before tab closed'}];
+ const db=memoryDB({library:{key:'library',userId:'account',items:edited,cloudItems:base,cloudRevision:0,dirty:true,localSequence:1}}),writes=[];
+ const {app}=autoSyncHarness({cacheDB:db,mediaItems:base,cloudBaseItems:base,pinApi:async(action,_payload,_token,body)=>{
+  if(action==='load')return {ok:true,account:{id:'account'},unchanged:true,revision:1};writes.push(JSON.parse(body));return {ok:true,revision:1};
+ }});
+ assert.equal(app.hasPending(),false);assert.equal(await app.synchronizeCloudLibrary(),true);
+ assert.equal(writes[0].changes[0].set.notes,'durable before tab closed');assert.equal(db.records.get('library').dirty,false);
 });

@@ -172,7 +172,8 @@
 
   const titleDetailsCache=new Map();
   async function fetchOfficialTitleDetails(item){
-    const payload={title:item.title,type:item.type==="Anime"?"Series":item.type||item.format,imdbId:item.imdbId||(item.source==="imdb"?item.externalId:""),tvmazeShowId:item.tvmazeShowId||item.tvmazeId,year:item.releaseYear||item.year,source:item.source,externalId:item.externalId,platform:item.platform||"",officialUrl:item.officialUrl||item.officialSite||""};
+    const format=item.type||item.format;
+    const payload={title:item.title,type:format==="Anime"?"Series":format,imdbId:item.imdbId||(item.source==="imdb"?item.externalId:""),tvmazeShowId:item.tvmazeShowId||item.tvmazeId,year:item.releaseYear||item.year,source:item.source,externalId:item.externalId,platform:item.platform||"",officialUrl:item.officialUrl||item.officialSite||""};
     const key="whole-title-v3:"+JSON.stringify(payload);
     return cachedMetadataRequest(titleDetailsCache,key,async()=>{
       try{
@@ -196,7 +197,7 @@
     const sources=[...(details.sources||[])];
     if(details.imdbUrl&&!sources.some(row=>row.url===details.imdbUrl))sources.push({name:"View on IMDb",url:details.imdbUrl});
     return sources.flatMap(row=>{
-      try{const url=new URL(row.url);if(url.protocol!=="https:"||!['www.tvmaze.com','tvmaze.com','www.imdb.com','imdb.com','itunes.apple.com','tv.apple.com','www.cbs.com','cbs.com','www.paramountplus.com','www.nbc.com','www.abc.com','www.fox.com','www.fxnetworks.com','www.hbo.com','www.max.com','www.disneyplus.com','www.disney.com','www.hulu.com','www.netflix.com','www.primevideo.com','www.peacocktv.com','www.starz.com','www.showtime.com','www.amc.com','www.amcplus.com','www.thecw.com','www.pbs.org','www.bbc.co.uk','www.bbc.com','www.itv.com','www.itvx.com','www.channel4.com','www.sky.com','www.nowtv.com','www.crunchyroll.com','www.aetv.com','www.freeform.com','www.adultswim.com','www.usanetwork.com','www.bet.com','www.warnerbros.com','www.universalpictures.com','www.paramountpictures.com','www.sonypictures.com','www.20thcenturystudios.com','www.marvel.com','www.lionsgate.com','www.focusfeatures.com','www.discoveryplus.com','www.tntdrama.com','www.tbs.com','www.paramountglobalcontent.com','paramountglobalcontent.com','www.paramountpressexpress.com','paramountpressexpress.com','media.netflix.com'].includes(url.hostname))return [];return [`<a href="${esc(url.href)}" target="_blank" rel="noopener noreferrer">${esc(row.name)}</a>`];}catch{return [];}
+      try{const url=new URL(row.url),host=url.hostname.replace(/^www\./,"");if(url.protocol!=="https:"||url.username||url.password||url.port||!['tvmaze.com','imdb.com','itunes.apple.com','tv.apple.com','cbs.com','paramountplus.com','nbc.com','abc.com','fox.com','fxnetworks.com','hbo.com','max.com','disneyplus.com','disney.com','hulu.com','netflix.com','primevideo.com','peacocktv.com','starz.com','showtime.com','amc.com','amcplus.com','thecw.com','pbs.org','bbc.co.uk','bbc.com','itv.com','itvx.com','channel4.com','sky.com','nowtv.com','crunchyroll.com','aetv.com','freeform.com','adultswim.com','usanetwork.com','bet.com','warnerbros.com','universalpictures.com','paramountpictures.com','sonypictures.com','20thcenturystudios.com','marvel.com','lionsgate.com','focusfeatures.com','discoveryplus.com','tntdrama.com','tbs.com','paramountglobalcontent.com','paramountpressexpress.com','media.netflix.com'].includes(host))return [];return [`<a href="${esc(url.href)}" target="_blank" rel="noopener noreferrer">${esc(row.name)}</a>`];}catch{return [];}
     }).join(" · ");
   }
 
@@ -567,9 +568,9 @@
     return{rows,changed};
   }
   function cleanShadowTitleEntries(items){
-    const rows=Array.isArray(items)?items:[];
-    const verifiedSeriesTitles=new Set(rows.filter(item=>item?.type!=="Film"&&item?.title&&(item.tvmazeShowId||item.imdbId||item.totalSeasons||item.curSeason===0||item.curSeason)).map(item=>normalizeTitle(item.title)));
-    return rows.filter(item=>!(isWeakFilmRecord(item)&&verifiedSeriesTitles.has(normalizeTitle(item.title))));
+    // A film and its television adaptation are separate works. Missing
+    // catalogue metadata is never evidence that a user's record is disposable.
+    return Array.isArray(items)?items:[];
   }
 
   function normalizeTitle(value){
@@ -1083,18 +1084,19 @@ function duplicateCleanupMessage(cleanup){
     return Number.isFinite(t)&&t>Date.now();
   }
 
-  function bestIMDbFilmMatch(rows,title,imdbId=""){
+  function bestIMDbFilmMatch(rows,title,imdbId="",expectedYear=""){
     const films=(rows||[]).filter(x=>x?.format==="Film"&&x.title);
-    if(imdbId){const byId=films.find(x=>x.externalId===imdbId);if(byId)return byId;}
-    const exact=films.filter(x=>normalizeTitle(x.title)===normalizeTitle(title));
-    const pool=exact.length?exact:films;
-    return pool.sort((a,b)=>suggestionScore(b,title)-suggestionScore(a,title)||Number(b.year||0)-Number(a.year||0))[0]||null;
+    if(imdbId)return films.find(x=>String(x.imdbId||x.externalId||"")===String(imdbId))||null;
+    const exact=films.filter(x=>normalizeTitle(x.title)===normalizeTitle(title)&&(!expectedYear||String(x.year||"")===String(expectedYear)));
+    const identities=new Map(exact.map(row=>[String(row.imdbId||row.externalId||row.year||""),row]));
+    // A name without a unique selected identity must not resolve to a remake.
+    return identities.size===1?[...identities.values()][0]:null;
   }
 
   function bestAppleFilmMatch(rows,title,expectedYear=""){
     const films=(rows||[]).filter(x=>x?.format==="Film"&&x.title);
-    const exact=films.filter(x=>normalizeTitle(x.title)===normalizeTitle(title));
-    const pool=exact.length?exact:films;
+    const pool=films.filter(x=>normalizeTitle(x.title)===normalizeTitle(title)&&(!expectedYear||String(x.year||"")===String(expectedYear)));
+    if(!expectedYear&&new Set(pool.map(x=>String(x.year||""))).size>1)return null;
     pool.sort((a,b)=>{
       let as=suggestionScore(a,title),bs=suggestionScore(b,title);
       if(expectedYear&&String(a.year)===String(expectedYear))as+=500;
@@ -1105,13 +1107,13 @@ function duplicateCleanupMessage(cleanup){
     return pool[0]||null;
   }
 
-  async function verifiedFilmReleaseData(title,{imdbId="",seedDate="",seedSource=""}={}){
+  async function verifiedFilmReleaseData(title,{imdbId="",seedDate="",seedSource="",year=""}={}){
     const [imdbResult,appleResult]=await Promise.allSettled([searchIMDbTitles(title),searchAppleMovies(title)]);
     const imdbRows=imdbResult.status==="fulfilled"?imdbResult.value:[];
     const appleRows=appleResult.status==="fulfilled"?appleResult.value:[];
-    const imdbMatch=bestIMDbFilmMatch(imdbRows,title,imdbId);
-    const resolvedImdbId=imdbId||imdbMatch?.externalId||"";
-    const expectedYear=imdbMatch?.year||"";
+    const imdbMatch=bestIMDbFilmMatch(imdbRows,title,imdbId,year);
+    const resolvedImdbId=imdbId||imdbMatch?.imdbId||imdbMatch?.externalId||"";
+    const expectedYear=imdbMatch?.year||String(year||"");
     const appleMatch=bestAppleFilmMatch(appleRows,title,expectedYear);
 
     const appleDate=isFutureDateOnly(appleMatch?.releaseDate)?appleMatch.releaseDate:"";

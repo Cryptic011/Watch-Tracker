@@ -11,6 +11,18 @@ const options={useCache:false};
 const suggestion={id:imdb,l:'Inception',y:2010,qid:'movie'};
 const fixture=name=>fs.readFileSync(new URL('./fixtures/'+name,import.meta.url),'utf8');
 const apple={trackId:1,kind:'feature-movie',trackName:'Inception',releaseDate:'2010-07-16',longDescription:'Apple film synopsis.',trackViewUrl:'https://tv.apple.com/gb/movie/inception/umc.test',trackTimeMillis:8880000,primaryGenreName:'Sci-Fi'};
+test('Anime uses verified series metadata and still rejects unsupported formats',async()=>{
+ const calls=[],result=await getTitleDetails({title:'Example anime',type:'Anime',imdbId:imdb},async url=>{
+  calls.push(url);
+  return url.includes('www.imdb.com/title/')?html(ld({'@type':'TVSeries',description:'A verified IMDb anime series synopsis.'})):failure();
+ },options);
+ assert.equal(result.state,'ready');assert.equal(result.source,'IMDb');
+ assert.equal(result.description,'A verified IMDb anime series synopsis.');
+ assert.ok(calls.includes('https://www.imdb.com/title/'+imdb+'/'));
+ let invalidCalls=0;
+ assert.equal((await getTitleDetails({title:'Example game',type:'Game',imdbId:imdb},async()=>{invalidCalls++;return failure();},options)).state,'unmatched');
+ assert.equal(invalidCalls,0);
+});
 test('IMDb is preferred and only structured data for the exact identity and format is accepted',async()=>{
  const calls=[],result=await getTitleDetails(film,async url=>{calls.push(url);return html(ld());},options);
  assert.equal(result.description,'An IMDb synopsis.');assert.equal(result.runtime,148);assert.equal(result.ratingSource,'IMDb');assert.equal(result.source,'IMDb');assert.equal(result.state,'ready');assert.deepEqual(calls,['https://www.imdb.com/title/'+imdb+'/']);

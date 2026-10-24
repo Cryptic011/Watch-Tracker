@@ -24,7 +24,7 @@ test('Legacy season-promo responses are hidden and never cached as a successful 
  await api.get(item);assert.equal(api.calls(),2,'validated whole-show details can be cached');
 });
 test('A film-scoped or obsolete synopsis cannot be shown as a whole-series description',async()=>{
- for(const invalid of [{...valid,synopsisScope:'film'},{...valid,synopsisVersion:1}]){
+ for(const invalid of [{...valid,synopsisScope:'film'},{...valid,synopsisVersion:1},{...valid,synopsisVersion:2}]){
   const api=harness([invalid]);assert.equal((await api.get(item)).description,'');
  }
 });

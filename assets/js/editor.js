@@ -42,7 +42,7 @@
       return manual;
     }
     if(filmVerifyNote)filmVerifyNote.textContent="Films and series are checked through multiple sources.";
-    const promise=verifiedFilmReleaseData(title,{imdbId,seedDate,seedSource});
+    const promise=verifiedFilmReleaseData(title,{imdbId,seedDate,seedSource,year});
     const pending={type:"Film",title:normalizeTitle(title),imdbId:String(imdbId||""),showId:"",resolvedImdbId:"",resolvedShowId:"",year:String(year||""),platform:normalizeTitle(platform),promise};
     editorVerificationInFlight=pending;
     try{
@@ -388,8 +388,9 @@
     try{
       const existingId=$("item-id").value,id=existingId||uuid(),title=$("title").value.trim(),type=$("type").value;
       if(!title)throw new Error("Enter a title.");
-      const ukChoice=typeof ukPlatform!=="undefined"?ukPlatform.value:"";
-      const platform=((typeof selectedUKPlatform!=="undefined"&&selectedUKPlatform)||$("platform").value||ukChoice||"").trim(),releaseYear=$("release-year").value||"",requestedImdbId=$("imdb-id").value||"";
+      // Choosing a provider copies it into this field. The visible value,
+      // including an intentional blank, is the user's final choice.
+      const platform=String($("platform").value||"").trim(),releaseYear=$("release-year").value||"",requestedImdbId=$("imdb-id").value||"";
       let sid=$("tvmaze-id").value,verified=null;
       const recentVerification=freshEditorVerification(type,title);
       const pendingVerification=recentVerification?null:pendingEditorVerification(type,title,{imdbId:requestedImdbId,showId:sid,year:releaseYear,platform});
@@ -441,8 +442,6 @@
         showDuplicateWarning(duplicate);showAppToast(`“${duplicate.title}” is already tracked.`,"warn");
         const duplicateError=new Error(`“${duplicate.title}” is already tracked.`);duplicateError.code="duplicate";throw duplicateError;
       }
-      const sameTitleSeries=mediaItems.find(x=>String(x.id)!==String(id)&&x.type!=="Film"&&normalizeTitle(x.title)===normalizeTitle(title));
-      if(isWeakFilmRecord(item)&&sameTitleSeries)throw new Error(`“${title}” is already saved as a verified series. Choose a verified film result with a year or release date if you mean a separate film.`);
       if(previous&&current&&previous!==current)item=mergeRecordChanges(previous,item,current);
       if(current&&sameRecordWithoutUpdateTime(item,current)){
         closeEditor();showAppToast("No changes to save.","success");return;

@@ -88,6 +88,9 @@
     if(isEpisodeTrackable(item)){
       const highest=highestWatchedEpisode(watchedEpisodeMap(item));
       if(highest)return{...highest,watchedAt:item?.lastEpisodeWatchedAt||""};
+      // Explicit progress, including an empty map after an unmark, supersedes
+      // historical marks retained solely for migration and activity history.
+      if(Object.prototype.hasOwnProperty.call(item||{},"watchedEpisodes"))return null;
     }
     const history=Array.isArray(item?.episodeHistory)?item.episodeHistory:[],recent=[...history].reverse().find(event=>event?.kind!=="unmark");
     const season=Number(item?.lastWatchedSeason??recent?.season??0),episode=Number(item?.lastWatchedEpisode??recent?.episode??0);

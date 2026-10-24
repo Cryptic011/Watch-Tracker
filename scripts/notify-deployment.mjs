@@ -38,9 +38,23 @@ async function broadcast(event,payload){
     }catch(error){if(attempt===2)throw error;await sleep(2000);}
   }
 }
+let workflowIdentity='';
+try{
+  const requestToken=process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN,requestUrl=process.env.ACTIONS_ID_TOKEN_REQUEST_URL;
+  if(!requestToken||!requestUrl)throw Error('GitHub workflow identity is unavailable');
+  const identityUrl=new URL(requestUrl);
+  if(identityUrl.protocol!=='https:'||!identityUrl.hostname.endsWith('.actions.githubusercontent.com'))throw Error('Unexpected workflow identity endpoint');
+  identityUrl.searchParams.set('audience','watchlog-deployment-status');
+  const identityResponse=await fetch(identityUrl,{headers:{Authorization:`Bearer ${requestToken}`},signal:AbortSignal.timeout(10000)});
+  if(!identityResponse.ok)throw Error(`Workflow identity request returned ${identityResponse.status}`);
+  const identity=await identityResponse.json();
+  if(typeof identity.value!=='string'||!/^[-\w]+\.[-\w]+\.[-\w]+$/.test(identity.value)||identity.value.length>20000)throw Error('Workflow identity response was invalid');
+  workflowIdentity=identity.value;
+}catch(_){console.warn('Private run-status notification skipped: a verified GitHub workflow identity could not be obtained.');}
+if(workflowIdentity){
 const response=await fetch(`${config.url}/functions/v1/watchlog-reminders`,{
   method:'POST',
-  headers:{apikey:config.key,Authorization:`Bearer ${config.key}`,'Content-Type':'application/json'},
+  headers:{apikey:config.key,Authorization:`Bearer ${workflowIdentity}`,'Content-Type':'application/json'},
   body:JSON.stringify({action:'deployment_status',runId,runNumber,runAttempt,failureSummary,sha,status,commitUrl:`https://github.com/Cryptic011/Watched-Tracker/commit/${sha}`}),
   signal:AbortSignal.timeout(15000),
 });
@@ -52,6 +66,7 @@ if(!response.ok){
   const delivered=Number(delivery.delivered||0), failed=Number(delivery.failed||0);
   console.log(`Private run-status notification processed: ${status}; delivered ${delivered}; failed ${failed}`);
   if(!delivery.ok||(!delivery.duplicate&&delivered<1)||failed>0)console.warn(`Private run-status notification was not fully delivered: ${JSON.stringify({ok:delivery.ok,delivered,failed,reason:delivery.reason||null})}`);
+}
 }
 
 if(status!=='success'||!page){console.log(`Deployment status sent: ${status} for ${sha}`);if(healthCheckFailed)process.exit(1);process.exit(0);}

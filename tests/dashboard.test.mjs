@@ -209,7 +209,7 @@ const backend=stripTypeScriptTypes(fs.readFileSync(new URL('../supabase/function
 async function requestHistory({session=true,owner=false}={}){
  const reads=[],filters=[];let handler;
  const db={from(table){reads.push(table);const q={select(){return q},eq(k,v){filters.push([table,k,v]);return q},order(){return q},limit(){return q},single(){return Promise.resolve({data:{email:'owner@example.test'}})},maybeSingle(){return Promise.resolve({data:{items:[]}})},then(resolve){resolve({data:[]})}};return q},rpc(name,args){reads.push(name);filters.push([name,'p_accounts',args.p_accounts]);return Promise.resolve({data:[{items:[]}],error:null});}};
- const c=vm.createContext({TextEncoder,Response,Request,console,Date,createClient:()=>db,Deno:{env:{get:()=>''},serve:fn=>handler=fn}});vm.runInContext(backend,c);
+ const c=vm.createContext({TextEncoder,Response,Request,URL,console,Date,createRemoteJWKSet:()=>()=>{throw Error('Private history must not request workflow identity');},createClient:()=>db,Deno:{env:{get:()=>''},serve:fn=>handler=fn}});vm.runInContext(backend,c);
  vm.runInContext(`getSession=async()=>${session?"({accountId:'session-owner'})":"null"};sha256=async()=>${owner?'PRIVATE_TEST_ACCOUNT_HASH':"'other-account'"};`,c);
  const response=await handler(new Request('https://example.test',{method:'POST',body:JSON.stringify({action:'private_history',accountId:'victim'})}));return {response,reads,filters};
 }
