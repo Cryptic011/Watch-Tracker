@@ -1,6 +1,6 @@
 /* Library organisation, Continue Watching, offline readiness and recovery. */
 let libraryScope='',featureAccount='',continueExpanded=false;
-function collectionNames(){return [...new Set(mediaItems.flatMap(item=>Array.isArray(item.lists)?item.lists:[]))].filter(name=>typeof name==='string'&&name.trim()).sort((a,b)=>titleCollator.compare(a,b));}
+function collectionNames(items=mediaItems){return [...new Set(items.flatMap(item=>Array.isArray(item.lists)?item.lists:[]))].filter(name=>typeof name==='string'&&name.trim()).sort((a,b)=>titleCollator.compare(a,b));}
 function libraryScopeIncludes(item){
   if(libraryScope==='archived')return item.archived===true;
   if(item.archived===true)return false;
@@ -19,18 +19,22 @@ function renderLibraryFeatures(){
   const account=String(currentUser?.id||'');
   if(featureAccount!==account){featureAccount=account;libraryScope='';continueExpanded=false;}
   const toolbar=$('library-collections'),root=$('continue-watching');if(!toolbar||!root)return;
-  const visible=Boolean(currentUser&&currentTab==='library');toolbar.classList.toggle('hidden',!visible);
-  root.classList.toggle('hidden',!visible||categoryControlsVisible()||Boolean(searchQuery.trim()));
-  if(!visible)return;
-  const options=[['','All titles'],['favourites','Favourites'],['archived','Archived'],...collectionNames().map(name=>['list:'+name,name])];
+  const category=window.WatchLogGallery?.getCategory?.()||'';
+  const visible=Boolean(currentUser&&categoryControlsVisible());toolbar.classList.toggle('hidden',!visible);
+  $('library-features').classList.toggle('hidden',!visible);
+  root.classList.add('hidden');
+  if(!visible){if(currentTab==='library'&&!category)libraryScope='';return;}
+  const categoryItems=mediaItems.filter(item=>category==='Film'?item.type==='Film':item.type!=='Film');
+  const options=[['',category==='Film'?'All movies':'All series'],['favourites','Favourites'],['archived','Archived'],...collectionNames(categoryItems).map(name=>['list:'+name,name])];
   if(!options.some(([value])=>value===libraryScope))libraryScope='';
   const select=$('library-collection-select'),markup=options.map(([value,label])=>`<option value="${esc(value)}">${esc(label)}</option>`).join('');
   if(select._options!==markup){select.innerHTML=markup;select._options=markup;}select.value=libraryScope;
-  const rows=mediaItems.filter(item=>libraryScopeIncludes(item)&&item.archived!==true&&isEpisodeTrackable(item)).flatMap(item=>{
+  const rows=mediaItems.filter(item=>libraryScopeIncludes(item)&&item.archived!==true&&isEpisodeTrackable(item)&&(activeFilter==='All'||item.status===activeFilter)).flatMap(item=>{
     const releases=releasedEpisodeMap(item),watched=watchedEpisodeMap(item,releases),next=nextWatchEpisode(item,releases,watched);
     return next&&(item.status==='Watching'||Object.values(watched).some(episodes=>episodes.length))?[{item,next}]:[];
   }).sort((a,b)=>toMillis(b.item.lastEpisodeWatchedAt)-toMillis(a.item.lastEpisodeWatchedAt)||titleCollator.compare(a.item.title,b.item.title));
   const shown=continueExpanded?rows:rows.slice(0,8);
+  root.classList.toggle('hidden',category!=='Series'||Boolean(searchQuery.trim())||!['All','Watching'].includes(activeFilter)||!rows.length);
   updateDashboardMarkup(root,rows.length?`<section class="dashboard-section"><h2>Continue Watching</h2><div class="continue-list">${shown.map(({item,next})=>`<article class="continue-row"><button type="button" class="continue-open" data-continue-open="${esc(item.id)}"><strong>${esc(item.title)}</strong><span>Next · S${next.season} E${next.episode}</span></button><button type="button" class="episode-quick-button" data-continue-mark="${esc(item.id)}" data-season="${next.season}" data-episode="${next.episode}"${episodeLogBusy.has(String(item.id))?' disabled':''}>${episodeLogBusy.has(String(item.id))?'Saving…':'Mark watched'}</button></article>`).join('')}</div>${rows.length>8?`<button type="button" class="btn btn-secondary" data-continue-more>${continueExpanded?'Show fewer':'Show all '+rows.length+' shows'}</button>`:''}</section>`:'');
 }
 $('library-collection-select').onchange=event=>{saveNavigationPosition();libraryScope=event.target.value;render();recordAppNavigation();};

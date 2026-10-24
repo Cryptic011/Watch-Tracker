@@ -355,7 +355,15 @@ window.WatchLogGallery=(()=>{
     else{const items=rows.filter(item=>category==='Film'?isFilm(item):!isFilm(item)),tracked=api.items().filter(item=>(category==='Film'?isFilm(item):!isFilm(item))&&(!api.includes||api.includes(item))),parts=sections(items,api.upcoming);
       const content=api.filter==='Watched'?releaseGroups(items).map(group=>section(group.year,group.rows)).join(''):section('Upcoming',parts.future,true)+section('Released',parts.released)+section('Date unknown',parts.remaining);
       markup=`<div class="gallery-nav"><button type="button" class="gallery-back" data-gallery-back aria-label="Back to Library">‹</button><h2>${category==='Film'?'Movies':'Series'}</h2><span class="gallery-heading-actions"><span class="gallery-count" data-gallery-total-count aria-label="${tracked.length} tracked ${category==='Film'?'films':'series'}">${tracked.length}</span>${manageButton(tracked,category==='Film'?'Movies':'Series')}</span></div>${content}${items.length?'':'<p class="gallery-empty">No titles match your search or filter.</p>'}`;}
-    if(host._galleryMarkup!==markup){host.innerHTML=markup;host._galleryMarkup=markup;}
+    if(host._galleryMarkup!==markup){
+      // Keep the live collection control and its handlers across gallery renders.
+      if(api.features&&host.contains(api.features))host.before(api.features);
+      host.innerHTML=markup;host._galleryMarkup=markup;
+    }
+    if(api.features){
+      const heading=host.querySelector('.gallery-nav');
+      if(heading&&api.features.previousElementSibling!==heading)heading.after(api.features);
+    }
     observe(host,rows);
   }
   return {mount,open,sections,releaseGroups,back,refreshCurrent,getCategory:()=>category,setCategory:value=>{category=['Film','Series'].includes(value)?value:'';},hasCategory:()=>Boolean(category)};
