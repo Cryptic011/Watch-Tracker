@@ -133,6 +133,36 @@ test('An overall release synopsis is retained when a season synopsis is rejected
  assert.match(result.description,/team of special agents/);
  assert.ok(urls.indexOf('https://www.cbs.com/shows/ncis/about/')<urls.indexOf('https://www.imdb.com/title/'+id+'/'));
 });
+
+test('An official series page never substitutes the current-season publication date for the original premiere',async()=>{
+ const id='tt0364845',cbs='https://www.cbs.com/shows/ncis/about/';
+ const details=await getTitleDetails({title:'NCIS',type:'Series',imdbId:id,officialUrl:cbs},async url=>{
+   if(url===cbs)return html('<h1>About NCIS</h1><script type="application/ld+json">'+JSON.stringify({
+     '@type':'TVSeries',name:'NCIS',datePublished:'2026-10-06',numberOfSeasons:24,
+     description:'A team of Navy investigators examines criminal cases involving military personnel.'})+'</script>');
+   if(url.includes('/title/'))return html('<script type="application/ld+json">'+JSON.stringify({
+     '@type':'TVSeries',url:'https://www.imdb.com/title/'+id+'/',datePublished:'2003-09-23',
+     description:'An IMDb alternative about the agents.'})+'</script>');
+   return failure();
+ },options);
+ assert.equal(details.source,'CBS');
+ assert.equal(details.description,'A team of Navy investigators examines criminal cases involving military personnel.');
+ assert.equal(details.seasons,24);
+ assert.equal(details.premiered,'2003-09-23');
+ assert.equal(details.year,'2003');
+ assert.deepEqual(details.sources.map(row=>row.name),['CBS','IMDb']);
+});
+test('An explicit first-series start date is valid independent of the current-season publication date',()=>{
+ const site='https://www.cbs.com/shows/ncis/about/';
+ const structured='<h1>About NCIS</h1><script type="application/ld+json">'+JSON.stringify({
+   '@type':'TVSeries',name:'NCIS',startDate:'2003-09-23',datePublished:'2026-10-06',numberOfSeasons:{value:24},
+   description:'Investigators work together to investigate crimes involving naval personnel.'})+'</script>';
+ const result=parseFirstPartyDetails(structured,site,{title:'NCIS',type:'Series',year:'2003'});
+ assert.equal(result.premiered,'2003-09-23');
+ assert.equal(result.year,'2003');
+ assert.equal(result.seasons,24);
+});
+
 test('Official studio film metadata cannot use a trailer or sequel-specific plot',()=>{
  const site='https://www.paramountpictures.com/movies/example';
  const title={title:'Example',type:'Film'};

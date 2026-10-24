@@ -49,6 +49,7 @@ function isWholeTitleSynopsis(value){
  // through the overall Show/Film Details panel.
  if(/\b(?:season\s*(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten)|s\d+\s*e\d+|episode\s*\d+)\b/i.test(description))return false;
  if(/\b(?:this|new|current|upcoming|latest|next|final|previous|first|second|third|fourth)\s+season\b/i.test(description))return false;
+ if(/\b(?:the|this|next|latest|new|previous|upcoming|final)\s+episode\b/i.test(description))return false;
  if(/^\s*(?:watch|stream|new episodes|all episodes|trailer|preview|recap)\b/i.test(description))return false;
  if(/\b(?:season|episode)\s+(?:premiere|finale|recap|guide|trailer)\b/i.test(description))return false;
  return true;
@@ -110,8 +111,13 @@ export function parseFirstPartyDetails(markup,url,{title,type,year}={}){
  const candidates=structured.filter(row=>[row?.["@type"]].flat().some(kind=>types.includes(kind))&&matchesFirstPartyTitle(row.name,title));
  const identity=candidates.length===1?candidates[0]:null;
  if(!identity&&!titles.some(name=>matchesFirstPartyTitle(name,title)))return null;
- const published=String(identity?.datePublished||""),publishedYear=yearOf(published);
+ // A series page's publication date can refer to its CURRENT SEASON.
+ // Only an explicit programme startDate can establish the series premiere;
+ // otherwise IMDb may fill the overall show's original premiere date.
+ const published=String((type==="Series"?identity?.startDate:identity?.datePublished)||""),publishedYear=yearOf(published);
  if(year&&publishedYear&&String(year)!==publishedYear)return null;
+ const count=Number(typeof identity?.numberOfSeasons==="object"?identity.numberOfSeasons?.value:identity?.numberOfSeasons);
+ const seasons=type==="Series"&&Number.isInteger(count)&&count>0&&count<=300?count:null;
  const descriptions=[
    identity?.description,
    aboutPageDescription(source,title),
@@ -121,7 +127,7 @@ export function parseFirstPartyDetails(markup,url,{title,type,year}={}){
  ];
  const description=descriptions.map(value=>text(value)).find(isWholeTitleSynopsis)||"";
  if(!description)return null;
- return record({description,year:publishedYear,
+ return record({description,year:publishedYear,seasons,
   premiered:/^\d{4}-\d{2}-\d{2}$/.test(published)?published:"",
   genres:[identity?.genre||[]].flat().filter(x=>typeof x==="string").map(clean).slice(0,15)
  },site.name,site.url);
