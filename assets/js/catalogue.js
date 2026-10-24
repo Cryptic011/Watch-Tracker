@@ -482,6 +482,10 @@
         shows=shows.filter(show=>!show?.externals?.imdb);
         if(!shows.length)return null;
       }
+      // Refuse fuzzy matches for metadata identity. Partial franchise matches
+      // are search suggestions, not safe sources for episode/watched data.
+      shows=shows.filter(show=>normalizeTitle(show.name||"")===norm&&(!year||!show.premiered||show.premiered.slice(0,4)===String(year)));
+      if(!shows.length)return null;
       const candidates=shows.map(show=>{
         const candidateTitle=normalizeTitle(show.name||""),candidateImdb=String(show?.externals?.imdb||""),candidateYear=show.premiered?.slice?.(0,4)||"";
         const candidatePlatform=normalizeTitle(show.network?.name||show.webChannel?.name||"");
@@ -495,7 +499,8 @@
         if(show.updated&&Date.now()/1000-Number(show.updated)<366*24*60*60)score+=90;
         return{show,score};
       }).sort((a,b)=>b.score-a.score);
-      return candidates[0]?.score>=700?candidates[0].show:null;
+      if(candidates.length>1&&candidates[0].score===candidates[1].score)return null;
+      return candidates[0]?.score>=2400?candidates[0].show:null;
     }catch(_){return null;}
   }
   $("cur-season").addEventListener("change",()=>refreshEpisodeOptions(0));
@@ -1042,7 +1047,9 @@ function duplicateCleanupMessage(cleanup){
     const exactTitle=normalizeTitle(match.title)===normalizeTitle(title);
     const yearMatches=!year||!match.year||String(match.year)===String(year);
     const confirmed=imdbId?matchedId===imdbId:(exactTitle&&yearMatches);
-    return{available:true,confirmed:confirmed?true:null,imdbId:confirmed?matchedId:(imdbId||matchedId),match};
+    // Never assign the ID of the nearest IMDb suggestion to an unrelated
+    // show. Unconfirmed suggestions must not poison future lookups or dedupe.
+    return{available:true,confirmed:confirmed?true:null,imdbId:confirmed?matchedId:(imdbId||""),match:confirmed?match:null};
   }
 
   function isFutureDateOnly(value){
