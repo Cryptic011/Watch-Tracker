@@ -72,10 +72,8 @@
       mazeA=String(a.tvmazeId||""),mazeB=String(b.tvmazeId||"");
     // A canonical provider ID establishes identity even if another source
     // supplied outdated title/year metadata.
-    if(mazeA&&mazeB&&mazeA===mazeB)return true;
-    if(imdbA&&imdbB&&imdbA===imdbB)return true;
-    if(mazeA&&mazeB&&mazeA!==mazeB)return false;
-    if(imdbA&&imdbB&&imdbA!==imdbB)return false;
+    if(mazeA&&mazeB)return mazeA===mazeB;
+    if(imdbA&&imdbB)return imdbA===imdbB;
     if(normalizeTitle(a.title)!==normalizeTitle(b.title))return false;
     const yearA=String(a.year||""),yearB=String(b.year||"");
     // Do not merge unrelated remakes with the same name, or invent an
@@ -205,11 +203,12 @@
       return;
     }
     suggestList.innerHTML=activeSuggestions.map((item,index)=>{
+      const tracked=findTrackedDuplicate({title:item.title,type:item.format,imdbId:item.imdbId, tvmazeShowId:item.tvmazeId,releaseYear:item.year},mediaItems,$("item-id").value);
       const sourceNames=(item.sources||[item.source]).map(src=>src==="imdb"?"IMDb":src==="apple"?"Apple":src==="tvmaze"?"TVMaze":"Media");
       const sourceLabel=Array.from(new Set(sourceNames)).join(" + ");
       const exactRelease=item.format==="Film"&&item.releaseDate?formatLocalDate(item.releaseDate):"";
       const meta=[exactRelease||item.year,item.format,item.detail&&item.detail!==item.format?item.detail:"",item.platform,String(item.status||"").toLowerCase()==="running"?"Currently running":""] .filter(Boolean).join(" • ");
-      return `<div class="suggest-item" data-suggestion-index="${index}"><div><div class="suggest-name">${esc(item.title)}</div><div class="suggest-meta">${esc(meta)}</div></div><span class="suggest-network">${esc(sourceLabel)}</span></div>`;
+      return `<div class="suggest-item" data-suggestion-index="${index}"><div><div class="suggest-name">${esc(item.title)}</div><div class="suggest-meta">${esc(meta)}${tracked?' · In your library':''}</div></div><span class="suggest-network">${esc(sourceLabel)}</span></div>`;
     }).join("");
     suggestList.classList.remove("hidden");
   }
@@ -233,6 +232,11 @@
 
   async function selectSuggestion(item){
     if(!item)return;
+    const duplicate=findTrackedDuplicate({title:item.title,type:item.format,imdbId:item.imdbId,tvmazeShowId:item.tvmazeId,releaseYear:item.year},mediaItems,$("item-id").value);
+    if(duplicate){
+      if(!$("item-id").value){closeEditor();openMediaRow(duplicate.id);return;}
+      showDuplicateWarning(duplicate);return;
+    }
     clearTimeout(searchTimer);activeCatalogueController?.abort();activeCatalogueController=null;const selectionRequestId=++searchRequestId,selectionApplyRevision=++editorApplyRevision;activeTitleSearchKey="";
     editorVerification=null;editorVerificationInFlight=null;titleSuggestionsWanted=false;cancelSuggestionProgress();
     titleInput.value=item.title;suggestList.classList.add("hidden");$("platform").value=item.platform||"";$("tvmaze-id").value="";
