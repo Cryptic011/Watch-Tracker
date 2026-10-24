@@ -172,7 +172,7 @@
 
   const titleDetailsCache=new Map();
   async function fetchOfficialTitleDetails(item){
-    const payload={title:item.title,type:item.type||item.format,imdbId:item.imdbId||(item.source==="imdb"?item.externalId:""),tvmazeShowId:item.tvmazeShowId||item.tvmazeId,year:item.releaseYear||item.year,source:item.source,externalId:item.externalId};
+    const payload={title:item.title,type:item.type||item.format,imdbId:item.imdbId||(item.source==="imdb"?item.externalId:""),tvmazeShowId:item.tvmazeShowId||item.tvmazeId,year:item.releaseYear||item.year,source:item.source,externalId:item.externalId,platform:item.platform||"",officialUrl:item.officialUrl||item.officialSite||""};
     const key=JSON.stringify(payload);
     return cachedMetadataRequest(titleDetailsCache,key,async()=>{
       try{
@@ -180,7 +180,7 @@
         // Drop legacy or stale third-party editorial information outright;
         // only IMDb and an official Apple TV listing may supply title details.
         const details=response.details||{};
-        const permitted=source=>["IMDb","Apple TV"].includes(String(source||""));
+        const permitted=source=>["IMDb","Apple TV","CBS","Paramount+","NBC","ABC","FOX","FX","HBO","Max","Disney+","Disney","Hulu","Netflix","Prime Video","Peacock","STARZ","Showtime","AMC","AMC+","The CW","PBS","BBC","ITV","ITVX","Channel 4","Sky","NOW","Crunchyroll","A&E","Freeform","Adult Swim","USA Network","BET","Warner Bros.","Universal","Paramount Pictures","Sony Pictures","20th Century Studios","Marvel","Lionsgate","Focus Features","Discovery+","TNT","TBS"].includes(String(source||""));
         const rejected=["source","descriptionSource","ratingSource"].some(field=>details[field]&&!permitted(details[field]));
         if(!rejected&&details.description)return details;
         titleDetailsCache.delete(key);
@@ -195,7 +195,7 @@
     const sources=[...(details.sources||[])];
     if(details.imdbUrl&&!sources.some(row=>row.url===details.imdbUrl))sources.push({name:"View on IMDb",url:details.imdbUrl});
     return sources.flatMap(row=>{
-      try{const url=new URL(row.url);if(url.protocol!=="https:"||!['www.imdb.com','imdb.com','itunes.apple.com','tv.apple.com'].includes(url.hostname))return [];return [`<a href="${esc(url.href)}" target="_blank" rel="noopener noreferrer">${esc(row.name)}</a>`];}catch{return [];}
+      try{const url=new URL(row.url);if(url.protocol!=="https:"||!['www.imdb.com','imdb.com','itunes.apple.com','tv.apple.com','www.cbs.com','cbs.com','www.paramountplus.com','www.nbc.com','www.abc.com','www.fox.com','www.fxnetworks.com','www.hbo.com','www.max.com','www.disneyplus.com','www.disney.com','www.hulu.com','www.netflix.com','www.primevideo.com','www.peacocktv.com','www.starz.com','www.showtime.com','www.amc.com','www.amcplus.com','www.thecw.com','www.pbs.org','www.bbc.co.uk','www.bbc.com','www.itv.com','www.itvx.com','www.channel4.com','www.sky.com','www.nowtv.com','www.crunchyroll.com','www.aetv.com','www.freeform.com','www.adultswim.com','www.usanetwork.com','www.bet.com','www.warnerbros.com','www.universalpictures.com','www.paramountpictures.com','www.sonypictures.com','www.20thcenturystudios.com','www.marvel.com','www.lionsgate.com','www.focusfeatures.com','www.discoveryplus.com','www.tntdrama.com','www.tbs.com'].includes(url.hostname))return [];return [`<a href="${esc(url.href)}" target="_blank" rel="noopener noreferrer">${esc(row.name)}</a>`];}catch{return [];}
     }).join(" · ");
   }
 

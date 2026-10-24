@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {getTitleDetails,parseIMDbDetails} from '../supabase/functions/watchlog-pin/title-details.mjs';
+import {getTitleDetails,parseIMDbDetails,parseFirstPartyDetails} from '../supabase/functions/watchlog-pin/title-details.mjs';
 const imdb='tt1375666',film={title:'Inception',type:'Film',imdbId:imdb,year:'2010'};
 const ld=(fields={})=>'<script type="application/ld+json">'+JSON.stringify({'@type':'Movie',url:'https://www.imdb.com/title/'+imdb+'/',description:'An IMDb synopsis.',datePublished:'2010-07-16',genre:['Action','Sci-Fi'],duration:'PT2H28M',aggregateRating:{ratingValue:8.8},...fields})+'</script>';
 const json=value=>({ok:true,json:async()=>value});
@@ -16,6 +16,42 @@ test('IMDb is preferred and only structured data for the exact identity and form
  assert.equal(parseIMDbDetails(ld({'@type':'TVSeries'}),imdb,'Film'),null);
  assert.equal(parseIMDbDetails(ld({url:'https://www.imdb.com.evil.example/title/'+imdb+'/'}),imdb,'Film'),null);
 });
+
+test('CBS NCIS official About page wins over IMDb and keeps the IMDb rating as a fallback',async()=>{
+ const calls=[],id='tt0364845',page='<html><head><title>About NCIS | CBS</title><meta property="og:title" content="About NCIS"><meta name="description" content="CBS official NCIS programme description covering the Navy investigators and their cases."></head><body><h1>About NCIS</h1></body></html>';
+ const data=await getTitleDetails({title:'NCIS',type:'Series',tvmazeShowId:'60',imdbId:id,year:'2003'},async url=>{
+  calls.push(url);
+  if(url.includes('api.tvmaze.com'))return json({id:60,name:'NCIS',premiered:'2003-09-23',externals:{imdb:id},network:{name:'CBS'},officialSite:'https://www.cbs.com/shows/ncis/'});
+  if(url==='https://www.cbs.com/shows/ncis/about/')return html(page);
+  if(url.includes('/title/'+id+'/'))return html('<script type="application/ld+json">'+JSON.stringify({'@type':'TVSeries',url:'https://www.imdb.com/title/'+id+'/',description:'IMDb alternate description.',aggregateRating:{ratingValue:7.8}})+'</script>');
+  return failure();
+ },options);
+ assert.equal(data.source,'CBS');assert.equal(data.descriptionSource,'CBS');
+ assert.equal(data.description,'CBS official NCIS programme description covering the Navy investigators and their cases.');
+ assert.equal(data.ratingSource,'IMDb');assert.equal(data.rating,7.8);
+ assert.deepEqual(data.sources.map(x=>x.name),['CBS','IMDb']);
+ assert.ok(calls.indexOf('https://www.cbs.com/shows/ncis/about/')<calls.indexOf('https://www.imdb.com/title/'+id+'/'));
+});
+test('Official film pages win over IMDb when a verified studio URL is supplied',async()=>{
+ const url='https://www.paramountpictures.com/movies/example',id='tt1234567',calls=[];
+ const data=await getTitleDetails({title:'Example',type:'Film',imdbId:id,officialUrl:url},async endpoint=>{
+  calls.push(endpoint);
+  if(endpoint===url)return html('<meta property="og:title" content="Example - Paramount Pictures"><meta property="og:description" content="Paramount Pictures official synopsis of Example and the international mission.">');
+  if(endpoint.includes('/title/'))return html('<script type="application/ld+json">'+JSON.stringify({'@type':'Movie',url:'https://www.imdb.com/title/'+id+'/',description:'IMDb fallback.',aggregateRating:{ratingValue:7.1}})+'</script>');
+  return failure();
+ },options);
+ assert.equal(data.source,'Paramount Pictures');assert.equal(data.rating,7.1);
+ assert.equal(data.description,'Paramount Pictures official synopsis of Example and the international mission.');
+ assert.deepEqual(calls,[url,'https://www.imdb.com/title/'+id+'/']);
+});
+test('Official page content must match the exact title and be from a trusted broadcaster',async()=>{
+ const page='<title>NCIS: Sydney on CBS</title><meta name="description" content="An unrelated official description about another NCIS show entirely.">';
+ const info={title:'NCIS',type:'Series',year:'2003'};
+ assert.equal(parseFirstPartyDetails(page,'https://www.cbs.com/shows/ncis-sydney/',info),null);
+ assert.equal(parseFirstPartyDetails('<title>NCIS</title><meta name="description" content="A very detailed but untrusted synopsis from an aggregator.">','https://www.justwatch.com/tv/ncis',info),null);
+ assert.equal(parseFirstPartyDetails('<title>NCIS</title><meta name="description" content="A very detailed but untrusted synopsis from an aggregator.">','http://www.cbs.com/shows/ncis/',info),null);
+});
+
 test('Series details never use TVMaze synopses or ratings when IMDb is unavailable',async()=>{
  const calls=[],result=await getTitleDetails({title:'Show',type:'Series',imdbId:'tt0903747',tvmazeShowId:'169'},async url=>{
   calls.push(url);if(url.includes('api.tvmaze.com'))throw Error('TVMaze must not be a details source');
@@ -25,14 +61,14 @@ test('Series details never use TVMaze synopses or ratings when IMDb is unavailab
  assert.equal(result.state,'unavailable');assert.deepEqual(result.sources,[]);
  assert.equal(result.imdbUrl,'https://www.imdb.com/title/tt0903747/');
  assert.equal(calls[0],'https://www.imdb.com/title/tt0903747/');
- assert.ok(!calls.some(url=>url.includes('tvmaze')));
+ assert.ok(calls.every(url=>!url.includes('justwatch')));
 });
 test('A TVMaze response with the wrong IMDb ID cannot supply a same-name remake description',async()=>{
  const result=await getTitleDetails({title:'Twin',type:'Series',tvmazeShowId:'12',imdbId:'tt1111111'},async url=>url.includes('api.tvmaze.com')?json({id:12,name:'Twin',externals:{imdb:'tt2222222'},summary:'Wrong remake'}):failure(),options);
  assert.equal(result.description,undefined);assert.deepEqual(result.sources,[]);
 });
 test('Film fallback uses a unique Apple title/year checked against its exact IMDb identity',async()=>{
- const result=await getTitleDetails(film,async url=>url.includes('media-imdb')?json({d:[{...suggestion,id:'tt9999999',y:1999},suggestion]}):url.includes('itunes.apple')?json({results:[{...apple,trackId:2,releaseDate:'1999-01-01',longDescription:'Wrong year'},apple]}):failure(),options);
+ const result=await getTitleDetails({...film,platform:'Apple TV'},async url=>url.includes('media-imdb')?json({d:[{...suggestion,id:'tt9999999',y:1999},suggestion]}):url.includes('itunes.apple')?json({results:[{...apple,trackId:2,releaseDate:'1999-01-01',longDescription:'Wrong year'},apple]}):failure(),options);
  assert.equal(result.description,'Apple film synopsis.');assert.equal(result.source,'Apple TV');assert.equal(result.year,'2010');assert.equal(result.runtime,148);assert.equal(result.imdbId,imdb);
 });
 test('IMDb failure and ambiguous Apple listings never trigger aggregator descriptions',async()=>{
@@ -42,7 +78,7 @@ test('IMDb failure and ambiguous Apple listings never trigger aggregator descrip
   if(url.includes('itunes.apple'))return json({results:[apple,{...apple,trackId:2}]});
   return failure();
  };
- const result=await getTitleDetails(film,request,options);
+ const result=await getTitleDetails({...film,platform:'Apple TV'},request,options);
  assert.equal(result.description,undefined);
  assert.equal(result.state,'unavailable');
  assert.deepEqual(result.sources,[]);
@@ -63,7 +99,8 @@ test('Series with an IMDb rating but no synopsis never borrow another provider d
  assert.equal(result.rating,8.8);
  assert.equal(result.ratingSource,'IMDb');
  assert.deepEqual(result.sources.map(row=>row.name),['IMDb']);
- assert.deepEqual(calls,['https://www.imdb.com/title/'+imdb+'/']);
+ assert.ok(calls.includes('https://www.imdb.com/title/'+imdb+'/'));
+ assert.ok(calls.every(url=>!url.includes('justwatch')));
 });
 test('Metadata never requests Wikimedia sources',async()=>{
  const calls=[];await getTitleDetails(film,async url=>{calls.push(url);return failure();},options);

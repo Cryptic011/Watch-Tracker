@@ -11,6 +11,76 @@ const yearOf=value=>/^\d{4}/.test(String(value||''))?String(value).slice(0,4):''
 const text=value=>clean(value).slice(0,8000);
 const imdbURL=id=>'https://www.imdb.com/title/'+id+'/';
 function record(fields,name,url){return {...fields,source:name,sourceUrl:url,sources:[{name,url}],descriptionSource:fields.description?name:'',ratingSource:fields.rating?name:''};}
+
+/* Exact first-party platform domains. Metadata from third-party aggregators
+   and arbitrary URLs must never be treated as official broadcaster content. */
+const FIRST_PARTY=new Map(Object.entries({
+ "cbs.com":"CBS","paramountplus.com":"Paramount+","nbc.com":"NBC","abc.com":"ABC",
+ "fox.com":"FOX","fxnetworks.com":"FX","hbo.com":"HBO","max.com":"Max",
+ "disneyplus.com":"Disney+","disney.com":"Disney","hulu.com":"Hulu",
+ "netflix.com":"Netflix","primevideo.com":"Prime Video","tv.apple.com":"Apple TV",
+ "peacocktv.com":"Peacock","starz.com":"STARZ","showtime.com":"Showtime",
+ "amc.com":"AMC","amcplus.com":"AMC+","thecw.com":"The CW","pbs.org":"PBS",
+ "bbc.co.uk":"BBC","bbc.com":"BBC","itv.com":"ITV","itvx.com":"ITVX",
+ "channel4.com":"Channel 4","sky.com":"Sky","nowtv.com":"NOW",
+ "crunchyroll.com":"Crunchyroll","aetv.com":"A&E","freeform.com":"Freeform",
+ "adultswim.com":"Adult Swim","usanetwork.com":"USA Network","bet.com":"BET",
+ "warnerbros.com":"Warner Bros.","universalpictures.com":"Universal",
+ "paramountpictures.com":"Paramount Pictures","sonypictures.com":"Sony Pictures",
+ "20thcenturystudios.com":"20th Century Studios","marvel.com":"Marvel",
+ "lionsgate.com":"Lionsgate","focusfeatures.com":"Focus Features",
+ "discoveryplus.com":"Discovery+","tntdrama.com":"TNT","tbs.com":"TBS"
+}));
+function firstPartyURL(value){
+ try{
+   const u=new URL(String(value||""));
+   if(u.protocol!=="https:"||u.username||u.password||u.port)return null;
+   const host=u.hostname.toLowerCase().replace(/^www\./,""),name=FIRST_PARTY.get(host);
+   if(!name||/\/(?:login|sign-in|signin|account|register|search)(?:\/|$)/i.test(u.pathname))return null;
+   u.hash="";return{url:u.href,name,host};
+ }catch{return null;}
+}
+function matchesFirstPartyTitle(value,title){
+ const expect=nameKey(title),actual=nameKey(value);
+ if(!expect||!actual)return false;
+ if(actual===expect)return true;
+ const stripped=actual.replace(/^(?:watch now|official site|the series|watch|stream|about)\s+/,"");
+ if(stripped===expect)return true;
+ return [actual,stripped].some(a=>a.startsWith(expect)&&/^(?: on | official | watch | streaming | tv | series | show | movie | film | netflix | cbs | nbc | abc | disney | paramount | apple | bbc | hbo )/.test(a.slice(expect.length)));
+}
+export function parseFirstPartyDetails(markup,url,{title,type,year}={}){
+ const site=firstPartyURL(url);if(!site||!title||!["Film","Series"].includes(type))return null;
+ const source=String(markup||"");if(source.length>2000000)return null;
+ const tags=new Map();
+ for(const tag of source.match(/<meta\b[^>]*>/gi)||[]){
+   const attrs={};
+   for(const match of tag.matchAll(/([a-z][\w:-]*)\s*=\s*(?:"([^"]*)"|'([^']*)')/gi))attrs[match[1].toLowerCase()]=match[2]??match[3]??"";
+   const key=String(attrs.property||attrs.name||"").toLowerCase();
+   if(key&&attrs.content&&!tags.has(key))tags.set(key,clean(attrs.content));
+ }
+ const titleTag=clean(source.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i)?.[1]);
+ const heading=clean(source.match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/i)?.[1]);
+ const titles=[tags.get("og:title"),tags.get("twitter:title"),titleTag,heading].filter(Boolean);
+ const structured=[];
+ for(const match of source.matchAll(/<script\b[^>]*type\s*=\s*["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script\s*>/gi)){
+  try{const json=JSON.parse(match[1]);for(const row of Array.isArray(json)?json:[json]){
+   structured.push(row);if(Array.isArray(row?.["@graph"]))structured.push(...row["@graph"]);
+  }}catch{}
+ }
+ const types=type==="Film"?["Movie"]:["TVSeries","TVMiniSeries","TVShow"];
+ const candidates=structured.filter(row=>[row?.["@type"]].flat().some(kind=>types.includes(kind))&&matchesFirstPartyTitle(row.name,title));
+ const identity=candidates.length===1?candidates[0]:null;
+ if(!identity&&!titles.some(name=>matchesFirstPartyTitle(name,title)))return null;
+ const published=String(identity?.datePublished||""),publishedYear=yearOf(published);
+ if(year&&publishedYear&&String(year)!==publishedYear)return null;
+ const description=text(identity?.description||tags.get("og:description")||tags.get("description")||tags.get("twitter:description"));
+ if(description.length<35)return null;
+ return record({description,year:publishedYear,
+  premiered:/^\d{4}-\d{2}-\d{2}$/.test(published)?published:"",
+  genres:[identity?.genre||[]].flat().filter(x=>typeof x==="string").map(clean).slice(0,15)
+ },site.name,site.url);
+}
+
 export function parseIMDbDetails(html,id,type){
   const rows=[];
   for(const match of html.matchAll(/<script\b[^>]*type\s*=\s*["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script\s*>/gi)){
@@ -27,7 +97,7 @@ export function parseIMDbDetails(html,id,type){
 export async function getTitleDetails(input,request=fetch,{useCache=true}={}){
   const type=input.type==='Film'?'Film':input.type==='Series'?'Series':null;
   if(!type)return {state:'unmatched',sources:[]};
-  const selected={type,title:clean(input.title).slice(0,160),year:yearOf(input.year||input.releaseYear),imdbId:imdbID(input.imdbId),tvmazeId:numericID(input.tvmazeShowId||input.tvmazeId),appleId:input.source==='apple'?numericID(input.externalId):''};
+  const selected={type,title:clean(input.title).slice(0,160),year:yearOf(input.year||input.releaseYear),imdbId:imdbID(input.imdbId),tvmazeId:numericID(input.tvmazeShowId||input.tvmazeId),appleId:input.source==='apple'?numericID(input.externalId):'',platform:clean(input.platform).slice(0,80),officialUrl:firstPartyURL(input.officialUrl||input.officialSite)?.url||''};
   const key=JSON.stringify(selected),cached=cache.get(key);
   if(useCache&&cached?.expires>Date.now())return structuredClone(cached.value);
   if(useCache&&inFlight.has(key))return structuredClone(await inFlight.get(key));
@@ -63,16 +133,36 @@ async function resolveDetails(selected,request){
     if(matches.length!==1)return null;
     canonical={title:clean(matches[0].l),year:yearOf(matches[0].y)};id=matches[0].id;return canonical;
   };
-  if(!id)await attempt(identity);
-  // A selected TVMaze ID can supply the linked IMDb identifier only when the
-  // actual series identity matches. Never import its synopsis or rating.
-  if(!id&&selected.type==='Series'&&selected.tvmazeId)await attempt(async()=>{
-    const show=await get('https://api.tvmaze.com/shows/'+selected.tvmazeId);
-    if(String(show?.id)!==selected.tvmazeId||nameKey(show?.name)!==nameKey(selected.title)||
-      (selected.year&&yearOf(show?.premiered)!==selected.year))return null;
-    id=imdbID(show?.externals?.imdb);return id||null;
+  // A TVMaze identity record can point to the broadcaster's actual web page,
+  // but its synopsis and rating are never used as editorial title details.
+  const pages=[];
+  if(selected.officialUrl)pages.push(selected.officialUrl);
+  if(selected.type==='Series'&&(selected.tvmazeId||id))await attempt(async()=>{
+    const url=selected.tvmazeId?'https://api.tvmaze.com/shows/'+selected.tvmazeId:
+      'https://api.tvmaze.com/lookup/shows?imdb='+encodeURIComponent(id);
+    const show=await get(url);
+    if(!show?.id||(selected.tvmazeId&&String(show.id)!==selected.tvmazeId)||
+      (id&&show.externals?.imdb&&show.externals.imdb!==id)||
+      !matchesFirstPartyTitle(show.name,selected.title)||
+      (selected.year&&yearOf(show.premiered)&&yearOf(show.premiered)!==selected.year))return null;
+    if(!id)id=imdbID(show.externals?.imdb);
+    if(firstPartyURL(show.officialSite))pages.push(show.officialSite);
+    // CBS has a separate verified About page with its full programme synopsis.
+    if(nameKey(show.network?.name)==='cbs'||nameKey(show.webChannel?.name)==='cbs'){
+      const slug=clean(show.name).toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+      if(slug)pages.unshift('https://www.cbs.com/shows/'+slug+'/about/');
+    }
+    return show;
   });
-  let result=id?await attempt(async()=>parseIMDbDetails(await get(imdbURL(id),true),id,selected.type)):null;
+  let result=null;
+  for(const candidate of [...new Set(pages)].slice(0,3)){
+    const site=firstPartyURL(candidate);if(!site)continue;
+    const firstParty=await attempt(async()=>{
+      const contents=await get(site.url,true);
+      return parseFirstPartyDetails(contents,site.url,selected);
+    });
+    if(firstParty){result=firstParty;break;}
+  }
   const add=details=>{
     if(!details)return;
     if(!result){result=details;return;}
@@ -82,10 +172,10 @@ async function resolveDetails(selected,request){
     }
     if(used)for(const source of details.sources||[])if(!result.sources.some(row=>row.url===source.url))result.sources.push(source);
   };
-  // When IMDb lacks a film synopsis, a uniquely matched Apple TV publisher
-  // listing can fill the missing description. Series remain IMDb-only unless
-  // a verified first-party programme source is available.
-  if(!result?.description&&selected.type==='Film')add(await attempt(async()=>{
+  // On Apple TV originals, its own listing is a first-party source. Do not
+  // treat an Apple retail listing as the original distributor of other films.
+  if(!result?.description&&selected.type==='Film'&&
+    (selected.appleId||/^(?:apple tv|apple tv\+)$/i.test(selected.platform)))add(await attempt(async()=>{
     const match=await attempt(identity);
     if(!selected.appleId&&(!match?.title||!match.year))return null;
     const url=selected.appleId?'https://itunes.apple.com/lookup?id='+selected.appleId+'&country=gb':'https://itunes.apple.com/search?term='+encodeURIComponent(match.title)+'&country=gb&media=movie&entity=movie&limit=40';
@@ -95,5 +185,9 @@ async function resolveDetails(selected,request){
     try{link=new URL(row.trackViewUrl);if(link.protocol!=='https:'||!['itunes.apple.com','tv.apple.com'].includes(link.hostname))return null;}catch{return null;}
     return record({description:text(row.longDescription||row.shortDescription),premiered:String(row.releaseDate||'').slice(0,10),year:yearOf(row.releaseDate),genres:row.primaryGenreName?[clean(row.primaryGenreName)]:[],runtime:row.trackTimeMillis?Math.round(row.trackTimeMillis/60000):null},'Apple TV',link.href);
   }));
+  // IMDb is the fallback. Existing first-party descriptions remain untouched;
+  // fields IMDb can uniquely supply (such as its rating) may fill gaps.
+  if(!id)await attempt(identity);
+  if(id)add(await attempt(async()=>parseIMDbDetails(await get(imdbURL(id),true),id,selected.type)));
   return {...(result||{sources:[]}),imdbId:id,imdbUrl:id?imdbURL(id):'',state:result?.description?'ready':result?'partial':id||selected.tvmazeId||selected.appleId?'unavailable':'unmatched'};
 }
