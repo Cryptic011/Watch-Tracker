@@ -174,6 +174,7 @@ function patch(items,changes){
    assert.equal(items.find(item=>item.id==='show').watchedEpisodes[1].includes(4),true,'reconnection uploads the saved offline change');
    assert.ok(saves.length>0&&saves.every(body=>!('items' in body)&&Array.isArray(body.changes)));
    await page.locator('[data-gallery-close]').click();await page.waitForFunction(()=>!document.querySelector('.gallery-detail[open]'));
+   await page.locator('[data-gallery-category="Series"]').click();
    await page.locator('[data-tab="settings"]').click();await page.locator('[data-settings-open="account"]').click();
    await page.locator('#recovery-current-pin').fill('1234');await page.locator('#generate-recovery-code').click();
    await page.locator('#recovery-code-dialog').waitFor({state:'visible'});assert.equal(await page.locator('#recovery-code-output').textContent(),code);
@@ -182,6 +183,7 @@ function patch(items,changes){
    await page.locator('#recovery-code-saved').check();await page.locator('#close-recovery-code').click();
    assert.equal(await page.locator('#recovery-code-output').textContent(),'');
    await page.locator('#logout-btn').click();await page.locator('#auth-screen').waitFor({state:'visible'});
+   assert.equal(await page.locator('#continue-watching').count(),1,'sign-out preserves the live progress container for the next sign-in');
    await page.locator('#forgot-pin').click();await page.locator('#recover-email').fill(account.email);await page.locator('#recover-code').fill(code);await page.locator('#recover-pin').fill('4321');await page.locator('#recover-submit').click();
    await page.locator('#recovery-code-dialog').waitFor({state:'visible'});await page.locator('#recovery-code-saved').check();await page.locator('#close-recovery-code').click();
    await page.locator('#auth-pin').fill('4321');await page.locator('#auth-submit').click();await page.waitForFunction(()=>document.querySelector('#auth-screen').classList.contains('hidden'));
