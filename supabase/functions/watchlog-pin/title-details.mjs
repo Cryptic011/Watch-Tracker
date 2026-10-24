@@ -151,7 +151,7 @@ export function parseIMDbDetails(html,id,type){
   return record({description:isWholeTitleSynopsis(row.description,1)?text(row.description):"",premiered:/^\d{4}-\d{2}-\d{2}$/.test(row.datePublished||'')?row.datePublished:'',year:yearOf(row.datePublished),genres:[row.genre||[]].flat().filter(v=>typeof v==='string').map(clean).slice(0,15),runtime:duration?Number(duration[1]||0)*60+Number(duration[2]||0)||null:null,rating:Number.isFinite(rating)&&rating>0&&rating<=10?rating:null},'IMDb',imdbURL(id));
 }
 export async function getTitleDetails(input,request=fetch,{useCache=true,tmdbToken=""}={}){
-  const type=input.type==='Film'?'Film':input.type==='Series'?'Series':null;
+  const type=input.type==='Film'?'Film':['Series','Anime'].includes(input.type)?'Series':null;
   if(!type)return {state:'unmatched',sources:[]};
   const selected={type,title:clean(input.title).slice(0,160),year:yearOf(input.year||input.releaseYear),imdbId:imdbID(input.imdbId),tvmazeId:numericID(input.tvmazeShowId||input.tvmazeId),appleId:input.source==='apple'?numericID(input.externalId):'',platform:clean(input.platform).slice(0,80),officialUrl:firstPartyURL(input.officialUrl||input.officialSite)?.url||''};
   const key=JSON.stringify(selected),cached=cache.get(key);

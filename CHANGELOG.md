@@ -1,3 +1,16 @@
+## 2026-10-24 — Fix twelve review findings across saved data, metadata and reminders
+- Merge device writes transactionally across browser tabs and preserve pending edits during acknowledgements and rapid saves.
+- Consume legacy imports only after the imported library is durable, preventing deleted titles from returning at sign-in.
+- Preserve manually logged films alongside same-name television adaptations.
+- Keep film verification tied to the selected year and provider identity instead of another remake.
+- Serialize PIN recovery, PIN changes and session creation so revoked requests cannot replace recovered credentials.
+- Require a signed GitHub Actions identity for deployment notifications and atomically lease reminder deliveries.
+- Keep successful online pages and assets available when runtime cache storage fails.
+- Save the visible platform value, including manual edits and clearing a previous provider.
+- Clear watched summaries when the final episode is unmarked.
+- Accept supported official Netflix/Paramount sources with verified attribution and load Anime details as series metadata.
+- Gate publishing on new unit, PostgreSQL and Chromium/WebKit regressions, including two tabs sharing device storage.
+
 ## 2026-10-24 — Validate whole-title descriptions across every verified fallback
 - Apply whole-series and whole-film synopsis checks to IMDb and Apple TV as well as broadcaster and studio pages.
 - Reject season/episode-specific plots, numbered or named episode headings, and trailer promotions without discarding verified ratings and other title-level facts.

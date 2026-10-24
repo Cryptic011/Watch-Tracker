@@ -4,12 +4,13 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 const source=fs.readFileSync(new URL('../sw.js',import.meta.url),'utf8');
 const version=source.match(/const SHELL_BUILD="([^"]+)"/)[1],scope='https://app.test/Watched-Tracker/';
-function worker({fail=false,offline=false}={}){
+function worker({fail=false,offline=false,cacheFailure=''}={}){
  const listeners={},stores=new Map(),requests=[];let skipped=0;
  const key=request=>new URL(request.url||String(request),scope).href;
  const caches={keys:async()=>[...stores.keys()],delete:async name=>stores.delete(name),open:async name=>{
+  if(cacheFailure==='open')throw Error('Cache unavailable');
   if(!stores.has(name))stores.set(name,new Map());const map=stores.get(name);
-  return {match:async request=>map.get(key(request))?.clone(),put:async(request,response)=>map.set(key(request),response.clone()),addAll:async assets=>{
+  return {match:async request=>{if(cacheFailure==='read')throw Error('Cache unavailable');return map.get(key(request))?.clone();},put:async(request,response)=>{if(cacheFailure==='write')throw Object.assign(Error('Storage full'),{name:'QuotaExceededError'});map.set(key(request),response.clone());},addAll:async assets=>{
    const staged=await Promise.all(assets.map(async request=>{const response=await fetcher(request);if(!response.ok)throw Error('Missing asset');return [key(request),response];}));
    for(const [url,response] of staged)map.set(url,response.clone());
   }};
@@ -46,4 +47,14 @@ test('Offline navigation uses HTML from the complete matching shell',async()=>{
  const app=worker({offline:true}),shell=await app.caches.open('watchlog-shell-'+version),navigation=await app.caches.open('watchlog-navigation-v4');
  await shell.put(scope+'index.html',new Response('matching shell'));await navigation.put(scope+'index.html',new Response('other build'));
  let work;app.listeners.fetch({request:{url:scope,method:'GET',mode:'navigate'},respondWith:promise=>work=promise});assert.equal(await (await work).text(),'matching shell');
+});
+test('Online scripts, styles and navigation survive runtime cache failures',async()=>{
+ for(const cacheFailure of ['open','read','write']){
+  const app=worker({cacheFailure});
+  for(const request of [new Request(scope+'assets/js/new.js?v=next'),new Request(scope+'assets/css/new.css?v=next'),{url:scope,method:'GET',mode:'navigate'}]){
+   let work;app.listeners.fetch({request,respondWith:promise=>work=promise});
+   const response=await work;assert.equal(response.status,200);assert.match(await response.text(),/^asset /);
+  }
+  assert.equal(app.requests.length,3,'a broken runtime cache still uses the available network');
+ }
 });

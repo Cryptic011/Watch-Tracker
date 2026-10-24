@@ -102,6 +102,7 @@
     if(Array.isArray(snap.items)&&snap.items.length)showMessage(`Found ${snap.items.length} title(s) from the previous on-device Watched Logger account. Creating a PIN account with this email will carry them into cloud sync.`,"info");
   }
 
+  const LOCAL_WRITER_ID=uuid();
   function cloneLibrarySnapshot(items){
     try{if(typeof structuredClone==="function")return structuredClone(Array.isArray(items)?items:[]);}catch(_){}
     return JSON.parse(JSON.stringify(Array.isArray(items)?items:[]));
@@ -117,6 +118,11 @@
       generation:Number(overrides.generation??persistenceGeneration),
       db:overrides.db??cacheDB,
       sequence:Number(overrides.sequence??++localSaveSequence),
+      writerId:overrides.writerId||LOCAL_WRITER_ID,
+      cacheRevision:Number(overrides.cacheRevision)||0,
+      localBaseItems:cloneLibrarySnapshot(Array.isArray(overrides.localBaseItems)?overrides.localBaseItems:
+        activePersistenceContext(latestLocalSnapshot)?latestLocalSnapshot.items:(overrides.baseItems||cloudBaseItems)),
+      legacyMigrationEmail:overrides.legacyMigrationEmail||"",
       baseItems:Array.isArray(overrides.baseItems)?overrides.baseItems:cloudBaseItems,
       expectedRevision:Math.max(0,Number(overrides.expectedRevision??cloudRevision)||0)
     };
@@ -202,6 +208,7 @@
       for(const pending of new Set([latestLocalSnapshot,queuedLocalSnapshot,queuedCloudSnapshot])){
         if(!pending||!activePersistenceContext(pending)||pending.sequence<=originalSnapshot.sequence)continue;
         pending.items=replayLocalChanges(originalSnapshot.items,pending.items,savedSnapshot.items);
+        pending.localBaseItems=replayLocalChanges(originalSnapshot.items,pending.localBaseItems||pending.baseItems,savedSnapshot.items);
         pending.json=JSON.stringify(pending.items);
         pending.baseItems=savedSnapshot.items;pending.expectedRevision=revision;
       }
@@ -212,7 +219,24 @@
       render();
       if(!sameSyncValue(originalSnapshot.items,savedSnapshot.items))window.WatchLogGallery?.refreshCurrent?.();
     }
-    await acknowledgeCachedSnapshot(originalSnapshot,savedSnapshot,revision);
+    const cached=await acknowledgeCachedSnapshot(originalSnapshot,savedSnapshot,revision);
+    if(cached&&activePersistenceContext(originalSnapshot)){
+      // A different tab may have saved while this cloud request was in flight.
+      // Bring that durable edit into this tab and keep it queued for upload.
+      mediaItems=replayLocalChanges(savedSnapshot.items,mediaItems,cached.items);
+      for(const pending of new Set([latestLocalSnapshot,queuedLocalSnapshot,queuedCloudSnapshot])){
+        if(!pending||!activePersistenceContext(pending)||pending.sequence<=originalSnapshot.sequence)continue;
+        pending.items=replayLocalChanges(savedSnapshot.items,pending.items,cached.items);
+        pending.localBaseItems=replayLocalChanges(savedSnapshot.items,pending.localBaseItems||pending.baseItems,cached.items);
+        pending.json=JSON.stringify(pending.items);pending.baseItems=cached.cloudItems;pending.expectedRevision=cached.cloudRevision;
+      }
+      if(cached.dirty){
+        const pending=latestLocalSnapshot&&latestLocalSnapshot.sequence>originalSnapshot.sequence?latestLocalSnapshot:
+          createLibrarySnapshot(mediaItems,{baseItems:cached.cloudItems,expectedRevision:cached.cloudRevision,localBaseItems:cached.items,cacheRevision:cached.localRevision});
+        latestLocalSnapshot=pending;queuedCloudSnapshot=pending;markPending(true,originalSnapshot.accountId);
+      }
+      render();
+    }
     /* A delayed callback can enqueue this same snapshot again. Its accepted
        baseline must now describe the accepted revision, including remote edits. */
     originalSnapshot.items=cloneLibrarySnapshot(savedSnapshot.items);
@@ -230,19 +254,16 @@
       request.onsuccess=()=>{
         const record=request.result;
         if(record?.userId!==originalSnapshot.accountId||Number(record.cloudRevision||0)>revision)return;
-        const sequence=Math.max(Number(record.localSequence)||0,originalSnapshot.sequence);
-        const items=Number(record.localSequence||0)>originalSnapshot.sequence
-          ? replayLocalChanges(originalSnapshot.items,record.items,savedSnapshot.items)
-          : savedSnapshot.items;
+        const items=replayLocalChanges(originalSnapshot.items,record.items,savedSnapshot.items);
         const json=JSON.stringify(items);
-        acknowledged={...record,items,json,dirty:json!==savedSnapshot.json,cloudItems:savedSnapshot.items,cloudRevision:revision,localSequence:sequence,updatedAt:nowISO()};
+        acknowledged={...record,items,json,dirty:json!==savedSnapshot.json,cloudItems:savedSnapshot.items,cloudRevision:revision,localRevision:(Number(record.localRevision)||0)+1,updatedAt:nowISO()};
         store.put(acknowledged);
       };
       tx.oncomplete=()=>{
         if(acknowledged&&activePersistenceContext(originalSnapshot)){
           lastLocalLibraryJSON=acknowledged.json;lastLocalAccountId=originalSnapshot.accountId;
         }
-        resolve(Boolean(acknowledged));
+        resolve(acknowledged);
       };
       tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error||new Error("On-device sync acknowledgement was interrupted."));
     });
@@ -295,14 +316,31 @@
     if(activePersistenceContext(snapshot)&&(!latestLocalSnapshot||snapshot.sequence>=latestLocalSnapshot.sequence))latestLocalSnapshot=snapshot;
     /* IndexedDB writes are serialized and coalesced. If five episode ticks or
        edits happen quickly, only the newest waiting snapshot is written. */
-    if(!queuedLocalSnapshot||queuedLocalSnapshot.accountId!==snapshot.accountId||snapshot.sequence>=queuedLocalSnapshot.sequence)queuedLocalSnapshot=snapshot;
+    if(!queuedLocalSnapshot||queuedLocalSnapshot.accountId!==snapshot.accountId||snapshot.sequence>=queuedLocalSnapshot.sequence){
+      if(queuedLocalSnapshot?.accountId===snapshot.accountId){
+        // A coalesced-away edit was never written. Carry its original view
+        // forward so the replacement includes every queued local change.
+        snapshot.localBaseItems=cloneLibrarySnapshot(queuedLocalSnapshot.localBaseItems||queuedLocalSnapshot.baseItems);
+        snapshot.legacyMigrationEmail ||= queuedLocalSnapshot.legacyMigrationEmail;
+      }
+      queuedLocalSnapshot=snapshot;
+    }
     if(localSaveInFlight)return localSaveInFlight;
     localSaveInFlight=(async()=>{
       while(queuedLocalSnapshot){
         const snapshot=queuedLocalSnapshot;
         queuedLocalSnapshot=null;
         if(snapshot.accountId===lastLocalAccountId&&snapshot.json===lastLocalLibraryJSON)continue;
-        await saveCache(snapshot.items,snapshot.json,{dirty:true,baseItems:snapshot.baseItems,baseRevision:snapshot.expectedRevision,sequence:snapshot.sequence,accountId:snapshot.accountId,db:snapshot.db});
+        const before=snapshot.items;
+        const saved=await saveCache(snapshot.items,snapshot.json,{dirty:true,baseItems:snapshot.baseItems,baseRevision:snapshot.expectedRevision,localBaseItems:snapshot.localBaseItems,
+          sequence:snapshot.sequence,writerId:snapshot.writerId,legacyMigrationEmail:snapshot.legacyMigrationEmail,accountId:snapshot.accountId,db:snapshot.db});
+        if(saved){
+          snapshot.items=cloneLibrarySnapshot(saved.items);snapshot.json=saved.json;snapshot.baseItems=saved.cloudItems;snapshot.expectedRevision=saved.cloudRevision;snapshot.cacheRevision=saved.localRevision;
+          if(activePersistenceContext(snapshot)){
+            mediaItems=localSaveSequence>snapshot.sequence?replayLocalChanges(before,mediaItems,saved.items):cloneLibrarySnapshot(saved.items);
+            render();
+          }
+        }
       }
       return true;
     })().finally(()=>{
@@ -360,7 +398,7 @@
     return cloudSaveInFlight;
   }
 
-  function persistLibrary(items,{background=false,precleaned=false}={}){
+  function persistLibrary(items,{background=false,precleaned=false,localBaseItems}={}){
     const source=Array.isArray(items)?items:[];
     const migration=migratePlannedStatuses(source);
     // Fast-path writes must still enforce unique title identity. Otherwise a
@@ -374,7 +412,7 @@
     /* Start the on-device and cloud writes together. The UI can close
        immediately, while both queues retain only the newest safe snapshot.
        Clone once: IndexedDB and fetch both treat this snapshot as read-only. */
-    const snapshot=createLibrarySnapshot(items);
+    const snapshot=createLibrarySnapshot(items,{localBaseItems});
     if(activePersistenceContext(snapshot))setSync("Saving on this device…","warn");
     const localSave=queueLocalLibrarySave(snapshot);
     const cloudSave=localSave.then(()=>queueCloudLibrarySave(snapshot));
@@ -403,7 +441,12 @@
       if(latestLocalSnapshot&&activePersistenceContext(latestLocalSnapshot))await queueLocalLibrarySave(latestLocalSnapshot);
       const cached=await loadCacheRecord();
       if(!activePersistenceContext(context))return;
-      if(cached?.items)await queueCloudLibrarySave(createLibrarySnapshot(cached.items,{baseItems:Array.isArray(cached.cloudItems)?cached.cloudItems:cloudBaseItems,expectedRevision:Number(cached.cloudRevision??cloudRevision),sequence:Number(cached.localSequence||++localSaveSequence)}));
+      if(cached?.items){
+        // Reading shared durable state creates a fresh operation in this tab;
+        // another writer's sequence must never compete with our own counter.
+        const snapshot=createLibrarySnapshot(cached.items,{baseItems:Array.isArray(cached.cloudItems)?cached.cloudItems:cloudBaseItems,expectedRevision:Number(cached.cloudRevision??cloudRevision),localBaseItems:cached.items,cacheRevision:cached.localRevision});
+        latestLocalSnapshot=snapshot;await queueCloudLibrarySave(snapshot);
+      }
     }catch(error){console.warn("Automatic cloud retry postponed",error);}
   }
   function localSyncPending(){return Boolean(latestLocalSnapshot&&activePersistenceContext(latestLocalSnapshot)&&latestLocalSnapshot.json!==lastCloudLibraryJSON);}
@@ -452,6 +495,9 @@
         if(localSaveInFlight)await localSaveInFlight;
         if(cloudSaveInFlight)await cloudSaveInFlight;
         if(!activePersistenceContext(context))return false;
+        // The durable queue is authoritative even if a tab closed between its
+        // IDB commit and updating the advisory localStorage pending flag.
+        if(cacheDB){const cached=await loadCacheRecord();if(!activePersistenceContext(context))return false;if(cached?.dirty)markPending(true,context.accountId);}
         if(hasPending()||queuedCloudSnapshot||localSyncPending())await retryPendingCloudSave();
         if(!activePersistenceContext(context))return false;
         if(hasPending()||queuedCloudSnapshot||localSyncPending()){cloudSyncFailures++;return false;}
@@ -473,7 +519,7 @@
         const migration=migratePlannedStatuses(merged),cleanup=cleanLibraryRecords(migration.rows);
         applyAccount(result.account);setCloudBaseline(result.items,result.revision,context.accountId);
         mediaItems=cleanup.items;render();window.WatchLogGallery?.refreshCurrent?.();
-        const saved=await persistLibrary(mediaItems,{precleaned:true});
+        const saved=await persistLibrary(mediaItems,{precleaned:true,localBaseItems:result.items});
         if(!activePersistenceContext(context))return false;
         if(!saved){cloudSyncFailures++;return false;}
         cloudSyncFailures=0;
@@ -517,7 +563,7 @@
       if(seed.type==="Film"){
         if(seed.filmReleaseSource==="Manual")return false;
         if(verificationPromise){try{result=await verificationPromise;}catch(_){}}
-        if(!result)result=await verifiedFilmReleaseData(seed.title,{imdbId:seed.imdbId||"",seedDate:seed.filmReleaseDate||"",seedSource:seed.filmReleaseSource||""});
+        if(!result)result=await verifiedFilmReleaseData(seed.title,{imdbId:seed.imdbId||"",year:seed.releaseYear||"",seedDate:seed.filmReleaseDate||"",seedSource:seed.filmReleaseSource||""});
       }else{
         if(verificationPromise){
           try{result=await verificationPromise;}catch(_){}
@@ -675,24 +721,38 @@
       : mergeLibraries(remoteItems,cached.items);
   }
 
-  async function establishCloudSession(result,items,cloudItems=items){
+  async function establishCloudSession(result,items,cloudItems=items,{legacyEmail=""}={}){
     cloudSessionToken=result.sessionToken||cloudSessionToken;
     applyAccount(result.account);
     setCloudBaseline(Array.isArray(cloudItems)?cloudItems:[],result.revision,currentUser.id);
     await openCache(currentUser.id);
     const cached=await loadCacheRecord();
+    const legacyMarker=legacyEmail?await cacheGet("legacy-migration-v1"):null;
+    // Previous PIN versions already imported legacy sources before creating
+    // this account's durable library. Honour that completed work on upgrade,
+    // including an empty library whose titles were deliberately deleted.
+    const previousImport=legacyMarker?.userId===String(currentUser.id)||(cached?.userId===String(currentUser.id)&&Array.isArray(cached.items));
+    const legacy=legacyEmail&&!previousImport?await collectPreviousLocalItems(legacyEmail):[];
+    if(legacy.length)items=mergeLibraries(Array.isArray(items)?items:[],legacy);
+    const legacyMigrationEmail=legacyEmail&&(legacy.length||previousImport)?normalizeEmail(legacyEmail):"";
     localSaveSequence=Math.max(localSaveSequence,Number(cached?.localSequence)||0);
     mediaItems=mergePendingCache(cached,Array.isArray(items)?items:[]);
     await saveProfile(currentProfile);
-    const pending=JSON.stringify(mediaItems)!==lastCloudLibraryJSON;
+    let pending=JSON.stringify(mediaItems)!==lastCloudLibraryJSON;
     if(pending){
-      const snapshot=createLibrarySnapshot(mediaItems);
+      const snapshot=createLibrarySnapshot(mediaItems,{legacyMigrationEmail});
       markPending(true,snapshot.accountId);
       await queueLocalLibrarySave(snapshot);
       void queueCloudLibrarySave(snapshot).catch(error=>console.warn("Cloud sync postponed",error));
     }else{
-      await saveCache(mediaItems,"",{dirty:false,baseItems:cloudBaseItems,baseRevision:cloudRevision});
-      markPending(false);
+      const saved=await saveCache(mediaItems,"",{dirty:false,baseItems:cloudBaseItems,baseRevision:cloudRevision,legacyMigrationEmail});
+      if(saved)mediaItems=saved.items;
+      if(saved?.cloudRevision>cloudRevision)setCloudBaseline(saved.cloudItems,saved.cloudRevision,currentUser.id);
+      pending=Boolean(saved?.dirty);markPending(pending);
+      if(pending){
+        const snapshot=createLibrarySnapshot(mediaItems,{baseItems:saved.cloudItems,expectedRevision:saved.cloudRevision,localBaseItems:saved.items,cacheRevision:saved.localRevision});
+        latestLocalSnapshot=snapshot;void queueCloudLibrarySave(snapshot).catch(error=>console.warn("Cloud sync postponed",error));
+      }
     }
     storePinSession({id:currentUser.id,email:currentProfile.email,displayName:currentProfile.display_name},cloudSessionToken,result.expiresAt||null,cloudRevision);
     await enterAccount(mediaItems,{syncText:pending?"Saved on this device. Syncing your latest changes…":"Synced. This library is available on your other devices.",syncState:pending?"warn":"ok"});
@@ -701,14 +761,12 @@
   async function registerPinAccount(name,email,pin){
     const localItems=await collectPreviousLocalItems(email);
     const result=await pinApi("register",{displayName:name||"User",email,pin,items:localItems},"");
-    await establishCloudSession(result,localItems);
+    await establishCloudSession(result,localItems,localItems,{legacyEmail:email});
   }
 
   async function loginPinAccount(email,pin){
     const result=await pinApi("login",{email,pin},"");
-    const legacy=await collectPreviousLocalItems(email);
-    const merged=mergeLibraries(result.items||[],legacy);
-    await establishCloudSession(result,merged,result.items||[]);
+    await establishCloudSession(result,result.items||[],result.items||[],{legacyEmail:email});
   }
 
   async function restorePinSession(){
@@ -729,7 +787,15 @@
       if(pending){
         const snapshot=createLibrarySnapshot(mediaItems,{baseItems:remoteItems,expectedRevision:cloudRevision});
         await queueLocalLibrarySave(snapshot);await queueCloudLibrarySave(snapshot);
-      }else await saveCache(mediaItems,"",{dirty:false,baseItems:remoteItems,baseRevision:cloudRevision});
+      }else{
+        const saved=await saveCache(mediaItems,"",{dirty:false,baseItems:remoteItems,baseRevision:cloudRevision});
+        if(saved)mediaItems=saved.items;
+        if(saved?.cloudRevision>cloudRevision)setCloudBaseline(saved.cloudItems,saved.cloudRevision,currentUser.id);
+        if(saved?.dirty){
+          const snapshot=createLibrarySnapshot(mediaItems,{baseItems:saved.cloudItems,expectedRevision:saved.cloudRevision,localBaseItems:saved.items,cacheRevision:saved.localRevision});
+          latestLocalSnapshot=snapshot;markPending(true);await queueCloudLibrarySave(snapshot);
+        }
+      }
       const stillPending=hasPending()||Boolean(queuedCloudSnapshot);
       storePinSession({id:currentUser.id,email:currentProfile.email,displayName:currentProfile.display_name},cloudSessionToken,saved.expiresAt||null,cloudRevision);await enterAccount(mediaItems,stillPending?{syncText:"Saved on this device. Cloud sync is pending; retrying automatically.",syncState:"warn"}:{});return true;
     }catch(e){

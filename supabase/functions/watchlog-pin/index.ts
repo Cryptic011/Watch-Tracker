@@ -188,13 +188,14 @@ async function isMaintenanceAdmin(accountId: string) {
   return safeEqual(candidate, MAINTENANCE_ADMIN_HASH);
 }
 
-async function createSession(accountId: string) {
+async function createSession(accountId: string, pinHash: string, pinSalt: string) {
   const token = randomToken();
   const tokenHash = await sha256(token);
   const expires = new Date(Date.now() + SESSION_DAYS * 86400000).toISOString();
-  const { error } = await db.from("watchlog_pin_sessions").insert({ token_hash: tokenHash, account_id: accountId, expires_at: expires });
+  const { data, error } = await db.rpc("watchlog_create_pin_session", { p_account: accountId, p_pin_hash: pinHash, p_pin_salt: pinSalt, p_token_hash: tokenHash, p_expires_at: expires });
   if (error) throw error;
-  return { token, expiresAt: expires };
+  if (!data?.ok) return { ok: false as const, code: String(data?.code || "invalid_login"), retryAfter: Number(data?.retryAfter || 0) };
+  return { ok: true as const, token, expiresAt: expires };
 }
 
 async function getSession(req: Request) {
@@ -286,7 +287,8 @@ Deno.serve(async (req: Request) => {
           .select("updated_at,revision")
           .single();
         if (libraryError) throw libraryError;
-        const session = await createSession(account.id);
+        const session = await createSession(account.id,pinHash,b64(salt));
+        if (!session.ok) return json({ error: "Account credential changed during registration. Sign in again.", code: "invalid_login" }, 409);
         return json({ ok: true, account: { id: account.id, email: account.email, displayName: account.display_name }, updatedAt: library.updated_at, revision: Number(library.revision || 0), sessionToken: session.token, expiresAt: session.expiresAt });
       } catch (registrationError) {
         await db.from("watchlog_pin_library").delete().eq("account_id", account.id);
@@ -332,29 +334,13 @@ Deno.serve(async (req: Request) => {
         return json({ error: maintenance.message, code: "maintenance", maintenance: true }, 503);
       }
 
-      // PBKDF2 runs outside the database. Recheck the credential and lock while
-      // updating so another request cannot have its new lock cleared here.
-      const verifiedAt = new Date().toISOString();
-      const { data: resetAccount, error: resetError } = await db.from("watchlog_pin_accounts")
-        .update({ failed_attempts: 0, locked_until: null, updated_at: verifiedAt })
-        .eq("id", account.id)
-        .eq("pin_hash", account.pin_hash)
-        .eq("pin_salt", account.pin_salt)
-        .or(`locked_until.is.null,locked_until.lte.${verifiedAt}`)
-        .select("id")
-        .maybeSingle();
-      if (resetError) throw resetError;
-      if (!resetAccount) {
-        const { data: latestAccount, error: latestError } = await db.from("watchlog_pin_accounts")
-          .select("locked_until")
-          .eq("id", account.id)
-          .maybeSingle();
-        if (latestError) throw latestError;
-        const retryAfter = Math.ceil((new Date(latestAccount?.locked_until || 0).getTime() - Date.now()) / 1000);
-        if (retryAfter > 0) return json({ error: `Too many incorrect PIN attempts. Try again in ${Math.ceil(retryAfter / 60)} minute(s).`, code: "locked", retryAfter }, 429);
+      // Session issuance shares recovery's account-row lock and rechecks the
+      // exact credential after PBKDF2. No session can appear after revocation.
+      const session = await createSession(account.id,account.pin_hash,account.pin_salt);
+      if (!session.ok) {
+        if (session.code === "locked") return json({ error: `Too many incorrect PIN attempts. Try again in ${Math.ceil(session.retryAfter / 60)} minute(s).`, code: "locked", retryAfter: session.retryAfter }, 429);
         return json({ error: "Email or PIN is incorrect. Try signing in again.", code: "invalid_login" }, 401);
       }
-      const session = await createSession(account.id);
       const library=await readLibrary(account.id);
       return json({ ok: true, account: { id: account.id, email: account.email, displayName: account.display_name }, items: Array.isArray(library?.items) ? library!.items : [], updatedAt: library?.updated_at || null, revision: Number(library?.revision || 0), sessionToken: session.token, expiresAt: session.expiresAt });
     }
@@ -496,10 +482,9 @@ Deno.serve(async (req: Request) => {
       if (!validPin(pin)) return json({ error: "PIN must be exactly 4 digits." }, 400);
       const salt = crypto.getRandomValues(new Uint8Array(16));
       const pinHash = await derivePin(pin, salt);
-      const { error } = await db.from("watchlog_pin_accounts").update({ pin_hash: pinHash, pin_salt: b64(salt), failed_attempts: 0, locked_until: null, updated_at: new Date().toISOString() }).eq("id", session.accountId);
+      const { data: changed, error } = await db.rpc("watchlog_change_pin", { p_account: session.accountId, p_session_token_hash: session.tokenHash, p_pin_hash: pinHash, p_pin_salt: b64(salt) });
       if (error) throw error;
-      const { error: revokeError } = await db.from("watchlog_pin_sessions").delete().eq("account_id", session.accountId).neq("token_hash", session.tokenHash);
-      if (revokeError) throw revokeError;
+      if (!changed) return json({ error: "Session expired. Sign in again.", code: "session_expired" }, 401);
       return json({ ok: true });
     }
 

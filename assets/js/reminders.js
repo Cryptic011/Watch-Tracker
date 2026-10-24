@@ -290,12 +290,33 @@
     lastCloudLibraryJSON=JSON.stringify(cloudBaseItems);
     lastCloudAccountId=accountId;
   }
-  async function saveCache(items,serialized="",{dirty=false,baseItems=cloudBaseItems,baseRevision=cloudRevision,sequence=localSaveSequence,accountId=String(currentUser?.id||""),db=cacheDB}={}){
+  async function saveCache(items,serialized="",{dirty=false,baseItems=cloudBaseItems,baseRevision=cloudRevision,localBaseItems=baseItems,sequence=localSaveSequence,writerId=LOCAL_WRITER_ID,legacyMigrationEmail="",accountId=String(currentUser?.id||""),db=cacheDB}={}){
     if(!accountId||!db)return false;
-    const json=serialized||JSON.stringify(items);
-    await cachePut({key:"library",userId:accountId,items,json,dirty,cloudItems:baseItems,cloudRevision:Math.max(0,Number(baseRevision)||0),localSequence:sequence,updatedAt:nowISO()},db);
-    if(String(currentUser?.id||"")===accountId&&cacheDB===db){lastLocalLibraryJSON=json;lastLocalAccountId=accountId;}
-    return true;
+    const saved=await new Promise((resolve,reject)=>{
+      // Every tab reads and merges the shared record under the same IDB write
+      // transaction. Tab-local counters never order another tab's changes.
+      const tx=db.transaction("data","readwrite"),store=tx.objectStore("data"),request=store.get("library");
+      let record;
+      request.onsuccess=()=>{
+        const previous=request.result?.userId===accountId?request.result:null;
+        const revision=Math.max(0,Number(baseRevision)||0,Number(previous?.cloudRevision)||0);
+        const baseline=Number(previous?.cloudRevision||0)>Number(baseRevision||0)&&Array.isArray(previous?.cloudItems)?previous.cloudItems:baseItems;
+        let shared=previous?.items||baseline;
+        if(previous&&Number(previous.cloudRevision||0)<Number(baseRevision||0))shared=previous.dirty
+          ?replayLocalChanges(previous.cloudItems||[],previous.items,baseline):baseline;
+        const merged=dirty?replayLocalChanges(localBaseItems,items,shared)
+          :previous?.dirty?replayLocalChanges(previous.cloudItems||[],previous.items,baseline)
+          :Number(previous?.cloudRevision||0)>Number(baseRevision||0)?shared:items;
+        const json=JSON.stringify(merged);
+        record={...previous,key:"library",userId:accountId,items:merged,json,dirty:json!==JSON.stringify(baseline),cloudItems:baseline,cloudRevision:revision,
+          localSequence:sequence,localWriter:writerId,localRevision:(Number(previous?.localRevision)||0)+1,updatedAt:nowISO()};
+        store.put(record);
+        if(legacyMigrationEmail)store.put({key:"legacy-migration-v1",userId:accountId,email:legacyMigrationEmail,completedAt:nowISO()});
+      };
+      tx.oncomplete=()=>resolve(record);tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error||new Error("On-device save was interrupted."));
+    });
+    if(String(currentUser?.id||"")===accountId&&cacheDB===db){lastLocalLibraryJSON=saved.json;lastLocalAccountId=accountId;}
+    return saved;
   }
   async function loadCacheRecord(){if(!currentUser)return null;const r=await cacheGet("library");return r?.userId===currentUser.id?r:null;}
   async function loadCache(){const r=await loadCacheRecord();return Array.isArray(r?.items)?r.items:[];}

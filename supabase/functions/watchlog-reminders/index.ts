@@ -1,5 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.112.4";
+import { createRemoteJWKSet, jwtVerify } from "npm:jose@6.2.13";
+import { authenticateDeploymentRequest } from "./deployment-identity.mjs";
 import {
   generateVAPIDKeys,
   sendNotification,
@@ -19,7 +21,8 @@ const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const db = createClient(supabaseUrl, serviceKey, {
   auth: { persistSession: false, autoRefreshToken: false },
 });
-// Deployment-status requests authenticate by verifying the completed run against GitHub Actions below.
+const githubActionsKeys = createRemoteJWKSet(new URL("https://token.actions.githubusercontent.com/.well-known/jwks"), { timeoutDuration: 5000 });
+// Deployment status requires a signed identity for this exact workflow and run.
 // Deploy this function with platform JWT verification disabled; other actions enforce their own session/cron checks.
 const enc = new TextEncoder();
 const VAPID_SUBJECT = "mailto:push@watched-logger.app";
@@ -453,16 +456,6 @@ async function sendPush(
   );
 }
 
-async function disableExpiredSubscription(row: PushRow) {
-  await db
-    .from("watchlog_push_subscriptions")
-    .update({
-      enabled: false,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", row.id);
-}
-
 async function claimDelivery(
   row: PushRow,
   accountId: string,
@@ -471,113 +464,31 @@ async function claimDelivery(
   scheduledFor: string,
   legacyKeys: string[] = [],
 ) {
-  if (legacyKeys.length) {
-    const { data: sent, error } = await db.from("watchlog_push_deliveries").select("id").eq("subscription_id", row.id).in("event_key", legacyKeys).eq("status", "sent").limit(1);
-    if (error) throw error;
-    if (sent?.length) return null;
-  }
-  const nowIso = new Date().toISOString();
-  const { data: existing } = await db
-    .from("watchlog_push_deliveries")
-    .select("id,status,attempts,next_attempt_at")
-    .eq("subscription_id", row.id)
-    .eq("event_key", eventKey)
-    .maybeSingle();
-
-  if (existing) {
-    if (existing.status === "sent" || existing.status === "expired") return null;
-    if (Number(existing.attempts || 0) >= MAX_PUSH_ATTEMPTS) return null;
-    if (
-      existing.next_attempt_at &&
-      new Date(existing.next_attempt_at).getTime() > Date.now()
-    ) {
-      return null;
-    }
-    const attempts = Number(existing.attempts || 0) + 1;
-    const { data, error } = await db
-      .from("watchlog_push_deliveries")
-      .update({
-        status: "pending",
-        attempts,
-        next_attempt_at: null,
-        updated_at: nowIso,
-      })
-      .eq("id", existing.id)
-      .select("id,attempts")
-      .single();
-    if (error) throw error;
-    return data;
-  }
-
-  const { data, error } = await db
-    .from("watchlog_push_deliveries")
-    .insert({
-      subscription_id: row.id,
-      account_id: accountId,
-      item_id: itemId,
-      event_key: eventKey,
-      scheduled_for: scheduledFor,
-      status: "pending",
-      attempts: 1,
-    })
-    .select("id,attempts")
-    .single();
-
-  if (error?.code === "23505") return null;
+  const { data, error } = await db.rpc("watchlog_claim_push_delivery", {
+    p_subscription: row.id, p_account: accountId, p_item: itemId,
+    p_event_key: eventKey, p_scheduled_for: scheduledFor, p_legacy_keys: legacyKeys,
+  });
   if (error) throw error;
-  return data;
+  return data?.id ? data : null;
 }
 
 async function finishDelivery(
-  delivery: { id: string; attempts: number },
-  row: PushRow,
+  delivery: { id: string; attempts: number; lease_token: string },
+  _row: PushRow,
   error?: unknown,
 ) {
-  const now = new Date();
-  if (!error) {
-    await db
-      .from("watchlog_push_deliveries")
-      .update({
-        status: "sent",
-        sent_at: now.toISOString(),
-        next_attempt_at: null,
-        last_error: null,
-        updated_at: now.toISOString(),
-      })
-      .eq("id", delivery.id);
-    return;
-  }
-
-  const code = statusCodeFor(error);
-  if (code === 404 || code === 410) {
-    await disableExpiredSubscription(row);
-    await db
-      .from("watchlog_push_deliveries")
-      .update({
-        status: "expired",
-        last_error: `Push subscription expired (${code})`,
-        updated_at: now.toISOString(),
-      })
-      .eq("id", delivery.id);
-    return;
-  }
-
-  const exhausted = Number(delivery.attempts || 0) >= MAX_PUSH_ATTEMPTS;
+  const code = statusCodeFor(error), exhausted = Number(delivery.attempts || 0) >= MAX_PUSH_ATTEMPTS;
+  const expired = Boolean(error) && (code === 404 || code === 410);
   const retryMinutes = Math.min(60, Math.max(5, Number(delivery.attempts || 1) * 5));
-  await db
-    .from("watchlog_push_deliveries")
-    .update({
-      status: exhausted ? "expired" : "retry",
-      next_attempt_at: exhausted
-        ? null
-        : new Date(now.getTime() + retryMinutes * 60000).toISOString(),
-      last_error: String((error as Error)?.message || error || "Push failed").slice(
-        0,
-        500,
-      ),
-      updated_at: now.toISOString(),
-    })
-    .eq("id", delivery.id);
+  const { data, error: finishError } = await db.rpc("watchlog_finish_push_delivery", {
+    p_delivery: delivery.id, p_lease: delivery.lease_token,
+    p_status: !error ? "sent" : expired || exhausted ? "expired" : "retry",
+    p_error: !error ? null : expired ? `Push subscription expired (${code})` : String((error as Error)?.message || error || "Push failed").slice(0,500),
+    p_next_attempt: error && !expired && !exhausted ? new Date(Date.now() + retryMinutes * 60000).toISOString() : null,
+    p_disable_subscription: expired,
+  });
+  if (finishError) throw finishError;
+  return data === true;
 }
 
 async function processPlannedReminders(
@@ -741,6 +652,12 @@ Deno.serve(async (req: Request) => {
       const commitUrl = String(body.commitUrl || "");
       const allowedStatuses = new Set(["success", "failure", "cancelled", "skipped"]);
       if (!/^\d+$/.test(runId) || !/^\d+$/.test(runNumber) || !/^\d+$/.test(runAttempt) || !/^[a-f0-9]{40}$/.test(sha) || !allowedStatuses.has(status)) return json({ error: "Invalid workflow status payload" }, 400);
+      try {
+        await authenticateDeploymentRequest(req, { runId, runNumber, runAttempt, sha },
+          (token: string, options: Parameters<typeof jwtVerify>[2]) => jwtVerify(token, githubActionsKeys, options));
+      } catch (_) {
+        return json({ error: "A verified deployment workflow identity is required." }, 401);
+      }
       // Keep the GitHub credential server-side; never forward the workflow token.
       const githubToken = Deno.env.get("WATCHLOG_GITHUB_TOKEN") || "";
       if (!githubToken) return json({ error: "Run verification is not configured" }, 503);
@@ -766,7 +683,7 @@ Deno.serve(async (req: Request) => {
         sha: String(verifiedRun.head_sha || "").toLowerCase() !== sha.toLowerCase(),
         active: verifiedRun.status !== "in_progress",
         // The workflow is still executing this always() step, so GitHub has
-        // not published its conclusion yet. The scoped token proves run access.
+        // not published its conclusion yet. Signed claims already bind the caller.
         conclusion: verifiedRun.conclusion !== null && verifiedRun.conclusion !== undefined,
         workflow: Number(verifiedRun.workflow_id) !== 344533582,
       };

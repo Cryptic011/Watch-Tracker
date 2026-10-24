@@ -8,6 +8,12 @@ function shellAsset(url){
   return url.origin===scope.origin&&url.pathname.startsWith(scope.pathname)&&
     !url.searchParams.has("update")&&/\.(?:js|css|png|svg|webmanifest)$/.test(url.pathname)&&!url.pathname.endsWith('/build-info.js')&&!url.pathname.endsWith('/sw.js');
 }
+async function runtimeCacheMatch(name,request){
+  try{return await (await caches.open(name)).match(request);}catch(_){return undefined;}
+}
+async function runtimeCachePut(name,request,response){
+  try{await (await caches.open(name)).put(request,response.clone());}catch(_){}
+}
 async function installShell(){
   const response=await fetch(new URL("asset-manifest.json",self.registration.scope),{cache:"no-store"});
   if(!response.ok)throw Error("Offline manifest unavailable");
@@ -42,23 +48,22 @@ self.addEventListener("fetch",event=>{
       const fallback=new Request(new URL("./index.html",self.registration.scope).href);
       try{
         const response=await fetch(request,{cache:"no-store"});
-        if(response.ok){const cache=await caches.open(NAVIGATION_CACHE);await cache.put(fallback,response.clone());}
+        if(response.ok)await runtimeCachePut(NAVIGATION_CACHE,fallback,response);
         return response;
       }catch(_){
         // Navigation cache and shell versions can differ during deployment;
         // static requests retain the exact versioned URLs embedded in HTML.
-        const navigation=await caches.open(NAVIGATION_CACHE),shell=await caches.open(SHELL_CACHE);
-        return (await shell.match(fallback))||(await navigation.match(request))||(await navigation.match(fallback))||Response.error();
+        return (await runtimeCacheMatch(SHELL_CACHE,fallback))||(await runtimeCacheMatch(NAVIGATION_CACHE,request))||(await runtimeCacheMatch(NAVIGATION_CACHE,fallback))||Response.error();
       }
     })());return;
   }
   const url=new URL(request.url);
   if(!shellAsset(url))return;
   event.respondWith((async()=>{
-    const cache=await caches.open(SHELL_CACHE),cached=await cache.match(request);
+    const cached=await runtimeCacheMatch(SHELL_CACHE,request);
     if(cached)return cached;
     const response=await fetch(request);
-    if(response.ok)await cache.put(request,response.clone());
+    if(response.ok)await runtimeCachePut(SHELL_CACHE,request,response);
     return response;
   })());
 });
