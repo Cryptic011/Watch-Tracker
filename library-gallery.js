@@ -261,7 +261,7 @@ window.WatchLogGallery=(()=>{
       <section id="gallery-watch-panel" class="gallery-watch-panel" role="tabpanel" aria-labelledby="gallery-watch-tab" data-gallery-panel="watch">
         ${api.reminder(item,isFilm(item))}
         ${show?(next?`<button type="button" class="btn btn-primary gallery-watch-next" data-gallery-watch-next>Watch next · S${next.season} E${next.episode}</button>`:seasons.length?'<p class="gallery-caught-up" role="status">All released episodes watched</p>':''):''}
-        ${show?`<section class="gallery-season-list"><h3>All Episodes</h3>${seasons.map(season=>seasonRow(item,season,releases,watched)).join('')||'<p class="gallery-empty">No verified released episodes available yet.</p>'}</section>`:''}
+        ${show?`<section class="gallery-season-list"><h3>All Episodes</h3>${seasons.map(season=>seasonRow(item,season,releases,watched)).join('')||'<p class="gallery-empty">Episode list unavailable or not yet released. Refresh verified episode data to check again.</p><button type="button" class="btn btn-secondary" data-gallery-retry-episodes>Refresh episodes</button>'}</section>`:''}
         <div class="gallery-detail-copy" data-gallery-watch-summary><strong>${esc(item.status||'Planned')}</strong><p>Watched to - ${esc(watchedTo)}</p><p>Watched on: ${esc(item.platform||'Not specified')}</p></div>
       </section>
       <section id="gallery-info-panel" class="gallery-info-panel hidden" role="tabpanel" aria-labelledby="gallery-info-tab" data-gallery-panel="details"><div data-gallery-details aria-live="polite">Loading details…</div></section>
@@ -306,6 +306,12 @@ window.WatchLogGallery=(()=>{
       const button=dialog.querySelector('[data-gallery-delete]');button.disabled=true;
       if(await api.remove?.(item.id))dialog.close();else{button.disabled=false;button.textContent='Delete failed — retry';}
     };
+    const retryEpisodes=dialog.querySelector('[data-gallery-retry-episodes]');
+    if(retryEpisodes)retryEpisodes.onclick=async()=>{
+      retryEpisodes.disabled=true;retryEpisodes.textContent='Checking episode sources…';
+      const updated=await api.refreshEpisodes?.(item,true).catch(()=>false);
+      if(!updated&&retryEpisodes.isConnected){retryEpisodes.disabled=false;retryEpisodes.textContent='Retry episode lookup';}
+    };
     const watchNext=dialog.querySelector('[data-gallery-watch-next]');
     if(watchNext)watchNext.onclick=()=>{
       const current=api.items().find(row=>String(row.id)===String(item.id));if(!current)return;
@@ -330,6 +336,7 @@ window.WatchLogGallery=(()=>{
     }
     dialog.querySelector('[data-gallery-lists]').onclick=()=>api.lists?.(item.id);
     observe(dialog,[item]);if(!dialog.open)dialog.showModal();void loadTrackerArtwork(item);void loadTitleDetails(item);
+    if(show)void api.refreshEpisodes?.(item);
   }
   function open(id,trigger=document.activeElement){
     const item=api?.items?.().find(row=>String(row.id)===String(id));
