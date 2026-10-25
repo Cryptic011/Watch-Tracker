@@ -30,7 +30,19 @@ test('Each deployed script and stylesheet uses the current commit URL',()=>{
       return assets[0][0];
     };
     const first=run();
+    const firstSha=git('rev-parse','HEAD');
+    fs.writeFileSync(path.join(dir,'release-notes.json'),JSON.stringify({
+      __current:{title:'Unrelated stale task',changes:['Old unrelated changes']},
+      [firstSha]:{title:'First build notes',changes:['First commit only'],commit:'wrong-sha',number:999,date:'1900-01-01'}
+    }));
     git('-c','user.name=Test','-c','user.email=test@example.test','commit','--allow-empty','-m','Second build');
     assert.notEqual(run(),first);
+    const metadata=JSON.parse(fs.readFileSync(path.join(dir,'build-info.js'),'utf8').slice('window.WATCHLOG_BUILD='.length).trim().replace(/;$/,''));
+    assert.equal(metadata.commits[0].title,'Second build');
+    assert.deepEqual(metadata.commits[0].changes,['Second build']);
+    const older=metadata.commits.find(entry=>entry.commit===firstSha);
+    assert.equal(older.title,'First build');
+    assert.deepEqual(older.changes,['First commit only']);
+    assert.notEqual(older.number,999);assert.notEqual(older.date,'1900-01-01');
   }finally{fs.rmSync(dir,{recursive:true,force:true});}
 });

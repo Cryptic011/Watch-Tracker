@@ -63,21 +63,6 @@
     ],
     "number": 224
   },
-  "__current": {
-    "title": "Keep series and film descriptions about the whole title",
-    "changes": [
-      "Validate IMDb and Apple TV fallbacks with the same whole-title rules as official broadcaster and studio synopses, rejecting season, episode and trailer text.",
-      "Retain verified title-level facts and source links without requesting Wikipedia, Wikidata or Wikimedia pages.",
-      "Save changed titles and episode deltas to account-scoped database rows with atomic conflict checks.",
-      "Reopen the full app offline; retain local edits across reopening and upload them on reconnection.",
-      "Create a single-use recovery code in Account & Sync; a PIN reset rotates the code and revokes old sessions.",
-      "Continue Watching lists each started show\u2019s next released episode with one-tap marking and Undo.",
-      "Use shareable page URLs with Back/Forward and restored Library and Search state.",
-      "Load episode rows when opening a season; preserve expanded seasons during progress updates.",
-      "Organise titles with Favourites, Archive and custom lists without replacing watch status or history.",
-      "Retain the colour-only schedule status and 24-hour grace period."
-    ]
-  },
   "37f6c39e9d0355b1bde705cb3fcb3cda2533119f": {
     "title": "Keep upcoming TV releases visible for 24 hours",
     "changes": [
@@ -111,7 +96,7 @@
     "number": 274
   },
   "737498912c0ad423cc4de25468de8bc2a79b80a0": {
-    "title": "Weekly Releases opt-out regression test \u2014 failed build",
+    "title": "Weekly Releases opt-out regression test — failed build",
     "changes": [
       "Attempted to add regression coverage for the per-show Hide from Weekly Releases preference.",
       "The build failed because the assertion expected the wrong checkbox selector; corrected by commit 91cd960."
@@ -119,7 +104,7 @@
     "number": 273
   },
   "052cc746bdcbaff93e343a177532b69f7d611a01": {
-    "title": "Add per-show Weekly Releases visibility setting \u2014 cancelled build",
+    "title": "Add per-show Weekly Releases visibility setting — cancelled build",
     "changes": [
       "Added a per-show checkbox to hide a series from Weekly Releases without removing it from the Library.",
       "Kept episode tracking and reminders attached to the existing media record.",
@@ -135,7 +120,7 @@
       "Open the new title page from upcoming releases, Prior Releases, TBA entries, recurring shows and saved search results instead of the old episode tracker or editor.",
       "Keep series on Episodes by default, with Details to the right, and restore focus to the clicked link on close.",
       "Move Recurring weekly shows to a collapsed dropdown at the top of Library home, with keyboard-accessible expansion and preserved open state during updates.",
-      "Add Recurring weekly shows as a separate Monday\u2013Sunday section unaffected by Library filters, search, sorting, or the release-calendar range.",
+      "Add Recurring weekly shows as a separate Monday–Sunday section unaffected by Library filters, search, sorting, or the release-calendar range.",
       "Keep each show listed, hold its aired episode for 24 hours, then advance to the next confirmed episode; retain Next episode TBA when no date is announced.",
       "Save verified recurring patterns across edits, metadata refreshes and reloads, respecting explicit Weekly Releases exclusions and showing device-local dates.",
       "Match Settings categories, Track Sync, and detail panels to the same grey as Changelog, with consistent separators and theme-aware light-mode colours.",
@@ -194,6 +179,47 @@
       "Reopen the complete app offline and sync saved device changes after reconnection.",
       "Create optional single-use recovery codes for forgotten PINs.",
       "Add Continue Watching, page history, lazy season loading, favourites, Archive and custom lists."
+    ]
+  },
+  "55adbe4ab385eb6aadc30a6e4a8e269af9754512": {
+    "title": "Validate whole-title synopses across IMDb and Apple fallbacks",
+    "changes": [
+      "Validate IMDb and Apple TV fallbacks with the same whole-title rules as official broadcaster and studio synopses, rejecting season, episode and trailer text.",
+      "Retain verified title-level facts and source links without requesting Wikipedia, Wikidata or Wikimedia pages."
+    ]
+  },
+  "fbae69daf3e1240871f25b2a293a94dd9b74aab3": {
+    "changes": [
+      "Restore the main show cover above the episode list."
+    ]
+  },
+  "0f230e51d72b542dcaf1e2a6ce74570dddf00f0b": {
+    "changes": [
+      "Keep reminder status, reconnect controls and the test button consistent with the device connection.",
+      "Repair missing subscriptions during a test and renew endpoints rejected as expired.",
+      "Send only the current reminder stage after missed background scans."
+    ]
+  },
+  "344f5a0d7310842671db4204865b9c286eef2080": {
+    "changes": [
+      "Ignore reminder action results after the signed-in account session changes."
+    ]
+  },
+  "71b0235f0401af2b417abab6729f576ee3e46baa": {
+    "changes": [
+      "Renew the device push endpoint when Reconnect Reminders is selected."
+    ]
+  },
+  "63f109664b6aac011155cb2538f8459fa69fde5e": {
+    "changes": [
+      "Smooth series and season opening and keep episode-list headings pinned."
+    ]
+  },
+  "b093006d7ff100b1dfa23717a46666fca5eede6e": {
+    "changes": [
+      "Prepare the push key and service worker before the reconnect tap.",
+      "Start Safari subscription directly from the tap and preserve existing valid subscriptions.",
+      "Check that the browser retained the subscription before showing reminders as enabled."
     ]
   }
 }

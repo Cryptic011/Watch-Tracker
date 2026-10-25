@@ -261,7 +261,7 @@
           if(!response.ok)throw new Error("GitHub Actions request failed");
           const data=await response.json();
           for(const run of (data.workflow_runs||[])) {
-            if(!run.head_sha||run.head_branch!=="main")continue;
+            if(!run.head_sha||run.head_branch!=="main"||run.path!==".github/workflows/pages.yml")continue;
             const title=String(run.head_commit?.message||run.display_title||"Repository push").split("\n")[0];
             const matchingCommit=commitsBySha.get(run.head_sha);
             const entry={appCommit:Number.isInteger(matchingCommit?.number)?matchingCommit.number:null,workflowRunNumber:Number.isInteger(run.run_number)?run.run_number:null,workflowRunAttempt:Number.isInteger(run.run_attempt)?run.run_attempt:null,workflowRunId:Number.isInteger(run.id)?run.id:null,commit:run.head_sha,date:String(run.created_at||"").slice(0,10),title,changes:[title],status:run.conclusion||run.status||"unknown"};

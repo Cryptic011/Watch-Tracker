@@ -2,7 +2,9 @@ import {execFileSync} from 'node:child_process';
 import {readFileSync,writeFileSync,existsSync} from 'node:fs';
 const rows=execFileSync('git',['log','--topo-order','--format=%H%x09%cs%x09%s'],{encoding:'utf8'}).trim().split('\n');
 const notes=JSON.parse(readFileSync('release-notes.json','utf8'));
-const commits=rows.map((row,index)=>{const [commit,date,...subject]=row.split('\t');const title=subject.join('\t');const note=notes[commit]||(index===0?notes.__current:null);return {number:rows.length-index+7,commit,date,title,changes:[title],...note};});
+// Release notes belong to an exact commit, never whichever commit is newest.
+// Identity and chronology always come from Git, even for curated notes.
+const commits=rows.map((row,index)=>{const [commit,date,...subject]=row.split('\t');const title=subject.join('\t');const note=notes[commit];return {number:rows.length-index+7,commit,date,title,changes:Array.isArray(note?.changes)&&note.changes.length?note.changes:[title]};});
 const releaseNumber=commits.length+7;
 if(Number.isInteger(releaseNumber)&&commits[0])commits[0].number=releaseNumber;
 const script='window.WATCHLOG_BUILD='+JSON.stringify({count:commits.length,releaseNumber,sha:commits[0].commit,commits}).replaceAll('<','\\u003c')+';\n';
