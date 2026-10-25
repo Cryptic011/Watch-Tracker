@@ -149,6 +149,7 @@ const server=http.createServer((req,res)=>{
   });
   const keyboardInput=await page.locator('#discovery-query').boundingBox();
   await page.evaluate(()=>{
+    document.querySelector('#discovery-global').classList.remove('hidden');
     document.querySelector('#discovery-results').innerHTML='<div style="height:1800px">Long search results</div>';
     document.querySelector('#search-sheet-results').scrollTop=600;
   });
@@ -166,6 +167,7 @@ const server=http.createServer((req,res)=>{
     if(window._searchOriginalViewport)Object.defineProperty(window,'visualViewport',window._searchOriginalViewport);else delete window.visualViewport;
     delete window._searchOriginalViewport;delete window._searchKeyboardViewport;
     document.querySelector('#discovery-results').innerHTML='';document.querySelector('#discovery-results')._discoveryMarkup=null;
+    document.querySelector('#discovery-global').classList.add('hidden');
     window.dispatchEvent(new Event('resize'));
   });
   await page.locator('#discovery-query').focus();await page.keyboard.press('Escape');
