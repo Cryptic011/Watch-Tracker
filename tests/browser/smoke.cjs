@@ -270,6 +270,10 @@ const server=http.createServer((req,res)=>{
   phase='episode artwork';
   await page.locator('[data-gallery-item="show"]').first().click();
   assert.equal(await page.getByRole('tab',{name:'Episodes',exact:true}).getAttribute('aria-selected'),'true');
+  assert.equal(await page.locator('.gallery-series-detail').count(),1,'series use the season-first detail view');
+  assert.equal(await page.locator('.gallery-detail-body>.gallery-art').count(),0,'episode tracking starts without a duplicated hero poster');
+  assert.equal(await page.locator('.gallery-season-label small').first().isVisible(),false,'collapsed season cards keep progress copy out of the way');
+  assert.match(await page.locator('.gallery-episodes-progress').getAttribute('aria-label'),/\d+ of \d+ released episodes watched/,'overall progress remains accessible');
   assert.equal(await page.locator('[data-gallery-notes-preview]').isVisible(),false);
   assert.equal(await page.locator('[data-gallery-watch-summary]').evaluate(summary=>summary.previousElementSibling.classList.contains('gallery-season-list')),true,'watch summary is below seasons');
   assert.equal(await page.locator('[data-gallery-watch-next]').textContent(),'Watch next · S1 E1');
@@ -291,6 +295,7 @@ const server=http.createServer((req,res)=>{
   assert.equal(await page.locator('.gallery-season-list').isVisible(),false);
   await page.getByRole('tab',{name:'Episodes',exact:true}).click();
   await page.locator('.gallery-season summary').first().click();
+  assert.equal(await page.locator('.gallery-season-label small').first().isVisible(),true,'opening a season reveals its exact progress');
   await page.locator('[data-gallery-toggle-episode="1:1"]').click();await page.waitForFunction(()=>!episodeLogBusy.size&&!cloudSaveInFlight);
   await page.locator('[data-gallery-episode="1:1"] img').waitFor({state:'visible'});
   assert.equal(await page.locator('[data-gallery-episode="1:1"] img').getAttribute('src'),'https://static.tvmaze.com/episode-one.jpg');

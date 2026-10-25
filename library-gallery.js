@@ -241,16 +241,19 @@ window.WatchLogGallery=(()=>{
     }
     dialog.dataset.item=String(item.id);
     const show=!isFilm(item),last=api.last(item);
+    dialog.classList.toggle('gallery-series-detail',show);
     const watchedTo=show?(last?`S${last.season} E${last.episode}`:'Not started'):(item.status==='Watched'?'Complete':'Not started');
     let savedNotes=String(item.notes||'').trim();
     dialog._savedNotes=savedNotes;
     const releases=show?(api.released?.(item)||item.releasedEpisodes||{}):{},watched=show?(api.watched?.(item)||item.watchedEpisodes||{}):{};
     const seasons=Object.keys(releases).map(Number).filter(number=>Number.isInteger(number)&&number>0).sort((left,right)=>left-right);
+    const episodeTotal=seasons.reduce((sum,season)=>sum+(releases[season]||[]).length,0);
+    const watchedTotal=seasons.reduce((sum,season)=>sum+(releases[season]||[]).filter(episode=>(watched[season]||[]).includes(episode)).length,0);
     const next=show?api.next?.(item):null;
-    dialog.innerHTML=`<header class="gallery-detail-header"><h2>${esc(item.title)}</h2><div class="gallery-detail-header-actions">
+    dialog.innerHTML=`<header class="gallery-detail-header">${show?'<button type="button" class="gallery-back" data-gallery-close aria-label="Back to Library">‹</button>':''}<h2>${esc(item.title)}</h2><div class="gallery-detail-header-actions">
       <button type="button" class="gallery-menu-button" data-gallery-menu aria-label="Title actions" aria-expanded="false">•••</button>
-      <button type="button" class="gallery-back" data-gallery-close aria-label="Close details">×</button></div></header>
-      <div class="gallery-detail-body">${art(item)}
+      ${show?'':'<button type="button" class="gallery-back" data-gallery-close aria-label="Close details">×</button>'}</div></header>
+      <div class="gallery-detail-body">${show?'':art(item)}
       <section class="gallery-notes-preview${savedNotes?'':' hidden'}" data-gallery-notes-preview><h3>Notes</h3><p>${esc(savedNotes)}</p></section>
       <section class="gallery-notes-editor hidden" data-gallery-notes-editor aria-labelledby="gallery-notes-label">
         <h3 id="gallery-notes-label">Notes</h3><textarea class="gallery-notes" data-gallery-notes-field aria-label="Notes" placeholder="Personal notes about this show or film">${esc(savedNotes)}</textarea>
@@ -260,9 +263,8 @@ window.WatchLogGallery=(()=>{
       <div class="gallery-detail-tabs" role="tablist" aria-label="Title view"><button id="gallery-watch-tab" type="button" role="tab" aria-selected="true" aria-controls="gallery-watch-panel" data-gallery-view="watch">${show?'Episodes':'Overview'}</button><button id="gallery-info-tab" type="button" role="tab" tabindex="-1" aria-selected="false" aria-controls="gallery-info-panel" data-gallery-view="details">Details</button></div>
       <section id="gallery-watch-panel" class="gallery-watch-panel" role="tabpanel" aria-labelledby="gallery-watch-tab" data-gallery-panel="watch">
         ${api.reminder(item,isFilm(item))}
-        ${show?(next?`<button type="button" class="btn btn-primary gallery-watch-next" data-gallery-watch-next>Watch next · S${next.season} E${next.episode}</button>`:seasons.length?'<p class="gallery-caught-up" role="status">All released episodes watched</p>':''):''}
-        ${show?`<section class="gallery-season-list"><h3>All Episodes</h3>${seasons.map(season=>seasonRow(item,season,releases,watched)).join('')||'<p class="gallery-empty">Episode list unavailable or not yet released. Refresh verified episode data to check again.</p><button type="button" class="btn btn-secondary" data-gallery-retry-episodes>Refresh episodes</button>'}</section>`:''}
-        <div class="gallery-detail-copy" data-gallery-watch-summary><strong>${esc(item.status||'Planned')}</strong><p>Watched to - ${esc(watchedTo)}</p><p>Watched on: ${esc(item.platform||'Not specified')}</p></div>
+        ${show?`<section class="gallery-season-list"><div class="gallery-episodes-heading"><h3>All Episodes</h3>${episodeTotal?`<span class="gallery-episodes-progress" role="img" aria-label="${watchedTotal} of ${episodeTotal} released episodes watched" style="--watched-progress:${Math.round(watchedTotal/episodeTotal*100)}%"></span>`:''}</div>${seasons.map(season=>seasonRow(item,season,releases,watched)).join('')||'<p class="gallery-empty">Episode list unavailable or not yet released. Refresh verified episode data to check again.</p><button type="button" class="btn btn-secondary" data-gallery-retry-episodes>Refresh episodes</button>'}</section>`:''}
+        <div class="gallery-detail-copy" data-gallery-watch-summary>${show?(next?`<button type="button" class="btn btn-primary gallery-watch-next" data-gallery-watch-next>Watch next · S${next.season} E${next.episode}</button>`:seasons.length?'<p class="gallery-caught-up" role="status">All released episodes watched</p>':''):''}<strong>${esc(item.status||'Planned')}</strong><p>Watched to - ${esc(watchedTo)}</p><p>Watched on: ${esc(item.platform||'Not specified')}</p></div>
       </section>
       <section id="gallery-info-panel" class="gallery-info-panel hidden" role="tabpanel" aria-labelledby="gallery-info-tab" data-gallery-panel="details"><div data-gallery-details aria-live="polite">Loading details…</div></section>
       <div class="gallery-action-menu hidden" data-gallery-action-menu><button type="button" data-gallery-edit-menu>Edit show or film</button><button type="button" data-gallery-notes>Notes</button><button type="button" data-gallery-favourite>${item.favorite?'Remove favourite':'Add to favourites'}</button><button type="button" data-gallery-lists>Custom lists</button><button type="button" data-gallery-archive>${item.archived?'Unarchive':'Archive'}</button><button type="button" class="danger" data-gallery-delete>Delete show or film</button></div>
