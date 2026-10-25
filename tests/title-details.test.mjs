@@ -57,6 +57,12 @@ test('An IMDb ID does not override a conflicting film name or release year',()=>
  assert.equal(parseIMDbDetails(ld({name:'Another film'}),imdb,'Film',film),null);
  assert.equal(parseIMDbDetails(ld(),imdb,'Film',{...film,year:'1999'}),null);
 });
+test('A trusted domain and matching title cannot turn a TV series or book into a film',()=>{
+ for(const kind of ['TVSeries','TVEpisode','Book']){
+  const page='<meta property="og:title" content="Carrie"><script type="application/ld+json">'+JSON.stringify({'@type':kind,name:'Carrie',description:'A supernatural story about a young woman discovering unusual powers.'})+'</script>';
+  assert.equal(parseFirstPartyDetails(page,'https://www.paramountpictures.com/movies/carrie',{title:'Carrie',type:'Film'}),null);
+ }
+});
 test('An IMDb-matched film database record rescues a studio outage with explicit attribution',async()=>{
  const data=await getTitleDetails(film,async url=>url.includes('/find/')?json({movie_results:[{id:27205,title:'Inception',release_date:'2010-07-16'}]}):url.endsWith('/movie/27205')?json({id:27205,imdb_id:imdb,title:'Inception',release_date:'2010-07-16',overview:'A skilled thief enters dreams to steal secrets and must plant an idea instead.',runtime:148}):failure(),{...options,tmdbToken:'test-token'});
  assert.equal(data.source,'TMDb');assert.equal(data.descriptionSource,'TMDb');assert.equal(data.year,'2010');assert.equal(data.runtime,148);

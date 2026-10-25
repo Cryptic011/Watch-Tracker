@@ -143,6 +143,8 @@ export function parseFirstPartyDetails(markup,url,{title,type,year,requireYear=f
  const types=type==="Film"?["Movie"]:["TVSeries","TVMiniSeries","TVShow"];
  const candidates=structured.filter(row=>[row?.["@type"]].flat().some(kind=>types.includes(kind))&&matchesFirstPartyTitle(row.name,title));
  const identity=candidates.length===1?candidates[0]:null;
+ const wrongFormats=structured.filter(row=>matchesFirstPartyTitle(row?.name,title)&&[row?.['@type']].flat().some(kind=>['Movie','TVSeries','TVMiniSeries','TVShow','TVEpisode','TVSeason','Book','VideoGame'].includes(kind)));
+ if(!candidates.length&&wrongFormats.length)return null;
  if(!identity&&!filmHero&&!titles.some(name=>matchesFirstPartyTitle(name,title)))return null;
  // A series page's publication date can refer to its CURRENT SEASON.
  // Only an explicit programme startDate can establish the series premiere;
