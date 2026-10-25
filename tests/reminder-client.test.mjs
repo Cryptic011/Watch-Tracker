@@ -8,7 +8,7 @@ function harness({permission='granted',missing=false}={}){
   const node=()=>({textContent:'',disabled:false,dataset:{},style:{},listeners:{},classList:{values:new Set(),toggle(name,on){on?this.values.add(name):this.values.delete(name);},contains(name){return this.values.has(name);}},addEventListener(name,callback){this.listeners[name]=callback;}});
   const enable=node(),disable=node(),status=node(),testButton=node(),quick=node(),label=node();quick.querySelector=()=>label;
   const nodes={'test-background-reminder':testButton,'quick-reminder-status':quick};
-  let subscription,serial=0,registered=0,permissionRequests=0,serverEnabled=!missing,failStatus=false,expireTest=false,localFailure=false,statusGate=null;
+  let subscription,serial=0,registered=0,permissionRequests=0,serverEnabled=!missing,failStatus=false,expireTest=false,localFailure=false,statusGate=null,testGate=null;
   const calls=[],prefs=new Map();
   const makeSubscription=()=>({endpoint:`https://web.push.apple.com/${++serial}`,toJSON(){return {endpoint:this.endpoint,keys:{auth:'auth',p256dh:'key'}};},unsubscribe:async()=>{if(localFailure)throw Error('Device unavailable');subscription=null;return true;}});
   subscription=missing?null:makeSubscription();
@@ -19,6 +19,7 @@ function harness({permission='granted',missing=false}={}){
   const context=vm.createContext({window,navigator,Notification,document:{visibilityState:'visible',addEventListener(){},querySelectorAll:()=>[],getElementById:id=>nodes[id]},backgroundReminderStatus:status,enableBackgroundReminders:enable,disableBackgroundReminders:disable,currentUser:{id:'account'},cloudSessionToken:'session',DEVICE_TIME_ZONE:'Europe/London',USER_LOCALE:'en-GB',REMINDER_API:'https://example.test/reminders',CLOUD_REQUEST_TIMEOUT_MS:1000,AbortController,setTimeout,clearTimeout,Uint8Array,atob,crypto:{randomUUID:()=> '12345678-1234-1234-1234-123456789012'},localStorage:{getItem:key=>prefs.get(key)||null,setItem:(key,value)=>prefs.set(key,value)},fetch:async(_url,request)=>{
     const body=JSON.parse(request.body);calls.push(body);
     if(body.action==='status'&&statusGate)await statusGate;
+    if(body.action==='test_reminder'&&testGate)await testGate;
     let data={ok:true},code=200;
     if(body.action==='public_key')data.publicKey='AQID';
     if(body.action==='subscribe')serverEnabled=true;
@@ -33,6 +34,7 @@ function harness({permission='granted',missing=false}={}){
     reconnect:()=>enable.onclick(),test:()=>testButton.listeners.click(),off:()=>disable.onclick(),
     loseSubscription:()=>subscription=null,failStatus:()=>failStatus=true,expireTest:()=>expireTest=true,failLocal:()=>localFailure=true,
     gateStatus:()=>{let release;statusGate=new Promise(resolve=>release=resolve);return release;},
+    gateTest:()=>{let release;testGate=new Promise(resolve=>release=resolve);return release;},
     stats:()=>({registered,permissionRequests,serverEnabled,subscription,serial}),
   };
 }
@@ -94,4 +96,14 @@ test('Permission is requested synchronously from the enable action',async()=>{
   const h=harness({permission:'default',missing:true});const connecting=h.reconnect();
   assert.equal(h.stats().permissionRequests,1);await connecting;
   assert.equal(h.label.textContent,'Reminders on');
+});
+
+test('A test response from a previous account cannot re-enable reminder controls',async()=>{
+  const h=harness();await h.check();const release=h.gateTest(),sending=h.test();
+  await new Promise(resolve=>setImmediate(resolve));
+  h.context.cloudSessionToken='another-account-session';h.context.currentUser={id:'other-account'};
+  h.context.setBackgroundReminderStatus('Sign in to manage background reminders.');
+  release();await sending;
+  assert.equal(h.label.textContent,'Reminders off');assert.equal(h.disable.classList.contains('hidden'),true);
+  assert.equal(h.testButton.disabled,true);
 });

@@ -150,13 +150,15 @@
     return refreshBackgroundReminderStatus({reconnect:true});
   }
   async function removeBackgroundPush(){
+    const token=cloudSessionToken;
     ++backgroundReminderGeneration;
     if(backgroundReminderRefresh)await backgroundReminderRefresh.catch(()=>{});
     const subscription=await currentPushSubscription();
     if(subscription){
-      const results=await Promise.allSettled([cloudSessionToken?reminderApi("unsubscribe",{endpoint:subscription.endpoint}):Promise.reject(new Error("Sign in again.")),subscription.unsubscribe().then(value=>{if(!value)throw new Error("Could not disconnect notifications on this device.");})]);
+      const results=await Promise.allSettled([token?reminderApi("unsubscribe",{endpoint:subscription.endpoint},token):Promise.reject(new Error("Sign in again.")),subscription.unsubscribe().then(value=>{if(!value)throw new Error("Could not disconnect notifications on this device.");})]);
       if(results.every(result=>result.status==="rejected"))throw new Error("Could not turn reminders off. Check your connection and try again.");
     }
+    if(token!==cloudSessionToken)return;
     backgroundReminderPreference("off");
     setBackgroundReminderStatus("Background reminders are off on this device.");
   }
@@ -166,13 +168,14 @@
     const token=cloudSessionToken;
     try{
       // Start permission requests in the click's user gesture, before any await.
-      await action();
+      await action(token);
     }catch(error){if(token===cloudSessionToken)setBackgroundReminderStatus(error.message||"Could not connect reminders. Try reconnecting.","error",pushSupportError()?"blocked":"repair");}
     finally{backgroundReminderBusy=false;if(token===cloudSessionToken){enableBackgroundReminders.disabled=backgroundReminderConnection==="blocked";disableBackgroundReminders.disabled=false;const test=document.getElementById("test-background-reminder");if(test)test.disabled=backgroundReminderConnection!=="on";}}
   }
-  enableBackgroundReminders.onclick=()=>runBackgroundReminderAction(async()=>{
+  enableBackgroundReminders.onclick=()=>runBackgroundReminderAction(async token=>{
     setBackgroundReminderStatus("Connecting this device…","","checking");
-    await ensureBackgroundPush({askPermission:true});
+    await ensureBackgroundPush({askPermission:true,token});
+    if(token!==cloudSessionToken)return;
     backgroundReminderPreference("on");
     setBackgroundReminderStatus("Enabled — alerts can arrive when Watched Logger is closed.","ok","on");
   });
@@ -180,15 +183,16 @@
     setBackgroundReminderStatus("Turning reminders off…","","on");
     await removeBackgroundPush();
   });
-  document.getElementById("test-background-reminder")?.addEventListener("click",()=>runBackgroundReminderAction(async()=>{
+  document.getElementById("test-background-reminder")?.addEventListener("click",()=>runBackgroundReminderAction(async token=>{
     setBackgroundReminderStatus("Sending test reminder…","","on");
     // A delivery test is independent of library saves. Repair a missing local
     // subscription or missing server record before submitting the test.
-    let subscription=await ensureBackgroundPush();
+    let subscription=await ensureBackgroundPush({token});
     const requestId=crypto.randomUUID();
     let result;
-    try{result=await reminderApi("test_reminder",{endpoint:subscription.endpoint,requestId});}
-    catch(error){if(error.code!=="push_subscription_expired")throw error;subscription=await ensureBackgroundPush({renew:true});result=await reminderApi("test_reminder",{endpoint:subscription.endpoint,requestId});}
+    try{result=await reminderApi("test_reminder",{endpoint:subscription.endpoint,requestId},token);}
+    catch(error){if(error.code!=="push_subscription_expired"||token!==cloudSessionToken)throw error;subscription=await ensureBackgroundPush({renew:true,token});result=await reminderApi("test_reminder",{endpoint:subscription.endpoint,requestId},token);}
+    if(token!==cloudSessionToken)return;
     backgroundReminderPreference("on");
     setBackgroundReminderStatus(result.duplicate?"Test reminder was already sent.":"Test reminder accepted by the push service.","ok","on");
   }));
