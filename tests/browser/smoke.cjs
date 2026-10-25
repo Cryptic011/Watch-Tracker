@@ -316,6 +316,18 @@ const server=http.createServer((req,res)=>{
   await page.locator('[data-gallery-season-art="1"] img').waitFor({state:'visible'});
   assert.equal(await page.locator('[data-gallery-season-art="1"] img').getAttribute('src'),'https://static.tvmaze.com/season-one.jpg');
   assert.equal(await page.locator('[data-gallery-season-art="2"] img').count(),0);
+  const firstSeason=page.locator('.gallery-season[data-season="1"]');
+  await firstSeason.locator('summary').press('Enter');
+  await page.locator('.gallery-season[data-season="1"]:not([open])').waitFor({state:'attached'});
+  await firstSeason.locator('summary').press('Enter');
+  await page.locator('[data-gallery-toggle-episode="1:1"]').waitFor({state:'visible'});
+  assert.equal(await page.locator('[data-gallery-toggle-episode="1:1"]').getAttribute('aria-pressed'),'false','animated keyboard expansion preserves episode progress');
+  await page.emulateMedia({reducedMotion:'reduce'});
+  await firstSeason.locator('summary').press('Enter');
+  assert.equal(await firstSeason.getAttribute('open'),null,'reduced motion collapses a season immediately');
+  await firstSeason.locator('summary').press('Enter');
+  assert.equal(await firstSeason.getAttribute('open'),'','reduced motion still opens the episode list');
+  await page.emulateMedia({reducedMotion:'no-preference'});
   for(const episode of [2,3]){
    assert.equal(await page.locator('[data-gallery-episode="1:'+episode+'"] img').count(),0);
    assert.equal(await page.locator('[data-gallery-episode="1:'+episode+'"] .gallery-artwork-placeholder').isVisible(),true);
@@ -334,6 +346,13 @@ const server=http.createServer((req,res)=>{
    assert.ok(Math.abs(layout.art.width/layout.art.height-16/9)<.04,'episode artwork keeps its natural landscape ratio');
   }
   await page.setViewportSize({width:390,height:844});
+  const pinnedSeason=await firstSeason.evaluate(node=>{
+   const dialog=node.closest('dialog'),header=dialog.querySelector('.gallery-detail-header'),summary=node.querySelector('summary');
+   dialog.scrollTop+=summary.getBoundingClientRect().top-header.getBoundingClientRect().bottom+30;
+   return {gap:summary.getBoundingClientRect().top-header.getBoundingClientRect().bottom,overflow:dialog.scrollWidth>dialog.clientWidth};
+  });
+  assert.ok(Math.abs(pinnedSeason.gap)<=2,'expanded season heading remains below the series header while scrolling');
+  assert.equal(pinnedSeason.overflow,false,'pinned headers do not introduce sideways scrolling');
   await page.locator('[data-gallery-episode="1:1"] .gallery-episode-art').click();
   assert.equal(await page.locator('[data-gallery-toggle-episode="1:1"]').getAttribute('aria-pressed'),'false','tapping the row does not accidentally mark progress');
   const gutterRow=await page.locator('[data-gallery-episode="1:1"]').boundingBox();

@@ -176,8 +176,29 @@ window.WatchLogGallery=(()=>{
     container.dataset.seasonLoaded='true';
     paintTrackerArtwork(node,dialog._trackerArtwork||{});
   }
+  function toggleSeasonDetails(node){
+    const expanded=!(node._seasonDesired??node.open),container=node.querySelector('.gallery-season-episodes');
+    const summary=node.querySelector('summary'),anchorTop=summary.getBoundingClientRect().top;
+    const start=node.open?container.getBoundingClientRect().height:0;
+    node._seasonMotion?.cancel();node._seasonMotion=null;
+    node._seasonDesired=expanded;
+    node.open=true;dialog._populateSeason(node);
+    if(!container.animate||window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches){
+      node.open=expanded;delete node._seasonDesired;container.classList.remove('is-animating');
+      if(!expanded)dialog.scrollTop+=summary.getBoundingClientRect().top-anchorTop;
+      return;
+    }
+    container.classList.add('is-animating');
+    const motion=container.animate([{height:start+'px',opacity:start?1:0},{height:(expanded?container.scrollHeight:0)+'px',opacity:expanded?1:0}],{duration:220,easing:'cubic-bezier(.2,.75,.25,1)'});
+    node._seasonMotion=motion;
+    void motion.finished.catch(()=>{}).finally(()=>{
+      if(node._seasonMotion!==motion)return;
+      node.open=expanded;node._seasonMotion=null;delete node._seasonDesired;container.classList.remove('is-animating');
+      if(!expanded&&node.isConnected)dialog.scrollTop+=summary.getBoundingClientRect().top-anchorTop;
+    });
+  }
   async function changeProgress(item,button,save){
-    const section=dialog.querySelector('.gallery-season-list'),expanded=[...dialog.querySelectorAll('.gallery-season[open]')].map(node=>node.dataset.season),scrollTop=dialog.scrollTop;
+    const section=dialog.querySelector('.gallery-season-list'),expanded=[...dialog.querySelectorAll('.gallery-season')].filter(node=>node._seasonDesired??node.open).map(node=>node.dataset.season),scrollTop=dialog.scrollTop;
     const selector=button.hasAttribute('data-gallery-watch-next')?'[data-gallery-watch-next]':button.hasAttribute('data-gallery-season')?`[data-gallery-season="${button.dataset.gallerySeason}"]`:`[data-gallery-toggle-episode="${button.dataset.galleryToggleEpisode}"]`;
     dialog.querySelectorAll('[data-gallery-season],[data-gallery-toggle-episode],[data-gallery-watch-next]').forEach(control=>{control.disabled=true;});
     try{await save();}
@@ -225,7 +246,7 @@ window.WatchLogGallery=(()=>{
     if(!dialog?.open||dialog.querySelector('[data-gallery-notes-editor]:not(.hidden)')||dialog.querySelector('[data-gallery-toggle-episode]:disabled,[data-gallery-season]:disabled'))return false;
     const fresh=api.items().find(row=>String(row.id)===dialog.dataset.item);
     if(!fresh){dialog.close();return true;}
-    const scroll=dialog.scrollTop,expanded=[...dialog.querySelectorAll('.gallery-season[open]')].map(node=>node.dataset.season),view=dialog.querySelector('[data-gallery-view][aria-selected="true"]')?.dataset.galleryView;
+    const scroll=dialog.scrollTop,expanded=[...dialog.querySelectorAll('.gallery-season')].filter(node=>node._seasonDesired??node.open).map(node=>node.dataset.season),view=dialog.querySelector('[data-gallery-view][aria-selected="true"]')?.dataset.galleryView;
     detail(fresh);
     for(const node of dialog.querySelectorAll('.gallery-season')){node.open=expanded.includes(node.dataset.season);if(node.open)dialog._populateSeason(node);}
     if(view==='details')dialog.querySelector('[data-gallery-view="details"]').click();
@@ -321,7 +342,13 @@ window.WatchLogGallery=(()=>{
       return changeProgress(current,watchNext,()=>api.toggleEpisode?.(current.id,candidate.season,candidate.episode));
     };
     dialog._populateSeason=node=>populateSeason(node,item,releases,watched);
-    for(const node of dialog.querySelectorAll('.gallery-season'))node.addEventListener('toggle',()=>{if(node.open)dialog._populateSeason(node);});
+    for(const node of dialog.querySelectorAll('.gallery-season')){
+      node.addEventListener('toggle',()=>{if(node.open)dialog._populateSeason(node);});
+      node.querySelector('summary').addEventListener('click',event=>{
+        if(event.target.closest('button'))return;
+        event.preventDefault();toggleSeasonDetails(node);
+      });
+    }
     dialog.onclick=event=>{
       const button=event.target.closest('[data-gallery-toggle-episode],[data-gallery-season]');if(!button)return;
       event.preventDefault();event.stopPropagation();
