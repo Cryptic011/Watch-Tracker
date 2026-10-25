@@ -95,12 +95,16 @@ function patch(items,changes){
    assert.equal(await continueSection.getAttribute('open'),null,'Continue Watching starts collapsed');
    assert.equal(await page.locator('[data-continue-mark="show"]').isVisible(),false);
    assert.equal(await page.locator('#continue-watching').evaluate(node=>node.previousElementSibling?.id),'library-features','without Upcoming, progress follows Collection');
-   await page.evaluate(()=>{mediaItems[0].nextSeasonNum=3;render();});
+   // Sync/cache reconciliation can reorder titles. Keep both fixture copies
+   // in agreement and address the show by identity rather than array index.
+   items.find(item=>item.id==='show').nextSeasonNum=3;
+   await page.evaluate(()=>{mediaItems.find(item=>item.id==='show').nextSeasonNum=3;render();});
    assert.equal(await page.locator('#continue-watching').evaluate(node=>node.previousElementSibling?.dataset.gallerySection),'Upcoming','Upcoming appears above Continue Watching');
    assert.equal(await page.locator('#library-features').evaluate(node=>node.nextElementSibling?.dataset.gallerySection),'Upcoming','Collection stays above Upcoming');
    await continueSummary.focus();await page.keyboard.press('Enter');
    assert.equal(await page.locator('[data-continue-mark="show"]').isVisible(),true,'keyboard expands Continue Watching');
-   await page.evaluate(()=>{delete mediaItems[0].nextSeasonNum;render();});
+   delete items.find(item=>item.id==='show').nextSeasonNum;
+   await page.evaluate(()=>{delete mediaItems.find(item=>item.id==='show').nextSeasonNum;render();});
    assert.equal(await continueSection.getAttribute('open'),'','gallery rebuild retains the expanded progress controls');
    await continueSummary.click();await page.evaluate(()=>render());
    assert.equal(await continueSection.getAttribute('open'),null,'refresh keeps Continue Watching collapsed');
