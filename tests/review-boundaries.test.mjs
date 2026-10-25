@@ -78,7 +78,7 @@ function workerHarness(episodes,options={}){
     claimDelivery:async(_sub,_account,_id,key)=>{if(claimed.has(key))return null;claimed.add(key);return{id:key};},
     sendPush:async(_sub,_config,payload)=>deliveries.push(payload),finishDelivery:async()=>{},sha256:async value=>value});
   const asyncNames=["readLibraries","refreshServerEpisodeSchedules","processPlannedReminders"];
-  const names=["episodeUtcValue","episodeReleaseTime","buildServerEpisodeSchedule","zonedLocalToUtc","scheduledEventTime","serverScheduleRefreshDue",...asyncNames,"plannedEvent","reminderEvents","reminderCopy"];
+  const names=["episodeUtcValue","episodeReleaseTime","buildServerEpisodeSchedule","zonedLocalToUtc","scheduledEventTime","serverScheduleRefreshDue",...asyncNames,"plannedEvent","reminderEvents","reminderCopy","reminderStageIsDue"];
   // extractFunction retains the declaration's own async keyword. Do not
   // prepend it again: "async async function" fails to parse before any
   // reminder-worker regression tests can execute.
@@ -105,6 +105,23 @@ test("Every episode in a same-time release receives its own reminder",async()=>{
   const release=worker.deliveries.filter(payload=>payload.body==='New episode now available');
   assert.equal(release.length,2);
   assert.equal(new Set(release.map(row=>row.data.eventKey)).size,2);
+  assert.equal(worker.deliveries.length,2,'a release scan does not also send stale advance reminders');
+});
+
+test('Background scans catch up only the current reminder stage',async()=>{
+  const release='2026-09-06T12:00:00Z';
+  for(const [clock,expected] of [
+    ['2026-09-05T11:59:59Z',[]],
+    ['2026-09-05T12:00:00Z',['New episode in 1 day']],
+    ['2026-09-06T06:00:00Z',['New episode in 6 hours']],
+    ['2026-09-06T12:00:00Z',['New episode now available']],
+    ['2026-09-07T12:00:00Z',[]],
+  ]){
+    const worker=workerHarness([{season:1,number:6,airstamp:release}]);
+    worker.setTime(clock);await worker.run();
+    assert.deepEqual(worker.deliveries.map(row=>row.body),expected,clock);
+    assert.equal((await worker.run()).sent,0,'repeated scans cannot duplicate the stage');
+  }
 });
 
 test("Provider failure preserves saved progress and a concurrent deletion suppresses stale alerts",async()=>{

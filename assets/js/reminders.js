@@ -8,13 +8,24 @@
   function isStandaloneWebApp(){
     return window.matchMedia?.("(display-mode: standalone)")?.matches||navigator.standalone===true;
   }
-  function setBackgroundReminderStatus(message,state=""){
+  let backgroundReminderBusy=false,backgroundReminderGeneration=0,backgroundReminderRefresh=null;
+  let backgroundReminderConnection="off";
+  function setBackgroundReminderStatus(message,state="",connection="off"){
+    backgroundReminderConnection=connection;
     if(!backgroundReminderStatus)return;
     backgroundReminderStatus.textContent=message;
+    backgroundReminderStatus.dataset.state=state||connection;
     backgroundReminderStatus.style.color=state==="error"?"#fca5a5":state==="ok"?"var(--green)":"var(--muted)";
+    const enabled=connection==="on",blocked=connection==="blocked";
+    enableBackgroundReminders?.classList.toggle("hidden",enabled);
+    disableBackgroundReminders?.classList.toggle("hidden",!enabled);
+    if(enableBackgroundReminders){enableBackgroundReminders.textContent=connection==="repair"?"Reconnect Reminders":"Enable Background Reminders";enableBackgroundReminders.disabled=backgroundReminderBusy||blocked;}
+    if(disableBackgroundReminders)disableBackgroundReminders.disabled=backgroundReminderBusy;
+    const test=document.getElementById("test-background-reminder");
+    if(test)test.disabled=backgroundReminderBusy||!enabled;
     const quick=document.getElementById("quick-reminder-status");
     const quickLabel=quick?.querySelector?.("span");
-    if(quick&&quickLabel){const enabled=state==="ok"&&!/not enabled|off|unsupported|blocked/i.test(message),attention=state==="error";quick.dataset.state=attention?"attention":enabled?"ok":"idle";quickLabel.textContent=attention?"Reminder issue":enabled?"Reminders on":"Reminders off";}
+    if(quick&&quickLabel){const attention=state==="error";quick.dataset.state=attention?"attention":enabled?"ok":"idle";quickLabel.textContent=attention?"Reminder issue":enabled?"Reminders on":connection==="checking"?"Checking reminders":"Reminders off";}
   }
   function pushSupportError(){
     if(!("Notification" in window)||!("serviceWorker" in navigator)||!("PushManager" in window))return"Background notifications are not supported in this browser.";
@@ -34,6 +45,7 @@
       const response=await fetch(REMINDER_API,{method:"POST",headers,body:JSON.stringify({action,...payload}),signal:controller.signal});
       let data={};try{data=await response.json();}catch(error){if(response.ok||controller.signal.aborted)throw error;}
       if(!response.ok){const error=new Error(data.error||`Reminder service error (${response.status})`);error.code=data.code||"reminder_error";error.status=response.status;throw error;}
+      if(data?.ok!==true)throw new Error("The reminder service returned an incomplete response.");
       return data;
     }catch(error){
       if(error?.code)throw error;
@@ -41,14 +53,21 @@
     }finally{clearTimeout(timeout);}
   }
   async function notificationWorker(){
-    await navigator.serviceWorker.register("./sw.js",{scope:"./",updateViaCache:"none"});
-    return navigator.serviceWorker.ready;
+    // App updates own worker registration. Reuse the active worker so a
+    // temporary update/download failure cannot hide an existing subscription.
+    const registration=await navigator.serviceWorker.getRegistration("./");
+    if(registration?.active)return registration;
+    if(!registration)await navigator.serviceWorker.register("./sw.js",{scope:"./",updateViaCache:"none"});
+    let timer;
+    try{return await Promise.race([navigator.serviceWorker.ready,new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error("Notifications are still starting. Try reconnecting in a moment.")),12000);})]);}
+    finally{clearTimeout(timer);}
   }
   async function currentPushSubscription(){
     if(typeof Notification==="undefined"||(pushSupportError()&&Notification.permission!=="granted"))return null;
-    try{return(await notificationWorker()).pushManager.getSubscription();}catch(_){return null;}
+    return(await notificationWorker()).pushManager.getSubscription();
   }
-  async function ensureBackgroundPush({askPermission=false}={}){
+  async function ensureBackgroundPush({askPermission=false,renew=false,token=cloudSessionToken}={}){
+    if(!token)throw new Error("Sign in to enable background reminders.");
     const supportError=pushSupportError();
     if(supportError)throw new Error(supportError);
     if(Notification.permission!=="granted"){
@@ -60,99 +79,127 @@
     const keyResult=await reminderApi("public_key",{},"");
     if(!keyResult.publicKey)throw new Error("The reminder service did not return a push key.");
     let subscription=await registration.pushManager.getSubscription();
+    const key=urlBase64ToUint8Array(keyResult.publicKey),oldKey=subscription?.options?.applicationServerKey;
+    const keyChanged=oldKey&&(new Uint8Array(oldKey).length!==key.length||new Uint8Array(oldKey).some((value,index)=>value!==key[index]));
+    if(subscription&&(renew||keyChanged||(subscription.expirationTime&&subscription.expirationTime<=Date.now()))){
+      if(!await subscription.unsubscribe())throw new Error("This device could not renew notifications. Try reconnecting again.");
+      subscription=null;
+    }
     if(!subscription){
       subscription=await registration.pushManager.subscribe({
         userVisibleOnly:true,
-        applicationServerKey:urlBase64ToUint8Array(keyResult.publicKey)
+        applicationServerKey:key
       });
     }
+    if(token!==cloudSessionToken)throw new Error("Sign in again to connect reminders.");
     await reminderApi("subscribe",{
       subscription:subscription.toJSON(),
       timeZone:DEVICE_TIME_ZONE||"UTC",
       locale:USER_LOCALE
-    });
+    },token);
+    if(token!==cloudSessionToken)throw new Error("Sign in again to connect reminders.");
     return subscription;
   }
-  async function refreshBackgroundReminderStatus(){
+  function backgroundReminderPreference(value){
+    const key=`watchlog_background_reminders_${currentUser?.id||""}`;
+    try{if(value!==undefined)localStorage.setItem(key,value);return localStorage.getItem(key);}catch(_){return null;}
+  }
+  async function refreshBackgroundReminderStatus({reconnect=false}={}){
+    if(backgroundReminderBusy)return false;
+    if(backgroundReminderRefresh)return backgroundReminderRefresh;
+    const generation=++backgroundReminderGeneration,token=cloudSessionToken;
+    const report=(message,state="",connection="off")=>{if(generation===backgroundReminderGeneration&&token===cloudSessionToken)setBackgroundReminderStatus(message,state,connection);};
+    const task=(async()=>{
+    if(!token){report("Sign in to manage background reminders.");return false;}
     const supportError=pushSupportError();
     if(supportError){
-      setBackgroundReminderStatus(supportError,"error");
-      enableBackgroundReminders?.classList.remove("hidden");disableBackgroundReminders?.classList.add("hidden");
+      report(supportError,"error","blocked");
       return false;
     }
     if(Notification.permission!=="granted"){
-      setBackgroundReminderStatus("Not enabled on this device. Planned alerts will not arrive while the app is closed.");
-      enableBackgroundReminders?.classList.remove("hidden");disableBackgroundReminders?.classList.add("hidden");
+      report("Not enabled on this device. Enable reminders to receive release alerts while the app is closed.");
       return false;
     }
+    try{
     const subscription=await currentPushSubscription();
     if(!subscription){
-      setBackgroundReminderStatus("Permission is allowed, but background reminders are not connected on this device.");
-      enableBackgroundReminders?.classList.remove("hidden");disableBackgroundReminders?.classList.add("hidden");
+      const off=backgroundReminderPreference()==="off";
+      report(off?"Background reminders are off on this device.":"Notifications are allowed, but this device needs reconnecting.","",off?"off":"repair");
       return false;
     }
-    try{
-      const result=await reminderApi("status",{endpoint:subscription.endpoint});
+      if(subscription.expirationTime&&subscription.expirationTime<=Date.now()){report("This device's notification connection expired. Reconnect reminders.","","repair");return false;}
+      const result=await reminderApi("status",{endpoint:subscription.endpoint},token);
       if(!result.enabled){
-        setBackgroundReminderStatus("Background reminders are off on this device.");
-        enableBackgroundReminders?.classList.remove("hidden");disableBackgroundReminders?.classList.add("hidden");
+        report("Background reminders need reconnecting on this device.","","repair");
         return false;
       }
+      if(reconnect&&backgroundReminderPreference()!=="off"&&generation===backgroundReminderGeneration&&token===cloudSessionToken){
+        await reminderApi("subscribe",{subscription:subscription.toJSON(),timeZone:DEVICE_TIME_ZONE||"UTC",locale:USER_LOCALE},token);
+      }
     }catch(error){
-      if(error.status===401)return false;
-      setBackgroundReminderStatus("This device has notification permission, but the server connection needs refreshing.");
-      enableBackgroundReminders?.classList.remove("hidden");disableBackgroundReminders?.classList.add("hidden");
+      report(error.status===401?"Your reminder session expired. Sign in again.":error.message||"Could not check reminders. Reconnect this device to try again.","error","repair");
       return false;
     }
-    setBackgroundReminderStatus("Enabled — alerts can arrive when Watched Logger is closed.","ok");
-    enableBackgroundReminders?.classList.add("hidden");disableBackgroundReminders?.classList.remove("hidden");
+    report("Enabled — alerts can arrive when Watched Logger is closed.","ok","on");
     return true;
+    })();
+    backgroundReminderRefresh=task;
+    try{return await task;}finally{if(backgroundReminderRefresh===task)backgroundReminderRefresh=null;}
   }
   async function syncExistingBackgroundPush(){
-    if(!cloudSessionToken||typeof Notification==="undefined"||Notification.permission!=="granted")return refreshBackgroundReminderStatus();
-    const subscription=await currentPushSubscription();
-    if(subscription){
-      await reminderApi("subscribe",{
-        subscription:subscription.toJSON(),
-        timeZone:DEVICE_TIME_ZONE||"UTC",
-        locale:USER_LOCALE
-      });
-    }
-    return refreshBackgroundReminderStatus();
+    return refreshBackgroundReminderStatus({reconnect:true});
   }
   async function removeBackgroundPush(){
+    ++backgroundReminderGeneration;
+    if(backgroundReminderRefresh)await backgroundReminderRefresh.catch(()=>{});
     const subscription=await currentPushSubscription();
     if(subscription){
-      try{if(cloudSessionToken)await reminderApi("unsubscribe",{endpoint:subscription.endpoint});}catch(error){console.warn(error);}
-      try{await subscription.unsubscribe();}catch(error){console.warn(error);}
+      const results=await Promise.allSettled([cloudSessionToken?reminderApi("unsubscribe",{endpoint:subscription.endpoint}):Promise.reject(new Error("Sign in again.")),subscription.unsubscribe().then(value=>{if(!value)throw new Error("Could not disconnect notifications on this device.");})]);
+      if(results.every(result=>result.status==="rejected"))throw new Error("Could not turn reminders off. Check your connection and try again.");
     }
+    backgroundReminderPreference("off");
     setBackgroundReminderStatus("Background reminders are off on this device.");
-    enableBackgroundReminders?.classList.remove("hidden");disableBackgroundReminders?.classList.add("hidden");
   }
-  enableBackgroundReminders.onclick=async()=>{
-    enableBackgroundReminders.disabled=true;
+  async function runBackgroundReminderAction(action){
+    if(backgroundReminderBusy)return;
+    backgroundReminderBusy=true;++backgroundReminderGeneration;
+    const token=cloudSessionToken;
     try{
-      setBackgroundReminderStatus("Connecting this device…");
-      await ensureBackgroundPush({askPermission:true});
-      await refreshBackgroundReminderStatus();
-    }catch(error){setBackgroundReminderStatus(error.message||"Could not enable background reminders.","error");}
-    finally{enableBackgroundReminders.disabled=false;}
-  };
-  disableBackgroundReminders.onclick=async()=>{
-    disableBackgroundReminders.disabled=true;
-    try{await removeBackgroundPush();}
-    finally{disableBackgroundReminders.disabled=false;}
-  };
-  document.getElementById("test-background-reminder")?.addEventListener("click",async event=>{
-    const button=event.currentTarget;button.disabled=true;
-    try{
-      if(currentUser&&cloudSessionToken){const saved=await persistLibrary(mediaItems,{precleaned:true});if(!saved)throw new Error("Sync your library before testing reminders.");}
-      const subscription=await currentPushSubscription();if(!subscription)throw new Error("Enable background reminders on this device first.");
-      const result=await reminderApi("test_reminder",{endpoint:subscription.endpoint,requestId:crypto.randomUUID()});
-      setBackgroundReminderStatus(result.duplicate?"Test reminder was already sent.":"Test reminder accepted by the push service.","ok");
-    }catch(error){setBackgroundReminderStatus(error.message||"Could not send a test reminder.","error");}
-    finally{button.disabled=false;}
+      // Start permission requests in the click's user gesture, before any await.
+      await action();
+    }catch(error){if(token===cloudSessionToken)setBackgroundReminderStatus(error.message||"Could not connect reminders. Try reconnecting.","error",pushSupportError()?"blocked":"repair");}
+    finally{backgroundReminderBusy=false;if(token===cloudSessionToken){enableBackgroundReminders.disabled=backgroundReminderConnection==="blocked";disableBackgroundReminders.disabled=false;const test=document.getElementById("test-background-reminder");if(test)test.disabled=backgroundReminderConnection!=="on";}}
+  }
+  enableBackgroundReminders.onclick=()=>runBackgroundReminderAction(async()=>{
+    setBackgroundReminderStatus("Connecting this device…","","checking");
+    await ensureBackgroundPush({askPermission:true});
+    backgroundReminderPreference("on");
+    setBackgroundReminderStatus("Enabled — alerts can arrive when Watched Logger is closed.","ok","on");
   });
+  disableBackgroundReminders.onclick=()=>runBackgroundReminderAction(async()=>{
+    setBackgroundReminderStatus("Turning reminders off…","","on");
+    await removeBackgroundPush();
+  });
+  document.getElementById("test-background-reminder")?.addEventListener("click",()=>runBackgroundReminderAction(async()=>{
+    setBackgroundReminderStatus("Sending test reminder…","","on");
+    // A delivery test is independent of library saves. Repair a missing local
+    // subscription or missing server record before submitting the test.
+    let subscription=await ensureBackgroundPush();
+    const requestId=crypto.randomUUID();
+    let result;
+    try{result=await reminderApi("test_reminder",{endpoint:subscription.endpoint,requestId});}
+    catch(error){if(error.code!=="push_subscription_expired")throw error;subscription=await ensureBackgroundPush({renew:true});result=await reminderApi("test_reminder",{endpoint:subscription.endpoint,requestId});}
+    backgroundReminderPreference("on");
+    setBackgroundReminderStatus(result.duplicate?"Test reminder was already sent.":"Test reminder accepted by the push service.","ok","on");
+  }));
+  function refreshRemindersOnReturn(){
+    if(currentUser&&cloudSessionToken&&document.visibilityState!=="hidden")void refreshBackgroundReminderStatus();
+  }
+  window.addEventListener("focus",refreshRemindersOnReturn);
+  window.addEventListener("online",refreshRemindersOnReturn);
+  document.addEventListener("visibilitychange",refreshRemindersOnReturn);
+  document.querySelectorAll('[data-settings-open="reminders"]').forEach(button=>button.addEventListener("click",refreshRemindersOnReturn));
+  setBackgroundReminderStatus("Sign in to manage background reminders.");
 
   async function pinApi(action,payload={},token=cloudSessionToken,preparedBody="",externalSignal=null){
     const headers={"Content-Type":"application/json"};

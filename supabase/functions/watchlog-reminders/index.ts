@@ -613,8 +613,9 @@ async function processPlannedReminders(
       const leadTimes = event.kind === "episode" ? [24, 6, 0] : [24, 6];
       for (const leadHours of leadTimes) {
         const reminderTime = eventTime - leadHours * 60 * 60 * 1000;
-        // Deliver within 24 hours after a missed scheduled scan, but never early.
-        if (reminderTime > now || reminderTime < now - 24 * 60 * 60 * 1000) {
+        // Catch up only the current stage. Reconnecting a device must not
+        // deliver "in 1 day" and "in 6 hours" after the episode has released.
+        if (!reminderStageIsDue(eventTime, leadHours, now)) {
           continue;
         }
 
@@ -656,6 +657,14 @@ async function processPlannedReminders(
   }
 
   return { sent, failed };
+}
+
+function reminderStageIsDue(eventTime: number, leadHours: number, now: number) {
+  const hour = 3600000;
+  const due = eventTime - leadHours * hour;
+  const expires = leadHours === 24 ? eventTime - 6 * hour
+    : leadHours === 6 ? eventTime : eventTime + 24 * hour;
+  return Number.isFinite(eventTime) && now >= due && now < expires;
 }
 
 async function processCron(req: Request) {
@@ -872,14 +881,15 @@ Deno.serve(async (req: Request) => {
 
     if (action === "status") {
       const endpoint = String(body.endpoint || "");
-      const { data } = endpoint
+      const { data, error } = endpoint
         ? await db
             .from("watchlog_push_subscriptions")
             .select("enabled")
             .eq("account_id", session.accountId)
             .eq("endpoint", endpoint)
             .maybeSingle()
-        : { data: null };
+        : { data: null, error: null };
+      if (error) throw error;
       return json({ ok: true, enabled: Boolean(data?.enabled) });
     }
 
@@ -931,7 +941,10 @@ Deno.serve(async (req: Request) => {
         return json({ ok: true, status: "sent" });
       } catch (error) {
         await finishDelivery(delivery, row as PushRow, error);
-        throw error;
+        const code = statusCodeFor(error);
+        return code === 404 || code === 410
+          ? json({ error: "This device's notification connection expired. Reconnect reminders.", code: "push_subscription_expired" }, 410)
+          : json({ error: "The push service could not accept the test. Try again shortly.", code: "push_delivery_failed" }, 502);
       }
     }
 

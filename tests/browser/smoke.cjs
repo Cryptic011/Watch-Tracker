@@ -20,7 +20,7 @@ const server=http.createServer((req,res)=>{
   const page=await context.newPage(),errors=[];let phase='login';
   page.on('pageerror',error=>{const message=String(error.message||'');const expectedWebKitPinCors=engine.name()==='webkit'&&message.includes('watchlog-pin?forceFunctionRegion=eu-west-1')&&message.includes('access control checks');if(!expectedWebKitPinCors)errors.push(message);console.error(`${engine.name()} [${phase}] page error: ${error.stack||error.message}`);});
   page.on('requestfailed',request=>console.error(`${engine.name()} [${phase}] request failed: ${request.method()} ${new URL(request.url()).pathname} ${request.failure()?.errorText}`));
-  let items=[],revision=0,failSave=false,saves=0,loads=0,changelogRequests=0;const catalogQueries=[];
+  let items=[],revision=0,failSave=false,saves=0,loads=0,changelogRequests=0,reminderEnabled=false,reminderExpiredTest=false;const catalogQueries=[],reminderTests=[];
   const account={id:'browser-test',email:'browser@example.test',displayName:'Browser Test'};
   await context.route('**/*',async route=>{
    const req=route.request();
@@ -41,6 +41,18 @@ const server=http.createServer((req,res)=>{
     {number:2,image:null}
    ]});
    if(url.hostname==='static.tvmaze.com')return route.fulfill({headers,contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="320" height="180"><rect width="320" height="180" fill="#334b68"/><path d="M0 150L110 40L210 120L270 70L320 140V180H0Z" fill="#87a5c5"/><circle cx="245" cy="40" r="18" fill="#e5bf7e"/></svg>'});
+   if(url.pathname.includes('/functions/v1/watchlog-reminders')){
+    const body=req.postDataJSON();let data={ok:true,history:[],upcoming:[],suppressed:[]};
+    if(body.action==='public_key')data.publicKey='AQID';
+    if(body.action==='subscribe')reminderEnabled=true;
+    if(body.action==='unsubscribe')reminderEnabled=false;
+    if(body.action==='status')data.enabled=reminderEnabled;
+    if(body.action==='test_reminder'){
+     reminderTests.push(body);
+     if(reminderExpiredTest){reminderExpiredTest=false;return route.fulfill({status:410,headers,json:{error:'Expired',code:'push_subscription_expired'}});}
+    }
+    return route.fulfill({headers,json:data});
+   }
    if(req.url().includes('/functions/v1/watchlog-pin')){
     const body=req.postDataJSON();let data={ok:true};
     if(['login','load'].includes(body.action)){loads++;data={ok:true,account,items,revision,sessionToken:'test-token'};}
@@ -432,6 +444,42 @@ const server=http.createServer((req,res)=>{
   await page.locator('[data-settings-open="reminders"]').click();
   assert.equal(await page.locator('#background-reminder-status').isVisible(),true,'Release Reminders opens reminder controls');
   await assertSettingsOnly();
+  phase='reminder recovery';
+  await page.evaluate(async()=>{
+   window._reminderOriginals={notification:Object.getOwnPropertyDescriptor(window,'Notification'),push:Object.getOwnPropertyDescriptor(window,'PushManager'),worker:Object.getOwnPropertyDescriptor(navigator,'serviceWorker')};
+   let serial=0;window._reminderSubscription=null;
+   const worker={active:{},pushManager:{getSubscription:async()=>window._reminderSubscription,subscribe:async()=>window._reminderSubscription={endpoint:'https://web.push.apple.com/browser-test-'+(++serial),toJSON(){return{endpoint:this.endpoint,keys:{auth:'auth',p256dh:'key'}};},unsubscribe:async()=>{window._reminderSubscription=null;return true;}}}};
+   Object.defineProperty(window,'Notification',{configurable:true,value:{permission:'granted'}});
+   Object.defineProperty(window,'PushManager',{configurable:true,value:{}});
+   Object.defineProperty(navigator,'serviceWorker',{configurable:true,value:{getRegistration:async()=>worker,ready:Promise.resolve(worker)}});
+   await refreshBackgroundReminderStatus();
+  });
+  assert.equal(await page.locator('#enable-background-reminders').textContent(),'Reconnect Reminders');
+  assert.equal(await page.locator('#disable-background-reminders').isVisible(),false);
+  assert.equal(await page.locator('#test-background-reminder').isDisabled(),true);
+  await page.locator('#enable-background-reminders').click();
+  await page.waitForFunction(()=>document.querySelector('#quick-reminder-status span').textContent==='Reminders on');
+  assert.equal(await page.locator('#disable-background-reminders').isVisible(),true);
+  await page.evaluate(()=>window._reminderSubscription=null);
+  await page.locator('#test-background-reminder').click();
+  await page.waitForFunction(()=>document.querySelector('#background-reminder-status').textContent.includes('accepted'));
+  reminderExpiredTest=true;
+  await page.locator('#test-background-reminder').click();
+  await page.waitForFunction(()=>!document.querySelector('#test-background-reminder').disabled);
+  assert.equal(reminderTests.length,3,'an expired endpoint is renewed and tested once more');
+  assert.equal(reminderTests[1].requestId,reminderTests[2].requestId);
+  assert.notEqual(reminderTests[1].endpoint,reminderTests[2].endpoint);
+  await page.locator('#disable-background-reminders').click();
+  await page.waitForFunction(()=>document.querySelector('#quick-reminder-status span').textContent==='Reminders off');
+  assert.equal(reminderEnabled,false);
+  assert.equal(await page.locator('#test-background-reminder').isDisabled(),true);
+  await page.evaluate(async()=>{
+   const original=window._reminderOriginals;
+   for(const [object,key,descriptor] of [[window,'Notification',original.notification],[window,'PushManager',original.push],[navigator,'serviceWorker',original.worker]]){if(descriptor)Object.defineProperty(object,key,descriptor);else delete object[key];}
+   delete window._reminderOriginals;delete window._reminderSubscription;
+   await refreshBackgroundReminderStatus();
+  });
+  console.log(engine.name()+': reminder reconnect, missing subscription, expired endpoint and device turn-off passed');
   await page.locator('[data-settings-panel="reminders"] [data-settings-back]').click();
   await page.locator('[data-settings-open="account"]').click();
   await assertSettingsOnly();
