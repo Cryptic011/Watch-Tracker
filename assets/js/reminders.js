@@ -174,7 +174,7 @@
   }
   enableBackgroundReminders.onclick=()=>runBackgroundReminderAction(async token=>{
     setBackgroundReminderStatus("Connecting this device…","","checking");
-    await ensureBackgroundPush({askPermission:true,token});
+    await ensureBackgroundPush({askPermission:true,renew:true,token});
     if(token!==cloudSessionToken)return;
     backgroundReminderPreference("on");
     setBackgroundReminderStatus("Enabled — alerts can arrive when Watched Logger is closed.","ok","on");

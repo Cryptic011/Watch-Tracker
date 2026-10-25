@@ -33,6 +33,7 @@ function harness({permission='granted',missing=false}={}){
     check:()=>context.refreshBackgroundReminderStatus(),
     reconnect:()=>enable.onclick(),test:()=>testButton.listeners.click(),off:()=>disable.onclick(),
     loseSubscription:()=>subscription=null,failStatus:()=>failStatus=true,expireTest:()=>expireTest=true,failLocal:()=>localFailure=true,
+    disconnectServer:()=>serverEnabled=false,
     gateStatus:()=>{let release;statusGate=new Promise(resolve=>release=resolve);return release;},
     gateTest:()=>{let release;testGate=new Promise(resolve=>release=resolve);return release;},
     stats:()=>({registered,permissionRequests,serverEnabled,subscription,serial}),
@@ -65,6 +66,14 @@ test('An expired push endpoint is renewed once and the same test request is retr
   assert.equal(tests.length,2);assert.equal(tests[0].requestId,tests[1].requestId);
   assert.notEqual(tests[0].endpoint,tests[1].endpoint);assert.equal(h.stats().serial,2);
   assert.equal(h.testButton.disabled,false);
+});
+
+test('Reconnect renews an endpoint disabled by the server even without a local expiry date',async()=>{
+  const h=harness();await h.check();h.disconnectServer();await h.check();
+  assert.equal(h.enable.textContent,'Reconnect Reminders');const oldEndpoint=h.stats().subscription.endpoint;
+  await h.reconnect();
+  assert.notEqual(h.stats().subscription.endpoint,oldEndpoint);
+  assert.equal(h.stats().serverEnabled,true);assert.equal(h.label.textContent,'Reminders on');
 });
 
 test('Permission refusal and network failure cannot leave enabled controls showing',async()=>{
