@@ -73,7 +73,43 @@ const DASHBOARD_WEEKDAY_FORMATTER=new Intl.DateTimeFormat(USER_LOCALE,{weekday:"
 const DASHBOARD_DATE_FORMATTER=new Intl.DateTimeFormat(USER_LOCALE,{day:"numeric",month:"short"});
 const DASHBOARD_TIME_FORMATTER=new Intl.DateTimeFormat(USER_LOCALE,{hour:"2-digit",minute:"2-digit"});
 const DASHBOARD_PRIOR_DATE_FORMATTER=new Intl.DateTimeFormat(USER_LOCALE,{weekday:"short",day:"numeric",month:"short"});
-let selectedCalendarRange='week';
+let selectedCalendarRange='week',selectedScheduleView='';
+function openScheduleView(view){
+  if(!['recurring','calendar'].includes(view))return;
+  saveNavigationPosition();selectedScheduleView=view;
+  window.WatchLogGallery?.setCategory?.('');
+  render();recordAppNavigation();window.scrollTo({top:0,behavior:'instant'});
+  document.querySelector('[data-schedule-back]')?.focus({preventScroll:true});
+}
+function closeScheduleView(){
+  if(appNavigationBack())return;
+  const view=selectedScheduleView;goToTabHome('library');
+  document.querySelector('[data-schedule-open="'+view+'"]')?.focus({preventScroll:true});
+}
+function renderScheduleNavigation(){
+  let root=document.getElementById('library-schedule-navigation');
+  if(!root){
+    root=document.createElement('div');root.id='library-schedule-navigation';
+    document.getElementById('library-view').prepend(root);
+    root.addEventListener('click',event=>{
+      const open=event.target.closest('[data-schedule-open]');if(open){openScheduleView(open.dataset.scheduleOpen);return;}
+      if(event.target.closest('[data-schedule-back]'))closeScheduleView();
+    });
+  }
+  const visible=Boolean(currentUser&&currentTab==='library'&&!categoryControlsVisible());
+  root.classList.toggle('hidden',!visible);
+  document.getElementById('media-list').classList.toggle('hidden',Boolean(selectedScheduleView));
+  if(!visible)return;
+  if(selectedScheduleView){
+    updateDashboardMarkup(root,`<div class="schedule-page-nav"><button type="button" class="schedule-back" data-schedule-back aria-label="Back to Library"><span aria-hidden="true">‹</span> Library</button><span>${selectedScheduleView==='recurring'?'WEEKLY SHOWS':'RELEASE CALENDAR'}</span></div>`);
+    return;
+  }
+  const now=new Date(),shows=new Set(recurringWeeklyShows(mediaItems,now).map(row=>String(row.item.id))).size;
+  const range=calendarRange(selectedCalendarRange,now),releases=calendarEvents(mediaItems,range.start,range.days).events.length;
+  const recurringIcon='<svg viewBox="0 0 24 24"><path d="M20 7h-7l2.5-2.5M4 17h7l-2.5 2.5M19 7a8 8 0 0 0-13-1M5 17a8 8 0 0 0 13 1"/></svg>';
+  const calendarIcon='<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M7 3v4m10-4v4M3 11h18m-13 4h1m6 0h1m-8 3h1"/></svg>';
+  updateDashboardMarkup(root,`<div class="schedule-shortcuts" aria-label="Your schedules">${[['recurring','Recurring shows',shows,'shows',recurringIcon],['calendar','Your calendar',releases,'releases',calendarIcon]].map(([view,label,count,unit,icon])=>`<button type="button" class="schedule-shortcut" data-schedule-open="${view}" aria-label="${label}, ${count} ${unit}"><span class="schedule-shortcut-top"><span class="schedule-shortcut-icon" aria-hidden="true">${icon}</span><span class="schedule-shortcut-count">${count}</span></span><span class="schedule-shortcut-copy"><strong>${label}</strong><span>${view==='recurring'?'Next 14 days':'Browse releases'}<span aria-hidden="true"> ›</span></span></span></button>`).join('')}</div>`);
+}
 function calendarRange(range,now=new Date()){
   const today=new Date(now);today.setHours(0,0,0,0);
   const weekStart=new Date(today);weekStart.setDate(weekStart.getDate()-(weekStart.getDay()+6)%7);
@@ -202,14 +238,15 @@ function renderRecurringWeeklySchedule(){
   let root=document.getElementById("recurring-weekly-dashboard");
   if(!root){
     const library=document.getElementById("library-view");if(!library)return;
-    root=document.createElement("div");root.id="recurring-weekly-dashboard";library.prepend(root);
+    root=document.createElement("div");root.id="recurring-weekly-dashboard";
+    document.getElementById('library-schedule-navigation').after(root);
     root.addEventListener("click",event=>{
       const button=event.target.closest("[data-recurring-open]");if(button)openMediaRow(button.dataset.recurringOpen,button);
     });
   }
-  const visible=Boolean(currentUser&&currentTab==="library"&&!categoryControlsVisible());
-  root.classList.toggle("hidden",!visible);
-  if(!visible){if(!currentUser){root.replaceChildren();root._dashboardMarkup=null;}return;}
+  const available=Boolean(currentUser&&currentTab==="library"&&!categoryControlsVisible());
+  root.classList.toggle("hidden",!available||selectedScheduleView!=="recurring");
+  if(!available){if(!currentUser){root.replaceChildren();root._dashboardMarkup=null;}return;}
   const now=new Date(),rows=recurringWeeklyShows(mediaItems,now),total=new Set(rows.map(row=>String(row.item.id))).size;
   const progressMarkers=new Map();
   const days=Array.from({length:7},(_,index)=>{
@@ -221,7 +258,7 @@ function renderRecurringWeeklySchedule(){
       return `<button type="button" class="release-card recurring-release-card" data-recurring-open="${esc(row.item.id)}"><span class="release-time">${esc(time)}</span><span class="release-card-copy"><strong class="release-show-title"><span>${esc(row.item.title)}</span>${scheduleProgressMarker(row.item,progressMarkers)}</strong><span class="release-episode">${esc(episode)} · ${esc(date)}</span><span class="release-state-badge" data-release-state="${row.state}">${row.state==="released"?"Released · last 24 hours":row.state==="upcoming"?"Upcoming":"Awaiting next episode"}</span><span class="release-platform">${esc(row.item.platform||"Platform not saved")}</span></span><span class="release-chevron" aria-hidden="true">›</span></button>`;
     }).join(""):'<p class="release-empty">No recurring shows</p>'}</section>`;
   }).join("");
-  updateDashboardMarkup(root,`<details class="dashboard-section weekly-releases recurring-weekly-releases" data-dashboard-section="recurring" aria-labelledby="recurring-weekly-title"><summary class="weekly-releases-heading"><div class="recurring-summary-copy"><span class="weekly-eyebrow">MONDAY–SUNDAY</span><h2 id="recurring-weekly-title">Recurring weekly shows</h2><p class="dashboard-note">Tap to expand · device timezone (${esc(DEVICE_TIME_ZONE||Intl.DateTimeFormat().resolvedOptions().timeZone||"UTC")})</p></div><span class="weekly-total">${total}<small>shows</small></span><span class="recurring-dropdown-chevron" aria-hidden="true">⌄</span></summary><div class="release-week-list">${days}</div><p class="weekly-footnote">Only confirmed releases within the next 14 days appear here. Episodes remain for 24 hours after airing. Historical broadcast weekdays do not confirm a future episode.</p></details>`);
+  updateDashboardMarkup(root,`<section class="dashboard-section weekly-releases recurring-weekly-releases" aria-labelledby="recurring-weekly-title"><header class="weekly-releases-heading"><div class="recurring-summary-copy"><span class="weekly-eyebrow">MONDAY–SUNDAY</span><h2 id="recurring-weekly-title">Recurring shows</h2><p class="dashboard-note">Next 14 days · ${esc(DEVICE_TIME_ZONE||Intl.DateTimeFormat().resolvedOptions().timeZone||"UTC")}</p></div><span class="weekly-total">${total}<small>shows</small></span></header><div class="release-week-list">${days}</div><p class="weekly-footnote">Only confirmed releases within the next 14 days appear here. Episodes remain for 24 hours after airing. Historical broadcast weekdays do not confirm a future episode.</p></section>`);
   if(document.visibilityState==="visible"){
     recurringWeeklyTimer=setTimeout(renderDashboard,recurringScheduleDelay(rows,now,mediaItems));
   }
@@ -262,11 +299,12 @@ function renderWatchStatistics(){
 
 function renderDashboard(){
   if(typeof renderLibraryFeatures==="function")renderLibraryFeatures();
+  renderScheduleNavigation();
   renderRecurringWeeklySchedule();
   const root=document.getElementById('library-dashboard');if(!root)return;
   renderWatchStatistics();
   const visible=Boolean(currentUser&&currentTab==='library'&&!categoryControlsVisible()&&!searchQuery.trim());
-  root.classList.toggle('hidden',!visible);if(!visible){if(!currentUser){root.replaceChildren();root._dashboardMarkup=null;}return;}
+  root.classList.toggle('hidden',!visible||selectedScheduleView!=='calendar');if(!visible){if(!currentUser){root.replaceChildren();root._dashboardMarkup=null;}return;}
   const progressMarkers=new Map();
   const {start,days:daysToShow,label:rangeLabel,priorStart,priorDays}=calendarRange(selectedCalendarRange,new Date());
   const {events,unknown}=calendarEvents(mediaItems,start,daysToShow);
@@ -309,18 +347,18 @@ function renderDashboard(){
   const excluded=mediaItems.filter(item=>item.hideFromWeeklyReleases===true);
   const priorMarkup=priorEvents.length?`<details class="release-tba prior-releases" data-dashboard-section="prior"><summary><span>Prior Releases</span><span class="release-tba-count">${priorEvents.length}</span></summary><div class="release-tba-list">${priorEvents.map(event=>`<button type="button" class="release-tba-item" data-dashboard-open="${esc(event.item.id)}"><strong class="release-show-title"><span>${esc(event.item.title)}</span>${scheduleProgressMarker(event.item,progressMarkers)}</strong><span>${esc(event.label)} · ${esc(DASHBOARD_PRIOR_DATE_FORMATTER.format(event.date))}${event.dateOnly?' · Date only':' · '+esc(DASHBOARD_TIME_FORMATTER.format(event.date))}</span></button>`).join('')}</div></details>`:'';
   const controls=`<div class="filter-pills calendar-range" role="group" aria-label="Filter release calendar">${[['today','Today'],['week','This week'],['upcoming','Upcoming']].map(([key,label])=>`<button type="button" class="pill-btn${selectedCalendarRange===key?' active':''}" data-calendar-range="${key}" aria-pressed="${selectedCalendarRange===key}">${label}</button>`).join('')}</div>`;
-  updateDashboardMarkup(root,`<details class="dashboard-section weekly-releases" data-dashboard-section="calendar" aria-labelledby="weekly-releases-title">
-    <summary class="weekly-releases-heading"><div class="recurring-summary-copy"><span class="weekly-eyebrow">RELEASE CALENDAR</span><h2 id="weekly-releases-title">Your schedule</h2><p class="dashboard-note">${rangeLabel} · device timezone (${esc(DEVICE_TIME_ZONE||Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC')})</p></div><span class="weekly-total">${events.length}<small>releases</small></span><span class="recurring-dropdown-chevron" aria-hidden="true">⌄</span></summary>
+  updateDashboardMarkup(root,`<section class="dashboard-section weekly-releases" aria-labelledby="weekly-releases-title">
+    <header class="weekly-releases-heading"><div class="recurring-summary-copy"><span class="weekly-eyebrow">RELEASE CALENDAR</span><h2 id="weekly-releases-title">Your calendar</h2><p class="dashboard-note">${rangeLabel} · ${esc(DEVICE_TIME_ZONE||Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC')}</p></div><span class="weekly-total">${events.length}<small>releases</small></span></header>
     ${controls}
     <div class="release-week-list">${days}</div>
     ${priorMarkup}
     ${unknown.length?`<details class="release-tba" data-dashboard-section="unknown"><summary><span>Dates to be announced</span><span class="release-tba-count">${unknown.length}</span></summary><div class="release-tba-list">${unknown.map(item=>`<button type="button" class="release-tba-item" data-dashboard-open="${esc(item.id)}"><strong class="release-show-title"><span>${esc(item.title)}</span>${scheduleProgressMarker(item,progressMarkers)}</strong><span>${esc(item.announcement)} · Date TBA</span><span class="release-chevron" aria-hidden="true">›</span></button>`).join('')}</div></details>`:''}
     ${excluded.length?`<details class="release-tba" data-dashboard-section="excluded"><summary><span>Excluded from Weekly Releases</span><span class="release-tba-count">${excluded.length}</span></summary><div class="release-tba-list">${excluded.map(item=>`<div class="dashboard-row excluded-release-row"><div><strong>${esc(item.title)}</strong><span class="release-state-badge" data-release-state="excluded">Excluded</span></div><button type="button" class="btn btn-secondary" data-calendar-include="${esc(item.id)}">Re-enable</button></div>`).join('')}</div></details>`:''}
     <p class="weekly-footnote">Broadcast and listed film dates may differ from UK streaming availability. Date-only releases use noon in the device timezone.</p>
-  </details>`);
+  </section>`);
 }
 document.getElementById('library-dashboard').addEventListener('click',event=>{
-  const range=event.target.closest('[data-calendar-range]');if(range){selectedCalendarRange=range.dataset.calendarRange;document.getElementById('library-dashboard')._dashboardMarkup=null;renderDashboard();return;}
+  const range=event.target.closest('[data-calendar-range]');if(range){saveNavigationPosition();selectedCalendarRange=range.dataset.calendarRange;renderDashboard();recordAppNavigation(true);return;}
   const include=event.target.closest('[data-calendar-include]');if(include){const item=mediaItems.find(row=>String(row.id)===include.dataset.calendarInclude);if(item){item.hideFromWeeklyReleases=false;render();void persistLibrary(mediaItems,{background:true,precleaned:true});}return;}
   const watch=event.target.closest('[data-dashboard-watch]');
   if(watch){

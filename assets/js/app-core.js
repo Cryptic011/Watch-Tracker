@@ -54,6 +54,7 @@
     if(!episodeTrackerModal.classList.contains("hidden")){closeEpisodeTrackerSheet();return;}
     if(!modal.classList.contains("hidden")){closeEditor();return;}
     if(window.WatchLogNavigation?.back?.())return;
+    if(typeof selectedScheduleView==='string'&&selectedScheduleView){closeScheduleView();return;}
     if(currentTab!=="library"){switchTab("library");return;}
     window.WatchLogGallery?.back?.();
   }

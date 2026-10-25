@@ -15,6 +15,27 @@
 .continue-watching-section[open]>summary{margin-bottom:12px}
 .continue-watching-section[open] .continue-chevron{transform:rotate(180deg)}
 
+/* Schedule entry cards lead to separate Library views. */
+.schedule-shortcuts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:2px 0 22px}
+.schedule-shortcut{display:flex;flex-direction:column;justify-content:space-between;gap:23px;min-width:0;min-height:158px;padding:17px;border:1px solid var(--border);border-radius:24px;background:var(--card);color:var(--text);text-align:left;cursor:pointer}
+.schedule-shortcut-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.schedule-shortcut-icon{display:grid;place-items:center;width:40px;height:40px;border-radius:13px;background:#60a5fa1c;color:var(--blue2)}
+.schedule-shortcut-icon svg{width:23px;height:23px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.schedule-shortcut[data-schedule-open="calendar"] .schedule-shortcut-icon{background:#34d3991c;color:var(--green)}
+.schedule-shortcut-count{font-size:1.65rem;line-height:1;font-weight:800;font-variant-numeric:tabular-nums;color:var(--blue2)}
+.schedule-shortcut[data-schedule-open="calendar"] .schedule-shortcut-count{color:var(--green)}
+.schedule-shortcut-copy{display:flex;flex-direction:column;gap:5px;min-width:0}
+.schedule-shortcut-copy strong{font-size:1rem;font-weight:800;letter-spacing:-.025em;line-height:1.2;overflow-wrap:anywhere}
+.schedule-shortcut-copy>span{display:flex;align-items:center;justify-content:space-between;color:var(--muted);font-size:.72rem;line-height:1.3}
+.schedule-shortcut-copy>span>span{font-size:1.2rem;line-height:1}
+.schedule-shortcut:active{background:var(--inner)}
+.schedule-shortcut:focus-visible,.schedule-back:focus-visible{outline:2px solid var(--blue2);outline-offset:3px}
+.schedule-page-nav{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 16px;min-height:44px}
+.schedule-back{display:flex;align-items:center;gap:7px;min-height:44px;padding:0 12px 0 6px;border:0;border-radius:12px;background:var(--inner);color:var(--blue2);font:inherit;font-size:.88rem;font-weight:700;cursor:pointer}
+.schedule-back>span{font-size:1.8rem;line-height:1}
+.schedule-page-nav>span{color:var(--muted);font-size:.63rem;font-weight:800;letter-spacing:.1em;text-align:right}
+@media(max-width:350px){.schedule-shortcuts{gap:9px}.schedule-shortcut{padding:13px;min-height:151px;border-radius:20px}.schedule-shortcut-copy strong{font-size:.92rem}}
+
 /* Weekly releases: compact, date-led schedule designed for narrow mobile screens. */
 .weekly-releases{padding:0!important;overflow:hidden;background:linear-gradient(180deg,#171a21 0%,var(--card) 170px);border-radius:24px!important}
 .weekly-releases-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:20px 17px 17px;border-bottom:1px solid var(--border)}
@@ -63,12 +84,7 @@
 .weekly-footnote{padding:11px 17px 15px;border-top:1px solid var(--border);font-size:.67rem;line-height:1.45;color:var(--muted)}
 .release-card:focus-visible,.release-tba-item:focus-visible{outline:2px solid var(--blue2);outline-offset:2px}
 .recurring-weekly-releases{background:var(--card)}
-.weekly-releases>summary.weekly-releases-heading{list-style:none;cursor:pointer;padding:20px 17px 17px;color:var(--text);font-size:inherit;font-weight:inherit}
-.weekly-releases>summary::-webkit-details-marker{display:none}
-.weekly-releases:not([open])>summary{border-bottom:0}
 .recurring-summary-copy{flex:1;min-width:0}
-.recurring-dropdown-chevron{flex:0 0 auto;color:var(--muted);font-size:1.4rem;line-height:1}
-.weekly-releases[open] .recurring-dropdown-chevron{transform:rotate(180deg)}
 .recurring-release-card{border-color:var(--border)}
 .recurring-release-card .release-episode{color:var(--muted)}
 .recurring-weekly-releases .release-state-badge[data-release-state="tba"]{background:var(--inner);border-color:var(--border);color:var(--muted)}

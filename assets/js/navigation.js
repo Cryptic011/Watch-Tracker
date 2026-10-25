@@ -3,12 +3,13 @@ let navigationApplying=false,navigationReady=false,navigationAccount='',navigati
 function currentAppPage(){
   const dialog=document.querySelector('.gallery-detail[open]');
   const panel=[...document.querySelectorAll('#settings-view [data-settings-panel]')].find(node=>!node.classList.contains('hidden'));
-  return {searchText:typeof discoveryInput!=='undefined'?discoveryInput.value.trim():'',searchFormat:typeof discoveryFilter!=='undefined'?discoveryFilter:'All',tab:currentTab,category:window.WatchLogGallery?.getCategory?.()||'',scope:typeof libraryScope==='string'?libraryScope:'',settings:panel?.dataset.settingsPanel||'',title:dialog?.dataset.item||'',query:searchQuery,filter:activeFilter,sort:activeSort,scroll:window.scrollY||0,dialogScroll:dialog?.scrollTop||0};
+  return {schedule:typeof selectedScheduleView==='string'?selectedScheduleView:'',calendarRange:typeof selectedCalendarRange==='string'?selectedCalendarRange:'week',searchText:typeof discoveryInput!=='undefined'?discoveryInput.value.trim():'',searchFormat:typeof discoveryFilter!=='undefined'?discoveryFilter:'All',tab:currentTab,category:window.WatchLogGallery?.getCategory?.()||'',scope:typeof libraryScope==='string'?libraryScope:'',settings:panel?.dataset.settingsPanel||'',title:dialog?.dataset.item||'',query:searchQuery,filter:activeFilter,sort:activeSort,scroll:window.scrollY||0,dialogScroll:dialog?.scrollTop||0};
 }
 function appPageHash(page){
-  let path=page.title?'title/'+encodeURIComponent(page.title):page.tab==='settings'?'settings'+(page.settings?'/'+page.settings:''):page.tab==='search'?'search':'library'+(page.category?'/'+(page.category==='Film'?'movies':'series'):'');
+  let path=page.title?'title/'+encodeURIComponent(page.title):page.tab==='settings'?'settings'+(page.settings?'/'+page.settings:''):page.tab==='search'?'search':'library'+(page.schedule?'/'+page.schedule:page.category?'/'+(page.category==='Film'?'movies':'series'):'');
   const query=new URLSearchParams();
   if(page.scope)query.set('collection',page.scope);
+  if(page.schedule==='calendar'&&page.calendarRange&&page.calendarRange!=='week')query.set('range',page.calendarRange);
   if(page.tab==='search'){if(page.searchText)query.set('q',page.searchText);if(page.searchFormat&&page.searchFormat!=='All')query.set('format',page.searchFormat);}else if(page.query)query.set('q',page.query);
   if(page.filter&&page.filter!=='All')query.set('filter',page.filter);
   if(page.sort&&page.sort!=='current')query.set('sort',page.sort);
@@ -16,10 +17,11 @@ function appPageHash(page){
 }
 function parseAppHash(hash){
   const [path,query='']=String(hash||'#/library').replace(/^#\/?/,'').split('?'),parts=path.split('/'),params=new URLSearchParams(query);
-  const page={tab:'library',category:'',settings:'',title:'',scope:params.get('collection')||'',query:params.get('q')||'',filter:['All','Planned','Watching','Watched'].includes(params.get('filter'))?params.get('filter'):'All',sort:['current','recent','release','title','platform','watched','shows'].includes(params.get('sort'))?params.get('sort'):'current',scroll:0,dialogScroll:0};
+  const page={tab:'library',category:'',schedule:'',calendarRange:['today','upcoming'].includes(params.get('range'))?params.get('range'):'week',settings:'',title:'',scope:params.get('collection')||'',query:params.get('q')||'',filter:['All','Planned','Watching','Watched'].includes(params.get('filter'))?params.get('filter'):'All',sort:['current','recent','release','title','platform','watched','shows'].includes(params.get('sort'))?params.get('sort'):'current',scroll:0,dialogScroll:0};
   if(parts[0]==='settings'){page.tab='settings';page.settings=['general','reminders','account','maintenance'].includes(parts[1])?parts[1]:'';}
   else if(parts[0]==='search'){page.tab='search';page.searchText=params.get('q')||'';page.query='';page.searchFormat=['Film','Series'].includes(params.get('format'))?params.get('format'):'All';}
   else if(parts[0]==='title'){try{page.title=decodeURIComponent(parts.slice(1).join('/'));}catch(_){}}
+  else if(['recurring','calendar'].includes(parts[1]))page.schedule=parts[1];
   else if(parts[1]==='movies'||parts[1]==='series')page.category=parts[1]==='movies'?'Film':'Series';
   return page;
 }
@@ -29,19 +31,21 @@ function saveNavigationPosition(){
   if(state?.page?.title&&!document.querySelector('.gallery-detail[open]'))return;
   if(state?.watchlog&&state.owner===String(currentUser.id))history.replaceState({...state,page:currentAppPage()},'',window.location.href);
 }
-function recordAppNavigation(){
+function recordAppNavigation(replace=false){
   if(!navigationReady||navigationApplying||!currentUser)return;
   const page=currentAppPage(),hash=appPageHash(page),previous=history.state;
-  if(hash===window.location.hash){history.replaceState({...previous,watchlog:true,owner:String(currentUser.id),page},'',hash);return;}
+  if(replace||hash===window.location.hash){history.replaceState({...previous,watchlog:true,owner:String(currentUser.id),page},'',hash);return;}
   history.pushState({watchlog:true,owner:String(currentUser.id),depth:(previous?.depth||0)+1,page,parent:previous?.page||null},'',hash);
 }
 function applyAppPage(page){
   if(!currentUser)return;
-  navigationApplying=true;const revision=++navigationRestore;
+  navigationApplying=true;const revision=++navigationRestore,previousSchedule=typeof selectedScheduleView==='string'?selectedScheduleView:'';
   try{
     document.querySelector('.gallery-detail[open]')?.close();
     libraryScope=page.scope||'';activeFilter=page.filter||'All';activeSort=page.sort||'current';searchQuery=page.query||'';searchInput.value=searchQuery;sortMode.value=activeSort;
     pillBtns.forEach(button=>button.classList.toggle('active',button.dataset.filter===activeFilter));
+    selectedScheduleView=['recurring','calendar'].includes(page.schedule)?page.schedule:'';
+    selectedCalendarRange=['today','upcoming'].includes(page.calendarRange)?page.calendarRange:'week';
     window.WatchLogGallery?.setCategory?.(page.category||'');
     if(page.tab==='search'){const text=page.searchText||'';if(discoveryQuery!==text){pauseTitleSearch();discoveryRows=[];discoveryQuery=text;}discoveryInput.value=text;discoveryFilter=page.searchFormat||'All';}
     switchTab(page.tab||'library');
@@ -53,6 +57,7 @@ function applyAppPage(page){
       if(revision!==navigationRestore)return;
       window.scrollTo?.({top:Number(page.scroll)||0,behavior:'auto'});
       const dialog=document.querySelector('.gallery-detail[open]');if(dialog)dialog.scrollTop=Number(page.dialogScroll)||0;
+      if(previousSchedule&&!selectedScheduleView&&page.tab==='library'&&!page.category&&!page.title)document.querySelector('[data-schedule-open="'+previousSchedule+'"]')?.focus({preventScroll:true});
     });
   }finally{navigationApplying=false;}
 }
@@ -60,7 +65,7 @@ function goToTabHome(tab){
   if(!['library','search','settings'].includes(tab))tab='library';
   saveNavigationPosition();
   if(tab==='search'&&typeof resetTitleSearch==='function')resetTitleSearch();
-  applyAppPage({tab,category:'',settings:'',title:'',scope:'',query:'',filter:'All',sort:'current',searchText:'',searchFormat:'All',scroll:0,dialogScroll:0});
+  applyAppPage({tab,category:'',schedule:'',calendarRange:'week',settings:'',title:'',scope:'',query:'',filter:'All',sort:'current',searchText:'',searchFormat:'All',scroll:0,dialogScroll:0});
   recordAppNavigation();
 }
 function initAppNavigation(){

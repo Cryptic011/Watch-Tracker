@@ -283,7 +283,11 @@
   function categoryControlsVisible(){return currentTab==="library"&&Boolean(window.WatchLogGallery?.hasCategory?.());}
   function updateFloatingAddVisibility(){
     renderLibraryMaintenance();
-    if(currentTab!=="search")document.querySelector(".top-nav h1").classList.toggle("hidden",currentTab!=="library"||categoryControlsVisible());
+    if(currentTab!=="search"){
+      const schedule=typeof selectedScheduleView==='string'&&Boolean(selectedScheduleView);
+      document.querySelector(".top-nav h1").classList.toggle("hidden",currentTab!=="library"||categoryControlsVisible()||schedule);
+      if(currentTab==='library')for(const selector of ['.top-nav .search-box','.stats-row'])document.querySelector(selector).classList.toggle('hidden',schedule);
+    }
     addBtn.classList.toggle("hidden",!(currentUser&&currentTab==="library"));
   }
   const ALLOWED_BOTTOM_TABS=new Set(["library","search","settings"]);
@@ -400,7 +404,7 @@
     updateCounts();updateFloatingAddVisibility();renderDashboard();
     if(!currentUser){const features=$("library-features"),progress=$("continue-watching");if(features&&progress&&mediaList.contains(progress))features.append(progress);if(mediaList.contains(features))mediaList.before(features);mediaList.replaceChildren();mediaList._galleryMarkup=null;emptyState.classList.add("hidden");return;}
     if(currentTab!=="library"){updateEpisodeTracker();return;}
-    const {rows,groups}=currentVisibleMediaRows();emptyState.classList.toggle("hidden",rows.length>0);
+    const {rows,groups}=currentVisibleMediaRows();emptyState.classList.toggle("hidden",Boolean(selectedScheduleView)||rows.length>0);
     if(currentTab==="library"&&window.WatchLogGallery){
       $("list-label").textContent="Library";
       window.WatchLogGallery.mount(mediaList,rows,{features:$("library-features"),filter:activeFilter,includes:typeof libraryScopeIncludes==="function"?libraryScopeIncludes:null,organise:typeof saveTitleOrganisation==="function"?saveTitleOrganisation:null,lists:typeof openTitleLists==="function"?openTitleLists:null,navigate:typeof recordAppNavigation==="function"?recordAppNavigation:null,manage:openBulkManage,upcoming:upcomingSortInfo,next:nextWatchEpisode,last:item=>isEpisodeTrackable(item)?lastLoggedEpisode(item):null,released:item=>releasedEpisodeMap(item),watched:item=>watchedEpisodeMap(item),toggleEpisode:toggleEpisodeWatched,toggleSeason:toggleSeasonWatched,refreshEpisodes:(item,force=false)=>{
