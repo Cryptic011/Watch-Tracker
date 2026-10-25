@@ -228,6 +228,7 @@ const server=http.createServer((req,res)=>{
   assert.equal(await page.locator('[data-gallery-watch-next]').count(),0,'films do not show an episode action');
   assert.equal(await page.locator('#modal').isVisible(),false,'viewing a saved search result is not editing it');
   await page.locator('[data-gallery-close]').click();
+  await page.waitForFunction(()=>!window.location.hash.startsWith('#/title/'));
   if(await page.locator('#discovery-view').isVisible())await page.locator('#close-title-search').click();
   await page.locator('[data-tab="library"]').click();await page.locator('#add-btn').click();assert.equal(await page.locator('#discovery-query').inputValue(),'','Search control returns to Search home');
   await page.locator('#discovery-manual').click();await page.locator('#modal').waitFor({state:'visible'});await page.locator('#close-modal').click();
