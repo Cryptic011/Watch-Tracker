@@ -331,7 +331,11 @@ async function resolveDetails(selected,request,tmdbToken="",signal){
       },'TMDb','https://www.themoviedb.org/movie/'+Number(movie.id));
       const homepage=firstPartyURL(movie.homepage);
       if(homepage){
-        const studio=await briefly(attempt(async()=>parseFirstPartyDetails(await get(homepage.url,true),homepage.url,selected)));
+        const studioTask=attempt(async()=>parseFirstPartyDetails(await get(homepage.url,true),homepage.url,selected));
+        // When the database has no synopsis, keep the studio task in the
+        // fallback race until it answers; a short preference window must not
+        // discard the only source capable of supplying a description.
+        const studio=filmDatabaseDetails.description?await briefly(studioTask):await studioTask;
         if(studio)return studio;
       }
       return filmDatabaseDetails;

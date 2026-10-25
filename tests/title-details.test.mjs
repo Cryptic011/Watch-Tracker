@@ -86,6 +86,11 @@ test('A stalled official homepage cannot hide a verified TMDb film record',{time
  const result=await getTitleDetails(film,async url=>url.includes('/find/')?json({movie_results:[{id:27205,title:'Inception',release_date:'2010-07-16'}]}):url.endsWith('/movie/27205')?json({id:27205,imdb_id:imdb,title:'Inception',release_date:'2010-07-16',homepage:'https://www.paramountpictures.com/movies/inception',overview:'A skilled thief enters dreams to steal secrets and must plant an idea instead.'}):url.includes('paramountpictures')?new Promise(()=>{}):failure(),{...options,tmdbToken:'test-token'});
  assert.equal(result.source,'TMDb');assert.equal(result.year,'2010');
 });
+test('An empty film database synopsis keeps a slower verified studio source available',async()=>{
+ const site='https://www.paramountpictures.com/movies/inception';
+ const result=await getTitleDetails(film,async url=>url.includes('/find/')?json({movie_results:[{id:27205,title:'Inception',release_date:'2010-07-16'}]}):url.endsWith('/movie/27205')?json({id:27205,imdb_id:imdb,title:'Inception',release_date:'2010-07-16',homepage:site,overview:''}):url===site?await new Promise(resolve=>setTimeout(()=>resolve(html('<h1>Inception</h1><meta property="og:description" content="A skilled thief enters dreams to steal secrets and must plant an idea instead.">')),180)):failure(),{...options,tmdbToken:'test-token'});
+ assert.equal(result.source,'Paramount Pictures');assert.equal(result.state,'ready');
+});
 test('Disney film pages prefer the full synopsis over truncated SEO and recognise the release date',()=>{
  const title='Star Wars: The Mandalorian and Grogu',plot='An experienced bounty hunter and his young companion accept a dangerous mission for the New Republic.';
  const page='<h1>'+title+'</h1><script type="application/ld+json">'+JSON.stringify({'@type':'Movie',name:title,dateCreated:'2026-05-22',description:'A truncated teaser...'})+'</script><p class="desc">'+plot+'</p>';
