@@ -17,3 +17,14 @@ test('Search and Settings have their own restorable URLs',()=>{
  assert.equal(parsed.tab,'search');assert.equal(parsed.searchText,'The Batman');assert.equal(parsed.searchFormat,'Film');
  assert.equal(c.parseAppHash('#/settings/unknown').settings,'');assert.equal(c.parseAppHash('#/title/%E0%A4').title,'');
 });
+test('Each primary control returns to its own home with nested state cleared',()=>{
+ const c=router(),applied=[];let resets=0,records=0;
+ c.saveNavigationPosition=()=>{};c.resetTitleSearch=()=>resets++;c.applyAppPage=page=>applied.push(page);c.recordAppNavigation=()=>records++;
+ for(const tab of ['library','search','settings'])c.goToTabHome(tab);
+ assert.equal(resets,1);assert.equal(records,3);
+ for(const [index,tab] of ['library','search','settings'].entries()){
+  const page=applied[index];assert.equal(page.tab,tab);
+  for(const key of ['category','settings','title','scope','query','searchText'])assert.equal(page[key],'');
+  assert.equal(page.filter,'All');assert.equal(page.scroll,0);
+ }
+});

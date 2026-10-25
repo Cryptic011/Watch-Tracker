@@ -183,7 +183,7 @@ const server=http.createServer((req,res)=>{
   assert.equal(await page.locator('[data-gallery-watch-next]').count(),0,'films do not show an episode action');
   assert.equal(await page.locator('#modal').isVisible(),false,'viewing a saved search result is not editing it');
   await page.locator('[data-gallery-close]').click();
-  await page.locator('[data-tab="library"]').click();await page.locator('[data-tab="search"]').click();assert.equal(await page.locator('#discovery-query').inputValue(),'Browser Test');
+  await page.locator('[data-tab="library"]').click();await page.locator('[data-tab="search"]').click();assert.equal(await page.locator('#discovery-query').inputValue(),'','Search control returns to Search home');
   await page.locator('#discovery-manual').click();await page.locator('#modal').waitFor({state:'visible'});await page.locator('#close-modal').click();
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),true);
   await page.locator('[data-tab="library"]').click();
@@ -193,6 +193,14 @@ const server=http.createServer((req,res)=>{
   assert.ok(categories[1].y>=categories[0].y+categories[0].height);
   await page.evaluate(()=>{mediaItems[0].status='Watched';mediaItems[0].filmReleaseDate='2020-02-14';mediaItems[0].date='2026-09-21';render();});
   await page.locator('[data-gallery-category="Film"]').click();await page.locator('[data-filter="Watched"]').click();
+  assert.equal(await page.locator('.library-filter-panel #library-collection-select').isVisible(),true,'status and collection controls share one filter panel');
+  const beforeCollectionTest=await page.evaluate(()=>{const prior=structuredClone(mediaItems[0]);mediaItems[0]={...prior,favorite:true,lists:['Weekend & films']};render();return prior;});
+  await page.locator('#library-collection-select').selectOption('favourites');
+  assert.equal(await page.locator('.gallery-tile').count(),1,'Favourites combines with the Watched status');
+  await page.locator('#library-collection-select').selectOption('list:Weekend & films');
+  assert.equal(await page.locator('.gallery-tile').count(),1,'user-created collection names filter the library');
+  await page.locator('#library-collection-select').selectOption('');
+  await page.evaluate(prior=>{mediaItems[0]=prior;render();},beforeCollectionTest);
   assert.match(await page.locator('.gallery-section h3').first().textContent(),/^2020/);
   assert.equal(await page.locator('[data-gallery-manage]').count(),1);
   assert.equal(await page.locator('.gallery-section [data-gallery-manage]').count(),0);
@@ -458,6 +466,9 @@ const server=http.createServer((req,res)=>{
   await page.evaluate(()=>document.documentElement.dataset.theme='dark');
   await page.locator('[data-settings-open="general"]').click();
   assert.equal(await page.locator('#appearance-mode').isVisible(),true,'General opens appearance controls');
+  await page.locator('[data-tab="settings"]').click();
+  assert.equal(await page.locator('#settings-category-menu').isVisible(),true,'pressing Settings returns to Settings home');
+  await page.locator('[data-settings-open="general"]').click();
   await assertSettingsOnly();
   await page.locator('[data-settings-panel="general"] [data-settings-back]').click();
   await page.locator('[data-settings-open="reminders"]').click();

@@ -936,7 +936,7 @@ Deno.serve(async (req: Request) => {
       const delivery = await claimDelivery(row as PushRow, session.accountId, "test-reminder", eventKey, new Date().toISOString());
       if (!delivery) return json({ ok: true, duplicate: true, status: "already_sent" });
       try {
-        await sendPush(row as PushRow, config, { title: "Watched Logger test", body: "Background reminders are connected on this device.", tag: `watchlog-test-${requestId}`, data: { url: "./", test: true } });
+        await sendPush(row as PushRow, config, { title: "Test reminder", body: "Notifications are connected.", tag: `watchlog-test-${requestId}`, data: { url: "./", test: true } });
         await finishDelivery(delivery, row as PushRow);
         return json({ ok: true, status: "sent" });
       } catch (error) {

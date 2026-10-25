@@ -65,8 +65,8 @@ self.addEventListener("fetch",event=>{
 
 self.addEventListener("push",event=>{
   let payload={
-    title:"Watched Logger",
-    body:"A Watched Logger reminder is ready.",
+    title:"Release reminder",
+    body:"Release update available.",
     tag:"watchlog-reminder",
     data:{url:"./"}
   };
@@ -77,7 +77,7 @@ self.addEventListener("push",event=>{
   }
 
   event.waitUntil((async()=>{
-    await self.registration.showNotification(typeof payload.title==="string"&&payload.title.trim()?payload.title.trim():"Watched Logger",{
+    await self.registration.showNotification(typeof payload.title==="string"&&payload.title.trim()?payload.title.trim():"Release reminder",{
       body:payload.body||"A reminder is ready.",
       icon:"./assets/img/app-icon.png?v=3",
       tag:payload.tag||"watchlog-reminder",

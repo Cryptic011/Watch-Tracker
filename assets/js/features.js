@@ -1,5 +1,13 @@
 /* Library organisation, Continue Watching, offline readiness and recovery. */
 let libraryScope='',featureAccount='',continueExpanded=false;
+// A single filter panel combines status with Favourites or a named collection.
+const libraryFilterPills=document.querySelector('#list-toolbar .filter-pills');
+const libraryCollectionControl=$('library-collections');
+if(libraryFilterPills&&libraryCollectionControl){
+  const panel=document.createElement('section');panel.className='library-filter-panel';panel.setAttribute('aria-label','Filter titles');
+  libraryFilterPills.before(panel);panel.append(libraryFilterPills,libraryCollectionControl);
+  libraryCollectionControl.querySelector('label').textContent='Favourites & collections';
+}
 function collectionNames(items=mediaItems){return [...new Set(items.flatMap(item=>Array.isArray(item.lists)?item.lists:[]))].filter(name=>typeof name==='string'&&name.trim()).sort((a,b)=>titleCollator.compare(a,b));}
 function libraryScopeIncludes(item){
   if(libraryScope==='archived')return item.archived===true;

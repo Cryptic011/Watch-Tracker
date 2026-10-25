@@ -56,6 +56,13 @@ function applyAppPage(page){
     });
   }finally{navigationApplying=false;}
 }
+function goToTabHome(tab){
+  if(!['library','search','settings'].includes(tab))tab='library';
+  saveNavigationPosition();
+  if(tab==='search'&&typeof resetTitleSearch==='function')resetTitleSearch();
+  applyAppPage({tab,category:'',settings:'',title:'',scope:'',query:'',filter:'All',sort:'current',searchText:'',searchFormat:'All',scroll:0,dialogScroll:0});
+  recordAppNavigation();
+}
 function initAppNavigation(){
   if(!currentUser||!window.location||typeof history==='undefined')return;
   const account=String(currentUser.id);if(navigationReady&&navigationAccount===account)return;

@@ -315,7 +315,7 @@
     if(typeof recordAppNavigation==="function")recordAppNavigation();
   }
   enforceBottomNavigation();
-  document.querySelectorAll(".bottom-tabs .tab-btn").forEach(b=>b.onclick=()=>switchTab(b.dataset.tab));
+  document.querySelectorAll(".bottom-tabs .tab-btn").forEach(b=>b.onclick=()=>goToTabHome(b.dataset.tab));
   pillBtns.forEach(b=>b.onclick=()=>{pillBtns.forEach(x=>x.classList.remove("active"));b.classList.add("active");if(typeof saveNavigationPosition==="function")saveNavigationPosition();activeFilter=b.dataset.filter;render();if(typeof recordAppNavigation==="function")recordAppNavigation();});
   sortMode.onchange=e=>{activeSort=e.target.value;safeWriteJSON(SORT_KEY,activeSort);render();if(typeof recordAppNavigation==="function")recordAppNavigation();};
 
