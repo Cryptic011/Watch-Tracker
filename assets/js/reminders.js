@@ -16,7 +16,7 @@
     backgroundReminderStatus.textContent=message;
     backgroundReminderStatus.dataset.state=state||connection;
     backgroundReminderStatus.style.color=state==="error"?"#fca5a5":state==="ok"?"var(--green)":"var(--muted)";
-    const enabled=connection==="on",blocked=connection==="blocked";
+    const enabled=connection==="on",blocked=connection==="blocked"||connection==="checking";
     enableBackgroundReminders?.classList.toggle("hidden",enabled);
     disableBackgroundReminders?.classList.toggle("hidden",!enabled);
     if(enableBackgroundReminders){enableBackgroundReminders.textContent=connection==="repair"?"Reconnect Reminders":"Enable Background Reminders";enableBackgroundReminders.disabled=backgroundReminderBusy||blocked;}
@@ -66,20 +66,30 @@
     if(typeof Notification==="undefined"||(pushSupportError()&&Notification.permission!=="granted"))return null;
     return(await notificationWorker()).pushManager.getSubscription();
   }
-  async function ensureBackgroundPush({askPermission=false,renew=false,token=cloudSessionToken}={}){
+  let backgroundPushPrepared=null,backgroundPushPreparing=null;
+  async function prepareBackgroundPush(){
+    if(backgroundPushPrepared)return backgroundPushPrepared;
+    if(backgroundPushPreparing)return backgroundPushPreparing;
+    backgroundPushPreparing=(async()=>{
+      const registration=await notificationWorker();
+      const result=await reminderApi("public_key",{},"");
+      if(!result.publicKey)throw new Error("The reminder service did not return a push key.");
+      return backgroundPushPrepared={registration,key:urlBase64ToUint8Array(result.publicKey)};
+    })();
+    try{return await backgroundPushPreparing;}finally{backgroundPushPreparing=null;}
+  }
+  async function ensureBackgroundPush({askPermission=false,renew=false,token=cloudSessionToken,subscriptionPromise=null}={}){
     if(!token)throw new Error("Sign in to enable background reminders.");
     const supportError=pushSupportError();
     if(supportError)throw new Error(supportError);
-    if(Notification.permission!=="granted"){
+    if(!subscriptionPromise&&Notification.permission!=="granted"){
       if(!askPermission)throw new Error("Background reminders are not enabled on this device.");
       const permission=await Notification.requestPermission();
       if(permission!=="granted")throw new Error("Notification permission was not allowed.");
     }
-    const registration=await notificationWorker();
-    const keyResult=await reminderApi("public_key",{},"");
-    if(!keyResult.publicKey)throw new Error("The reminder service did not return a push key.");
-    let subscription=await registration.pushManager.getSubscription();
-    const key=urlBase64ToUint8Array(keyResult.publicKey),oldKey=subscription?.options?.applicationServerKey;
+    const {registration,key}=await prepareBackgroundPush();
+    let subscription=subscriptionPromise?await subscriptionPromise:await registration.pushManager.getSubscription();
+    const oldKey=subscription?.options?.applicationServerKey;
     const keyChanged=oldKey&&(new Uint8Array(oldKey).length!==key.length||new Uint8Array(oldKey).some((value,index)=>value!==key[index]));
     if(subscription&&(renew||keyChanged||(subscription.expirationTime&&subscription.expirationTime<=Date.now()))){
       if(!await subscription.unsubscribe())throw new Error("This device could not renew notifications. Try reconnecting again.");
@@ -92,6 +102,8 @@
       });
     }
     if(token!==cloudSessionToken)throw new Error("Sign in again to connect reminders.");
+    const confirmed=await registration.pushManager.getSubscription();
+    if(!confirmed||confirmed.endpoint!==subscription.endpoint)throw new Error("iPhone did not retain the notification connection. Tap Reconnect Reminders to try again.");
     await reminderApi("subscribe",{
       subscription:subscription.toJSON(),
       timeZone:DEVICE_TIME_ZONE||"UTC",
@@ -116,6 +128,8 @@
       report(supportError,"error","blocked");
       return false;
     }
+    report("Preparing notification connection…","","checking");
+    try{await prepareBackgroundPush();}catch(error){report(error.message,"error","repair");return false;}
     if(Notification.permission!=="granted"){
       report("Not enabled on this device. Enable reminders to receive release alerts while the app is closed.");
       return false;
@@ -173,8 +187,12 @@
     finally{backgroundReminderBusy=false;if(token===cloudSessionToken){enableBackgroundReminders.disabled=backgroundReminderConnection==="blocked";disableBackgroundReminders.disabled=false;const test=document.getElementById("test-background-reminder");if(test)test.disabled=backgroundReminderConnection!=="on";}}
   }
   enableBackgroundReminders.onclick=()=>runBackgroundReminderAction(async token=>{
+    // Safari requires subscribe() in the tap itself, before network/worker
+    // awaits. Reusing a valid subscription also avoids needless revocation.
+    const prepared=backgroundPushPrepared;
+    const subscriptionPromise=prepared?prepared.registration.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:prepared.key}):null;
     setBackgroundReminderStatus("Connecting this device…","","checking");
-    await ensureBackgroundPush({askPermission:true,renew:true,token});
+    await ensureBackgroundPush({askPermission:true,token,subscriptionPromise});
     if(token!==cloudSessionToken)return;
     backgroundReminderPreference("on");
     setBackgroundReminderStatus("Enabled — alerts can arrive when Watched Logger is closed.","ok","on");

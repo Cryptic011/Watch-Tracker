@@ -8,11 +8,11 @@ function harness({permission='granted',missing=false}={}){
   const node=()=>({textContent:'',disabled:false,dataset:{},style:{},listeners:{},classList:{values:new Set(),toggle(name,on){on?this.values.add(name):this.values.delete(name);},contains(name){return this.values.has(name);}},addEventListener(name,callback){this.listeners[name]=callback;}});
   const enable=node(),disable=node(),status=node(),testButton=node(),quick=node(),label=node();quick.querySelector=()=>label;
   const nodes={'test-background-reminder':testButton,'quick-reminder-status':quick};
-  let subscription,serial=0,registered=0,permissionRequests=0,serverEnabled=!missing,failStatus=false,expireTest=false,localFailure=false,statusGate=null,testGate=null;
+  let subscription,serial=0,registered=0,permissionRequests=0,subscribes=0,serverEnabled=!missing,failStatus=false,expireTest=false,localFailure=false,statusGate=null,testGate=null;
   const calls=[],prefs=new Map();
   const makeSubscription=()=>({endpoint:`https://web.push.apple.com/${++serial}`,toJSON(){return {endpoint:this.endpoint,keys:{auth:'auth',p256dh:'key'}};},unsubscribe:async()=>{if(localFailure)throw Error('Device unavailable');subscription=null;return true;}});
   subscription=missing?null:makeSubscription();
-  const worker={active:{},pushManager:{getSubscription:async()=>subscription,subscribe:async()=>subscription=makeSubscription()}};
+  const worker={active:{},pushManager:{getSubscription:async()=>subscription,subscribe:async()=>{subscribes++;return subscription||=makeSubscription();}}};
   const Notification={permission,requestPermission:async()=>{permissionRequests++;return Notification.permission='granted';}};
   const window={Notification,PushManager:{},addEventListener(){},matchMedia:()=>({matches:true})};
   const navigator={userAgent:'iPhone',standalone:true,serviceWorker:{getRegistration:async()=>worker,register:async()=>{registered++;throw Error('Update download failed');},ready:Promise.resolve(worker)}};
@@ -36,7 +36,7 @@ function harness({permission='granted',missing=false}={}){
     disconnectServer:()=>serverEnabled=false,
     gateStatus:()=>{let release;statusGate=new Promise(resolve=>release=resolve);return release;},
     gateTest:()=>{let release;testGate=new Promise(resolve=>release=resolve);return release;},
-    stats:()=>({registered,permissionRequests,serverEnabled,subscription,serial}),
+    stats:()=>({registered,permissionRequests,serverEnabled,subscription,serial,subscribes}),
   };
 }
 
@@ -68,12 +68,20 @@ test('An expired push endpoint is renewed once and the same test request is retr
   assert.equal(h.testButton.disabled,false);
 });
 
-test('Reconnect renews an endpoint disabled by the server even without a local expiry date',async()=>{
+test('Reconnect preserves and re-registers the existing browser subscription',async()=>{
   const h=harness();await h.check();h.disconnectServer();await h.check();
   assert.equal(h.enable.textContent,'Reconnect Reminders');const oldEndpoint=h.stats().subscription.endpoint;
   await h.reconnect();
-  assert.notEqual(h.stats().subscription.endpoint,oldEndpoint);
+  assert.equal(h.stats().subscription.endpoint,oldEndpoint);
   assert.equal(h.stats().serverEnabled,true);assert.equal(h.label.textContent,'Reminders on');
+});
+
+test('Prepared reconnect calls subscribe in the tap before awaiting any network work',async()=>{
+  const h=harness({missing:true});await h.check();
+  const requests=h.calls.length,connecting=h.reconnect();
+  assert.equal(h.stats().subscribes,1,'subscribe starts synchronously in the click handler');
+  assert.equal(h.calls.length,requests,'no key fetch or server request precedes subscribe');
+  await connecting;assert.equal(h.label.textContent,'Reminders on');
 });
 
 test('Permission refusal and network failure cannot leave enabled controls showing',async()=>{
