@@ -253,7 +253,7 @@ window.WatchLogGallery=(()=>{
     dialog.innerHTML=`<header class="gallery-detail-header">${show?'<button type="button" class="gallery-back" data-gallery-close aria-label="Back to Library">‹</button>':''}<h2>${esc(item.title)}</h2><div class="gallery-detail-header-actions">
       <button type="button" class="gallery-menu-button" data-gallery-menu aria-label="Title actions" aria-expanded="false">•••</button>
       ${show?'':'<button type="button" class="gallery-back" data-gallery-close aria-label="Close details">×</button>'}</div></header>
-      <div class="gallery-detail-body">${show?'':art(item)}
+      <div class="gallery-detail-body">${art(item)}
       <section class="gallery-notes-preview${savedNotes?'':' hidden'}" data-gallery-notes-preview><h3>Notes</h3><p>${esc(savedNotes)}</p></section>
       <section class="gallery-notes-editor hidden" data-gallery-notes-editor aria-labelledby="gallery-notes-label">
         <h3 id="gallery-notes-label">Notes</h3><textarea class="gallery-notes" data-gallery-notes-field aria-label="Notes" placeholder="Personal notes about this show or film">${esc(savedNotes)}</textarea>

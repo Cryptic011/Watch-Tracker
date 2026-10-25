@@ -270,8 +270,10 @@ const server=http.createServer((req,res)=>{
   phase='episode artwork';
   await page.locator('[data-gallery-item="show"]').first().click();
   assert.equal(await page.getByRole('tab',{name:'Episodes',exact:true}).getAttribute('aria-selected'),'true');
-  assert.equal(await page.locator('.gallery-series-detail').count(),1,'series use the season-first detail view');
-  assert.equal(await page.locator('.gallery-detail-body>.gallery-art').count(),0,'episode tracking starts without a duplicated hero poster');
+  assert.equal(await page.locator('.gallery-series-detail').count(),1,'series retain the updated season cards');
+  assert.equal(await page.locator('.gallery-detail-body>.gallery-art').count(),1,'series retain their main cover above the episode list');
+  await page.locator('.gallery-detail-body>.gallery-art img').waitFor({state:'visible'});
+  assert.equal(await page.locator('.gallery-detail-body>.gallery-art img').getAttribute('src'),'https://static.tvmaze.com/series-poster.jpg','the main cover uses the show artwork');
   assert.equal(await page.locator('.gallery-season-label small').first().isVisible(),false,'collapsed season cards keep progress copy out of the way');
   assert.match(await page.locator('.gallery-episodes-progress').getAttribute('aria-label'),/\d+ of \d+ released episodes watched/,'overall progress remains accessible');
   assert.equal(await page.locator('[data-gallery-notes-preview]').isVisible(),false);
