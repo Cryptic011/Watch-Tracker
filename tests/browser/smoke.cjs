@@ -533,6 +533,7 @@ const server=http.createServer((req,res)=>{
   assert.ok(loads>loadsBeforeTrackSync,'Track Sync performs a cloud library load');
   await page.waitForFunction(()=>!document.querySelector('#sync-now').disabled&&document.querySelector('#sync-status').textContent.includes('Synced.'),null,{timeout:10000});
   await assertSettingsOnly();
+  await page.locator('[data-tab="library"]').click();
   await page.locator('#add-btn').click();
   assert.equal(await page.locator('#discovery-view').isVisible(),true,'Search opens after leaving Settings');
   assert.equal(await page.locator('.top-nav h1').isVisible(),false,'Search has its own heading without the app title');

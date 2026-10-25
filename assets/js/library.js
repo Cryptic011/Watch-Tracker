@@ -284,7 +284,7 @@
   function updateFloatingAddVisibility(){
     renderLibraryMaintenance();
     document.querySelector(".top-nav h1").classList.toggle("hidden",currentTab!=="library"||categoryControlsVisible());
-    addBtn.classList.toggle("hidden",!(currentUser&&currentTab!=="search"));
+    addBtn.classList.toggle("hidden",!(currentUser&&currentTab==="library"));
   }
   const ALLOWED_BOTTOM_TABS=new Set(["library","search","settings"]);
   function enforceBottomNavigation(){
