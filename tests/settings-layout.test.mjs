@@ -43,11 +43,12 @@ test('Settings surfaces share the Changelog theme colour rather than fixed light
  assert.ok(!css.includes('background:#292929')&&!css.includes('background:#2b2b2d'));
 });
 
-test('Floating Add button is only visible on the Library tab and only under its allowed filters',()=>{
- const library=read('assets/js/library.js');
- assert.match(library,/addBtn\.classList\.toggle\("hidden",!\(currentUser&&currentTab==="library"&&\(!categoryControlsVisible\(\)\|\|activeFilter==="All"\)\)\)/);
- assert.match(library,/button\.addEventListener\("click",\(\)=>\{if\(button\.dataset\.tab!=="library"\)addBtn\.classList\.add\("hidden"\);\}\)/);
- assert.match(library,/libraryView\.classList\.toggle\("hidden",settings\|\|search\);settingsView\.classList\.toggle\("hidden",!settings\)/);
+test('A compact search action replaces the labelled Add button and separate Search tab',()=>{
+ const html=read('index.html');
+ assert.match(html,/id="add-btn"[^>]*aria-label="Search and add titles"/);
+ assert.doesNotMatch(html,/data-tab="search"|aria-label="Add show or film"/);
+ assert.match(html,/id="discovery-view"[^>]*role="dialog"/);
+ assert.match(html,/id="close-title-search"/);
 });
 
 

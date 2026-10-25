@@ -230,3 +230,9 @@ html[data-theme="light"] .settings-detail-panel>.profile-card{background:#fff}
 .library-filter-panel .library-collections{margin:0;padding:10px 0 4px;border:0;border-top:1px solid var(--border);border-radius:0;background:transparent;flex-wrap:wrap}
 .library-filter-panel .library-collections label{font-size:.78rem;color:var(--muted);flex:1 1 140px}
 .library-filter-panel .library-collections select{flex:1 1 140px;max-width:100%}
+
+/* Compact navigation with a separate circular search action. */
+.bottom-tabs{left:16px;right:auto;bottom:calc(env(safe-area-inset-bottom,0px) + 10px);width:calc(100% - 112px);max-width:360px;border:1px solid var(--border);border-radius:999px;padding:8px 4px;gap:4px}
+.bottom-tabs .tab-btn{min-height:44px;justify-content:center}
+.floating-add-button{left:auto;right:16px;bottom:calc(env(safe-area-inset-bottom,0px) + 10px);width:64px;height:64px;padding:18px;border-radius:50%;background:var(--card);color:var(--text);border:1px solid var(--border);z-index:61}
+.floating-add-button svg{width:28px;height:28px;fill:none;stroke:currentColor;stroke-width:2.5;stroke-linecap:round}

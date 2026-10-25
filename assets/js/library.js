@@ -284,9 +284,8 @@
   function updateFloatingAddVisibility(){
     renderLibraryMaintenance();
     document.querySelector(".top-nav h1").classList.toggle("hidden",currentTab!=="library"||categoryControlsVisible());
-    addBtn.classList.toggle("hidden",!(currentUser&&currentTab==="library"&&(!categoryControlsVisible()||activeFilter==="All")));
+    addBtn.classList.toggle("hidden",!(currentUser&&currentTab!=="search"));
   }
-  document.querySelectorAll(".bottom-tabs .tab-btn").forEach(button=>button.addEventListener("click",()=>{if(button.dataset.tab!=="library")addBtn.classList.add("hidden");}));
   const ALLOWED_BOTTOM_TABS=new Set(["library","search","settings"]);
   function enforceBottomNavigation(){
     document.querySelectorAll(".bottom-tabs .tab-btn").forEach(button=>{
@@ -296,14 +295,16 @@
     });
   }
   enforceBottomNavigation();
+  let searchReturnTab="library";
   function switchTab(tab){
     if(!ALLOWED_BOTTOM_TABS.has(tab))tab="library";
     if(typeof saveNavigationPosition==="function")saveNavigationPosition();
     enforceBottomNavigation();
     const currentTabBtns=document.querySelectorAll(".bottom-tabs .tab-btn");
+    if(tab==="search"&&currentTab!=="search")searchReturnTab=currentTab;
     currentTab=tab;currentTabBtns.forEach(b=>{b.classList.toggle("active",b.dataset.tab===tab);b.setAttribute("aria-current",b.dataset.tab===tab?"page":"false");});
-    const settings=tab==="settings",search=tab==="search";
-    libraryView.classList.toggle("hidden",settings||search);settingsView.classList.toggle("hidden",!settings);
+    const search=tab==="search",settings=(search?searchReturnTab:tab)==="settings";
+    libraryView.classList.toggle("hidden",settings);settingsView.classList.toggle("hidden",!settings);
     $("discovery-view").classList.toggle("hidden",!search);
     document.querySelector(".top-nav .search-box").classList.toggle("hidden",settings||search);
     document.querySelector(".stats-row").classList.toggle("hidden",settings||search);

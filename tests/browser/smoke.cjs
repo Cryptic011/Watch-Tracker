@@ -133,6 +133,11 @@ const server=http.createServer((req,res)=>{
   // Add and edit via the real form; external catalogue responses stay mocked.
   phase='search';
   await page.locator('#add-btn').click();
+  assert.equal(await page.locator('[data-tab="search"]').count(),0,'Search is a sheet rather than a navigation page');
+  assert.equal(await page.locator('#discovery-view').getAttribute('role'),'dialog');
+  await page.locator('#close-title-search').click();
+  assert.equal(await page.locator('#discovery-view').isVisible(),false,'closing search returns to Library');
+  await page.locator('#add-btn').click();
   assert.equal(await page.locator('[data-browse-format]').count(),0,'Search has no Movies/Series selection cards');
   assert.equal(await page.locator('#discovery-query').inputValue(),'');
   assert.equal(await page.locator('#discovery-format-filters').isVisible(),false,'the empty search page starts with just search');
@@ -186,7 +191,7 @@ const server=http.createServer((req,res)=>{
   assert.equal(await page.locator('[data-gallery-watch-next]').count(),0,'films do not show an episode action');
   assert.equal(await page.locator('#modal').isVisible(),false,'viewing a saved search result is not editing it');
   await page.locator('[data-gallery-close]').click();
-  await page.locator('[data-tab="library"]').click();await page.locator('[data-tab="search"]').click();assert.equal(await page.locator('#discovery-query').inputValue(),'','Search control returns to Search home');
+  await page.locator('[data-tab="library"]').click();await page.locator('#add-btn').click();assert.equal(await page.locator('#discovery-query').inputValue(),'','Search control returns to Search home');
   await page.locator('#discovery-manual').click();await page.locator('#modal').waitFor({state:'visible'});await page.locator('#close-modal').click();
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),true);
   await page.locator('[data-tab="library"]').click();
@@ -528,7 +533,7 @@ const server=http.createServer((req,res)=>{
   assert.ok(loads>loadsBeforeTrackSync,'Track Sync performs a cloud library load');
   await page.waitForFunction(()=>!document.querySelector('#sync-now').disabled&&document.querySelector('#sync-status').textContent.includes('Synced.'),null,{timeout:10000});
   await assertSettingsOnly();
-  await page.locator('[data-tab="search"]').click();
+  await page.locator('#add-btn').click();
   assert.equal(await page.locator('#discovery-view').isVisible(),true,'Search opens after leaving Settings');
   assert.equal(await page.locator('.top-nav h1').isVisible(),false,'Search has its own heading without the app title');
   assert.equal(await page.locator('.top-nav .search-box').isVisible(),false);
@@ -660,7 +665,7 @@ const server=http.createServer((req,res)=>{
   assert.equal(await recurringMarker().getAttribute('data-behind-level'),'green','watching released episodes makes the recurring marker green');
   assert.equal(await page.locator('#library-dashboard [data-dashboard-open="show"] .release-progress-dot').first().getAttribute('data-behind-level'),'green','watching released episodes makes the release-calendar marker green');
   phase='duplicate prevention';
-  await page.locator('[data-tab="search"]').click();await page.locator('#discovery-query').fill('Browser Test Series');
+  await page.locator('#add-btn').click();await page.locator('#discovery-query').fill('Browser Test Series');
   await page.locator('[data-discovery-filter="Series"]').click();
   await page.locator('#discovery-library-results [data-library-result="show"]').waitFor();
   assert.equal(await page.locator('#discovery-results [data-discovery-add]').count(),0,'a shared TVMaze ID is saved even when the catalogue IMDb ID differs');

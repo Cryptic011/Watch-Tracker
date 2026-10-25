@@ -121,7 +121,7 @@
     if(query.length>=2&&!discoveryLoading&&discoveryGlobalCompleteQuery!==query&&(discoveryGlobalRequestedQuery===query||!discoveryLibraryMatches(query).length))void runTitleSearch({global:discoveryGlobalRequestedQuery===query});
   }
   function openTitleSearch(){
-    goToTabHome("search");discoveryInput.focus();
+    resetTitleSearch();switchTab("search");discoveryInput.focus();
   }
   async function runTitleSearch({global=false}={}){
     clearTimeout(discoveryTimer);discoveryController?.abort();
@@ -197,3 +197,14 @@
   $("discovery-close").onclick=()=>discoveryDialog.close();
   discoveryDialog.addEventListener("click",event=>{if(event.target===discoveryDialog)discoveryDialog.close();});
   discoveryDialog.addEventListener("close",()=>{if(discoveryReturnFocus?.isConnected)discoveryReturnFocus.focus({preventScroll:true});discoveryReturnFocus=null;});
+
+  function closeTitleSearch(){switchTab(searchReturnTab);addBtn.focus();}
+  $("close-title-search").onclick=closeTitleSearch;
+  $("discovery-view").addEventListener("keydown",event=>{
+    if(event.key==="Escape"&&!discoveryDialog.open){event.preventDefault();closeTitleSearch();return;}
+    if(event.key!=="Tab")return;
+    const controls=[...$("discovery-view").querySelectorAll('input,button,a[href],summary')].filter(node=>!node.disabled&&node.getClientRects().length);
+    const first=controls[0],last=controls.at(-1);
+    if(event.shiftKey&&document.activeElement===first){event.preventDefault();last?.focus();}
+    else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first?.focus();}
+  });

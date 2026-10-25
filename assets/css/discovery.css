@@ -16,3 +16,8 @@ html:has(#discovery-view:not(.hidden)),body:has(#discovery-view:not(.hidden)){ov
 .discovery-section{margin:0 0 22px}.discovery-section>h3{font-size:1rem;margin:0 2px 12px}.discovery-global-button{display:block;width:100%;min-height:44px;margin-top:16px}
 
 .discovery-full-description{white-space:pre-line}
+
+html:has(#discovery-view:not(.hidden)),body:has(#discovery-view:not(.hidden)){overflow:hidden}
+.discovery-view{position:fixed;inset:auto 12px calc(env(safe-area-inset-bottom,0px) + 88px);max-width:760px;margin:0 auto;max-height:calc(100dvh - 130px - env(safe-area-inset-top,0px));overflow:auto;overscroll-behavior:contain;padding:24px 16px;border:1px solid var(--border);border-radius:26px;background:var(--bg);box-shadow:0 0 0 100vmax #000a;z-index:70}
+.discovery-heading{padding-right:48px}
+.search-sheet-close{position:absolute;right:12px;top:12px;width:44px;height:44px}
