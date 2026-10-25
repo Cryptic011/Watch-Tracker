@@ -110,6 +110,44 @@ test('Unannounced returns never occupy recurring weekdays, even with historical 
  assert.equal(JSON.stringify(item),original,'rendering never edits saved metadata');
 });
 
+test('Distant returning shows enter the weekly schedule only at the two-week boundary',()=>{
+ const c=app(),air=new Date(2027,0,5,20).getTime(),entry=air-14*86400000;
+ const episodes=[-91,-84,0,7].map((days,index)=>({season:9,number:index+1,raw:new Date(air+days*86400000).toISOString()}));
+ // Historical patterns and either source of confirmed dates obey the same limit.
+ const shows=[
+  {id:'rookie',title:'The Rookie',type:'Series',status:'Watched',recurringWeeklySchedule:{days:[new Date(air).getDay()],episodes:episodes.slice(0,2)},scheduledEpisodeReleases:episodes.slice(2)},
+  {id:'rookie-north',title:'The Rookie North',type:'Series',status:'Planned',airingSeason:9,nextEpisodeNum:3,nextEpisodeDate:episodes[2].raw,recurringWeeklySchedule:{days:[new Date(air).getDay()],episodes:episodes.slice(0,2)}}
+ ];
+ const original=JSON.stringify(shows);
+ assert.equal(c.recurringWeeklyShows(shows,new Date(2026,9,25)).length,0,'a distant date cannot occupy a weekly slot');
+ assert.equal(c.recurringWeeklyShows(shows,new Date(entry-1)).length,0,'just over two weeks away stays hidden');
+ assert.equal(c.recurringWeeklyShows(shows,new Date(entry)).length,2,'exactly two weeks away becomes visible');
+ assert.equal(c.recurringWeeklyShows(shows,new Date(entry+1)).length,2);
+ assert.equal(JSON.stringify(shows),original,'date filtering never changes saved library or reminder metadata');
+});
+
+test('A show on a long break disappears after the 24-hour grace until its return is within two weeks',()=>{
+ const c=app(),air=new Date(2026,9,22,20).getTime();
+ const episodes=[-7,0,70,77].map((days,index)=>({season:1,number:index+1,raw:new Date(air+days*86400000).toISOString()}));
+ const item={id:'break',title:'Returning show',type:'Anime',recurringWeeklySchedule:c.weeklyReleasePattern(episodes)};
+ assert.equal(c.recurringWeeklyShows([item],new Date(air+86400000-1))[0].state,'released');
+ assert.equal(c.recurringWeeklyShows([item],new Date(air+86400000)).length,0);
+ const entry=Date.parse(episodes[2].raw)-14*86400000;
+ assert.equal(c.recurringWeeklyShows([item],new Date(entry-1)).length,0);
+ assert.equal(c.recurringWeeklyShows([item],new Date(entry))[0].episodes[0].number,3);
+});
+
+test('The schedule wakes when a hidden release enters the two-week window, including date-only next episodes',()=>{
+ const c=app(),now=new Date(2026,11,22,11),entry=now.getTime()+3600000,air=entry+14*86400000;
+ const episode={season:1,number:1,raw:new Date(air).toISOString()};
+ for(const metadata of [
+  {scheduledEpisodeReleases:[episode]},
+  {recurringWeeklySchedule:{episodes:[episode]}},
+  {nextEpisodeDate:episode.raw},
+  {nextEpisodeDate:c.localISODate(new Date(air))}
+ ])assert.equal(c.recurringScheduleDelay([],now,[{type:'Series',...metadata}]),3600000);
+});
+
 test('Recurring releases sort by displayed local clock time, even across different future weeks',()=>{
  const c=app(),make=(id,days,hour)=>({id,title:id,type:'Series',scheduledEpisodeReleases:days.map((day,index)=>({season:1,number:index+1,raw:new Date(2026,9,day,hour).toISOString()}))});
  const evening=make('17:00 show',[8,15,22],17);

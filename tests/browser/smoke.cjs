@@ -111,8 +111,12 @@ const server=http.createServer((req,res)=>{
    const untimed=make('date-only','Time unknown programme',[-2,-1,0],null);
    const expired=make('expired','Unannounced returning programme',[-3,-2,-1],21);
    expired.nextEpisodeNum=4;expired.nextEpisodeDate='';
+   const distant=make('distant-return','The Rookie',[8,9],20);
+   const cachedReturn={...make('cached-return','The Rookie North',[8,9],21)};
+   cachedReturn.recurringWeeklySchedule=weeklyReleasePattern(cachedReturn.scheduledEpisodeReleases);
+   cachedReturn.scheduledEpisodeReleases=[];
    try{
-    mediaItems=[evening,overnight,untimed,expired,{...evening,id:'duplicate-clock',imdbId:'tt1234999'}];
+    mediaItems=[evening,overnight,untimed,expired,distant,cachedReturn,{...evening,id:'duplicate-clock',imdbId:'tt1234999'}];
     renderRecurringWeeklySchedule();
     const area=document.querySelector('.recurring-weekday[data-recurring-day="'+day+'"]');
     return {cards:[...area.querySelectorAll('[data-recurring-open]')].map(node=>({
@@ -120,12 +124,16 @@ const server=http.createServer((req,res)=>{
      time:node.querySelector('.release-time')?.textContent
     })),count:area.querySelector('.release-day-count')?.textContent,
     unannouncedPresent:document.querySelector('#recurring-weekly-dashboard')?.textContent.includes('Unannounced returning programme'),
+    distantReturns:document.querySelectorAll('#recurring-weekly-dashboard [data-recurring-open="distant-return"],#recurring-weekly-dashboard [data-recurring-open="cached-return"]').length,
+    total:document.querySelector('#recurring-weekly-dashboard .weekly-total')?.textContent,
     noHorizontalOverflow:document.documentElement.scrollWidth<=window.innerWidth};
    }finally{mediaItems=original;renderRecurringWeeklySchedule();}
   });
   assert.deepEqual(weeklyScreen.cards.map(card=>card.title),['01:00 programme','17:00 programme','Time unknown programme'],'recurring cards are ordered by local time before the next calendar week');
   assert.ok(weeklyScreen.cards.at(-1).time.includes('TBA'),'a confirmed date without a time sorts last');
   assert.equal(weeklyScreen.unannouncedPresent,false,'past release patterns cannot assign a weekday to an unannounced return');
+  assert.equal(weeklyScreen.distantReturns,0,'confirmed and cached returns beyond two weeks do not appear in the weekly calendar');
+  assert.match(weeklyScreen.total,/^3shows$/,'distant returns do not inflate the total show count');
   assert.match(weeklyScreen.count,/^3 shows$/,'duplicate entries do not inflate the schedule');
   assert.equal(weeklyScreen.noHorizontalOverflow,true,'weekly schedule fits the mobile viewport');
   console.log(engine.name()+': recurring clock order, undated returns, duplicate cards and mobile width passed');
