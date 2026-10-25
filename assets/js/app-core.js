@@ -35,7 +35,7 @@
   function beginSwipe(x,y,target){
     globalSwipeX=x;globalSwipeY=y;globalSwipeAt=Date.now();globalSwipeTarget=target;
     // Horizontal poster rows own their gestures in both directions, even at an end.
-    swipeActive=!target?.closest?.('input,textarea,select,[contenteditable="true"],.gallery-carousel,#discovery-view');
+    swipeActive=!target?.closest?.('input,textarea,select,[contenteditable="true"],.gallery-carousel,#discovery-view,.bottom-tabs,[data-schedule-back],.schedule-shortcut');
     swipeComplete=false;swipeVertical=false;
   }
   function handleGlobalSwipe(endX,endY,event){

@@ -5,11 +5,11 @@ import vm from 'node:vm';
 import fs from 'node:fs';
 const html = readAppSource();
 const source=html.slice(html.indexOf('  let globalSwipeX='),html.indexOf('  let searchQuery ='));
-function setup(view,{carousel=false,search=false}={}){
+function setup(view,{carousel=false,search=false,navigation=false}={}){
   const calls=[],listeners={};let now=1000;
   const context=vm.createContext({Date:{now:()=>now},document:{querySelector:()=>view==='detail'?{close:()=>calls.push('detail')}:null,addEventListener:(n,f)=>listeners[n]=f},episodeTrackerModal:{classList:{contains:()=>view!=='tracker'}},modal:{classList:{contains:()=>view!=='editor'}},closeEpisodeTrackerSheet:()=>calls.push('tracker'),closeEditor:()=>calls.push('editor'),currentTab:view==='settings'?'settings':'library',switchTab:()=>calls.push('library'),window:{WatchLogGallery:{back:()=>calls.push('category')}}});
   vm.runInContext(source,context);
-  const target={closest:selector=>(carousel&&selector.includes('.gallery-carousel'))||(search&&selector.includes('#discovery-view'))?{}:null};
+  const target={closest:selector=>(carousel&&selector.includes('.gallery-carousel'))||(search&&selector.includes('#discovery-view'))||(navigation&&selector.includes('.bottom-tabs'))?{}:null};
   return {calls,listeners,target,swipe:(dx=100,dy=0)=>{listeners.pointerdown({pointerType:'touch',clientX:200,clientY:100,target});listeners.touchstart({changedTouches:[{clientX:200,clientY:100}],target});now+=100;listeners.pointerup({pointerType:'touch',clientX:200+dx,clientY:100+dy,target});listeners.touchend({changedTouches:[{clientX:200+dx,clientY:100+dy}],target});}};
 }
 for(const view of ['detail','tracker','editor','settings','category'])test(`One left-to-right swipe backs out of ${view} once despite paired events`,()=>{const app=setup(view);app.swipe();assert.deepEqual(app.calls,[view==='settings'?'library':view]);});
@@ -50,4 +50,9 @@ test('Mouse drag across a carousel also stays within the carousel',()=>{
 });
 test('Horizontal gestures in search never navigate the Library behind the sheet',()=>{
  const app=setup('category',{search:true});app.swipe();assert.deepEqual(app.calls,[]);
+});
+
+test('Navigation controls never become a swipe or suppress their subsequent click',()=>{
+ const app=setup('category',{navigation:true});app.swipe();assert.deepEqual(app.calls,[]);
+ let blocked=false;app.listeners.click({preventDefault:()=>blocked=true,stopImmediatePropagation(){}});assert.equal(blocked,false);
 });

@@ -78,7 +78,7 @@ function openScheduleView(view){
   if(!['recurring','calendar'].includes(view))return;
   saveNavigationPosition();selectedScheduleView=view;
   window.WatchLogGallery?.setCategory?.('');
-  render();recordAppNavigation();window.scrollTo({top:0,behavior:'instant'});
+  render();window.scrollTo({top:0,behavior:'instant'});recordAppNavigation();
   document.querySelector('[data-schedule-back]')?.focus({preventScroll:true});
 }
 function closeScheduleView(){
