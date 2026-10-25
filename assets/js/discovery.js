@@ -76,7 +76,7 @@
     root.querySelectorAll(".discovery-poster img").forEach(img=>img.addEventListener("error",()=>{img.hidden=true;},{once:true}));
   }
   function renderTitleSearch(){
-    $("discovery-browse")?.classList.toggle("hidden",Boolean(discoveryQuery.trim()));
+    $("discovery-format-filters")?.classList.toggle("hidden",!discoveryQuery.trim());
     const expanded=new Set([...discoveryResults.querySelectorAll("[data-discovery-row]")].filter(row=>row.querySelector("details")?.open).map(row=>row.dataset.discoveryRow));
     const local=discoveryLibraryMatches(),localIDs=new Set(local.map(item=>String(item.id)));
     const visible=discoveryRows.map((item,index)=>({item,index})).filter(({item})=>["Film","Series"].includes(item.format)&&(discoveryFilter==="All"||item.format===discoveryFilter)).filter(({item})=>{
@@ -111,7 +111,7 @@
     if(discoveryDialog.open)discoveryDialog.close();
   }
   function resetTitleSearch(){
-    pauseTitleSearch();discoveryRows=[];discoveryQuery="";discoveryOwner=String(currentUser?.id||"");discoveryInput.value="";discoveryFilter="All";discoveryError=false;discoveryDetailItem=null;discoveryGlobalRequestedQuery="";discoveryGlobalCompleteQuery="";
+    pauseTitleSearch();discoveryRows=[];discoveryQuery="";discoveryOwner=String(currentUser?.id||"");discoveryInput.value="";discoveryInput.placeholder="Search movies and series";discoveryFilter="All";discoveryError=false;discoveryDetailItem=null;discoveryGlobalRequestedQuery="";discoveryGlobalCompleteQuery="";
     discoveryResults.replaceChildren();discoveryResults._discoveryMarkup=null;$("discovery-library-results").replaceChildren();$("discovery-library-results")._discoveryMarkup=null;$("discovery-library").classList.add("hidden");$("discovery-detail-body").replaceChildren();
   }
   function activateTitleSearch(){
@@ -121,7 +121,7 @@
     if(query.length>=2&&!discoveryLoading&&discoveryGlobalCompleteQuery!==query&&(discoveryGlobalRequestedQuery===query||!discoveryLibraryMatches(query).length))void runTitleSearch({global:discoveryGlobalRequestedQuery===query});
   }
   function openTitleSearch(){
-    switchTab("search");discoveryInput.focus();
+    goToTabHome("search");discoveryInput.focus();
   }
   async function runTitleSearch({global=false}={}){
     clearTimeout(discoveryTimer);discoveryController?.abort();
@@ -188,7 +188,6 @@
   $("discovery-retry").onclick=()=>{dismissTitleSearchKeyboard();void runTitleSearch({global:true});};
   $("discovery-search-global").onclick=()=>{dismissTitleSearchKeyboard();void runTitleSearch({global:true});};
   $("discovery-library-results").addEventListener("click",event=>{const button=event.target.closest("[data-library-open]");if(button&&mediaItems.some(item=>String(item.id)===button.dataset.libraryOpen)){dismissTitleSearchKeyboard();openMediaRow(button.dataset.libraryOpen,button);}});
-  document.querySelectorAll("[data-browse-format]").forEach(button=>button.onclick=()=>{discoveryFilter=button.dataset.browseFormat;renderTitleSearch();discoveryInput.placeholder=discoveryFilter==="Film"?"Search movies":"Search series";discoveryInput.focus();});
   $("discovery-manual").onclick=()=>{if(!currentUser)return;openAdd();titleInput.value=discoveryInput.value.trim();titleInput.focus();};
   document.querySelectorAll("[data-discovery-filter]").forEach(button=>button.onclick=()=>{dismissTitleSearchKeyboard();discoveryFilter=button.dataset.discoveryFilter;renderTitleSearch();if(discoveryInput.value.trim().length>=2&&!discoveryLoading&&discoveryGlobalCompleteQuery!==discoveryQuery&&!discoveryLibraryMatches().length)void runTitleSearch();if(typeof recordAppNavigation==="function")recordAppNavigation();});
   discoveryResults.addEventListener("click",event=>{

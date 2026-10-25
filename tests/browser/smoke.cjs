@@ -133,8 +133,11 @@ const server=http.createServer((req,res)=>{
   // Add and edit via the real form; external catalogue responses stay mocked.
   phase='search';
   await page.locator('#add-btn').click();
-  await page.locator('[data-browse-format="Film"]').click();assert.equal(await page.locator('#discovery-query').inputValue(),'');
-  await page.locator('[data-discovery-filter="All"]').click();await page.locator('#discovery-query').fill('Browser Test Film');
+  assert.equal(await page.locator('[data-browse-format]').count(),0,'Search has no Movies/Series selection cards');
+  assert.equal(await page.locator('#discovery-query').inputValue(),'');
+  assert.equal(await page.locator('#discovery-format-filters').isVisible(),false,'the empty search page starts with just search');
+  await page.locator('#discovery-query').fill('Browser Test Film');
+  assert.equal(await page.locator('#discovery-format-filters').isVisible(),true,'format filters are optional once searching');
   await page.locator('#discovery-results .discovery-title').first().waitFor();
   // iOS keeps the keyboard open until the search input actually loses focus.
   await page.locator('#discovery-query').focus();
@@ -657,8 +660,8 @@ const server=http.createServer((req,res)=>{
   assert.equal(await recurringMarker().getAttribute('data-behind-level'),'green','watching released episodes makes the recurring marker green');
   assert.equal(await page.locator('#library-dashboard [data-dashboard-open="show"] .release-progress-dot').first().getAttribute('data-behind-level'),'green','watching released episodes makes the release-calendar marker green');
   phase='duplicate prevention';
-  await page.locator('[data-tab="search"]').click();await page.locator('[data-discovery-filter="Series"]').click();
-  await page.locator('#discovery-query').fill('Browser Test Series');
+  await page.locator('[data-tab="search"]').click();await page.locator('#discovery-query').fill('Browser Test Series');
+  await page.locator('[data-discovery-filter="Series"]').click();
   await page.locator('#discovery-library-results [data-library-result="show"]').waitFor();
   assert.equal(await page.locator('#discovery-results [data-discovery-add]').count(),0,'a shared TVMaze ID is saved even when the catalogue IMDb ID differs');
   await page.locator('[data-tab="library"]').click();

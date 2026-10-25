@@ -19,6 +19,17 @@ function harness(){
   vm.runInContext(source,c);c.activateTitleSearch();
   return {c,$,calls,filters};
 }
+test('Search starts without format selection and Add opens the same clean search home',()=>{
+ const {c,$}=harness(),input=$('discovery-query');
+ assert.equal($('discovery-format-filters').classList.hidden,true);
+ input.value='A saved title';c.mediaItems=[{id:'saved',title:input.value,type:'Series'}];input.listeners.input();
+ assert.equal($('discovery-format-filters').classList.hidden,false);
+ let tab;c.goToTabHome=value=>{tab=value;c.resetTitleSearch();c.renderTitleSearch();};
+ c.openTitleSearch();assert.equal(tab,'search');assert.equal(input.value,'');assert.equal(input.placeholder,'Search movies and series');
+ assert.equal(input.focused,true);assert.equal($('discovery-format-filters').classList.hidden,true);
+ const html=fs.readFileSync(new URL('../index.html',import.meta.url),'utf8');
+ assert.doesNotMatch(html,/data-browse-format|id="discovery-browse"/);
+});
 test('Newer queries win even when the cancelled provider replies late',async()=>{
   const {c,$}=harness(),requests=[];
   c.searchAllTitles=(query,options)=>new Promise(resolve=>requests.push({query,options,resolve}));
