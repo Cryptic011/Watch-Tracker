@@ -14,7 +14,7 @@ function harness(responses){
 }
 const item={title:'NCIS',type:'Series',imdbId:'tt0364845'};
 const url='https://www.paramountglobalcontent.com/title/ncis';
-const valid={source:'Paramount Global Content',descriptionSource:'Paramount Global Content',description:'NCIS follows a team investigating crimes with Navy or Marine Corps ties.',sources:[{name:'Paramount Global Content',url}],synopsisVersion:3,synopsisScope:'series',state:'ready'};
+const valid={source:'Paramount Global Content',descriptionSource:'Paramount Global Content',description:'NCIS follows a team investigating crimes with Navy or Marine Corps ties.',sources:[{name:'Paramount Global Content',url}],synopsisVersion:4,synopsisScope:'series',state:'ready'};
 
 test('Legacy season-promo responses are hidden and never cached as a successful overview',async()=>{
  const old={source:'CBS',description:'Michael Weatherly returns as Tony DiNozzo, joining the team as they tackle Navy crimes and personal challenges.',sources:[{name:'CBS',url:'https://www.cbs.com/shows/ncis/'}],state:'ready'};
@@ -38,4 +38,18 @@ test('TVMaze series descriptions and their labelled attribution reach the Detail
  const api=harness([details]);assert.equal((await api.get(item)).description,valid.description);
  assert.match(api.links(details),/https:\/\/www\.tvmaze\.com\/shows\/59/);
  assert.equal(api.links({sources:[{name:'Fake',url:'https://www.tvmaze.com.evil.test/shows/59'}]}),'');
+});
+test('Conflicting film identities and remake years cannot reach the Details panel',async()=>{
+ const film={title:'Carrie',type:'Film',imdbId:'tt1939659',releaseYear:'2013'};
+ for(const conflict of [{imdbId:'tt0074285',year:'2013'},{imdbId:'tt1939659',year:'1976'}]){
+  const api=harness([{...valid,...conflict,synopsisScope:'film'}]);
+  assert.equal((await api.get(film)).state,'unmatched');
+ }
+});
+test('Verified fallback sources remain labelled and malicious lookalike domains stay excluded',async()=>{
+ for(const [name,url] of [['JustWatch','https://www.justwatch.com/uk/movie/carrie-2013'],['TMDb','https://www.themoviedb.org/movie/133805'],['Disney','https://movies.disney.com/star-wars-the-mandalorian-and-grogu'],['Harry Potter','https://www.harrypotter.com/discover/films/harry-potter-and-the-chamber-of-secrets']]){
+  const details={...valid,source:name,descriptionSource:name,synopsisScope:'film',sources:[{name,url}]};
+  const api=harness([details]);assert.equal((await api.get({title:'Film',type:'Film'})).description,valid.description);assert.ok(api.links(details).includes(url));
+  assert.equal(api.links({sources:[{name,url:url.replace('.com/','.com.evil.test/').replace('.org/','.org.evil.test/')}]}),'');
+ }
 });

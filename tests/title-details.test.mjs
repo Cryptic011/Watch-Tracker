@@ -11,6 +11,56 @@ const options={useCache:false};
 const suggestion={id:imdb,l:'Inception',y:2010,qid:'movie'};
 const fixture=name=>fs.readFileSync(new URL('./fixtures/'+name,import.meta.url),'utf8');
 const apple={trackId:1,kind:'feature-movie',trackName:'Inception',releaseDate:'2010-07-16',longDescription:'Apple film synopsis.',trackViewUrl:'https://tv.apple.com/gb/movie/inception/umc.test',trackTimeMillis:8880000,primaryGenreName:'Sci-Fi'};
+test('Non-Apple films can recover through an exact Apple title and year',async()=>{
+ const data=await getTitleDetails(film,async url=>url.includes('itunes.apple')?json({results:[apple]}):failure(),options);
+ assert.equal(data.description,'Apple film synopsis.');assert.equal(data.source,'Apple TV');assert.equal(data.year,'2010');
+});
+test('An Apple lookup ID alone cannot substitute a different movie or remake',async()=>{
+ for(const row of [{...apple,trackName:'Another film'},{...apple,releaseDate:'1999-01-01'}]){
+  const data=await getTitleDetails({...film,source:'apple',externalId:'1'},async url=>url.includes('itunes.apple')?json({results:[row]}):failure(),options);
+  assert.ok(!data.description);
+ }
+});
+test('An empty UK catalogue can recover through a uniquely matching US listing',async()=>{
+ const data=await getTitleDetails(film,async url=>url.includes('itunes.apple')?json({results:url.includes('country=us')?[apple]:[]}):failure(),options);
+ assert.equal(data.source,'Apple TV');assert.equal(data.year,'2010');
+});
+test('Film fallback distinguishes Carrie remakes and the TV series by IMDb ID, title, year and format',async()=>{
+ const row=(type,id,year)=>({node:{objectType:type,content:{title:'Carrie',originalReleaseYear:year,externalIds:{imdbId:id},fullPath:'/uk/movie/carrie-'+year,shortDescription:'A shy teenager discovers telekinetic powers and confronts the cruelty around her.'}}});
+ const data=await getTitleDetails({title:'Carrie',type:'Film',imdbId:'tt1939659',year:'2013'},async url=>url.includes('justwatch')?json({data:{popularTitles:{edges:[row('MOVIE','tt0074285',1976),row('MOVIE','tt1939659',2013),row('SHOW','tt11540908',2026)]}}}):failure(),options);
+ assert.equal(data.source,'JustWatch');assert.equal(data.year,'2013');assert.equal(data.imdbId,'tt1939659');assert.match(data.sources[0].url,/carrie-2013$/);
+ for(const wrong of [row('SHOW','tt1939659',2013),row('MOVIE','tt0074285',2013),row('MOVIE','tt1939659',1976)]){
+  const rejected=await getTitleDetails({title:'Carrie',type:'Film',imdbId:'tt1939659',year:'2013'},async url=>url.includes('justwatch')?json({data:{popularTitles:{edges:[wrong]}}}):failure(),options);
+  assert.ok(!rejected.description);
+ }
+});
+test('A stalled catalogue does not hold up a verified independent fallback',{timeout:2000},async()=>{
+ const data=await getTitleDetails(film,async url=>url.includes('itunes.apple')?new Promise(()=>{}):url.includes('justwatch')?json({data:{popularTitles:{edges:[{node:{objectType:'MOVIE',content:{title:'Inception',originalReleaseYear:2010,externalIds:{imdbId:imdb},fullPath:'/uk/movie/inception',shortDescription:'A skilled thief enters dreams to steal secrets and must plant an idea instead.'}}}]}}}):failure(),options);
+ assert.equal(data.source,'JustWatch');assert.equal(data.state,'ready');
+});
+test('Disney film pages prefer the full synopsis over truncated SEO and recognise the release date',()=>{
+ const title='Star Wars: The Mandalorian and Grogu',plot='An experienced bounty hunter and his young companion accept a dangerous mission for the New Republic.';
+ const page='<h1>'+title+'</h1><script type="application/ld+json">'+JSON.stringify({'@type':'Movie',name:title,dateCreated:'2026-05-22',description:'A truncated teaser...'})+'</script><p class="desc">'+plot+'</p>';
+ const data=parseFirstPartyDetails(page,'https://movies.disney.com/star-wars-the-mandalorian-and-grogu',{title,type:'Film',year:'2026',requireYear:true});
+ assert.equal(data.description,plot);assert.equal(data.year,'2026');assert.equal(data.source,'Disney');
+ assert.equal(parseFirstPartyDetails(page,'https://movies.disney.com/star-wars-the-mandalorian-and-grogu',{title,type:'Film',year:'2025',requireYear:true}),null);
+});
+test('Official franchise film pages cannot supply book plots or a different film year',()=>{
+ const title='Harry Potter and the Chamber of Secrets',plot='Young friends return to their magical school and investigate a dangerous mystery threatening its students.';
+ const page='<script id="__NEXT_DATA__" type="application/json">'+JSON.stringify({props:{pageProps:{pageData:{world:{heroTitle:title,heroDescription:plot,heroFootnote:'Released 2002 · Directed by Chris Columbus'}}}}})+'</script>';
+ const url='https://www.harrypotter.com/discover/films/harry-potter-and-the-chamber-of-secrets';
+ assert.equal(parseFirstPartyDetails(page,url,{title,type:'Film',year:'2002',requireYear:true}).description,plot);
+ assert.equal(parseFirstPartyDetails(page,url.replace('/films/','/books/'),{title,type:'Film',year:'2002'}),null);
+ assert.equal(parseFirstPartyDetails(page,url,{title,type:'Film',year:'2026',requireYear:true}),null);
+});
+test('An IMDb ID does not override a conflicting film name or release year',()=>{
+ assert.equal(parseIMDbDetails(ld({name:'Another film'}),imdb,'Film',film),null);
+ assert.equal(parseIMDbDetails(ld(),imdb,'Film',{...film,year:'1999'}),null);
+});
+test('An IMDb-matched film database record rescues a studio outage with explicit attribution',async()=>{
+ const data=await getTitleDetails(film,async url=>url.includes('/find/')?json({movie_results:[{id:27205,title:'Inception',release_date:'2010-07-16'}]}):url.endsWith('/movie/27205')?json({id:27205,imdb_id:imdb,title:'Inception',release_date:'2010-07-16',overview:'A skilled thief enters dreams to steal secrets and must plant an idea instead.',runtime:148}):failure(),{...options,tmdbToken:'test-token'});
+ assert.equal(data.source,'TMDb');assert.equal(data.descriptionSource,'TMDb');assert.equal(data.year,'2010');assert.equal(data.runtime,148);
+});
 test('IMDb is preferred and only structured data for the exact identity and format is accepted',async()=>{
  const calls=[],result=await getTitleDetails(film,async url=>{calls.push(url);return html(ld());},options);
  assert.equal(result.description,'An IMDb synopsis.');assert.equal(result.runtime,148);assert.equal(result.ratingSource,'IMDb');assert.equal(result.source,'IMDb');assert.equal(result.state,'ready');assert.deepEqual(calls,['https://www.imdb.com/title/'+imdb+'/']);
@@ -44,7 +94,7 @@ test('Official film pages win over IMDb when a verified studio URL is supplied',
  },options);
  assert.equal(data.source,'Paramount Pictures');assert.equal(data.rating,7.1);
  assert.equal(data.description,'Paramount Pictures official synopsis of Example and the international mission.');
- assert.deepEqual(calls,[url,'https://www.imdb.com/title/'+id+'/']);
+ assert.deepEqual(calls,['https://www.imdb.com/title/'+id+'/',url]);
 });
 
 test('An IMDb-matched film finds its real studio page without copying TMDb editorial text',async()=>{
@@ -62,7 +112,7 @@ test('An IMDb-matched film finds its real studio page without copying TMDb edito
  assert.equal(data.description,'This is the verified studio homepage summary for the film Example.');
  assert.equal(data.source,'Paramount Pictures');
  assert.ok(!JSON.stringify(data).includes('Not an official synopsis'));
- assert.ok(calls.indexOf(site)<calls.indexOf('https://www.imdb.com/title/'+id+'/'));
+ assert.ok(calls.includes(site)&&calls.includes('https://www.imdb.com/title/'+id+'/'),'studio discovery and IMDb are both attempted');
 });
 test('A homepage from the wrong movie or untrusted host cannot supply title details',async()=>{
  const called=[],id='tt1234567';
@@ -146,7 +196,7 @@ test('A distributor fallback uses the full matching series synopsis, never its t
  assert.match(result.description,/NCIS \(Naval Criminal Investigative Service\) follows a team/);
  assert.match(result.description,/crimes with Navy or Marine Corps ties\.$/);
  assert.doesNotMatch(result.description,/returns as|Show More|Show Less|\.\.\./);
- assert.equal(result.synopsisScope,'series');assert.equal(result.synopsisVersion,3);
+ assert.equal(result.synopsisScope,'series');assert.equal(result.synopsisVersion,4);
  assert.equal(result.sources[0].url,site);
  assert.equal(parseFirstPartyDetails(page.replace('>NCIS</h2>','>NCIS: Sydney</h2>'),site,{title:'NCIS',type:'Series'}),null);
  assert.ok(urls.includes(site));
@@ -238,7 +288,7 @@ test('Film fallback uses a unique Apple title/year checked against its exact IMD
  const result=await getTitleDetails({...film,platform:'Apple TV'},async url=>url.includes('media-imdb')?json({d:[{...suggestion,id:'tt9999999',y:1999},suggestion]}):url.includes('itunes.apple')?json({results:[{...apple,trackId:2,releaseDate:'1999-01-01',longDescription:'Wrong year'},apple]}):failure(),options);
  assert.equal(result.description,'Apple film synopsis.');assert.equal(result.source,'Apple TV');assert.equal(result.year,'2010');assert.equal(result.runtime,148);assert.equal(result.imdbId,imdb);
 });
-test('IMDb failure and ambiguous Apple listings never trigger aggregator descriptions',async()=>{
+test('Ambiguous or unavailable fallbacks never substitute an unverified description',async()=>{
  const calls=[],request=async url=>{
   calls.push(url);
   if(url.includes('media-imdb'))return json({d:[suggestion]});
@@ -252,7 +302,7 @@ test('IMDb failure and ambiguous Apple listings never trigger aggregator descrip
  assert.equal(result.imdbId,imdb);
  assert.ok(calls.some(url=>url.includes('imdb.com/title')));
  assert.ok(calls.some(url=>url.includes('itunes.apple')));
- assert.ok(calls.every(url=>!/(justwatch|tvmaze|wikipedia|wikimedia|wikidata)/i.test(url)));
+ assert.ok(calls.every(url=>!/(tvmaze|wikipedia|wikimedia|wikidata)/i.test(url)));
 });
 test('Series with an IMDb rating but no synopsis never borrow another provider description',async()=>{
  const calls=[],result=await getTitleDetails({title:'Series',type:'Series',imdbId:imdb,tvmazeShowId:'12'},async url=>{
@@ -361,7 +411,7 @@ test('Apple descriptions reject trailers and episode summaries rather than displ
    return failure();
   },options);
   assert.ok(!result.description);
-  assert.equal(result.descriptionSource,'');
+  assert.ok(!result.descriptionSource);
  }
 });
 
