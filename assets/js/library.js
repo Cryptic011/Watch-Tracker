@@ -283,7 +283,7 @@
   function categoryControlsVisible(){return currentTab==="library"&&Boolean(window.WatchLogGallery?.hasCategory?.());}
   function updateFloatingAddVisibility(){
     renderLibraryMaintenance();
-    document.querySelector(".top-nav h1").classList.toggle("hidden",currentTab!=="library"||categoryControlsVisible());
+    if(currentTab!=="search")document.querySelector(".top-nav h1").classList.toggle("hidden",currentTab!=="library"||categoryControlsVisible());
     addBtn.classList.toggle("hidden",!(currentUser&&currentTab==="library"));
   }
   const ALLOWED_BOTTOM_TABS=new Set(["library","search","settings"]);
@@ -305,9 +305,13 @@
     currentTab=tab;currentTabBtns.forEach(b=>{b.classList.toggle("active",b.dataset.tab===tab);b.setAttribute("aria-current",b.dataset.tab===tab?"page":"false");});
     const search=tab==="search",settings=(search?searchReturnTab:tab)==="settings";
     libraryView.classList.toggle("hidden",settings);settingsView.classList.toggle("hidden",!settings);
+    if(!search)dismissTitleSearchKeyboard();
+    setTitleSearchSheetOpen(search);
     $("discovery-view").classList.toggle("hidden",!search);
-    document.querySelector(".top-nav .search-box").classList.toggle("hidden",settings||search);
-    document.querySelector(".stats-row").classList.toggle("hidden",settings||search);
+    if(!search){
+      document.querySelector(".top-nav .search-box").classList.toggle("hidden",settings);
+      document.querySelector(".stats-row").classList.toggle("hidden",settings);
+    }
     updateFloatingAddVisibility();
     if(search){activateTitleSearch();if(typeof recordAppNavigation==="function")recordAppNavigation();return;}
     pauseTitleSearch();

@@ -60,15 +60,18 @@
       <section id="private-reminder-history" class="dashboard-section hidden"><h3>Reminders</h3><p class="small-note">Upcoming reminders and recent delivery activity.</p><button id="refresh-reminder-history" type="button" class="btn btn-secondary">View reminders</button><dialog id="reminder-history-dialog" class="changelog-dialog"><header class="changelog-heading"><h2>Reminders</h2><button id="close-reminder-history" class="close-btn" type="button" aria-label="Close Reminders">&times;</button></header><div class="changelog-body" id="reminder-history-body"></div></dialog></section>
     </div>
     <section id="discovery-view" class="discovery-view hidden" role="dialog" aria-modal="true" aria-labelledby="discovery-heading">
+      <div class="search-sheet"><div class="search-sheet-header">
       <button id="close-title-search" class="close-btn search-sheet-close" type="button" aria-label="Close search">&times;</button><header class="discovery-heading"><h2 id="discovery-heading">Search &amp; add</h2><p>Find saved titles or add something new.</p></header>
       <form id="discovery-form" role="search"><label class="discovery-label" for="discovery-query">Search your library and all titles</label><div class="discovery-search"><input id="discovery-query" type="search" placeholder="Search movies and series" autocomplete="off" enterkeyhint="search" maxlength="100"><button type="submit">Search</button></div></form>
       <div id="discovery-format-filters" class="discovery-filters hidden" role="group" aria-label="Search format"><button type="button" data-discovery-filter="All" aria-pressed="true">All</button><button type="button" data-discovery-filter="Series" aria-pressed="false">Series</button><button type="button" data-discovery-filter="Film" aria-pressed="false">Films</button></div>
+      </div><div class="search-sheet-results" id="search-sheet-results">
       <p id="discovery-status" class="discovery-status" role="status" aria-live="polite">Search your library instantly. Enter at least two characters to search all titles.</p>
       <section id="discovery-library" class="discovery-section hidden" aria-labelledby="discovery-library-heading"><h3 id="discovery-library-heading">Your library</h3><div id="discovery-library-results" class="discovery-results"></div></section>
       <section id="discovery-global" class="discovery-section hidden" aria-labelledby="discovery-global-heading"><h3 id="discovery-global-heading">All titles</h3><div id="discovery-results" class="discovery-results" aria-busy="false"></div></section>
       <button id="discovery-search-global" type="button" class="btn btn-secondary discovery-global-button hidden">Search all titles</button>
       <button id="discovery-retry" type="button" class="btn btn-secondary hidden">Try again</button>
       <div class="discovery-manual"><span>Can’t find a title?</span><button id="discovery-manual" type="button">Add manually</button></div>
+      </div></div>
     </section>
   </main>
   <dialog id="discovery-detail" class="discovery-detail" aria-labelledby="discovery-detail-title"><header><h2 id="discovery-detail-title">Title details</h2><button id="discovery-close" type="button" class="close-btn" aria-label="Close title details">&times;</button></header><div id="discovery-detail-body"></div></dialog>

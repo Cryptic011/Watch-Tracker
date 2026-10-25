@@ -121,7 +121,7 @@
     if(query.length>=2&&!discoveryLoading&&discoveryGlobalCompleteQuery!==query&&(discoveryGlobalRequestedQuery===query||!discoveryLibraryMatches(query).length))void runTitleSearch({global:discoveryGlobalRequestedQuery===query});
   }
   function openTitleSearch(){
-    resetTitleSearch();switchTab("search");discoveryInput.focus();
+    resetTitleSearch();$("search-sheet-results").scrollTop=0;switchTab("search");discoveryInput.focus({preventScroll:true});
   }
   async function runTitleSearch({global=false}={}){
     clearTimeout(discoveryTimer);discoveryController?.abort();
@@ -198,7 +198,7 @@
   discoveryDialog.addEventListener("click",event=>{if(event.target===discoveryDialog)discoveryDialog.close();});
   discoveryDialog.addEventListener("close",()=>{if(discoveryReturnFocus?.isConnected)discoveryReturnFocus.focus({preventScroll:true});discoveryReturnFocus=null;});
 
-  function closeTitleSearch(){switchTab(searchReturnTab);addBtn.focus();}
+  function closeTitleSearch(){dismissTitleSearchKeyboard();switchTab(searchReturnTab);addBtn.focus({preventScroll:true});}
   $("close-title-search").onclick=closeTitleSearch;
   $("discovery-view").addEventListener("keydown",event=>{
     if(event.key==="Escape"&&!discoveryDialog.open){event.preventDefault();closeTitleSearch();return;}
@@ -208,3 +208,41 @@
     if(event.shiftKey&&document.activeElement===first){event.preventDefault();last?.focus();}
     else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first?.focus();}
   });
+
+  // Keyboard and browser chrome resize the visual viewport independently of
+  // the layout viewport. Keep only results scrollable and preserve the page.
+  let titleSearchViewportState=null;
+  function titleSearchViewportBounds(viewport,layoutHeight){
+    const height=Math.max(1,Number(viewport?.height)||Number(layoutHeight)||1);
+    const maximumOffset=Math.max(0,Number(layoutHeight)-height);
+    return {height,top:Math.max(0,Math.min(Number(viewport?.offsetTop)||0,maximumOffset))};
+  }
+  function updateTitleSearchViewport(){
+    if(!titleSearchViewportState)return;
+    const layoutHeight=Math.max(window.innerHeight||0,document.documentElement.clientHeight||0);
+    const bounds=titleSearchViewportBounds(window.visualViewport,layoutHeight),sheet=$("discovery-view");
+    sheet.style.setProperty('--search-viewport-top',bounds.top+'px');
+    sheet.style.setProperty('--search-viewport-height',bounds.height+'px');
+  }
+  function setTitleSearchSheetOpen(open){
+    const body=document.body,sheet=$("discovery-view");
+    if(open){
+      if(!titleSearchViewportState){
+        const properties=['position','top','left','width','overflow'];
+        titleSearchViewportState={x:window.scrollX||0,y:window.scrollY||0,styles:Object.fromEntries(properties.map(key=>[key,body.style[key]]))};
+        Object.assign(body.style,{position:'fixed',top:-titleSearchViewportState.y+'px',left:-titleSearchViewportState.x+'px',width:'100%',overflow:'hidden'});
+      }
+      updateTitleSearchViewport();
+    }else if(titleSearchViewportState){
+      const previous=titleSearchViewportState;titleSearchViewportState=null;
+      Object.assign(body.style,previous.styles);
+      sheet.style.removeProperty('--search-viewport-top');sheet.style.removeProperty('--search-viewport-height');
+      window.scrollTo({left:previous.x,top:previous.y,behavior:'instant'});
+    }
+  }
+  if(typeof window!=='undefined'){
+    window.visualViewport?.addEventListener('resize',updateTitleSearchViewport);
+    window.visualViewport?.addEventListener('scroll',updateTitleSearchViewport);
+    window.addEventListener?.('resize',updateTitleSearchViewport);
+  }
+  $("discovery-view").addEventListener('click',event=>{if(event.target===$("discovery-view"))closeTitleSearch();});

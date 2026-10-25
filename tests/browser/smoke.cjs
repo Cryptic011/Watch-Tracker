@@ -132,11 +132,46 @@ const server=http.createServer((req,res)=>{
 
   // Add and edit via the real form; external catalogue responses stay mocked.
   phase='search';
+  const libraryScrollBeforeSearch=await page.evaluate(async()=>{window.scrollTo(0,160);await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));return window.scrollY;});
   await page.locator('#add-btn').click();
   assert.equal(await page.locator('[data-tab="search"]').count(),0,'Search is a sheet rather than a navigation page');
   assert.equal(await page.locator('#discovery-view').getAttribute('role'),'dialog');
   await page.locator('#close-title-search').click();
   assert.equal(await page.locator('#discovery-view').isVisible(),false,'closing search returns to Library');
+  assert.ok(Math.abs(await page.evaluate(()=>window.scrollY)-libraryScrollBeforeSearch)<=2,'closing search restores the original Library scroll');
+  await page.locator('#add-btn').click();
+  assert.equal(await page.evaluate(()=>document.body.style.position),'fixed','the Library stays pinned behind search');
+  await page.evaluate(()=>{
+    window._searchOriginalViewport=Object.getOwnPropertyDescriptor(window,'visualViewport');
+    window._searchKeyboardViewport={height:380,offsetTop:40};
+    Object.defineProperty(window,'visualViewport',{configurable:true,value:window._searchKeyboardViewport});
+    window.dispatchEvent(new Event('resize'));
+  });
+  const keyboardInput=await page.locator('#discovery-query').boundingBox();
+  await page.evaluate(()=>{
+    document.querySelector('#discovery-results').innerHTML='<div style="height:1800px">Long search results</div>';
+    document.querySelector('#search-sheet-results').scrollTop=600;
+  });
+  const scrolledInput=await page.locator('#discovery-query').boundingBox();
+  assert.ok(Math.abs(scrolledInput.y-keyboardInput.y)<=1,'results cannot scroll the search field out of view');
+  const keyboardSheet=await page.locator('.search-sheet').boundingBox();
+  assert.ok(keyboardSheet.y>=40&&keyboardSheet.y+keyboardSheet.height<=421,'the sheet stays above the simulated iPhone keyboard');
+  assert.ok(await page.locator('#search-sheet-results').evaluate(node=>node.scrollTop)>0,'results have their own scroll area');
+  await page.evaluate(()=>{
+    window._searchKeyboardViewport.height=window.innerHeight;window._searchKeyboardViewport.offsetTop=40;
+    window.dispatchEvent(new Event('resize'));
+  });
+  assert.equal(await page.locator('#discovery-view').evaluate(node=>node.style.getPropertyValue('--search-viewport-top')),'0px','stale iOS keyboard offsets are cleared');
+  await page.evaluate(()=>{
+    if(window._searchOriginalViewport)Object.defineProperty(window,'visualViewport',window._searchOriginalViewport);else delete window.visualViewport;
+    delete window._searchOriginalViewport;delete window._searchKeyboardViewport;
+    document.querySelector('#discovery-results').innerHTML='';document.querySelector('#discovery-results')._discoveryMarkup=null;
+    window.dispatchEvent(new Event('resize'));
+  });
+  await page.locator('#discovery-query').focus();await page.keyboard.press('Escape');
+  assert.equal(await page.locator('#discovery-view').isVisible(),false,'Escape closes the sheet');
+  assert.equal(await page.locator('#discovery-query').evaluate(input=>input===document.activeElement),false,'closing search dismisses keyboard input');
+  assert.notEqual(await page.evaluate(()=>document.body.style.position),'fixed','closing releases the background scroll lock');
   await page.locator('#add-btn').click();
   assert.equal(await page.locator('[data-browse-format]').count(),0,'Search has no Movies/Series selection cards');
   assert.equal(await page.locator('#discovery-query').inputValue(),'');
@@ -191,9 +226,11 @@ const server=http.createServer((req,res)=>{
   assert.equal(await page.locator('[data-gallery-watch-next]').count(),0,'films do not show an episode action');
   assert.equal(await page.locator('#modal').isVisible(),false,'viewing a saved search result is not editing it');
   await page.locator('[data-gallery-close]').click();
+  if(await page.locator('#discovery-view').isVisible())await page.locator('#close-title-search').click();
   await page.locator('[data-tab="library"]').click();await page.locator('#add-btn').click();assert.equal(await page.locator('#discovery-query').inputValue(),'','Search control returns to Search home');
   await page.locator('#discovery-manual').click();await page.locator('#modal').waitFor({state:'visible'});await page.locator('#close-modal').click();
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),true);
+  await page.locator('#close-title-search').click();
   await page.locator('[data-tab="library"]').click();
   phase='gallery';
   assert.equal(await page.getByRole('heading',{name:'Next to watch',exact:true}).count(),0);
@@ -536,9 +573,8 @@ const server=http.createServer((req,res)=>{
   await page.locator('[data-tab="library"]').click();
   await page.locator('#add-btn').click();
   assert.equal(await page.locator('#discovery-view').isVisible(),true,'Search opens after leaving Settings');
-  assert.equal(await page.locator('.top-nav h1').isVisible(),false,'Search has its own heading without the app title');
-  assert.equal(await page.locator('.top-nav .search-box').isVisible(),false);
-  assert.equal(await page.locator('.stats-row').isVisible(),false);
+  assert.equal(await page.evaluate(()=>document.body.style.position),'fixed','the Library remains anchored behind the modal search backdrop');
+  await page.locator('#close-title-search').click();
   await page.locator('[data-tab="settings"]').click();
   await assertSettingsOnly();
   await page.locator('[data-tab="library"]').click();
@@ -670,6 +706,7 @@ const server=http.createServer((req,res)=>{
   await page.locator('[data-discovery-filter="Series"]').click();
   await page.locator('#discovery-library-results [data-library-result="show"]').waitFor();
   assert.equal(await page.locator('#discovery-results [data-discovery-add]').count(),0,'a shared TVMaze ID is saved even when the catalogue IMDb ID differs');
+  await page.locator('#close-title-search').click();
   await page.locator('[data-tab="library"]').click();
   const beforeDuplicate=await page.evaluate(()=>mediaItems.length),beforeDuplicateSaves=saves;
   await page.evaluate(()=>{openAdd();titleInput.value='Test Series';typeSelect.value='Series';$('tvmaze-id').value='12';$('imdb-id').value='tt7654321';$('release-year').value='2021';});

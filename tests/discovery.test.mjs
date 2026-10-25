@@ -30,6 +30,32 @@ test('Search starts without format selection and Add opens the same clean search
  const html=fs.readFileSync(new URL('../index.html',import.meta.url),'utf8');
  assert.doesNotMatch(html,/data-browse-format|id="discovery-browse"/);
 });
+test('Search viewport follows keyboard height and discards stale offsets after dismissal',()=>{
+ const {c}=harness();
+ for(const [viewport,layout,height,top] of [[{height:380,offsetTop:60},844,380,60],[{height:844,offsetTop:60},844,844,0],[{height:380,offsetTop:-5},844,380,0],[null,844,844,0]]){
+  const bounds=c.titleSearchViewportBounds(viewport,layout);assert.equal(bounds.height,height);assert.equal(bounds.top,top);
+ }
+});
+test('Search pins the background once, resizes independently, and restores its original scroll and styles',()=>{
+ const {c,$}=harness(),properties=new Map(),scrolls=[];
+ const styles={position:'relative',top:'2px',left:'',width:'',overflow:''};
+ c.document.body={style:{...styles}};c.document.documentElement={clientHeight:844};
+ $('discovery-view').style={setProperty:(key,value)=>properties.set(key,value),removeProperty:key=>properties.delete(key)};
+ c.window={innerHeight:844,scrollX:0,scrollY:280,visualViewport:{height:844,offsetTop:0},scrollTo:options=>scrolls.push(options)};
+ c.setTitleSearchSheetOpen(true);assert.equal(c.document.body.style.position,'fixed');assert.equal(c.document.body.style.top,'-280px');
+ c.window.scrollY=0;c.setTitleSearchSheetOpen(true);
+ c.window.visualViewport={height:380,offsetTop:60};c.updateTitleSearchViewport();
+ assert.equal(properties.get('--search-viewport-height'),'380px');assert.equal(properties.get('--search-viewport-top'),'60px');
+ c.setTitleSearchSheetOpen(false);assert.deepEqual(c.document.body.style,styles);
+ assert.equal(scrolls[0].top,280);assert.equal(properties.size,0);
+ c.updateTitleSearchViewport();assert.equal(properties.size,0,'closed search cannot move the Library on a late keyboard resize');
+});
+test('Closing search ends keyboard input before returning focus without scrolling',()=>{
+ const {c,$,calls}=harness(),input=$('discovery-query');let focused;
+ c.document.activeElement=input;input.blur=()=>{c.document.activeElement=null;};
+ c.searchReturnTab='library';c.addBtn={focus:options=>focused=options};c.closeTitleSearch();
+ assert.equal(c.document.activeElement,null);assert.deepEqual(calls,['library']);assert.equal(focused.preventScroll,true);
+});
 test('Newer queries win even when the cancelled provider replies late',async()=>{
   const {c,$}=harness(),requests=[];
   c.searchAllTitles=(query,options)=>new Promise(resolve=>requests.push({query,options,resolve}));
