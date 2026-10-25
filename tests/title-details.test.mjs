@@ -38,6 +38,54 @@ test('A stalled catalogue does not hold up a verified independent fallback',{tim
  const data=await getTitleDetails(film,async url=>url.includes('itunes.apple')?new Promise(()=>{}):url.includes('justwatch')?json({data:{popularTitles:{edges:[{node:{objectType:'MOVIE',content:{title:'Inception',originalReleaseYear:2010,externalIds:{imdbId:imdb},fullPath:'/uk/movie/inception',shortDescription:'A skilled thief enters dreams to steal secrets and must plant an idea instead.'}}}]}}}):failure(),options);
  assert.equal(data.source,'JustWatch');assert.equal(data.state,'ready');
 });
+test('A stalled IMDb page cannot hold a ready, identity-checked film fallback',{timeout:1000},async()=>{
+ const result=await getTitleDetails(film,async url=>url.includes('imdb.com/title/')?new Promise(()=>{}):url.includes('itunes.apple')?json({results:[apple]}):failure(),options);
+ assert.equal(result.source,'Apple TV');assert.equal(result.year,'2010');
+});
+test('Remaining provider requests are cancelled once a usable description is returned',async()=>{
+ const pending=[];
+ const result=await getTitleDetails(film,async(url,init)=>{
+  if(url.includes('itunes.apple'))return json({results:[apple]});
+  if(url.includes('imdb.com/title/')){pending.push(init.signal);return new Promise((_,reject)=>init.signal.addEventListener('abort',()=>reject(Error('cancelled')),{once:true}));}
+  return failure();
+ },options);
+ assert.equal(result.source,'Apple TV');assert.ok(pending.length);assert.ok(pending.every(signal=>signal.aborted));
+});
+test('One verified studio response does not wait for unrelated studio requests',{timeout:1000},async()=>{
+ const page='<script type="application/ld+json">'+JSON.stringify({'@type':'Movie',name:'Inception',datePublished:'2010-07-16',description:'A skilled thief enters dreams to steal secrets and must plant an idea instead.'})+'</script>';
+ const result=await getTitleDetails(film,async url=>url.includes('warnerbros.com')?html(page):url.includes('movies.disney.com')?new Promise(()=>{}):failure(),options);
+ assert.equal(result.source,'Warner Bros.');assert.equal(result.state,'ready');
+});
+test('A known film title/year does not wait for IMDb suggestions before searching Apple',{timeout:1000},async()=>{
+ const result=await getTitleDetails({...film,imdbId:''},async url=>url.includes('media-imdb')?new Promise(()=>{}):url.includes('itunes.apple')?json({results:[apple]}):failure(),options);
+ assert.equal(result.source,'Apple TV');assert.equal(result.year,'2010');
+});
+test('A film without a stored IMDb ID can still recover via its unique title and year',async()=>{
+ const result=await getTitleDetails({...film,imdbId:''},async url=>url.includes('media-imdb')?json({d:[suggestion]}):url.includes('imdb.com/title/')?html(ld()):failure(),options);
+ assert.equal(result.source,'IMDb');assert.equal(result.imdbId,imdb);assert.equal(result.description,'An IMDb synopsis.');
+});
+test('A supplied official series page does not depend on TVMaze availability',{timeout:1000},async()=>{
+ const site='https://www.cbs.com/shows/ncis/about/';
+ const result=await getTitleDetails({title:'NCIS',type:'Series',tvmazeShowId:'60',officialUrl:site},async url=>url.includes('api.tvmaze.com')?new Promise(()=>{}):url===site?html('<h1>About NCIS</h1><p>NCIS follows an investigative team handling crimes involving the United States Navy and Marine Corps.</p>'):failure(),options);
+ assert.equal(result.source,'CBS');assert.equal(result.state,'ready');
+});
+test('A missing stored film year can be recovered from the exact IMDb-linked film record',async()=>{
+ const row={node:{objectType:'MOVIE',content:{title:'Carrie',originalReleaseYear:2013,externalIds:{imdbId:'tt1939659'},fullPath:'/uk/movie/carrie-2013',shortDescription:'A shy teenager discovers telekinetic powers and confronts the cruelty around her.'}}};
+ const result=await getTitleDetails({title:'Carrie',type:'Film',imdbId:'tt1939659'},async url=>url.includes('justwatch')?json({data:{popularTitles:{edges:[row]}}}):failure(),options);
+ assert.equal(result.source,'JustWatch');assert.equal(result.year,'2013');assert.equal(result.imdbId,'tt1939659');
+});
+test('A slow season-count source cannot hold a ready TVMaze synopsis',{timeout:1000},async()=>{
+ const result=await getTitleDetails({title:'Show',type:'Series',tvmazeShowId:'12'},async url=>url.endsWith('/seasons')?new Promise(()=>{}):json({id:12,name:'Show',summary:'<p>The full programme follows a team investigating mysterious events.</p>'}),options);
+ assert.equal(result.source,'TVMaze');assert.equal(result.seasons,null);assert.equal(result.state,'ready');
+});
+test('An IMDb series fallback can answer while TVMaze is stalled',{timeout:1000},async()=>{
+ const result=await getTitleDetails({title:'Inception',type:'Series',imdbId:imdb,tvmazeShowId:'12'},async url=>url.includes('api.tvmaze.com')?new Promise(()=>{}):url.includes('imdb.com/title/')?html(ld({'@type':'TVSeries'})):failure(),options);
+ assert.equal(result.source,'IMDb');assert.equal(result.description,'An IMDb synopsis.');
+});
+test('A stalled official homepage cannot hide a verified TMDb film record',{timeout:1000},async()=>{
+ const result=await getTitleDetails(film,async url=>url.includes('/find/')?json({movie_results:[{id:27205,title:'Inception',release_date:'2010-07-16'}]}):url.endsWith('/movie/27205')?json({id:27205,imdb_id:imdb,title:'Inception',release_date:'2010-07-16',homepage:'https://www.paramountpictures.com/movies/inception',overview:'A skilled thief enters dreams to steal secrets and must plant an idea instead.'}):url.includes('paramountpictures')?new Promise(()=>{}):failure(),{...options,tmdbToken:'test-token'});
+ assert.equal(result.source,'TMDb');assert.equal(result.year,'2010');
+});
 test('Disney film pages prefer the full synopsis over truncated SEO and recognise the release date',()=>{
  const title='Star Wars: The Mandalorian and Grogu',plot='An experienced bounty hunter and his young companion accept a dangerous mission for the New Republic.';
  const page='<h1>'+title+'</h1><script type="application/ld+json">'+JSON.stringify({'@type':'Movie',name:title,dateCreated:'2026-05-22',description:'A truncated teaser...'})+'</script><p class="desc">'+plot+'</p>';

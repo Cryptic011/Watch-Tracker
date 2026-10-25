@@ -4,17 +4,47 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 
 const source=fs.readFileSync(new URL('../assets/js/catalogue.js',import.meta.url),'utf8');
-function harness(responses){
+function harness(responses,storage){
  let calls=0;
  const cache=source.slice(source.indexOf('  const METADATA_CACHE_TTL_MS='),source.indexOf('  function episodeAirTime('));
  const details=source.slice(source.indexOf('  const titleDetailsCache='),source.indexOf('  function tvMazeShowMatchesSelection('));
- const context=vm.createContext({URL,console,esc:String,pinApi:async()=>({details:responses[Math.min(calls++,responses.length-1)]})});
+ const context=vm.createContext({URL,console,localStorage:storage,esc:String,pinApi:async()=>({details:responses[Math.min(calls++,responses.length-1)]})});
  vm.runInContext(cache+details,context);
  return {get:item=>context.fetchOfficialTitleDetails(item),links:info=>context.titleDetailsSourceLinks(info),calls:()=>calls};
 }
 const item={title:'NCIS',type:'Series',imdbId:'tt0364845'};
 const url='https://www.paramountglobalcontent.com/title/ncis';
 const valid={source:'Paramount Global Content',descriptionSource:'Paramount Global Content',description:'NCIS follows a team investigating crimes with Navy or Marine Corps ties.',sources:[{name:'Paramount Global Content',url}],synopsisVersion:4,synopsisScope:'series',state:'ready'};
+const deviceStorage=()=>{const values=new Map();return {getItem:key=>values.get(key)||null,setItem:(key,value)=>values.set(key,value)};};
+
+test('Verified details reopen immediately after an app restart without another network request',async()=>{
+ const storage=deviceStorage(),first=harness([valid],storage);
+ await first.get(item);assert.equal(first.calls(),1);
+ const restarted=harness([],storage);
+ assert.equal((await restarted.get(item)).description,valid.description);assert.equal(restarted.calls(),0);
+});
+test('Expired, obsolete and wrong-identity stored details are fetched again',async()=>{
+ for(const mutate of [row=>{row.expiresAt=Date.now()-1;},row=>{row.details.synopsisVersion=1;},row=>{row.details.imdbId='tt9999999';}]){
+  const storage=deviceStorage();await harness([valid],storage).get(item);
+  const key='watchlog_verified_title_details_v1',rows=JSON.parse(storage.getItem(key));mutate(rows[0]);storage.setItem(key,JSON.stringify(rows));
+  const fresh=harness([valid],storage);assert.equal((await fresh.get(item)).description,valid.description);assert.equal(fresh.calls(),1);
+ }
+});
+test('An unavailable result is never persisted and a retry can recover',async()=>{
+ const storage=deviceStorage(),failed=harness([{state:'unavailable',sources:[]}],storage);
+ await failed.get(item);assert.equal(storage.getItem('watchlog_verified_title_details_v1'),null);
+ const retry=harness([valid],storage);assert.equal((await retry.get(item)).description,valid.description);assert.equal(retry.calls(),1);
+});
+test('A different title identity cannot reuse another film’s persisted details',async()=>{
+ const storage=deviceStorage(),first={title:'Carrie',type:'Film',imdbId:'tt1939659',releaseYear:'2013'};
+ await harness([{...valid,synopsisScope:'film',imdbId:first.imdbId,year:'2013'}],storage).get(first);
+ const remake=harness([{...valid,synopsisScope:'film',imdbId:'tt0074285',year:'1976'}],storage);
+ assert.equal((await remake.get({...first,imdbId:'tt0074285',releaseYear:'1976'})).year,'1976');assert.equal(remake.calls(),1);
+});
+test('Blocked device storage does not prevent a successful fetch',async()=>{
+ const blocked={getItem:()=>{throw Error('blocked');},setItem:()=>{throw Error('full');}};
+ const api=harness([valid],blocked);assert.equal((await api.get(item)).description,valid.description);assert.equal(api.calls(),1);
+});
 
 test('Legacy season-promo responses are hidden and never cached as a successful overview',async()=>{
  const old={source:'CBS',description:'Michael Weatherly returns as Tony DiNozzo, joining the team as they tackle Navy crimes and personal challenges.',sources:[{name:'CBS',url:'https://www.cbs.com/shows/ncis/'}],state:'ready'};

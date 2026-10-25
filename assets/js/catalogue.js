@@ -171,23 +171,42 @@
   }
 
   const titleDetailsCache=new Map();
+  const TITLE_DETAILS_STORAGE_KEY="watchlog_verified_title_details_v1";
+  function readStoredTitleDetails(){
+    try{
+      const rows=JSON.parse(localStorage.getItem(TITLE_DETAILS_STORAGE_KEY)||"[]");
+      return Array.isArray(rows)?rows.filter(row=>row&&typeof row.key==="string"&&Number.isFinite(row.expiresAt)&&row.expiresAt>Date.now()).slice(-60):[];
+    }catch(_){return [];}
+  }
+  function storeTitleDetails(key,details){
+    try{
+      const rows=readStoredTitleDetails().filter(row=>row.key!==key);
+      rows.push({key,expiresAt:Date.now()+METADATA_CACHE_TTL_MS,details});
+      localStorage.setItem(TITLE_DETAILS_STORAGE_KEY,JSON.stringify(rows.slice(-60)));
+    }catch(_){/* A private/full browser still keeps the in-memory cache. */}
+  }
   async function fetchOfficialTitleDetails(item){
     const payload={title:item.title,type:item.type==="Anime"?"Series":item.type||item.format,imdbId:item.imdbId||(item.source==="imdb"?item.externalId:""),tvmazeShowId:item.tvmazeShowId||item.tvmazeId,year:item.releaseYear||item.year,source:item.source,externalId:item.externalId,platform:item.platform||"",officialUrl:item.officialUrl||item.officialSite||""};
-    const key="whole-title-v4:"+JSON.stringify(payload);
+    const key="whole-title-v5:"+JSON.stringify(payload);
     return cachedMetadataRequest(titleDetailsCache,key,async()=>{
       try{
-        const response=await pinApi("catalog_details",payload);
-        // Require the current whole-title policy, so an old gateway or cache
-        // cannot reintroduce a season promo into the series overview.
-        const details=response.details||{};
         const permitted=source=>["TVMaze","IMDb","Apple TV","CBS","Paramount+","NBC","ABC","FOX","FX","HBO","Max","Disney+","Disney","Hulu","Netflix","Prime Video","Peacock","STARZ","Showtime","AMC","AMC+","The CW","PBS","BBC","ITV","ITVX","Channel 4","Sky","NOW","Crunchyroll","A&E","Freeform","Adult Swim","USA Network","BET","Warner Bros.","Universal","Paramount Pictures","Sony Pictures","20th Century Studios","Marvel","Lionsgate","Focus Features","Discovery+","TNT","TBS","Paramount Global Content","Paramount Press Express","Netflix Media Center","TMDb","JustWatch","Harry Potter","Star Wars","Lucasfilm","MGM","Amazon MGM Studios","Searchlight Pictures"].includes(String(source||""));
-        const rejected=["source","descriptionSource","ratingSource"].some(field=>details[field]&&!permitted(details[field]));
         const scope=payload.type==="Series"?"series":"film";
-        const currentSynopsis=details.synopsisVersion===4&&details.synopsisScope===scope;
-        const wrongIdentity=Boolean(payload.imdbId&&details.imdbId&&payload.imdbId!==details.imdbId)||
+        const rejectedSource=details=>["source","descriptionSource","ratingSource"].some(field=>details[field]&&!permitted(details[field]));
+        const current=details=>details.synopsisVersion===4&&details.synopsisScope===scope;
+        const mismatched=details=>Boolean(payload.imdbId&&details.imdbId&&payload.imdbId!==details.imdbId)||
           Boolean(payload.type==='Film'&&payload.year&&details.year&&String(payload.year)!==String(details.year));
-        if(wrongIdentity){titleDetailsCache.delete(key);return {state:"unmatched",sources:[]};}
-        if(!rejected&&details.description&&currentSynopsis)return details;
+        let stored=readStoredTitleDetails().find(row=>row.key===key)?.details;
+        if(stored&&(!stored.description||stored.state!=="ready"||!current(stored)||mismatched(stored)||rejectedSource(stored)))stored=null;
+        const response=stored?{details:stored}:await pinApi("catalog_details",payload);
+        // Revalidate persisted public metadata with the same identity and
+        // whole-title rules as a fresh gateway response.
+        const details=response.details||{},rejected=rejectedSource(details);
+        if(mismatched(details)){titleDetailsCache.delete(key);return {state:"unmatched",sources:[]};}
+        if(!rejected&&details.description&&current(details)){
+          if(!stored)storeTitleDetails(key,details);
+          return details;
+        }
         titleDetailsCache.delete(key);
         if(!rejected&&details.sources?.length)return {...details,description:"",descriptionSource:"",state:"partial"};
       }catch(_) {titleDetailsCache.delete(key);}

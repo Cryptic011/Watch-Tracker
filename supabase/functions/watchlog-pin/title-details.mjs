@@ -12,6 +12,16 @@ const yearOf=value=>/^\d{4}/.test(String(value||''))?String(value).slice(0,4):''
 const text=value=>clean(value).slice(0,8000);
 const imdbURL=id=>'https://www.imdb.com/title/'+id+'/';
 function record(fields,name,url){return {...fields,source:name,sourceUrl:url,sources:[{name,url}],descriptionSource:fields.description?name:'',ratingSource:fields.rating?name:''};}
+// Preferred sources get a short opportunity to answer, never an unbounded
+// veto over an already verified synopsis from another provider.
+async function briefly(task,ms=120){
+ let timer;
+ try{return await Promise.race([task,new Promise(resolve=>{timer=setTimeout(()=>resolve(null),ms);})]);}
+ finally{clearTimeout(timer);}
+}
+const firstSynopsis=tasks=>Promise.any(tasks.map(task=>Promise.resolve(task).then(details=>{
+ if(!details?.description)throw Error('No matched synopsis');return details;
+}))).catch(()=>null);
 
 /* Exact first-party platform domains. Metadata from third-party aggregators
    and arbitrary URLs must never be treated as official broadcaster content. */
@@ -195,7 +205,8 @@ export async function getTitleDetails(input,request=fetch,{useCache=true,tmdbTok
   const key=JSON.stringify(selected),cached=cache.get(key);
   if(useCache&&cached?.expires>Date.now())return structuredClone(cached.value);
   if(useCache&&inFlight.has(key))return structuredClone(await inFlight.get(key));
-  const task=resolveDetails(selected,request,tmdbToken);
+  const controller=new AbortController();
+  const task=resolveDetails(selected,request,tmdbToken,controller.signal).finally(()=>controller.abort());
   if(useCache)inFlight.set(key,task);
   try{
     const value=await task;
@@ -203,11 +214,11 @@ export async function getTitleDetails(input,request=fetch,{useCache=true,tmdbTok
     return structuredClone(value);
   }finally{if(inFlight.get(key)===task)inFlight.delete(key);}
 }
-async function resolveDetails(selected,request,tmdbToken=""){
+async function resolveDetails(selected,request,tmdbToken="",signal){
   const deadline=Date.now()+16000;
   const get=async(url,asText=false,init={})=>{
     const remaining=deadline-Date.now();if(remaining<100)throw Error('Details deadline reached');
-    const response=await request(url,{...init,signal:AbortSignal.timeout(Math.min(7000,remaining)),headers:{'User-Agent':'WatchedLogger/1.0 (title metadata)','Accept':asText?'text/html':'application/json',...(init.headers||{})}});
+    const response=await request(url,{...init,signal:AbortSignal.any([signal,AbortSignal.timeout(Math.min(7000,remaining))]),headers:{'User-Agent':'WatchedLogger/1.0 (title metadata)','Accept':asText?'text/html':'application/json',...(init.headers||{})}});
     if(!response.ok)throw Error('Metadata source unavailable');
     // Never follow a platform redirect to a third-party or unrelated host
     // and continue to attribute the HTML to the original broadcaster.
@@ -221,8 +232,12 @@ async function resolveDetails(selected,request,tmdbToken=""){
   // Series use TVMaze's show-level record, never an episode or season summary.
   // Film overviews retain the existing studio/IMDb lookup.
   let id=selected.imdbId,canonical=null,identityTask=null;
-  let imdbTask=null;
-  const loadIMDb=()=>imdbTask||(imdbTask=attempt(async()=>parseIMDbDetails(await get(imdbURL(id),true),id,selected.type,selected)));
+  let imdbTask=null,imdbDetails=null;
+  const loadIMDb=()=>imdbTask||(imdbTask=attempt(async()=>{
+    const targetId=id;
+    imdbDetails=parseIMDbDetails(await get(imdbURL(targetId),true),targetId,selected.type,selected);
+    return imdbDetails;
+  }));
   // Start the preferred film source while independent studio discovery runs.
   if(selected.type==='Film'&&id)loadIMDb();
   const identity=()=>identityTask||(identityTask=attempt(async()=>{
@@ -236,10 +251,25 @@ async function resolveDetails(selected,request,tmdbToken=""){
     if(matches.length!==1){if(id&&(data.d||[]).some(row=>row.id===id))id='';return null;}
     canonical={title:clean(matches[0].l),year:yearOf(matches[0].y)};id=matches[0].id;return canonical;
   }));
+  // Older/manual films may have only a title and year. Resolve their IMDb
+  // identity independently so a slow suggestion service cannot block Apple,
+  // while a working suggestion service can still rescue a retail outage.
+  const discoveredIMDb=selected.type==='Film'&&!id?attempt(async()=>{
+    await identity();return id?loadIMDb():null;
+  }):null;
   let seriesDetails=null;
   const pages=[];
   if(selected.officialUrl)pages.push(selected.officialUrl);
-  if(selected.type==='Series')await attempt(async()=>{
+  const officialRequests=new Map();
+  const loadOfficial=url=>{
+    if(!officialRequests.has(url))officialRequests.set(url,attempt(async()=>{
+      const site=firstPartyURL(url);if(!site)return null;
+      return parseFirstPartyDetails(await get(site.url,true),site.url,selected);
+    }));
+    return officialRequests.get(url);
+  };
+  const suppliedOfficial=selected.officialUrl?loadOfficial(selected.officialUrl):null;
+  const seriesTask=selected.type==='Series'?attempt(async()=>{
     const url=selected.tvmazeId?'https://api.tvmaze.com/shows/'+selected.tvmazeId:id?
       'https://api.tvmaze.com/lookup/shows?imdb='+encodeURIComponent(id):
       'https://api.tvmaze.com/search/shows?q='+encodeURIComponent(selected.title);
@@ -253,7 +283,8 @@ async function resolveDetails(selected,request,tmdbToken=""){
     if(!id)id=imdbID(show.externals?.imdb);
     const description=String(show.summary||'').split(/<\/p\s*>/i).map(text).filter(Boolean).join('\n\n');
     if(description&&isWholeTitleSynopsis(description,1)){
-      const seasons=await attempt(()=>get('https://api.tvmaze.com/shows/'+show.id+'/seasons'));
+      // The synopsis is usable even if this optional secondary request stalls.
+      const seasons=await briefly(attempt(()=>get('https://api.tvmaze.com/shows/'+show.id+'/seasons')));
       seriesDetails=record({description,premiered:/^\d{4}-\d{2}-\d{2}$/.test(show.premiered||'')?show.premiered:'',
         year:yearOf(show.premiered),genres:Array.isArray(show.genres)?show.genres.map(clean):[],
         status:clean(show.status),language:clean(show.language),runtime:Number(show.averageRuntime||show.runtime)||null,
@@ -274,7 +305,8 @@ async function resolveDetails(selected,request,tmdbToken=""){
       }
     }
     return show;
-  });
+  }):null;
+  if(seriesTask)await briefly(seriesTask,180);
   if(seriesDetails)return {...seriesDetails,synopsisVersion:SYNOPSIS_VERSION,synopsisScope:'series',imdbId:id,imdbUrl:id?imdbURL(id):'',state:'ready'};
   // Cross-check the exact IMDb identity, film title and year. The studio
   // homepage takes priority; an attributed film record can rescue outages.
@@ -299,20 +331,20 @@ async function resolveDetails(selected,request,tmdbToken=""){
       },'TMDb','https://www.themoviedb.org/movie/'+Number(movie.id));
       const homepage=firstPartyURL(movie.homepage);
       if(homepage){
-        const studio=await attempt(async()=>parseFirstPartyDetails(await get(homepage.url,true),homepage.url,selected));
+        const studio=await briefly(attempt(async()=>parseFirstPartyDetails(await get(homepage.url,true),homepage.url,selected)));
         if(studio)return studio;
       }
       return filmDatabaseDetails;
   }):null;
-  let result=null;
-  for(const candidate of [...new Set(pages)].slice(0,3)){
-    const site=firstPartyURL(candidate);if(!site)continue;
-    const firstParty=await attempt(async()=>{
-      const contents=await get(site.url,true);
-      return parseFirstPartyDetails(contents,site.url,selected);
-    });
-    if(firstParty){result=firstParty;break;}
-  }
+  const discoveredOfficial=attempt(async()=>{
+    // TVMaze can still finish in the background and provide its verified
+    // broadcaster URL, while an independent IMDb fallback is already running.
+    if(seriesTask)await seriesTask;
+    if(seriesDetails)return seriesDetails;
+    return firstSynopsis([...new Set(pages)].slice(0,3).map(loadOfficial));
+  });
+  const officialTask=suppliedOfficial?firstSynopsis([suppliedOfficial,discoveredOfficial]):discoveredOfficial;
+  let result=await briefly(officialTask);
   const add=details=>{
     if(!details)return;
     if(!result){result=details;return;}
@@ -324,17 +356,18 @@ async function resolveDetails(selected,request,tmdbToken=""){
   };
   // IMDb remains the preferred film source. A store listing is also a valid
   // fallback for non-Apple films, but only for the exact title and release year.
-  if(!id)await attempt(identity);
+  if(!id&&!selected.year)await attempt(identity);
   const preferredIMDb=id?loadIMDb():null;
   // Give a quick preferred response a brief head start before fanning out.
-  if(!result?.description&&preferredIMDb){
-    let timer;
-    const quick=await Promise.race([preferredIMDb,new Promise(resolve=>{timer=setTimeout(()=>resolve(null),120);})]);
-    clearTimeout(timer);add(quick);
+  const waitedForIMDb=!result?.description&&Boolean(preferredIMDb);
+  if(waitedForIMDb){
+    add(await briefly(preferredIMDb));
   }
-  const fallbackTasks=filmDatabaseTask?[filmDatabaseTask]:[];
+  const fallbackTasks=[officialTask,...(filmDatabaseTask?[filmDatabaseTask]:[]),...(discoveredIMDb?[discoveredIMDb]:[])];
   if(!result?.description&&selected.type==='Film')fallbackTasks.push(attempt(async()=>{
-    const match=await attempt(identity);
+    // An exact selected title/year is sufficient for a retail lookup. Do not
+    // make it wait for an unrelated IMDb suggestion request to time out.
+    const match=canonical||(!selected.year?await attempt(identity):null);
     const title=match?.title||selected.title,year=match?.year||selected.year;
     if(!title||!year)return null; // A title alone cannot distinguish remakes.
     for(const country of ['gb','us']){
@@ -356,15 +389,15 @@ async function resolveDetails(selected,request,tmdbToken=""){
     }
     return null;
   }));
-  if(!result?.description&&selected.type==='Film'&&id&&selected.title&&selected.year)fallbackTasks.push(attempt(async()=>{
+  if(!result?.description&&selected.type==='Film'&&id&&selected.title)fallbackTasks.push(attempt(async()=>{
     const query='query($title:String!){popularTitles(country:GB,first:20,filter:{searchQuery:$title}){edges{node{objectType content(country:GB,language:en){title originalReleaseYear externalIds{imdbId} fullPath shortDescription}}}}}';
     const data=await get('https://apis.justwatch.com/graphql',false,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query,variables:{title:selected.title}})});
     if(data.errors?.length)return null;
-    const matches=(data.data?.popularTitles?.edges||[]).map(row=>row.node).filter(row=>row?.objectType==='MOVIE'&&row.content?.externalIds?.imdbId===id&&nameKey(row.content.title)===nameKey(selected.title)&&String(row.content.originalReleaseYear)===selected.year);
+    const matches=(data.data?.popularTitles?.edges||[]).map(row=>row.node).filter(row=>row?.objectType==='MOVIE'&&row.content?.externalIds?.imdbId===id&&nameKey(row.content.title)===nameKey(selected.title)&&yearOf(row.content.originalReleaseYear)&&(!selected.year||String(row.content.originalReleaseYear)===selected.year));
     if(matches.length!==1)return null;
     const content=matches[0].content;
     if(!/^\/uk\/movie\/[a-zA-Z0-9_-]+$/.test(content.fullPath||'')||!isWholeTitleSynopsis(content.shortDescription))return null;
-    return record({description:text(content.shortDescription),year:selected.year},'JustWatch','https://www.justwatch.com'+content.fullPath);
+    return record({description:text(content.shortDescription),year:yearOf(content.originalReleaseYear)},'JustWatch','https://www.justwatch.com'+content.fullPath);
   }));
   // Last-resort studio discovery is generic, not a list of hand-written plots.
   // Unlike an IMDb-linked homepage, a guessed studio path must prove its year.
@@ -372,13 +405,17 @@ async function resolveDetails(selected,request,tmdbToken=""){
     const slug=nameKey(selected.title).replace(/ /g,'-');
     const urls=[...(/^(?:harry potter|fantastic beasts)\b/.test(nameKey(selected.title))?['https://www.harrypotter.com/discover/films/'+slug]:[]),'https://movies.disney.com/'+slug,'https://www.warnerbros.com/movies/'+slug,
       'https://www.sonypictures.com/movies/'+slug.replace(/-/g,''),'https://www.mgm.com/movies/'+slug];
-    fallbackTasks.unshift(Promise.all(urls.map(url=>attempt(async()=>parseFirstPartyDetails(await get(url,true),url,{...selected,requireYear:true})))).then(rows=>rows.find(Boolean)));
+    fallbackTasks.unshift(firstSynopsis(urls.map(url=>attempt(async()=>parseFirstPartyDetails(await get(url,true),url,{...selected,requireYear:true})))));
   }
-  if(preferredIMDb)add(await preferredIMDb);
+  if(preferredIMDb)fallbackTasks.push(preferredIMDb);
   if(!result?.description){
-    const winner=await Promise.any(fallbackTasks.map(task=>task.then(details=>{if(!details?.description)throw Error('No matched synopsis');return details;}))).catch(()=>null);
+    const winner=await firstSynopsis(fallbackTasks);
     add(winner);
   }
+  if(result?.description&&preferredIMDb&&!imdbDetails&&!waitedForIMDb)add(await briefly(preferredIMDb));
+  // Merge only facts that have already arrived. Optional ratings, season
+  // counts and slow preferred providers must not delay a usable description.
+  add(imdbDetails);
   add(filmDatabaseDetails);
   return {...(result||{sources:[]}),synopsisVersion:SYNOPSIS_VERSION,synopsisScope:selected.type==='Series'?'series':'film',imdbId:id,imdbUrl:id?imdbURL(id):'',state:result?.description?'ready':result?'partial':id||selected.tvmazeId||selected.appleId?'unavailable':'unmatched'};
 }

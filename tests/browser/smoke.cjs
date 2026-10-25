@@ -20,7 +20,7 @@ const server=http.createServer((req,res)=>{
   const page=await context.newPage(),errors=[];let phase='login';
   page.on('pageerror',error=>{const message=String(error.message||'');const expectedWebKitPinCors=engine.name()==='webkit'&&message.includes('watchlog-pin?forceFunctionRegion=eu-west-1')&&message.includes('access control checks');if(!expectedWebKitPinCors)errors.push(message);console.error(`${engine.name()} [${phase}] page error: ${error.stack||error.message}`);});
   page.on('requestfailed',request=>console.error(`${engine.name()} [${phase}] request failed: ${request.method()} ${new URL(request.url()).pathname} ${request.failure()?.errorText}`));
-  let items=[],revision=0,failSave=false,saves=0,loads=0,changelogRequests=0,reminderEnabled=false,reminderExpiredTest=false;const catalogQueries=[],reminderTests=[];
+  let items=[],revision=0,failSave=false,saves=0,loads=0,changelogRequests=0,titleDetailsRequests=0,reminderEnabled=false,reminderExpiredTest=false;const catalogQueries=[],reminderTests=[];
   const account={id:'browser-test',email:'browser@example.test',displayName:'Browser Test'};
   await context.route('**/*',async route=>{
    const req=route.request();
@@ -61,6 +61,7 @@ const server=http.createServer((req,res)=>{
      {title:'Browser Test Series',format:'Series',source:'tvmaze',tvmazeId:'12',imdbId:'tt7654321',year:'2021',description:'Investigators work together to solve difficult cases.'},
     ]};}
     if(body.action==='catalog_details'){
+     titleDetailsRequests++;
      const series=body.type==='Series',id=series?'tt1234568':'tt1234567',url='https://www.imdb.com/title/'+id+'/';
      data={ok:true,details:{state:'ready',synopsisVersion:4,synopsisScope:series?'series':'film',description:series?'An official series description & a second detail.':'A detective uncovers a mystery in a quiet coastal town. '.repeat(8),year:'2020',genres:['Drama','Action'],runtime:series?42:120,rating:8.4,ratingSource:series?'TVMaze':'IMDb',source:series?'TVMaze':'IMDb',sources:[{name:series?'TVMaze':'IMDb',url:series?'https://www.tvmaze.com/shows/12':url}],imdbUrl:url}};
     }
@@ -752,6 +753,8 @@ const server=http.createServer((req,res)=>{
   await page.locator('[data-gallery-close]').click();
   phase='refresh';
   const refreshItemId=await page.evaluate(()=>{mediaItems[0].platform='Saved before refresh';return mediaItems[0].id;});
+  await page.evaluate(()=>fetchOfficialTitleDetails(mediaItems.find(item=>item.id==='show')));
+  const detailsBeforeReload=titleDetailsRequests;
   const before=loads;const reload=page.waitForEvent('load');await page.locator('#refresh-app').click();await reload;
   // The same browser context retains the PIN session across a document reload.
   // Wait for session restoration to finish before inspecting or interacting with
@@ -763,6 +766,11 @@ const server=http.createServer((req,res)=>{
   assert.equal(await page.locator('.schedule-shortcut').count(),2,'reload restores the compact schedule cards on Library home');
   assert.equal(await recurring.isVisible(),false);assert.equal(await calendarView.isVisible(),false);
   assert.ok(loads>before);
+  await page.evaluate(()=>WatchLogGallery.open('show'));
+  await page.getByRole('tab',{name:'Details',exact:true}).click();
+  await page.waitForFunction(()=>document.querySelector('[data-gallery-details]').textContent.includes('official series description'));
+  assert.equal(titleDetailsRequests,detailsBeforeReload,'verified descriptions survive a full reload without refetching');
+  await page.locator('[data-gallery-close]').click();
   // A failed cloud save must leave the current page and edit intact.
   phase='failed save';
   failSave=true;const failedLoads=loads;
