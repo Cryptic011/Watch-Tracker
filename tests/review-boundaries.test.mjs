@@ -93,7 +93,7 @@ test("Cron keeps release-time alerts after rollover and advances without opening
   for(const [index,status] of ["Planned","Watching","Watched"].entries()){
     worker.setStatus(status);worker.setTime(episodes[index].airstamp);
     assert.ok((await worker.run()).sent>0);
-    assert.ok(worker.deliveries.some(payload=>payload.body.includes(`E${index+6} is out now`)));
+    assert.ok(worker.deliveries.some(payload=>payload.body==='New episode now available'&&payload.data.eventKey.includes(`e${index+6}:`)));
     assert.equal((await worker.run()).sent,0);
   }
   assert.deepEqual(worker.getLibrary().items[0].watchedEpisodes,{1:[1,2,3,4,5]});
@@ -102,7 +102,7 @@ test("Cron keeps release-time alerts after rollover and advances without opening
 test("Every episode in a same-time release receives its own reminder",async()=>{
   const worker=workerHarness([{season:1,number:6,airstamp:"2026-09-06T12:00:00Z"},{season:1,number:7,airstamp:"2026-09-06T12:00:00Z"}]);
   await worker.run();
-  const release=worker.deliveries.filter(payload=>payload.body.includes("is out now"));
+  const release=worker.deliveries.filter(payload=>payload.body==='New episode now available');
   assert.equal(release.length,2);
   assert.equal(new Set(release.map(row=>row.data.eventKey)).size,2);
 });
@@ -124,14 +124,16 @@ test("UTC instants schedule identically across subscription time zones",()=>{
   }
 });
 
-test('Reminder copy names each show or film and uses a single reminder heading',()=>{
+test('Reminder notifications use the title as heading and a concise release message',()=>{
  const c=vm.createContext({});vm.runInContext(extractFunction(backend,'reminderCopy'),c);
  for(const [item,event,lead,body] of [
-  [{title:'NCIS'},{kind:'episode',season:23,number:2},6,'NCIS — S23 E2 releases in 6 hours.'],
-  [{title:'Doomsday'},{kind:'film'},24,'Doomsday releases in 1 day.'],
-  [{title:'Reacher'},{kind:'season',number:4},6,'Reacher — Season 4 releases in 6 hours.'],
-  [{title:'NCIS'},{kind:'episode',season:23,number:2},0,'NCIS — S23 E2 is out now.'],
- ]){const copy=c.reminderCopy(item,event,lead);assert.equal(copy.title,'Watch Logger Reminder');assert.equal(copy.body,body);}
+  [{title:'NCIS'},{kind:'episode',season:23,number:2},6,'New episode in 6 hours'],
+  [{title:'Doomsday'},{kind:'film'},24,'Available in 1 day'],
+  [{title:'Reacher'},{kind:'season',number:4},6,'Season 4 in 6 hours'],
+  [{title:'Ted Lasso'},{kind:'episode',season:3,number:2},0,'New episode now available'],
+  [{title:'Reacher'},{kind:'season',number:4},0,'Season 4 now available'],
+  [{title:'Doomsday'},{kind:'film'},0,'Now available'],
+ ]){const copy=c.reminderCopy(item,event,lead);assert.equal(copy.title,item.title);assert.equal(copy.body,body);}
 });
 
 test('Saving an older edit form preserves episode ticks received from another device',async()=>{

@@ -402,14 +402,12 @@ function reminderCopy(
   event: { kind: string; number: unknown },
   leadHours: number,
 ) {
-  const name = String(item.title || "Tracked title");
-  const timing = leadHours === 24 ? "in 1 day" : `in ${leadHours} hours`;
-  const title = "Watch Logger Reminder";
-  const season = Number((event as { season?: unknown }).season || item.nextSeasonNum || item.airingSeason || 0);
-  const label = event.kind === "episode" && event.number
-    ? `${name} — ${season ? `S${season} ` : ""}E${event.number}`
-    : event.kind === "season" && event.number ? `${name} — Season ${event.number}` : name;
-  const body = leadHours === 0 ? `${label} is out now.` : `${label} releases ${timing}.`;
+  const title = String(item.title || "").replace(/\s+/g, " ").trim() || "Watched Logger";
+  const timing = leadHours === 24 ? "in 1 day" : leadHours === 1 ? "in 1 hour" : `in ${leadHours} hours`;
+  const label = event.kind === "episode" ? "New episode"
+    : event.kind === "season" ? (event.number ? `Season ${event.number}` : "New season") : "";
+  const body = leadHours === 0 ? (label ? `${label} now available` : "Now available")
+    : label ? `${label} ${timing}` : `Available ${timing}`;
   return { title, body };
 }
 
