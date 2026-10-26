@@ -1,6 +1,6 @@
 /* Public metadata only. A provider must match the selected identity before use. */
 const cache=new Map(),inFlight=new Map(),TTL=6*60*60*1000;
-const SYNOPSIS_VERSION=4;
+const SYNOPSIS_VERSION=5;
 const clean=value=>String(value??'').replace(/<[^>]*>/g,' ').replace(/&(?:#(\d+)|#x([0-9a-f]+)|(amp|quot|apos|lt|gt|nbsp));/gi,(all,decimal,hex,name)=>{
   if(name)return {amp:'&',quot:'"',apos:"'",lt:'<',gt:'>',nbsp:' '}[name.toLowerCase()];
   const n=parseInt(decimal||hex,decimal?10:16);return n>0&&n<=0x10ffff?String.fromCodePoint(n):'';
@@ -45,8 +45,43 @@ const FIRST_PARTY=new Map(Object.entries({
  "paramountpressexpress.com":"Paramount Press Express",
  "media.netflix.com":"Netflix Media Center",
  "movies.disney.com":"Disney","starwars.com":"Star Wars","lucasfilm.com":"Lucasfilm",
- "mgm.com":"MGM","amazonmgmstudios.com":"Amazon MGM Studios","searchlightpictures.com":"Searchlight Pictures","harrypotter.com":"Harry Potter"
+ "mgm.com":"MGM","amazonmgmstudios.com":"Amazon MGM Studios","searchlightpictures.com":"Searchlight Pictures","harrypotter.com":"Harry Potter",
+ "intl.paramountplus.com":"Paramount+","watch.amazon.co.uk":"Prime Video","amazon.co.uk":"Prime Video",
+ "rakuten.tv":"Rakuten TV","skystore.com":"Sky Store"
 }));
+const WATCH_SERVICE_HOSTS=new Set(['cbs.com','paramountplus.com','intl.paramountplus.com','nbc.com','abc.com','fox.com','hbo.com','max.com','disneyplus.com','hulu.com','netflix.com','primevideo.com','watch.amazon.co.uk','amazon.co.uk','tv.apple.com','peacocktv.com','starz.com','showtime.com','amc.com','amcplus.com','thecw.com','pbs.org','bbc.co.uk','bbc.com','itv.com','itvx.com','channel4.com','sky.com','nowtv.com','crunchyroll.com','discoveryplus.com','rakuten.tv','skystore.com']);
+const WATCH_LIST_QUERY='query($title:String!){popularTitles(country:GB,first:20,filter:{searchQuery:$title}){edges{node{objectType content(country:GB,language:en){title originalReleaseYear externalIds{imdbId} fullPath shortDescription} offers(country:GB,platform:WEB){monetizationType standardWebURL package{clearName}}}}}}';
+function watchServiceURL(value){
+ const site=firstPartyURL(value);if(!site||!WATCH_SERVICE_HOSTS.has(site.host))return null;
+ const url=new URL(site.url);
+ // Amazon retail pages and broadcaster search/login pages are not title pages.
+ if(['amazon.co.uk','watch.amazon.co.uk'].includes(site.host)&&!/^\/(?:gp\/video\/detail\/|dp\/|(?:-\/[^/]+\/)?detail(?:\/|$))/.test(url.pathname))return null;
+ if(url.pathname==='/'||/\/(?:browse|help|support)(?:\/|$)/i.test(url.pathname))return null;
+ if(['tv.apple.com','netflix.com','paramountplus.com','intl.paramountplus.com'].includes(site.host))url.search='';
+ site.url=url.href;return site;
+}
+function serviceKey(value){
+ const name=nameKey(value);
+ if(/\b(?:amazon|prime video)\b/.test(name))return 'prime video';
+ if(name.includes('paramount'))return 'paramount';
+ if(name.includes('apple tv'))return 'apple tv';
+ return name;
+}
+async function watchListing(selected,get){
+ if(!selected.title)return null;
+ const query=WATCH_LIST_QUERY.replaceAll('country:GB','country:'+selected.country);
+ const data=await get('https://apis.justwatch.com/graphql',false,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query,variables:{title:selected.title}})});
+ if(data.errors?.length)return null;
+ const rows=(data.data?.popularTitles?.edges||[]).map(row=>row.node).filter(row=>{
+  const content=row?.content;
+  if(row?.objectType!==(selected.type==='Film'?'MOVIE':'SHOW')||!imdbID(content?.externalIds?.imdbId)||nameKey(content.title)!==nameKey(selected.title))return false;
+  if(selected.imdbId&&content.externalIds.imdbId!==selected.imdbId)return false;
+  // Strong series IDs can coexist with an old saved current-season year.
+  if(selected.year&&(selected.type==='Film'||!selected.imdbId)&&String(content.originalReleaseYear)!==selected.year)return false;
+  return Boolean(yearOf(content.originalReleaseYear))&&Boolean(selected.imdbId||selected.year);
+ });
+ return rows.length===1?rows[0]:null;
+}
 function isIndividualReleasePath(path){
  const segments=String(path||"").toLowerCase().split("/").filter(Boolean);
  // A network's /shows/title/ homepage or /about/ page is series-level.
@@ -71,7 +106,7 @@ function isWholeTitleSynopsis(value,minimumLength=35){
  // Cast announcements and returning-character promos can describe the current
  // run without saying "season" anywhere (including CBS's NCIS SEO copy).
  if(/\b(?:returns?\s+as|(?:is\s+)?back\s+as|reprises?\s+(?:(?:his|her|their|the)\s+)?role|joins?\s+the\s+cast|guest[- ]stars?|guest[- ]starring)\b/i.test(description))return false;
- if(/^\s*(?:watch|stream|new episodes|all episodes|trailer|preview|recap)\b/i.test(description))return false;
+ if(/^\s*(?:watch|stream|new episodes|all episodes|trailer|preview|recap|sign in|sign up|subscribe|start (?:your |a )?free trial)\b/i.test(description))return false;
  return true;
 }
 function aboutPageDescription(markup,title){
@@ -153,6 +188,10 @@ export function parseFirstPartyDetails(markup,url,{title,type,year,requireYear=f
  const types=type==="Film"?["Movie"]:["TVSeries","TVMiniSeries","TVShow"];
  const candidates=structured.filter(row=>[row?.["@type"]].flat().some(kind=>types.includes(kind))&&matchesFirstPartyTitle(row.name,title));
  const identity=candidates.length===1?candidates[0]:null;
+ const works=structured.filter(row=>[row?.['@type']].flat().some(kind=>['Movie','TVSeries','TVMiniSeries','TVShow','TVEpisode','TVSeason','Book','VideoGame'].includes(kind)));
+ // Some service episode URLs use opaque IDs. A generic show-level OG title
+ // cannot override a single explicit work record naming an episode or remake.
+ if(!identity&&works.length===1)return null;
  const wrongFormats=structured.filter(row=>matchesFirstPartyTitle(row?.name,title)&&[row?.['@type']].flat().some(kind=>['Movie','TVSeries','TVMiniSeries','TVShow','TVEpisode','TVSeason','Book','VideoGame'].includes(kind)));
  if(!candidates.length&&wrongFormats.length)return null;
  if(!identity&&!filmHero&&!titles.some(name=>matchesFirstPartyTitle(name,title)))return null;
@@ -178,7 +217,7 @@ export function parseFirstPartyDetails(markup,url,{title,type,year,requireYear=f
  const description=descriptions.map(value=>text(value)).find(value=>isWholeTitleSynopsis(value))||"";
  if(!description)return null;
  return record({description,year:publishedYear,seasons,
-  premiered:/^\d{4}-\d{2}-\d{2}$/.test(published)?published:"",
+  premiered:/^\d{4}-\d{2}-\d{2}(?:T|$)/.test(published)?published.slice(0,10):"",
   genres:[identity?.genre||[]].flat().filter(x=>typeof x==="string").map(clean).slice(0,15)
  },site.name,site.url);
 }
@@ -198,15 +237,16 @@ export function parseIMDbDetails(html,id,type,selected={}){
   if(type==='Film'&&selected.year&&yearOf(row.datePublished)&&selected.year!==yearOf(row.datePublished))return null;
   return record({description:isWholeTitleSynopsis(row.description,1)?text(row.description):"",premiered:/^\d{4}-\d{2}-\d{2}$/.test(row.datePublished||'')?row.datePublished:'',year:yearOf(row.datePublished),genres:[row.genre||[]].flat().filter(v=>typeof v==='string').map(clean).slice(0,15),runtime:duration?Number(duration[1]||0)*60+Number(duration[2]||0)||null:null,rating:Number.isFinite(rating)&&rating>0&&rating<=10?rating:null},'IMDb',imdbURL(id));
 }
-export async function getTitleDetails(input,request=fetch,{useCache=true,tmdbToken=""}={}){
+export async function getTitleDetails(input,request=fetch,{useCache=true,tmdbToken="",providerTimeoutMs=12000}={}){
   const type=input.type==='Film'?'Film':input.type==='Series'?'Series':null;
   if(!type)return {state:'unmatched',sources:[]};
-  const selected={type,title:clean(input.title).slice(0,160),year:yearOf(input.year||input.releaseYear),imdbId:imdbID(input.imdbId),tvmazeId:numericID(input.tvmazeShowId||input.tvmazeId),appleId:input.source==='apple'?numericID(input.externalId):'',platform:clean(input.platform).slice(0,80),officialUrl:firstPartyURL(input.officialUrl||input.officialSite)?.url||''};
+  const country=String(input.country||'GB').toUpperCase();
+  const selected={type,title:clean(input.title).slice(0,160),year:yearOf(input.year||input.releaseYear),imdbId:imdbID(input.imdbId),tvmazeId:numericID(input.tvmazeShowId||input.tvmazeId),appleId:input.source==='apple'?numericID(input.externalId):'',platform:clean(input.platform).slice(0,80),officialUrl:firstPartyURL(input.officialUrl||input.officialSite)?.url||'',country:country==='UK'?'GB':/^[A-Z]{2}$/.test(country)?country:'GB'};
   const key=JSON.stringify(selected),cached=cache.get(key);
   if(useCache&&cached?.expires>Date.now())return structuredClone(cached.value);
   if(useCache&&inFlight.has(key))return structuredClone(await inFlight.get(key));
   const controller=new AbortController();
-  const task=resolveDetails(selected,request,tmdbToken,controller.signal).finally(()=>controller.abort());
+  const task=resolveDetails(selected,request,tmdbToken,controller.signal,providerTimeoutMs).finally(()=>controller.abort());
   if(useCache)inFlight.set(key,task);
   try{
     const value=await task;
@@ -214,9 +254,12 @@ export async function getTitleDetails(input,request=fetch,{useCache=true,tmdbTok
     return structuredClone(value);
   }finally{if(inFlight.get(key)===task)inFlight.delete(key);}
 }
-async function resolveDetails(selected,request,tmdbToken="",signal){
+async function resolveDetails(selected,request,tmdbToken="",signal,providerTimeoutMs=12000){
   const deadline=Date.now()+16000;
-  const get=async(url,asText=false,init={})=>{
+  const responses=new Map();
+  const get=(url,asText=false,init={})=>{
+   const key=JSON.stringify([url,asText,init.method||'GET',init.body||'']);
+   if(!responses.has(key))responses.set(key,(async()=>{
     const remaining=deadline-Date.now();if(remaining<100)throw Error('Details deadline reached');
     const response=await request(url,{...init,signal:AbortSignal.any([signal,AbortSignal.timeout(Math.min(7000,remaining))]),headers:{'User-Agent':'WatchedLogger/1.0 (title metadata)','Accept':asText?'text/html':'application/json',...(init.headers||{})}});
     if(!response.ok)throw Error('Metadata source unavailable');
@@ -224,10 +267,69 @@ async function resolveDetails(selected,request,tmdbToken="",signal){
     // and continue to attribute the HTML to the original broadcaster.
     if(asText&&firstPartyURL(url)&&response.url){
       const initial=firstPartyURL(url),final=firstPartyURL(response.url);
-      if(!final||final.host!==initial.host)throw Error('Unofficial redirect rejected');
+      if(!final||(final.host!==initial.host&&!(watchServiceURL(url)&&watchServiceURL(response.url)&&final.name===initial.name)))throw Error('Unofficial redirect rejected');
     }
     return asText?response.text():response.json();
+   })());
+   return responses.get(key);
   };
+  let catalogue=null;
+  const preferred=resolveWatchServiceDetails(selected,get).catch(()=>null);
+  // Keep the existing sources warm so a blocked or inaccessible provider page
+  // can fall back without starting a second round of network waits.
+  const fallback=resolveCatalogueDetails(selected,get,tmdbToken).then(value=>(catalogue=value)).catch(()=>({state:'unavailable',sources:[]}));
+  const service=await briefly(preferred,Math.max(0,Math.min(14000,Number(providerTimeoutMs)||12000)));
+  if(!service)return {...await fallback,descriptionMethod:'catalogue'};
+  // Facts can come from a separate verified catalogue; the About text and its
+  // attribution always remain the streaming service's own description.
+  if(!catalogue)catalogue=await briefly(fallback);
+  if(catalogue&&(!service.year||!catalogue.year||service.year===catalogue.year)){
+    let used=false;
+    for(const field of ['premiered','year','genres','status','rating','runtime','language','seasons']){
+      if((!service[field]||(Array.isArray(service[field])&&!service[field].length))&&catalogue[field]){service[field]=catalogue[field];used=true;if(field==='rating')service.ratingSource=catalogue.ratingSource||catalogue.source;}
+    }
+    if(used)for(const source of catalogue.sources||[])if(!service.sources.some(row=>row.url===source.url))service.sources.push(source);
+  }
+  return {...service,synopsisVersion:SYNOPSIS_VERSION,synopsisScope:selected.type==='Series'?'series':'film',descriptionMethod:'watch-service',state:'ready'};
+}
+async function resolveWatchServiceDetails(selected,get){
+  const attempt=async task=>{try{return await task();}catch{return null;}};
+  const readPage=(value,identity=selected)=>attempt(async()=>{
+    const site=watchServiceURL(value);if(!site)return null;
+    const details=parseFirstPartyDetails(await get(site.url,true),site.url,{...identity,requireYear:identity.type==='Film'});
+    return details?{...details,imdbId:identity.imdbId,imdbUrl:identity.imdbId?imdbURL(identity.imdbId):''}:null;
+  });
+  const tasks=[];
+  if(watchServiceURL(selected.officialUrl))tasks.push(readPage(selected.officialUrl));
+  const showTask=selected.type==='Series'?attempt(async()=>{
+    const url=selected.tvmazeId?'https://api.tvmaze.com/shows/'+selected.tvmazeId:selected.imdbId?
+      'https://api.tvmaze.com/lookup/shows?imdb='+encodeURIComponent(selected.imdbId):
+      'https://api.tvmaze.com/search/shows?q='+encodeURIComponent(selected.title);
+    const data=await get(url);
+    const candidates=Array.isArray(data)?data.map(row=>row.show).filter(show=>nameKey(show?.name)===nameKey(selected.title)&&(!selected.year||yearOf(show.premiered)===selected.year)):[data];
+    if(candidates.length!==1)return null;
+    const show=candidates[0];
+    if(!show?.id||nameKey(show.name)!==nameKey(selected.title)||(selected.tvmazeId&&String(show.id)!==selected.tvmazeId)||
+      (selected.imdbId&&show.externals?.imdb&&selected.imdbId!==show.externals.imdb))return null;
+    return show;
+  }):null;
+  if(showTask)tasks.push(attempt(async()=>{
+    const show=await showTask;if(!show)return null;
+    return readPage(show.officialSite,{...selected,imdbId:selected.imdbId||imdbID(show.externals?.imdb),year:yearOf(show.premiered)});
+  }));
+  tasks.push(attempt(async()=>{
+    let identity=selected;
+    if(!identity.imdbId&&showTask){const show=await showTask;if(show)identity={...selected,imdbId:imdbID(show.externals?.imdb),year:yearOf(show.premiered)||selected.year};}
+    const listing=await watchListing(identity,get);if(!listing)return null;
+    const matched={...identity,imdbId:listing.content.externalIds.imdbId,year:yearOf(listing.content.originalReleaseYear)};
+    const priority=offer=>Number(serviceKey(offer.package?.clearName)!==serviceKey(selected.platform))*10+({FLATRATE:0,FREE:1,ADS:2,RENT:3,BUY:4}[offer.monetizationType]??99);
+    const offers=(Array.isArray(listing.offers)?listing.offers:[]).filter(offer=>['FLATRATE','FREE','ADS','RENT','BUY'].includes(offer.monetizationType)).sort((a,b)=>priority(a)-priority(b));
+    const urls=[...new Set(offers.map(offer=>watchServiceURL(offer.standardWebURL)?.url).filter(Boolean))].slice(0,4);
+    return firstSynopsis(urls.map(url=>readPage(url,matched)));
+  }));
+  return firstSynopsis(tasks);
+}
+async function resolveCatalogueDetails(selected,get,tmdbToken=""){
   const attempt=async task=>{try{return await task();}catch{return null;}};
   // Series use TVMaze's show-level record, never an episode or season summary.
   // Film overviews retain the existing studio/IMDb lookup.
@@ -394,13 +496,10 @@ async function resolveDetails(selected,request,tmdbToken="",signal){
     return null;
   }));
   if(!result?.description&&selected.type==='Film'&&id&&selected.title)fallbackTasks.push(attempt(async()=>{
-    const query='query($title:String!){popularTitles(country:GB,first:20,filter:{searchQuery:$title}){edges{node{objectType content(country:GB,language:en){title originalReleaseYear externalIds{imdbId} fullPath shortDescription}}}}}';
-    const data=await get('https://apis.justwatch.com/graphql',false,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query,variables:{title:selected.title}})});
-    if(data.errors?.length)return null;
-    const matches=(data.data?.popularTitles?.edges||[]).map(row=>row.node).filter(row=>row?.objectType==='MOVIE'&&row.content?.externalIds?.imdbId===id&&nameKey(row.content.title)===nameKey(selected.title)&&yearOf(row.content.originalReleaseYear)&&(!selected.year||String(row.content.originalReleaseYear)===selected.year));
-    if(matches.length!==1)return null;
-    const content=matches[0].content;
-    if(!/^\/uk\/movie\/[a-zA-Z0-9_-]+$/.test(content.fullPath||'')||!isWholeTitleSynopsis(content.shortDescription))return null;
+    const listing=await watchListing({...selected,imdbId:id},get);if(!listing)return null;
+    const content=listing.content;
+    const region=selected.country==='GB'?'uk':selected.country.toLowerCase();
+    if(!new RegExp('^/'+region+'/movie/[a-zA-Z0-9_-]+$').test(content.fullPath||'')||!isWholeTitleSynopsis(content.shortDescription))return null;
     return record({description:text(content.shortDescription),year:yearOf(content.originalReleaseYear)},'JustWatch','https://www.justwatch.com'+content.fullPath);
   }));
   // Last-resort studio discovery is generic, not a list of hand-written plots.

@@ -7,7 +7,7 @@ const ld=(fields={})=>'<script type="application/ld+json">'+JSON.stringify({'@ty
 const json=value=>({ok:true,json:async()=>value});
 const html=value=>({ok:true,text:async()=>value});
 const failure=()=>({ok:false,status:503});
-const options={useCache:false};
+const options={useCache:false,providerTimeoutMs:200};
 const suggestion={id:imdb,l:'Inception',y:2010,qid:'movie'};
 const fixture=name=>fs.readFileSync(new URL('./fixtures/'+name,import.meta.url),'utf8');
 const apple={trackId:1,kind:'feature-movie',trackName:'Inception',releaseDate:'2010-07-16',longDescription:'Apple film synopsis.',trackViewUrl:'https://tv.apple.com/gb/movie/inception/umc.test',trackTimeMillis:8880000,primaryGenreName:'Sci-Fi'};
@@ -120,9 +120,9 @@ test('An IMDb-matched film database record rescues a studio outage with explicit
  const data=await getTitleDetails(film,async url=>url.includes('/find/')?json({movie_results:[{id:27205,title:'Inception',release_date:'2010-07-16'}]}):url.endsWith('/movie/27205')?json({id:27205,imdb_id:imdb,title:'Inception',release_date:'2010-07-16',overview:'A skilled thief enters dreams to steal secrets and must plant an idea instead.',runtime:148}):failure(),{...options,tmdbToken:'test-token'});
  assert.equal(data.source,'TMDb');assert.equal(data.descriptionSource,'TMDb');assert.equal(data.year,'2010');assert.equal(data.runtime,148);
 });
-test('IMDb is preferred and only structured data for the exact identity and format is accepted',async()=>{
+test('IMDb remains a verified fallback when watch-service discovery finds no usable page',async()=>{
  const calls=[],result=await getTitleDetails(film,async url=>{calls.push(url);return html(ld());},options);
- assert.equal(result.description,'An IMDb synopsis.');assert.equal(result.runtime,148);assert.equal(result.ratingSource,'IMDb');assert.equal(result.source,'IMDb');assert.equal(result.state,'ready');assert.deepEqual(calls,['https://www.imdb.com/title/'+imdb+'/']);
+ assert.equal(result.description,'An IMDb synopsis.');assert.equal(result.runtime,148);assert.equal(result.ratingSource,'IMDb');assert.equal(result.source,'IMDb');assert.equal(result.state,'ready');assert.deepEqual(calls,['https://apis.justwatch.com/graphql','https://www.imdb.com/title/'+imdb+'/']);
  assert.equal(parseIMDbDetails(ld({url:'https://www.imdb.com/title/tt9999999/'}),imdb,'Film'),null);
  assert.equal(parseIMDbDetails(ld({'@type':'TVSeries'}),imdb,'Film'),null);
  assert.equal(parseIMDbDetails(ld({url:'https://www.imdb.com.evil.example/title/'+imdb+'/'}),imdb,'Film'),null);
@@ -153,7 +153,7 @@ test('Official film pages win over IMDb when a verified studio URL is supplied',
  },options);
  assert.equal(data.source,'Paramount Pictures');assert.equal(data.rating,7.1);
  assert.equal(data.description,'Paramount Pictures official synopsis of Example and the international mission.');
- assert.deepEqual(calls,['https://www.imdb.com/title/'+id+'/',url]);
+ assert.deepEqual(calls,['https://apis.justwatch.com/graphql','https://www.imdb.com/title/'+id+'/',url]);
 });
 
 test('An IMDb-matched film finds its real studio page without copying TMDb editorial text',async()=>{
@@ -255,7 +255,7 @@ test('A distributor fallback uses the full matching series synopsis, never its t
  assert.match(result.description,/NCIS \(Naval Criminal Investigative Service\) follows a team/);
  assert.match(result.description,/crimes with Navy or Marine Corps ties\.$/);
  assert.doesNotMatch(result.description,/returns as|Show More|Show Less|\.\.\./);
- assert.equal(result.synopsisScope,'series');assert.equal(result.synopsisVersion,4);
+ assert.equal(result.synopsisScope,'series');assert.equal(result.synopsisVersion,5);
  assert.equal(result.sources[0].url,site);
  assert.equal(parseFirstPartyDetails(page.replace('>NCIS</h2>','>NCIS: Sydney</h2>'),site,{title:'NCIS',type:'Series'}),null);
  assert.ok(urls.includes(site));
@@ -335,9 +335,9 @@ test('A TVMaze outage leaves series details unavailable when all fallbacks fail'
  assert.equal(result.imdbUrl,'https://www.imdb.com/title/tt0903747/');
  assert.deepEqual(calls,[
    'https://api.tvmaze.com/shows/169',
+   'https://apis.justwatch.com/graphql',
    'https://www.imdb.com/title/tt0903747/'
- ],'the series locator is tried first, then IMDb if no official page is available');
- assert.ok(calls.every(url=>!url.includes('justwatch')));
+ ],'the service discovery and series locator are tried before the IMDb fallback');
 });
 test('A TVMaze response with the wrong IMDb ID cannot supply a same-name remake description',async()=>{
  const result=await getTitleDetails({title:'Twin',type:'Series',tvmazeShowId:'12',imdbId:'tt1111111'},async url=>url.includes('api.tvmaze.com')?json({id:12,name:'Twin',externals:{imdb:'tt2222222'},summary:'Wrong remake'}):failure(),options);
@@ -376,7 +376,7 @@ test('Series with an IMDb rating but no synopsis never borrow another provider d
  assert.equal(result.ratingSource,'IMDb');
  assert.deepEqual(result.sources.map(row=>row.name),['IMDb']);
  assert.ok(calls.includes('https://www.imdb.com/title/'+imdb+'/'));
- assert.ok(calls.every(url=>!url.includes('justwatch')));
+ assert.ok(calls.includes('https://apis.justwatch.com/graphql'),'availability is checked, but its own synopsis is not substituted for a series');
 });
 test('Metadata never requests Wikimedia sources',async()=>{
  const calls=[];await getTitleDetails(film,async url=>{calls.push(url);return failure();},options);
@@ -413,7 +413,7 @@ test('TVMaze whole-show details work across Origins, Chicago Fire and other seri
   assert.equal(result.source,'TVMaze');assert.equal(result.premiered,premiered,'stored current-season years do not override the original premiere');
   assert.equal(result.seasons,2);assert.equal(result.ratingSource,'TVMaze');assert.equal(result.runtime,42);
   assert.match(result.description,/\n\nThe team/);assert.doesNotMatch(result.description,/<[^>]*>/);
-  assert.deepEqual(calls,['https://api.tvmaze.com/shows/'+maze,'https://api.tvmaze.com/shows/'+maze+'/seasons']);
+  assert.deepEqual(calls,['https://api.tvmaze.com/shows/'+maze,'https://apis.justwatch.com/graphql','https://api.tvmaze.com/shows/'+maze+'/seasons']);
  }
 });
 test('TVMaze title-only discovery requires a unique exact title and matches the original year',async()=>{

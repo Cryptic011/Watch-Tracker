@@ -66,7 +66,7 @@ const server=http.createServer((req,res)=>{
     ]};}
     if(body.action==='catalog_details'){
      const series=body.type==='Series',id=series?'tt1234568':'tt1234567',url='https://www.imdb.com/title/'+id+'/';
-     data={ok:true,details:{state:'ready',synopsisVersion:4,synopsisScope:series?'series':'film',description:series?'An official series description & a second detail.':'A detective uncovers a mystery in a quiet coastal town. '.repeat(8),year:'2020',genres:['Drama','Action'],runtime:series?42:120,rating:8.4,ratingSource:series?'TVMaze':'IMDb',source:series?'TVMaze':'IMDb',sources:[{name:series?'TVMaze':'IMDb',url:series?'https://www.tvmaze.com/shows/12':url}],imdbUrl:url}};
+     data={ok:true,details:{state:'ready',synopsisVersion:5,synopsisScope:series?'series':'film',description:series?'An official series description & a second detail.':'A detective uncovers a mystery in a quiet coastal town. '.repeat(8),year:'2020',genres:['Drama','Action'],runtime:series?42:120,rating:8.4,ratingSource:series?'TVMaze':'IMDb',source:series?'TVMaze':'IMDb',sources:[{name:series?'TVMaze':'IMDb',url:series?'https://www.tvmaze.com/shows/12':url}],imdbUrl:url}};
     }
     if(body.action==='save'){
      if(failSave)return route.fulfill({status:503,headers,json:{error:'Offline'}});
