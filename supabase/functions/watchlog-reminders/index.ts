@@ -641,7 +641,7 @@ async function processPlannedReminders(
 
       const leadTimes = [24, 6, 0];
       for (const leadHours of leadTimes) {
-        if(leadHours===0 && /^\d{4}-\d{2}-\d{2}$/.test(event.raw))continue; // A date alone does not confirm an availability time.
+        if(/^\d{4}-\d{2}-\d{2}$/.test(event.raw))continue; // A date alone does not confirm an availability time.
         const reminderTime = eventTime - leadHours * 60 * 60 * 1000;
         // Catch up only the current stage. Reconnecting a device must not
         // deliver "in 1 day" and "in 6 hours" after the episode has released.
@@ -950,7 +950,7 @@ Deno.serve(async (req: Request) => {
         const release = scheduledEventTime(event.raw, subscription.time_zone);
         for (const lead of [24, 6, 0]) {
           const due = release - lead * 3600000;
-          if(lead===0&&/^\d{4}-\d{2}-\d{2}$/.test(event.raw))continue;
+          if(/^\d{4}-\d{2}-\d{2}$/.test(event.raw))continue;
           if (!Number.isFinite(due) || due <= now || due >= now + 7 * 86400000) continue;
           const key = `${item.id}:${event.kind}:${event.raw}:${event.number}:${due}`;
           if (seen.has(key)) continue; seen.add(key);
