@@ -24,13 +24,16 @@ test('Device language does not turn France or Ireland into the UK and an explici
 test('Regional web listings cross-check provider country, show identity and episode; unknown times stay date-only',async()=>{
  const api=engine(),item={type:'Series',tvmazeShowId:'12',imdbId:'tt1234568',nextEpisodeDate:'2026-10-26T00:00:00Z'},now=Date.parse('2026-10-26T01:00:00Z');
  const make=(number,options={})=>({season:2,number,airdate:'2026-10-26',airtime:'08:00',airstamp:'2026-10-26T08:00:00Z',_embedded:{show:{id:12,externals:{imdb:'tt1234568'},webChannel:{name:'Example stream',country:{code:'GB'}}}},...options});
- const fetcher=async()=>({ok:true,json:async()=>[make(4),make(5,{airtime:''}),make(6,{_embedded:{show:{id:12,externals:{imdb:'tt1234568'},webChannel:{name:'Wrong region',country:{code:'US'}}}}}),make(7,{_embedded:{show:{id:12,externals:{imdb:'tt9999999'},webChannel:{name:'Wrong title',country:{code:'GB'}}}}})]});
+ const fetcher=async()=>({ok:true,json:async()=>[make(1),make(9,{_embedded:{show:{id:12,externals:{imdb:'tt1234568'},webChannel:{name:'Global stream',country:null}}}}),make(4),make(5,{airtime:''}),make(6,{_embedded:{show:{id:12,externals:{imdb:'tt1234568'},webChannel:{name:'Wrong region',country:{code:'US'}}}}}),make(7,{_embedded:{show:{id:12,externals:{imdb:'tt9999999'},webChannel:{name:'Wrong title',country:{code:'GB'}}}}})]});
  await api.refresh([item],{country:'GB'},fetcher,now);
  const event={season:2,number:4,raw:'2026-10-26T00:00:00Z'};
  assert.equal(api.resolveEvent(item,event,{country:'GB'},now).raw,'2026-10-26T08:00:00Z');
  assert.equal(api.resolveEvent(item,{...event,number:5},{country:'GB'},now).raw,'2026-10-26');
  for(const number of [6,7,8])assert.equal(api.resolveEvent(item,{...event,number},{country:'GB'},now).releaseSchedule,undefined);
+ assert.equal(api.resolveEvent(item,{kind:'season',season:2,number:2,raw:event.raw},{country:'GB'},now).raw,'2026-10-26T08:00:00Z','season premiere uses episode one rather than episode two');
  assert.equal(api.resolveEvent(item,event,{country:'US'},now).releaseSchedule,undefined);
+ await api.refresh([item],{country:'US'},fetcher,now);
+ assert.equal(api.resolveEvent(item,{...event,number:9},{country:'US'},now).platform,'Global stream','cached global feeds remain available after switching regions');
  assert.equal(api.resolveEvent(item,event,{country:'GB'},now+6*3600000).releaseSchedule,undefined);
 });
 test('A special broadcast outside the checked weekday does not invent a streaming release',()=>{

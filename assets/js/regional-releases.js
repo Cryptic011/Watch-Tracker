@@ -53,7 +53,7 @@
     const upcoming=items.map(item=>String(item.nextEpisodeDate||'').slice(0,10)).filter(date=>/^\d{4}-\d{2}-\d{2}$/.test(date)&&Date.parse(date)>=now&&Date.parse(date)<now+14*86400000).sort()[0];
     if(upcoming&&!dates.includes(upcoming))dates.push(upcoming);
     await Promise.all(dates.flatMap(date=>[region,''].map(feed=>{
-      const key=feed+':'+date+':'+[...tracked.keys()].sort().join(','),existing=requests.get(key);if(existing&&existing.expires>now)return existing.promise;
+      const key=region+':'+feed+':'+date+':'+[...tracked.keys()].sort().join(','),existing=requests.get(key);if(existing&&existing.expires>now)return existing.promise;
       const url='https://api.tvmaze.com/schedule/web?country='+encodeURIComponent(feed)+'&date='+date;
       const promise=(async()=>{try{
         const response=await fetcher(url,{signal:AbortSignal.timeout(5000)});if(!response.ok)throw Error('Regional listing unavailable');
@@ -72,8 +72,8 @@
     })));
   }
   function resolveEvent(item,event,viewer={},now=Date.now()){
-    if(item.releaseSchedule?.key==='marshals-gb-paramount-8')return item.releaseSchedule.confirmedTimes.includes(event.raw)?{...event,releaseSchedule:item.releaseSchedule,platform:item.releaseSchedule.platform}:{...event,streamingUnconfirmed:true};
-    const hit=listings.get(country(viewer)+':'+item.tvmazeShowId+':'+event.season+':'+(event.number??event.episode));
+    if(item.releaseSchedule?.key==='marshals-gb-paramount-8')return item.releaseSchedule.confirmedTimes?.includes(event.raw)?{...event,releaseSchedule:item.releaseSchedule,platform:item.releaseSchedule.platform}:{...event,streamingUnconfirmed:true};
+    const hit=listings.get(country(viewer)+':'+item.tvmazeShowId+':'+(event.season||(event.kind==='season'?event.number:''))+':'+(event.kind==='season'?1:(event.number??event.episode)));
     if(!hit||hit.expires<=now)return event;
     return {...event,broadcastRaw:event.raw,raw:hit.raw,platform:hit.platform,releaseSchedule:{country:hit.country,platform:hit.platform,sources:[hit.source],note:'TVMaze regional streaming listing'}};
   }
