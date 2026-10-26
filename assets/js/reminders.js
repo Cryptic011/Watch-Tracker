@@ -16,16 +16,16 @@
     backgroundReminderStatus.textContent=message;
     backgroundReminderStatus.dataset.state=state||connection;
     backgroundReminderStatus.style.color=state==="error"?"#fca5a5":state==="ok"?"var(--green)":"var(--muted)";
-    const enabled=connection==="on",blocked=connection==="blocked"||connection==="checking";
+    const enabled=connection==="on"||connection==="pending",blocked=connection==="blocked"||connection==="checking";
     enableBackgroundReminders?.classList.toggle("hidden",enabled);
     disableBackgroundReminders?.classList.toggle("hidden",!enabled);
     if(enableBackgroundReminders){enableBackgroundReminders.textContent=connection==="repair"?"Reconnect Reminders":"Enable Background Reminders";enableBackgroundReminders.disabled=backgroundReminderBusy||blocked;}
     if(disableBackgroundReminders)disableBackgroundReminders.disabled=backgroundReminderBusy;
     const test=document.getElementById("test-background-reminder");
-    if(test)test.disabled=backgroundReminderBusy||!enabled;
+    if(test)test.disabled=backgroundReminderBusy||connection!=="on";
     const quick=document.getElementById("quick-reminder-status");
     const quickLabel=quick?.querySelector?.("span");
-    if(quick&&quickLabel){const attention=state==="error";quick.dataset.state=attention?"attention":enabled?"ok":"idle";quickLabel.textContent=attention?"Reminder issue":enabled?"Reminders on":connection==="checking"?"Checking reminders":"Reminders off";}
+    if(quick&&quickLabel){const attention=state==="error";quick.dataset.state=attention?"attention":enabled?"ok":"idle";quickLabel.textContent=attention?"Reminder issue":connection==="pending"?"Reminders · awaiting connection":enabled?"Reminders on":connection==="checking"?"Checking reminders":"Reminders off";}
   }
   function pushSupportError(){
     if(!("Notification" in window)||!("serviceWorker" in navigator)||!("PushManager" in window))return"Background notifications are not supported in this browser.";
@@ -128,32 +128,41 @@
       report(supportError,"error","blocked");
       return false;
     }
-    report("Preparing notification connection…","","checking");
-    try{await prepareBackgroundPush();}catch(error){report(error.message,"error","repair");return false;}
     if(Notification.permission!=="granted"){
+      if(navigator.onLine!==false)try{await prepareBackgroundPush();}catch(_){}
       report("Not enabled on this device. Enable reminders to receive release alerts while the app is closed.");
       return false;
     }
+    let subscription;
     try{
-    const subscription=await currentPushSubscription();
+    subscription=await currentPushSubscription();
+    if(backgroundReminderPreference()==="off"){
+      report("Background reminders are off on this device.");return false;
+    }
+    if(navigator.onLine===false){
+      report(subscription?"This device's reminder connection is saved. It will be checked automatically when online.":"Go online to connect reminders on this device.","",subscription?"pending":"checking");return false;
+    }
+    // Prepare the permission-sensitive Safari tap without making the key
+    // service a prerequisite for checking an already registered endpoint.
+    void prepareBackgroundPush().catch(()=>{});
     if(!subscription){
+      await prepareBackgroundPush();
       const off=backgroundReminderPreference()==="off";
       report(off?"Background reminders are off on this device.":"Notifications are allowed, but this device needs reconnecting.","",off?"off":"repair");
       return false;
     }
       if(subscription.expirationTime&&subscription.expirationTime<=Date.now()){report("This device's notification connection expired. Reconnect reminders.","","repair");return false;}
       const result=await reminderApi("status",{endpoint:subscription.endpoint},token);
-      if(!result.enabled){
-        report("Background reminders need reconnecting on this device.","","repair");
-        return false;
-      }
-      if(reconnect&&backgroundReminderPreference()!=="off"&&generation===backgroundReminderGeneration&&token===cloudSessionToken){
+      if((!result.enabled||reconnect)&&backgroundReminderPreference()!=="off"&&generation===backgroundReminderGeneration&&token===cloudSessionToken){
         await reminderApi("subscribe",{subscription:subscription.toJSON(),timeZone:DEVICE_TIME_ZONE||"UTC",locale:typeof reminderViewingLocale==="function"?reminderViewingLocale():USER_LOCALE},token);
       }
     }catch(error){
-      report(error.status===401?"Your reminder session expired. Sign in again.":error.message||"Could not check reminders. Reconnect this device to try again.","error","repair");
+      if(error.code==="network"||error.code==="timeout"||error.status>=500||error.status===429){
+        report(subscription?"Reminder connection saved. Temporarily unable to check the service; retrying automatically.":"Unable to reach the reminder service. Retrying when connected.","",subscription?"pending":"checking");
+      }else report(error.status===401?"Your reminder session expired. Sign in again.":error.message||"Could not check reminders.","error",error.status===401?"blocked":"repair");
       return false;
     }
+    if(generation===backgroundReminderGeneration&&token===cloudSessionToken)backgroundReminderPreference("on");
     report("Enabled — alerts can arrive when Watched Logger is closed.","ok","on");
     return true;
     })();
@@ -214,9 +223,15 @@
     backgroundReminderPreference("on");
     setBackgroundReminderStatus(result.duplicate?"Test reminder was already sent.":"Test reminder accepted by the push service.","ok","on");
   }));
-  function refreshRemindersOnReturn(){
-    if(currentUser&&cloudSessionToken&&document.visibilityState!=="hidden")void refreshBackgroundReminderStatus();
+  let lastReminderReturnCheck=0;
+  function refreshRemindersOnReturn(event){
+    if(!currentUser||!cloudSessionToken||document.visibilityState==="hidden")return;
+    const now=Date.now();
+    if(event?.type!=="online"&&now-lastReminderReturnCheck<60000)return;
+    lastReminderReturnCheck=now;void refreshBackgroundReminderStatus();
   }
+  // A transient failure recovers even if the device never emits online again.
+  setInterval(()=>{if(backgroundReminderConnection==="pending")refreshRemindersOnReturn();},60000);
   window.addEventListener("focus",refreshRemindersOnReturn);
   window.addEventListener("online",refreshRemindersOnReturn);
   document.addEventListener("visibilitychange",refreshRemindersOnReturn);

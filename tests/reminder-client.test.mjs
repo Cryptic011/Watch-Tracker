@@ -16,7 +16,7 @@ function harness({permission='granted',missing=false}={}){
   const Notification={permission,requestPermission:async()=>{permissionRequests++;return Notification.permission='granted';}};
   const window={Notification,PushManager:{},addEventListener(){},matchMedia:()=>({matches:true})};
   const navigator={userAgent:'iPhone',standalone:true,serviceWorker:{getRegistration:async()=>worker,register:async()=>{registered++;throw Error('Update download failed');},ready:Promise.resolve(worker)}};
-  const context=vm.createContext({window,navigator,Notification,document:{visibilityState:'visible',addEventListener(){},querySelectorAll:()=>[],getElementById:id=>nodes[id]},backgroundReminderStatus:status,enableBackgroundReminders:enable,disableBackgroundReminders:disable,currentUser:{id:'account'},cloudSessionToken:'session',DEVICE_TIME_ZONE:'Europe/London',USER_LOCALE:'en-GB',REMINDER_API:'https://example.test/reminders',CLOUD_REQUEST_TIMEOUT_MS:1000,AbortController,setTimeout,clearTimeout,Uint8Array,atob,crypto:{randomUUID:()=> '12345678-1234-1234-1234-123456789012'},localStorage:{getItem:key=>prefs.get(key)||null,setItem:(key,value)=>prefs.set(key,value)},fetch:async(_url,request)=>{
+  const context=vm.createContext({window,navigator,Notification,document:{visibilityState:'visible',addEventListener(){},querySelectorAll:()=>[],getElementById:id=>nodes[id]},backgroundReminderStatus:status,enableBackgroundReminders:enable,disableBackgroundReminders:disable,currentUser:{id:'account'},cloudSessionToken:'session',DEVICE_TIME_ZONE:'Europe/London',USER_LOCALE:'en-GB',REMINDER_API:'https://example.test/reminders',CLOUD_REQUEST_TIMEOUT_MS:1000,AbortController,setTimeout,clearTimeout,setInterval:()=>0,Uint8Array,atob,crypto:{randomUUID:()=> '12345678-1234-1234-1234-123456789012'},localStorage:{getItem:key=>prefs.get(key)||null,setItem:(key,value)=>prefs.set(key,value)},fetch:async(_url,request)=>{
     const body=JSON.parse(request.body);calls.push(body);
     if(body.action==='status'&&statusGate)await statusGate;
     if(body.action==='test_reminder'&&testGate)await testGate;
@@ -70,7 +70,7 @@ test('An expired push endpoint is renewed once and the same test request is retr
 
 test('Reconnect preserves and re-registers the existing browser subscription',async()=>{
   const h=harness();await h.check();h.disconnectServer();await h.check();
-  assert.equal(h.enable.textContent,'Reconnect Reminders');const oldEndpoint=h.stats().subscription.endpoint;
+  assert.equal(h.label.textContent,'Reminders on');const oldEndpoint=h.stats().subscription.endpoint;
   await h.reconnect();
   assert.equal(h.stats().subscription.endpoint,oldEndpoint);
   assert.equal(h.stats().serverEnabled,true);assert.equal(h.label.textContent,'Reminders on');
@@ -84,13 +84,14 @@ test('Prepared reconnect calls subscribe in the tap before awaiting any network 
   await connecting;assert.equal(h.label.textContent,'Reminders on');
 });
 
-test('Permission refusal and network failure cannot leave enabled controls showing',async()=>{
+test('Permission refusal blocks reminders while temporary network failure preserves the subscription',async()=>{
   const blocked=harness({permission:'denied'});await blocked.check();
   assert.equal(blocked.enable.disabled,true);assert.equal(blocked.testButton.disabled,true);
   assert.equal(blocked.disable.classList.contains('hidden'),true);assert.match(blocked.status.textContent,/blocked/);
   const h=harness();await h.check();h.failStatus();await h.check();
-  assert.equal(h.disable.classList.contains('hidden'),true);assert.equal(h.enable.disabled,false);
-  assert.equal(h.label.textContent,'Reminder issue');
+  assert.equal(h.disable.classList.contains('hidden'),false);assert.equal(h.enable.classList.contains('hidden'),true);
+  assert.equal(h.testButton.disabled,true);assert.match(h.label.textContent,/awaiting connection/);
+  assert.equal(h.stats().serial,1);
 });
 
 test('Turning reminders off wins over an older status response',async()=>{
@@ -123,4 +124,19 @@ test('A test response from a previous account cannot re-enable reminder controls
   release();await sending;
   assert.equal(h.label.textContent,'Reminders off');assert.equal(h.disable.classList.contains('hidden'),true);
   assert.equal(h.testButton.disabled,true);
+});
+
+
+test('Missing server registration repairs automatically without replacing the phone subscription',async()=>{
+  const h=harness();await h.check();const endpoint=h.stats().subscription.endpoint;
+  h.disconnectServer();await h.check();
+  assert.equal(h.stats().serverEnabled,true);assert.equal(h.stats().subscription.endpoint,endpoint);
+  assert.equal(h.stats().subscribes,0);assert.equal(h.stats().permissionRequests,0);
+});
+
+test('Offline status preserves device subscription and makes no service requests',async()=>{
+  const h=harness();h.context.navigator.onLine=false;await h.check();
+  assert.equal(h.calls.length,0);assert.match(h.status.textContent,/saved/);
+  assert.equal(h.enable.classList.contains('hidden'),true);
+  h.context.navigator.onLine=true;await h.check();assert.equal(h.label.textContent,'Reminders on');
 });

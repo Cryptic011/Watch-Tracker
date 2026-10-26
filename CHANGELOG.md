@@ -1,3 +1,9 @@
+## 2026-10-26 — Offline reliability and lasting reminder connections
+- Open saved libraries immediately when offline and retain queued edits for automatic sync.
+- Fall back to the complete installed app on failed or stalled navigation; keep up to 150 viewed public artwork images for offline browsing.
+- Preserve valid reminder subscriptions through temporary connection failures, retry checks automatically, and repair missing server registrations without another reconnect tap.
+- Keep intentional device turn-off and notification permission controls intact.
+
 ## 2026-10-26 — Keep episode and website text out of About
 - Reject ITV player descriptions and opaque episode URLs as sources of whole-show metadata.
 - Cross-check descriptions against structured episode records and exclude matching episode plots.

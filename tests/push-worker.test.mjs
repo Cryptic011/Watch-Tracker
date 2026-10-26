@@ -47,7 +47,7 @@ test('Navigation requests bypass the HTTP cache and refresh the offline fallback
   };
   const Request=function(url){this.url=String(url);};
   let work;
-  vm.runInNewContext(source,{self,URL,Request,fetch:async(_request,options)=>{
+  vm.runInNewContext(source,{self,URL,Request,AbortController,setTimeout,clearTimeout,fetch:async(_request,options)=>{
     assert.equal(options.cache,'no-store');return response;
   },caches:{open:async()=>cache},Response:{error:()=>({ok:false})}});
   listeners.fetch({request:{method:'GET',mode:'navigate'},respondWith:promise=>work=promise});

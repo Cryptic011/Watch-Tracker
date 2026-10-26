@@ -664,7 +664,7 @@
     if(migration.changed||cleanup.removedCount||cleanup.repairedCount||cleaned.length!==original.length)await persistLibrary(cleaned,{background:true,precleaned:true});
     setTimeout(()=>{void refreshLibraryEpisodeMetadata({force:true});},0);
     try{await syncExistingBackgroundPush();}catch(error){console.warn("Background reminder sync skipped",error);}
-    await refreshMaintenanceAdmin();
+    if(navigator.onLine!==false)await refreshMaintenanceAdmin();
     cloudSyncAuthBlocked=false;cloudSyncFailures=0;resumeDialogsAfterAuth();scheduleCloudSync(0);
   }
 
@@ -718,6 +718,10 @@
     if(cached?.dirty===true)markPending(true);
     localSaveSequence=Math.max(localSaveSequence,Number(cached?.localSequence)||0);
     if(cached?.items)setCloudBaseline(Array.isArray(cached.cloudItems)?cached.cloudItems:cached.items,Number(cached.cloudRevision??saved.revision??0),currentUser.id);
+    if(navigator.onLine===false&&Array.isArray(cached?.items)){
+      mediaItems=cached.items;
+      await enterAccount(mediaItems,{syncText:"Offline: changes save on this device and sync automatically when connected.",syncState:"warn"});return true;
+    }
     try{
       const result=await pinApi("load"),remoteItems=Array.isArray(result.items)?result.items:[];
       applyAccount(result.account);await saveProfile(currentProfile);setCloudBaseline(remoteItems,result.revision,currentUser.id);

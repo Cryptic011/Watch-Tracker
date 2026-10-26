@@ -1,6 +1,8 @@
 "use strict";
 
 const NAVIGATION_CACHE="watchlog-navigation-v4";
+const ARTWORK_CACHE="watchlog-artwork-v1";
+const ARTWORK_LIMIT=150;
 const SHELL_BUILD="__WATCHLOG_BUILD__";
 const SHELL_CACHE="watchlog-shell-"+SHELL_BUILD;
 function shellAsset(url){
@@ -40,19 +42,39 @@ self.addEventListener("fetch",event=>{
   if(request.mode==="navigate"){
     event.respondWith((async()=>{
       const fallback=new Request(new URL("./index.html",self.registration.scope).href);
+      const navigation=await caches.open(NAVIGATION_CACHE),shell=await caches.open(SHELL_CACHE);
+      const cached=(await shell.match(fallback))||(await navigation.match(request))||(await navigation.match(fallback));
+      // Bound stalled navigation requests, retaining the installed shell on
+      // offline/HTTP failures without preventing online build upgrades.
+      const controller=new AbortController();let timer;
       try{
-        const response=await fetch(request,{cache:"no-store"});
-        if(response.ok){const cache=await caches.open(NAVIGATION_CACHE);await cache.put(fallback,response.clone());}
+        const response=await Promise.race([
+          fetch(request,{cache:"no-store",signal:controller.signal}),
+          new Promise((_,reject)=>{timer=setTimeout(()=>{controller.abort();reject(Error("Navigation timed out"));},2500);})
+        ]);
+        if(!response.ok&&cached)return cached;
+        if(response.ok)try{await navigation.put(fallback,response.clone());}catch(_){}
         return response;
-      }catch(_){
-        // Navigation cache and shell versions can differ during deployment;
-        // static requests retain the exact versioned URLs embedded in HTML.
-        const navigation=await caches.open(NAVIGATION_CACHE),shell=await caches.open(SHELL_CACHE);
-        return (await shell.match(fallback))||(await navigation.match(request))||(await navigation.match(fallback))||Response.error();
-      }
+      }catch(_){return cached||Response.error();}
+      finally{clearTimeout(timer);}
     })());return;
   }
   const url=new URL(request.url);
+  // Cache only public artwork requested as images. Never cache account APIs.
+  if(request.destination==="image"&&url.protocol==="https:"&&
+    ["static.tvmaze.com","image.tmdb.org","m.media-amazon.com","is1-ssl.mzstatic.com","is2-ssl.mzstatic.com","is3-ssl.mzstatic.com","is4-ssl.mzstatic.com","is5-ssl.mzstatic.com"].includes(url.hostname)){
+    event.respondWith((async()=>{
+      const cache=await caches.open(ARTWORK_CACHE),cached=await cache.match(request);
+      if(cached)return cached;
+      const response=await fetch(request);
+      if(response.ok||response.type==="opaque")try{
+        await cache.put(request,response.clone());
+        const keys=await cache.keys();
+        await Promise.all(keys.slice(0,Math.max(0,keys.length-ARTWORK_LIMIT)).map(key=>cache.delete(key)));
+      }catch(_){} // A full/evicted cache must not break online artwork.
+      return response;
+    })());return;
+  }
   if(!shellAsset(url))return;
   event.respondWith((async()=>{
     const cache=await caches.open(SHELL_CACHE),cached=await cache.match(request);
