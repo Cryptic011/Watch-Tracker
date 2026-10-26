@@ -29,7 +29,11 @@ function saveNavigationPosition(){
   if(!navigationReady||navigationApplying||!currentUser)return;
   const state=history.state;
   if(state?.page?.title&&!document.querySelector('.gallery-detail[open]'))return;
-  if(state?.watchlog&&state.owner===String(currentUser.id))history.replaceState({...state,page:currentAppPage()},'',window.location.href);
+  if(state?.watchlog&&state.owner===String(currentUser.id)){
+    const page=currentAppPage();
+    if(state.page?.scroll===page.scroll&&state.page?.dialogScroll===page.dialogScroll&&appPageHash(state.page)===appPageHash(page))return;
+    history.replaceState({...state,page},'',window.location.href);
+  }
 }
 function recordAppNavigation(replace=false){
   if(!navigationReady||navigationApplying||!currentUser)return;
@@ -100,5 +104,9 @@ if(typeof window.addEventListener==='function'){
     else applyAppPage(parseAppHash(window.location.hash));
   });
   window.addEventListener('hashchange',()=>{if(navigationReady&&currentUser&&!history.state?.watchlog)applyAppPage(parseAppHash(window.location.hash));});
-  window.addEventListener('scroll',()=>{saveNavigationPosition();},{passive:true});
+  let scrollPositionTimer=null;
+  window.addEventListener('scroll',()=>{
+    if(scrollPositionTimer!==null)return;
+    scrollPositionTimer=setTimeout(()=>{scrollPositionTimer=null;saveNavigationPosition();},250);
+  },{passive:true});
 }

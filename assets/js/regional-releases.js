@@ -43,6 +43,7 @@
     return localTime(day.toISOString().slice(0,10),8,'Europe/London');
   }
   const listings=new Map(),requests=new Map();
+  let nextRequestAt=0;
   async function refresh(items,viewer={},fetcher=root.fetch,now=Date.now()){
     const region=country(viewer);if(!region||!fetcher)return;
     const tracked=new Map(items.filter(item=>['Series','Anime'].includes(item.type)&&item.tvmazeShowId).map(item=>[String(item.tvmazeShowId),item]));
@@ -57,6 +58,9 @@
     const run=async()=>{while(cursor<jobs.length){
       const {date,feed}=jobs[cursor++];
       const key=region+':'+feed+':'+date+':'+[...tracked.keys()].sort().join(','),existing=requests.get(key);if(existing&&existing.expires>now){await existing.promise;continue;}
+      // Space requests across workers and regions to stay below the public API rate limit.
+      const delay=Math.max(0,nextRequestAt-Date.now());nextRequestAt=Math.max(Date.now(),nextRequestAt)+650;
+      if(delay&&root.setTimeout)await new Promise(resolve=>root.setTimeout(resolve,delay));
       const url='https://api.tvmaze.com/schedule/web?country='+encodeURIComponent(feed)+'&date='+date;
       const promise=(async()=>{try{
         const response=await fetcher(url,{signal:AbortSignal.timeout(5000)});if(!response.ok)throw Error('Regional listing unavailable');
