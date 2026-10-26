@@ -49,11 +49,14 @@
     if(!tracked.size)return;
     const zone=viewer.timeZone||({'GB':'Europe/London','US':'America/New_York','CA':'America/Toronto','AU':'Australia/Sydney','NZ':'Pacific/Auckland'}[region])||'UTC';
     const dateAt=time=>{const p=Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone:zone,year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date(time)).filter(p=>p.type!=='literal').map(p=>[p.type,p.value]));return `${p.year}-${p.month}-${p.day}`;};
-    const dates=[...new Set([dateAt(now-86400000),dateAt(now),dateAt(now+86400000)])];
-    const upcoming=items.map(item=>String(item.nextEpisodeDate||'').slice(0,10)).filter(date=>/^\d{4}-\d{2}-\d{2}$/.test(date)&&Date.parse(date)>=now&&Date.parse(date)<now+14*86400000).sort()[0];
-    if(upcoming&&!dates.includes(upcoming))dates.push(upcoming);
-    await Promise.all(dates.flatMap(date=>[region,''].map(feed=>{
-      const key=region+':'+feed+':'+date+':'+[...tracked.keys()].sort().join(','),existing=requests.get(key);if(existing&&existing.expires>now)return existing.promise;
+    // Check the complete displayed window, not just today and one title's
+    // nearest episode. Otherwise a missing feed date silently removes shows.
+    const dates=[...new Set(Array.from({length:15},(_,index)=>dateAt(now+(index-1)*86400000)))];
+    const jobs=dates.flatMap(date=>[region,''].map(feed=>({date,feed})));
+    let cursor=0;
+    const run=async()=>{while(cursor<jobs.length){
+      const {date,feed}=jobs[cursor++];
+      const key=region+':'+feed+':'+date+':'+[...tracked.keys()].sort().join(','),existing=requests.get(key);if(existing&&existing.expires>now){await existing.promise;continue;}
       const url='https://api.tvmaze.com/schedule/web?country='+encodeURIComponent(feed)+'&date='+date;
       const promise=(async()=>{try{
         const response=await fetcher(url,{signal:AbortSignal.timeout(5000)});if(!response.ok)throw Error('Regional listing unavailable');
@@ -68,8 +71,9 @@
           if(!raw||!Number.isFinite(Date.parse(raw)))continue;
           listings.set(region+':'+show.id+':'+ep.season+':'+ep.number,{raw,platform:channel.name,country:region,source:url,expires:now+3600000});
         }
-      }catch(_){requests.delete(key);}})();requests.set(key,{expires:now+3600000,promise});return promise;
-    })));
+      }catch(_){requests.delete(key);}})();requests.set(key,{expires:now+3600000,promise});await promise;
+    }};
+    await Promise.all(Array.from({length:3},run));
   }
   function resolveEvent(item,event,viewer={},now=Date.now()){
     if(item.releaseSchedule?.key==='marshals-gb-paramount-8')return item.releaseSchedule.confirmedTimes?.includes(event.raw)?{...event,releaseSchedule:item.releaseSchedule,platform:item.releaseSchedule.platform}:{...event,streamingUnconfirmed:true};

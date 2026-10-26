@@ -119,3 +119,12 @@
  .release-card-copy strong{font-size:.82rem}
  .release-episode,.release-platform{font-size:.7rem}
 }
+
+/* Empty days remain useful context without filling the screen with blank cards. */
+.release-day.is-empty,.recurring-weekday:has(.release-empty){padding:10px 12px;margin:5px 0;border-radius:13px}
+.release-day.is-empty .release-day-heading,.recurring-weekday:has(.release-empty) .release-day-heading{margin-bottom:0}
+.release-day.is-empty .release-empty,.recurring-weekday:has(.release-empty) .release-empty{display:none}
+.release-pending{margin:14px 16px;padding-top:16px;border-top:1px solid var(--border)}
+.release-pending h3{font-size:.9rem;line-height:1.4}.release-pending h3>span{color:var(--muted);font-size:.75rem}
+.release-pending>p{margin:7px 0 12px;color:var(--muted);font-size:.76rem;line-height:1.5}
+.release-pending .release-tba-item>span:nth-child(2){grid-column:1;line-height:1.4}

@@ -12,6 +12,15 @@ function app(){
  const c=vm.createContext({Date,console});
  vm.runInContext(['toMillis','isEpisodeTrackable','normalizeReleasedEpisodeMap','positiveEpisodeMap','releasedEpisodeMap','normalizeWatchedEpisodeMap','legacyWatchedEpisodeMap','watchedEpisodeMap','nextWatchEpisode','calendarRange','calendarEvents','localISODate','weeklyReleasePattern','recurringWeeklyShows','scheduleEpisodeAirTimes','recurringScheduleDelay','scheduleBehindLevel','scheduleProgressMarker'].map(n=>extractFunction(html,n)).join('\n'),c);return c;
 }
+test('Unconfirmed streaming shows remain visible separately from genuinely unknown dates',()=>{
+ const c=app();c.regionalScheduleEvent=(_item,event)=>({...event,streamingUnconfirmed:true});
+ const result=c.calendarEvents([{id:'fire',title:'Chicago Fire',type:'Series',scheduledEpisodeReleases:[{season:15,number:3,raw:'2026-10-28T22:00:00Z'}]}],new Date('2026-10-26T12:00:00Z'),14);
+ assert.equal(result.events.length,0,'broadcast times never masquerade as confirmed streaming');
+ assert.equal(result.unknown.length,1);assert.equal(result.unknown[0].streamingPending,true);
+ vm.runInContext(extractFunction(html,'pendingStreamingMarkup'),c);c.esc=String;
+ const markup=c.pendingStreamingMarkup(result.unknown,'data-recurring-open');
+ assert.match(markup,/Chicago Fire/);assert.match(markup,/Date and time unconfirmed/);assert.doesNotMatch(markup,/22:00|Date TBA/);
+});
 test('Schedule dots use amber for one or two released episodes behind and red for more than two',()=>{
  const c=app(),released={1:[1,2,3],2:[1,3]},all=Object.entries(released).flatMap(([season,episodes])=>episodes.map(episode=>[season,episode]));
  for(let behind=0;behind<=all.length;behind++){

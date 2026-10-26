@@ -90,6 +90,21 @@ const server=http.createServer((req,res)=>{
   await page.locator('#auth-email').fill(account.email);await page.locator('#auth-pin').fill('1234');await page.locator('#auth-submit').click();
   await page.waitForFunction(()=>document.querySelector('#auth-screen').classList.contains('hidden'));
   assert.equal(changelogRequests,0,'startup does not request workflow history');
+  const pendingSchedule=await page.evaluate(()=>{
+   const saved=mediaItems,view=selectedScheduleView,range=selectedCalendarRange;
+   try{
+    mediaItems=[{id:'regional-pending',title:'Chicago Fire pending streaming',type:'Series',tvmazeShowId:'999999',platform:'Saved service',scheduledEpisodeReleases:[{season:15,number:3,raw:new Date(Date.now()+2*86400000).toISOString()}]}];
+    selectedScheduleView='recurring';renderDashboard();
+    const recurring=document.querySelector('#recurring-weekly-dashboard'),name=recurring.querySelector('.release-pending')?.textContent,
+     emptyHeights=[...recurring.querySelectorAll('.recurring-weekday')].map(node=>node.getBoundingClientRect().height);
+    selectedScheduleView='calendar';selectedCalendarRange='upcoming';renderDashboard();
+    const calendar=document.querySelector('#library-dashboard');
+    return {name,emptyHeights,calendar:calendar.querySelector('.release-pending')?.textContent,undated:calendar.querySelectorAll('[data-dashboard-section="unknown"]').length};
+   }finally{mediaItems=saved;selectedScheduleView=view;selectedCalendarRange=range;renderDashboard();}
+  });
+  assert.match(pendingSchedule.name,/Chicago Fire pending streaming/,'recurring view retains shows without a regional listing');
+  assert.match(pendingSchedule.calendar,/Date and time unconfirmed/,'calendar distinguishes unconfirmed streaming from no release date');
+  assert.equal(pendingSchedule.undated,0);assert.ok(pendingSchedule.emptyHeights.every(height=>height<65),'empty weekdays stay compact');
   assert.equal(await page.locator('.changelog-entry').count(),0,'startup does not construct the full hidden changelog');
   assert.equal(await page.evaluate(()=>{const node=mediaList.querySelector('.gallery-category');render();return Boolean(node)&&node===mediaList.querySelector('.gallery-category');}),true,'unchanged Library render retains category and poster nodes');
   // Exercise the actual weekly schedule DOM, not just its sorting helper.

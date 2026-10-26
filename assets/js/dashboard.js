@@ -107,7 +107,7 @@ function renderScheduleNavigation(){
     updateDashboardMarkup(root,`<div class="schedule-page-nav"><button type="button" class="schedule-back" data-schedule-back aria-label="Back to Library"><span aria-hidden="true">‹</span> Library</button><span>${selectedScheduleView==='recurring'?'WEEKLY SHOWS':'RELEASE CALENDAR'}</span></div>`);
     return;
   }
-  const now=new Date(),shows=new Set(recurringWeeklyShows(mediaItems,now).map(row=>String(row.item.id))).size;
+  const now=new Date(),shows=new Set([...recurringWeeklyShows(mediaItems,now).map(row=>String(row.item.id)),...calendarEvents(mediaItems,now,14).unknown.filter(item=>item.streamingPending&&isEpisodeTrackable(item)).map(item=>String(item.id))]).size;
   const range=calendarRange(selectedCalendarRange,now),releases=calendarEvents(mediaItems,range.start,range.days).events.length;
   const recurringIcon='<svg viewBox="0 0 24 24"><path d="M20 7h-7l2.5-2.5M4 17h7l-2.5 2.5M19 7a8 8 0 0 0-13-1M5 17a8 8 0 0 0 13 1"/></svg>';
   const calendarIcon='<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M7 3v4m10-4v4M3 11h18m-13 4h1m6 0h1m-8 3h1"/></svg>';
@@ -145,7 +145,7 @@ function calendarEvents(items,now=new Date(),days=7){
       }
       const activeSeason=Number(item.airingSeason||item.curSeason||0);
       const activeSeasonContinues=activeSeason>0&&Number(item.nextSeasonNum)>activeSeason&&Number(item.nextEpisodeNum)>1&&(Boolean(item.nextEpisodeDate)||Boolean((releasedEpisodeMap(item)||{})[activeSeason]?.length));
-      if(item.nextSeasonNum&&!activeSeasonContinues&&!candidates.some(e=>e.season===Number(item.nextSeasonNum)&&e.episode===1))candidates.push({raw:item.nextSeasonDate,label:`Season ${item.nextSeasonNum}`});
+      if(item.nextSeasonNum&&!activeSeasonContinues&&!candidates.some(e=>e.season===Number(item.nextSeasonNum)&&e.episode===1))candidates.push({raw:item.nextSeasonDate,label:`Season ${item.nextSeasonNum}`,kind:'season',season:Number(item.nextSeasonNum),number:Number(item.nextSeasonNum)});
     }
     const undated=[];let streamingUnconfirmed=false;
     for(const originalCandidate of candidates){
@@ -177,9 +177,14 @@ function calendarEvents(items,now=new Date(),days=7){
       !(item.type==='Film'?item.filmReleaseDate:item.seriesReleaseDate)&&
       !candidates.some(candidate=>candidate.raw))announcements.push(item.type==='Film'?'Film release':'Series premiere');
     if(streamingUnconfirmed)announcements.push('Streaming availability to be confirmed');
-    if(announcements.length)unknown.push({...item,announcement:[...new Set(announcements)].join(' / ')});
+    if(announcements.length)unknown.push({...item,streamingPending:streamingUnconfirmed,announcement:[...new Set(announcements)].join(' / ')});
   }
   return{start,end,events:events.sort((a,b)=>a.date-b.date||a.item.title.localeCompare(b.item.title)),unknown};
+}
+
+function pendingStreamingMarkup(items,attribute){
+  if(!items.length)return '';
+  return `<section class="release-pending" aria-label="Streaming dates awaiting confirmation"><h3>Streaming dates awaiting confirmation <span>${items.length}</span></h3><p>These shows have upcoming episode listings. Their availability in your viewing region is still being checked.</p><div class="release-tba-list">${items.map(item=>`<button type="button" class="release-tba-item" ${attribute}="${esc(item.id)}"><strong>${esc(item.title)}</strong><span>${esc(item.platform||'Streaming service to be confirmed')} · Date and time unconfirmed</span><span class="release-chevron" aria-hidden="true">›</span></button>`).join('')}</div></section>`;
 }
 
 function updateDashboardMarkup(root,markup){
@@ -257,7 +262,7 @@ function renderRecurringWeeklySchedule(){
   const available=Boolean(currentUser&&currentTab==="library"&&!categoryControlsVisible());
   root.classList.toggle("hidden",!available||selectedScheduleView!=="recurring");
   if(!available){if(!currentUser){root.replaceChildren();root._dashboardMarkup=null;}return;}
-  const now=new Date(),rows=recurringWeeklyShows(mediaItems,now),total=new Set(rows.map(row=>String(row.item.id))).size;
+  const now=new Date(),rows=recurringWeeklyShows(mediaItems,now),pending=calendarEvents(mediaItems,now,14).unknown.filter(item=>item.streamingPending&&isEpisodeTrackable(item)),total=new Set([...rows.map(row=>String(row.item.id)),...pending.map(item=>String(item.id))]).size;
   const progressMarkers=new Map();
   const days=Array.from({length:7},(_,index)=>{
     const day=(index+1)%7,label=DASHBOARD_WEEKDAY_FORMATTER.format(new Date(2026,0,5+index)),shows=rows.filter(row=>row.day===day);
@@ -268,7 +273,7 @@ function renderRecurringWeeklySchedule(){
       return `<button type="button" class="release-card recurring-release-card" data-recurring-open="${esc(row.item.id)}"><span class="release-time">${esc(time)}</span><span class="release-card-copy"><strong class="release-show-title"><span>${esc(row.item.title)}</span>${scheduleProgressMarker(row.item,progressMarkers)}</strong><span class="release-episode">${esc(episode)} · ${esc(date)}</span><span class="release-state-badge" data-release-state="${row.state}">${row.state==="released"?"Released · last 24 hours":row.state==="upcoming"?"Upcoming":"Awaiting next episode"}</span><span class="release-platform">${esc(row.item.platform||"Platform not saved")}${row.item.releaseSchedule?` · ${esc(row.item.releaseSchedule.country)} streaming`:""}</span></span><span class="release-chevron" aria-hidden="true">›</span></button>`;
     }).join(""):'<p class="release-empty">No recurring shows</p>'}</section>`;
   }).join("");
-  updateDashboardMarkup(root,`<section class="dashboard-section weekly-releases recurring-weekly-releases" aria-labelledby="recurring-weekly-title"><header class="weekly-releases-heading"><div class="recurring-summary-copy"><span class="weekly-eyebrow">MONDAY–SUNDAY</span><h2 id="recurring-weekly-title">Recurring shows</h2><p class="dashboard-note">Next 14 days · ${esc(DEVICE_TIME_ZONE||Intl.DateTimeFormat().resolvedOptions().timeZone||"UTC")}</p></div><span class="weekly-total">${total}<small>shows</small></span></header><div class="release-week-list">${days}</div><p class="weekly-footnote">Only confirmed releases within the next 14 days appear here. Episodes remain for 24 hours after airing. Historical broadcast weekdays do not confirm a future episode. Only regional streaming availability is listed. Broadcast times do not establish streaming availability. Unconfirmed releases appear in Your calendar.</p></section>`);
+  updateDashboardMarkup(root,`<section class="dashboard-section weekly-releases recurring-weekly-releases" aria-labelledby="recurring-weekly-title"><header class="weekly-releases-heading"><div class="recurring-summary-copy"><span class="weekly-eyebrow">MONDAY–SUNDAY</span><h2 id="recurring-weekly-title">Recurring shows</h2><p class="dashboard-note">Next 14 days · ${esc(DEVICE_TIME_ZONE||Intl.DateTimeFormat().resolvedOptions().timeZone||"UTC")}</p></div><span class="weekly-total">${total}<small>shows</small></span></header><div class="release-week-list">${days}</div>${pendingStreamingMarkup(pending,"data-recurring-open")}<p class="weekly-footnote">Only confirmed releases within the next 14 days appear here. Episodes remain for 24 hours after airing. Historical broadcast weekdays do not confirm a future episode. Only regional streaming availability is listed. Broadcast times do not establish streaming availability. Unconfirmed streaming releases are listed separately above.</p></section>`);
   if(document.visibilityState==="visible"){
     recurringWeeklyTimer=setTimeout(renderDashboard,recurringScheduleDelay(rows,now,mediaItems));
   }
@@ -317,7 +322,7 @@ function renderDashboard(){
   root.classList.toggle('hidden',!visible||selectedScheduleView!=='calendar');if(!visible){if(!currentUser){root.replaceChildren();root._dashboardMarkup=null;}return;}
   const progressMarkers=new Map();
   const {start,days:daysToShow,label:rangeLabel,priorStart,priorDays}=calendarRange(selectedCalendarRange,new Date());
-  const {events,unknown}=calendarEvents(mediaItems,start,daysToShow);
+  const {events,unknown:unresolved}=calendarEvents(mediaItems,start,daysToShow),pending=unresolved.filter(item=>item.streamingPending),unknown=unresolved.filter(item=>!item.streamingPending);
   const priorEvents=selectedCalendarRange==='week'&&priorDays?calendarEvents(mediaItems,priorStart,priorDays).events:[];
   const eventsByDay=new Map();
   for(const event of events){const key=localISODate(event.date);if(!eventsByDay.has(key))eventsByDay.set(key,[]);eventsByDay.get(key).push(event);}
@@ -362,9 +367,10 @@ function renderDashboard(){
     ${controls}
     <div class="release-week-list">${days}</div>
     ${priorMarkup}
+    ${pendingStreamingMarkup(pending,"data-dashboard-open")}
     ${unknown.length?`<details class="release-tba" data-dashboard-section="unknown"><summary><span>Dates to be announced</span><span class="release-tba-count">${unknown.length}</span></summary><div class="release-tba-list">${unknown.map(item=>`<button type="button" class="release-tba-item" data-dashboard-open="${esc(item.id)}"><strong class="release-show-title"><span>${esc(item.title)}</span>${scheduleProgressMarker(item,progressMarkers)}</strong><span>${esc(item.announcement)} · Date TBA</span><span class="release-chevron" aria-hidden="true">›</span></button>`).join('')}</div></details>`:''}
     ${excluded.length?`<details class="release-tba" data-dashboard-section="excluded"><summary><span>Excluded from Weekly Releases</span><span class="release-tba-count">${excluded.length}</span></summary><div class="release-tba-list">${excluded.map(item=>`<div class="dashboard-row excluded-release-row"><div><strong>${esc(item.title)}</strong><span class="release-state-badge" data-release-state="excluded">Excluded</span></div><button type="button" class="btn btn-secondary" data-calendar-include="${esc(item.id)}">Re-enable</button></div>`).join('')}</div></details>`:''}
-    <p class="weekly-footnote">Streaming availability takes priority. Unconfirmed regional dates stay under Dates to be announced. A date without a confirmed time shows Time TBA and does not trigger a timed release alert.</p>
+    <p class="weekly-footnote">Streaming availability takes priority. Unconfirmed regional availability is listed separately from undated releases. A date without a confirmed time shows Time TBA and does not trigger a timed release alert.</p>
   </section>`);
 }
 document.getElementById('library-dashboard').addEventListener('click',event=>{

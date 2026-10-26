@@ -1,3 +1,8 @@
+## 2026-10-26 — Keep unresolved streaming shows visible
+- Check every date in the two-week regional streaming window with bounded request concurrency.
+- Show unconfirmed streaming releases explicitly in both schedules, separate from undated releases and confirmed release times.
+- Compact empty weekdays and retain the streaming-first reminder rules.
+
 ## 2026-10-26 — Centre and animate primary navigation
 - Centre Library and Settings in a floating capsule with a sliding selection highlight and directional page transitions.
 - Keep the separate Library search action clear of the capsule on small screens, with safe-area spacing and light/dark styling.

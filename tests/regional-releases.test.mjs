@@ -40,4 +40,16 @@ test('A special broadcast outside the checked weekday does not invent a streamin
  const api=engine(),item=api.resolve({...show,nextEpisodeDate:'2026-10-27T00:00:00Z'},{country:'GB'});
  assert.equal(api.resolveEvent(item,{season:2,number:4,raw:item.nextEpisodeDate},{country:'GB'}).streamingUnconfirmed,true);
 });
+test('Regional refresh covers every date in the two-week window with bounded concurrency',async()=>{
+ const api=engine(),now=Date.parse('2026-10-26T01:00:00Z'),dates=new Set();let active=0,peak=0;
+ const item={type:'Series',tvmazeShowId:'59',imdbId:'tt2261391'};
+ await api.refresh([item],{country:'GB'},async url=>{
+  active++;peak=Math.max(peak,active);await Promise.resolve();active--;
+  const date=new URL(url).searchParams.get('date');dates.add(date);
+  return {ok:true,json:async()=>date==='2026-11-05'?[{season:15,number:7,airdate:date,airtime:'09:00',airstamp:date+'T09:00:00Z',_embedded:{show:{id:59,externals:{imdb:item.imdbId},webChannel:{name:'Example stream',country:{code:'GB'}}}}}]:[]};
+ },now);
+ assert.equal(dates.size,15);assert.ok(dates.has('2026-11-08'));assert.ok(peak<=3);
+ const event=api.resolveEvent(item,{season:15,number:7,raw:'2026-11-04T22:00:00Z'},{country:'GB'},now);
+ assert.equal(event.raw,'2026-11-05T09:00:00Z');assert.equal(event.platform,'Example stream');
+});
 test('Browser and deployed reminder worker share identical regional schedule rules',()=>assert.equal(source,fs.readFileSync(new URL('../supabase/functions/watchlog-reminders/regional-releases.js',import.meta.url),'utf8')));
