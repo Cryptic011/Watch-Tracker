@@ -1,3 +1,4 @@
+import "./regional-releases.js";
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.112.4";
 import {
@@ -613,15 +614,24 @@ async function processPlannedReminders(
       Array.isArray(row.items) ? row.items : [],
     ]),
   );
+  if(globalThis.WatchLogRegionalReleases)await Promise.all([...new Set(subscriptions.map(row=>row.locale+':'+row.time_zone))].map(key=>{
+    const row=subscriptions.find(row=>row.locale+':'+row.time_zone===key)!;
+    let country='';try{country=new Intl.Locale(row.locale).region||'';}catch(_){}
+    return globalThis.WatchLogRegionalReleases.refresh([...byAccount.values()].flat(),{country,timeZone:row.time_zone,locale:row.locale});
+  }));
   const now = Date.now();
   let sent = 0;
   let failed = 0;
 
   for (const subscription of subscriptions) {
     const items = byAccount.get(subscription.account_id) || [];
-    for (const item of items as Record<string, unknown>[]) {
+    for (const original of items as Record<string, unknown>[]) {
+      const item = globalThis.WatchLogRegionalReleases?.resolve(original, {country: (()=>{try{return new Intl.Locale(subscription.locale).region||"";}catch{return"";}})(),timeZone:subscription.time_zone,locale:subscription.locale}) || original;
       const status = String(item?.status || "");
-      for (const event of reminderEvents(item)) {
+      for (const originalEvent of reminderEvents(item)) {
+      let country="";try{country=new Intl.Locale(subscription.locale).region||"";}catch(_){}
+      const event=globalThis.WatchLogRegionalReleases?.resolveEvent(item,originalEvent,{country,timeZone:subscription.time_zone,locale:subscription.locale})||originalEvent;
+      if(event.streamingUnconfirmed || (globalThis.WatchLogRegionalReleases && !item.releaseSchedule && !event.releaseSchedule))continue; // Never substitute a broadcast for streaming availability.
       const isPlanned = status === "Planned" || status === "Saved";
       // Every dated episode gets advance and release-time alerts regardless of
       // whether the tracked title is Planned, Watching, or Watched.
@@ -631,6 +641,7 @@ async function processPlannedReminders(
 
       const leadTimes = [24, 6, 0];
       for (const leadHours of leadTimes) {
+        if(leadHours===0 && /^\d{4}-\d{2}-\d{2}$/.test(event.raw))continue; // A date alone does not confirm an availability time.
         const reminderTime = eventTime - leadHours * 60 * 60 * 1000;
         // Catch up only the current stage. Reconnecting a device must not
         // deliver "in 1 day" and "in 6 hours" after the episode has released.
@@ -654,6 +665,7 @@ async function processPlannedReminders(
         if (!delivery) continue;
 
         const copy = reminderCopy(item, event, leadHours);
+        if(event.releaseSchedule||item.releaseSchedule)copy.body += ` on ${(event.releaseSchedule||item.releaseSchedule).platform}`;
         const payload = {
           title: copy.title,
           body: copy.body,
@@ -918,7 +930,7 @@ Deno.serve(async (req: Request) => {
       const [deliveries, library, subscriptions] = await Promise.all([
         db.from("watchlog_push_deliveries").select("item_id,event_key,scheduled_for,status,attempts,next_attempt_at,sent_at,last_error,updated_at").eq("account_id", session.accountId).order("updated_at", { ascending: false }).limit(50),
         privateLibrary(session.accountId),
-        db.from("watchlog_push_subscriptions").select("time_zone").eq("account_id", session.accountId).eq("enabled", true),
+        db.from("watchlog_push_subscriptions").select("time_zone,locale").eq("account_id", session.accountId).eq("enabled", true),
       ]);
       for (const result of [deliveries, library, subscriptions]) if (result.error) throw result.error;
       const items = (Array.isArray(library.data?.items) ? library.data.items : []) as Record<string, unknown>[];
@@ -927,16 +939,24 @@ Deno.serve(async (req: Request) => {
         ...(deliveries.data || []).filter(row => !String(row.event_key).startsWith("workflow-status:")).map(row => ({ ...row, title: titles.get(String(row.item_id)) || "Removed title", label: String(row.event_key).match(/episode:s\d+e\d+/)?.[0].replace("episode:", "") || "Release reminder", event_key: undefined })),
       ].sort((a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at)).slice(0, 50);
       const now = Date.now(), upcoming = [], seen = new Set<string>();
-      for (const subscription of subscriptions.data || []) for (const item of items) for (const event of reminderEvents(item)) {
+      for (const subscription of subscriptions.data || []) for (const original of items) {
+        let country="";try{country=new Intl.Locale(subscription.locale).region||"";}catch(_){}
+        const viewer={country,timeZone:subscription.time_zone,locale:subscription.locale};
+        const item=globalThis.WatchLogRegionalReleases?.resolve(original,viewer)||original;
+        for (const originalEvent of reminderEvents(item)) {
+        const event=globalThis.WatchLogRegionalReleases?.resolveEvent(item,originalEvent,viewer)||originalEvent;
+        if(event.streamingUnconfirmed||(globalThis.WatchLogRegionalReleases&&!item.releaseSchedule&&!event.releaseSchedule))continue;
         if (event.kind !== "episode" && !["Planned", "Saved"].includes(String(item.status))) continue;
         const release = scheduledEventTime(event.raw, subscription.time_zone);
         for (const lead of [24, 6, 0]) {
           const due = release - lead * 3600000;
+          if(lead===0&&/^\d{4}-\d{2}-\d{2}$/.test(event.raw))continue;
           if (!Number.isFinite(due) || due <= now || due >= now + 7 * 86400000) continue;
           const key = `${item.id}:${event.kind}:${event.raw}:${event.number}:${due}`;
           if (seen.has(key)) continue; seen.add(key);
           upcoming.push({title: String(item.title || "Tracked title"), scheduled_for: new Date(due).toISOString(), label: `${event.kind === "episode" ? "Episode " + event.number : event.kind === "season" ? "Season " + event.number : "Film"} · ${lead ? lead + " hours before" : "At release"}`});
         }
+      }
       }
       upcoming.sort((a,b) => Date.parse(a.scheduled_for) - Date.parse(b.scheduled_for));
       const suppressed = items.filter(item => item.hideFromWeeklyReleases === true).map(item => ({title:String(item.title||"Tracked title"),status:"suppressed",label:"Weekly Releases exclusion"}));

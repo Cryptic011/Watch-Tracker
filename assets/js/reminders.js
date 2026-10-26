@@ -107,7 +107,7 @@
     await reminderApi("subscribe",{
       subscription:subscription.toJSON(),
       timeZone:DEVICE_TIME_ZONE||"UTC",
-      locale:USER_LOCALE
+      locale:typeof reminderViewingLocale==="function"?reminderViewingLocale():USER_LOCALE
     },token);
     if(token!==cloudSessionToken)throw new Error("Sign in again to connect reminders.");
     return subscription;
@@ -148,7 +148,7 @@
         return false;
       }
       if(reconnect&&backgroundReminderPreference()!=="off"&&generation===backgroundReminderGeneration&&token===cloudSessionToken){
-        await reminderApi("subscribe",{subscription:subscription.toJSON(),timeZone:DEVICE_TIME_ZONE||"UTC",locale:USER_LOCALE},token);
+        await reminderApi("subscribe",{subscription:subscription.toJSON(),timeZone:DEVICE_TIME_ZONE||"UTC",locale:typeof reminderViewingLocale==="function"?reminderViewingLocale():USER_LOCALE},token);
       }
     }catch(error){
       report(error.status===401?"Your reminder session expired. Sign in again.":error.message||"Could not check reminders. Reconnect this device to try again.","error","repair");

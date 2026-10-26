@@ -89,3 +89,23 @@ test('Release processing sends at-release alerts for Planned seasons, films and 
  assert.deepEqual(sent.map(p=>p.title),['Season premiere','Film premiere','Returning series']);
  assert.ok(sent.every(p=>/now available/i.test(p.body)),'release alerts must not be replaced with late advance reminders');
 });
+
+test('Streaming-first worker never sends a UK Marshals release at US broadcast time',async()=>{
+ let clock=Date.parse('2026-10-26T00:00:00Z');const sent=[],claimed=new Set();
+ class Clock extends Date {static now(){return clock;}}
+ const c=vm.createContext({Date:Clock,Number,Array,Set,String,Object,Map,Intl,TextEncoder,crypto,Response,URL,AbortSignal,console,Deno:{env:{get:()=>''},serve(){}},createClient:()=>({})});
+ vm.runInContext(fs.readFileSync(path.join(root,'assets/js/regional-releases.js'),'utf8'),c);
+ vm.runInContext(stripTypeScriptTypes(source.replace(/^import[\s\S]*?from "npm:web-push-neo@0\.1\.2";\n/m,'')),c);
+ const item={id:'marshals',title:'Marshals',type:'Series',status:'Watching',tvmazeShowId:'84526',imdbId:'tt36849871',platform:'CBS',airingSeason:2,nextEpisodeNum:4,nextEpisodeDate:'2026-10-26T00:00:00Z',scheduledEpisodeReleases:[{season:2,number:4,raw:'2026-10-26T00:00:00Z'}]};
+ c.readLibraries=async()=>[{account_id:'account',items:[item,{...item,id:'unverified',tvmazeShowId:'99999',imdbId:'tt9999999',title:'Unverified streaming'}]}];c.refreshServerEpisodeSchedules=async rows=>rows;
+ c.claimDelivery=async(row,account,id,key)=>{if(claimed.has(key))return null;claimed.add(key);return{id:'delivery',attempts:1};};c.finishDelivery=async()=>{};c.sendPush=async(row,config,payload)=>sent.push(payload);
+ const subscriptions=[{account_id:'account',locale:'en-GB',time_zone:'Europe/London'}];
+ await c.processPlannedReminders(subscriptions,{});
+ assert.equal(sent.filter(p=>/now available/i.test(p.body)).length,0,'US broadcast midnight is not UK streaming release');
+ assert.ok(sent.every(p=>p.title==='Marshals'),'unverified streaming availability must not use broadcast dates');
+ sent.length=0;clock=Date.parse('2026-10-26T08:00:00Z');
+ await c.processPlannedReminders(subscriptions,{});
+ assert.equal(sent.length,1);assert.equal(sent[0].body,'New episode now available on Paramount+');
+ assert.match(sent[0].data.eventKey,/2026-10-26T08:00:00.000Z:lead-0h$/);
+ assert.equal((await c.processPlannedReminders(subscriptions,{})).sent,0);
+});

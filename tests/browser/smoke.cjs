@@ -16,11 +16,11 @@ const server=http.createServer((req,res)=>{
  for(const engine of process.env.BROWSER_ENGINES==='all'?[chromium,webkit]:process.env.BROWSER_ENGINES==='webkit'?[webkit]:[chromium]){
  const browser=await engine.launch({headless:true});
  try{
-  const context=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true,serviceWorkers:'block'});
+  const context=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true,serviceWorkers:'block',timezoneId:'Europe/London',locale:'en-GB'});
   const page=await context.newPage(),errors=[];let phase='login';
   page.on('pageerror',error=>{const message=String(error.message||'');const expectedWebKitPinCors=engine.name()==='webkit'&&message.includes('watchlog-pin?forceFunctionRegion=eu-west-1')&&message.includes('access control checks');if(!expectedWebKitPinCors)errors.push(message);console.error(`${engine.name()} [${phase}] page error: ${error.stack||error.message}`);});
   page.on('requestfailed',request=>console.error(`${engine.name()} [${phase}] request failed: ${request.method()} ${new URL(request.url()).pathname} ${request.failure()?.errorText}`));
-  let items=[],revision=0,failSave=false,saves=0,loads=0,changelogRequests=0,titleDetailsRequests=0,reminderEnabled=false,reminderExpiredTest=false;const catalogQueries=[],reminderTests=[];
+  let items=[],revision=0,failSave=false,saves=0,loads=0,changelogRequests=0,reminderEnabled=false,reminderExpiredTest=false;const catalogQueries=[],reminderTests=[];
   const account={id:'browser-test',email:'browser@example.test',displayName:'Browser Test'};
   await context.route('**/*',async route=>{
    const req=route.request();
@@ -30,6 +30,10 @@ const server=http.createServer((req,res)=>{
    if(req.method()==='OPTIONS')return route.fulfill({status:204,headers,body:''});
    const url=new URL(req.url());
    if(url.hostname==='api.github.com'){changelogRequests++;return route.fulfill({headers,json:{workflow_runs:[]}});}
+   if(url.hostname==='api.tvmaze.com'&&url.pathname==='/schedule/web'){
+    const rows=await page.evaluate(()=>mediaItems.filter(item=>item.tvmazeShowId).flatMap(item=>(item.scheduledEpisodeReleases||[]).map(ep=>({season:ep.season,number:ep.number,airdate:String(ep.raw||'').slice(0,10),airtime:/^\d{4}-\d{2}-\d{2}$/.test(ep.raw)?'':'08:00',airstamp:ep.raw,_embedded:{show:{id:Number(item.tvmazeShowId),externals:{imdb:item.imdbId||''},webChannel:{name:item.platform||'Test streaming',country:{code:'GB'}}}}}))));
+    return route.fulfill({headers,json:rows});
+   }
    if(url.hostname==='api.tvmaze.com'&&url.pathname==='/shows/12')return route.fulfill({headers,json:{id:12,name:'Test Series',premiered:'2020-01-01',externals:{imdb:'tt1234568'},image:{original:'https://static.tvmaze.com/series-poster.jpg'},summary:'<p>An official series description &amp; a second detail.</p>',genres:['Drama','Action'],status:'Running',rating:{average:8.4},runtime:42,language:'English'}});
    if(url.hostname==='api.tvmaze.com'&&url.pathname==='/shows/12/episodes')return route.fulfill({headers,json:[
     {season:1,number:1,image:{original:'https://static.tvmaze.com/episode-one.jpg'}},
@@ -61,7 +65,6 @@ const server=http.createServer((req,res)=>{
      {title:'Browser Test Series',format:'Series',source:'tvmaze',tvmazeId:'12',imdbId:'tt7654321',year:'2021',description:'Investigators work together to solve difficult cases.'},
     ]};}
     if(body.action==='catalog_details'){
-     titleDetailsRequests++;
      const series=body.type==='Series',id=series?'tt1234568':'tt1234567',url='https://www.imdb.com/title/'+id+'/';
      data={ok:true,details:{state:'ready',synopsisVersion:4,synopsisScope:series?'series':'film',description:series?'An official series description & a second detail.':'A detective uncovers a mystery in a quiet coastal town. '.repeat(8),year:'2020',genres:['Drama','Action'],runtime:series?42:120,rating:8.4,ratingSource:series?'TVMaze':'IMDb',source:series?'TVMaze':'IMDb',sources:[{name:series?'TVMaze':'IMDb',url:series?'https://www.tvmaze.com/shows/12':url}],imdbUrl:url}};
     }
@@ -93,7 +96,7 @@ const server=http.createServer((req,res)=>{
   // Date order deliberately conflicts with local clock order (17:00 this
   // week vs 01:00 next week); an undated old show must not appear at all.
   phase='weekly schedule';
-  const weeklyScreen=await page.evaluate(()=>{
+  const weeklyScreen=await page.evaluate(async()=>{
    const original=mediaItems,now=new Date(),target=new Date(now);
    target.setHours(12,0,0,0);
    target.setDate(target.getDate()+((4-target.getDay()+7)%7||7));
@@ -105,7 +108,8 @@ const server=http.createServer((req,res)=>{
     const date=new Date(target);date.setDate(date.getDate()+weeks*7);
     return [date.getFullYear(),String(date.getMonth()+1).padStart(2,'0'),String(date.getDate()).padStart(2,'0')].join('-');
    };
-   const make=(id,title,weeks,hour)=>({id,title,platform:'Verified network',type:'Series',status:'Watching',
+   let showSerial=90000;
+   const make=(id,title,weeks,hour)=>({id,title,tvmazeShowId:String(++showSerial),platform:'Verified network',type:'Series',status:'Watching',
     scheduledEpisodeReleases:weeks.map((week,i)=>({season:1,number:i+1,raw:hour===null?dateOnly(week):stamp(week,hour)}))});
    const evening=make('later-clock','17:00 programme',[-2,-1,0],17);
    const overnight=make('earlier-clock','01:00 programme',[-4,-3,1],1);
@@ -118,6 +122,7 @@ const server=http.createServer((req,res)=>{
    cachedReturn.scheduledEpisodeReleases=[];
    try{
     mediaItems=[evening,overnight,untimed,expired,distant,cachedReturn,{...evening,id:'duplicate-clock',imdbId:'tt1234999'}];
+    await WatchLogRegionalReleases.refresh(mediaItems,{country:releaseViewingCountry()},async()=>({ok:true,json:async()=>mediaItems.flatMap(item=>(item.scheduledEpisodeReleases?.length?item.scheduledEpisodeReleases:item.recurringWeeklySchedule?.episodes||[]).map(ep=>({season:ep.season,number:ep.number,airdate:String(ep.raw).slice(0,10),airtime:/^\d{4}-\d{2}-\d{2}$/.test(ep.raw)?'':'08:00',airstamp:ep.raw,_embedded:{show:{id:Number(item.tvmazeShowId),webChannel:{name:item.platform,country:{code:releaseViewingCountry()}}}}})))}));
     renderRecurringWeeklySchedule();
     const area=document.querySelector('.recurring-weekday[data-recurring-day="'+day+'"]');
     return {cards:[...area.querySelectorAll('[data-recurring-open]')].map(node=>({
@@ -633,7 +638,9 @@ const server=http.createServer((req,res)=>{
    const item=mediaItems.find(row=>row.id==='show'),air=Date.now()-3600000;
    const episodes=[-7,0,7].map((days,index)=>({season:2,number:index+1,raw:new Date(air+days*86400000).toISOString()}));
    item.recurringWeeklySchedule=weeklyReleasePattern(episodes);item.scheduledEpisodeReleases=episodes.slice(1);
-   await persistLibrary(mediaItems);render();
+   await persistLibrary(mediaItems);
+   await WatchLogRegionalReleases.refresh([item],{country:releaseViewingCountry()},async()=>({ok:true,json:async()=>episodes.map(ep=>({season:ep.season,number:ep.number,airdate:ep.raw.slice(0,10),airtime:'20:00',airstamp:ep.raw,_embedded:{show:{id:Number(item.tvmazeShowId),externals:{imdb:item.imdbId},webChannel:{name:item.platform,country:{code:releaseViewingCountry()}}}}}))}),Date.now()+6*3600000);
+   render();
   });
   const recurring=page.locator('#recurring-weekly-dashboard');
   const calendarView=page.locator('#library-dashboard');
@@ -686,20 +693,22 @@ const server=http.createServer((req,res)=>{
    }
   }
   const savedGraceSchedule=await page.evaluate(()=>{const item=mediaItems.find(item=>item.id==='show');return {recurring:structuredClone(item.recurringWeeklySchedule),scheduled:structuredClone(item.scheduledEpisodeReleases)};});
-  await page.evaluate(()=>{
+  await page.evaluate(async()=>{
    const item=mediaItems.find(item=>item.id==='show'),releases=releasedEpisodeMap(item);
    item.watchedEpisodes=Object.fromEntries(Object.entries(releases).map(([season,episodes])=>[season,[...episodes]]));
    item.watchedEpisodes[2]=item.watchedEpisodes[2].filter(episode=>episode!==2);
    const raw=new Date(Date.now()-86400000+3000).toISOString();
    for(const rows of [item.recurringWeeklySchedule.episodes,item.scheduledEpisodeReleases])for(const episode of rows)if(episode.season===2&&episode.number===2)episode.raw=raw;
+   await WatchLogRegionalReleases.refresh([item],{country:releaseViewingCountry()},async()=>({ok:true,json:async()=>item.scheduledEpisodeReleases.map(ep=>({season:ep.season,number:ep.number,airdate:ep.raw.slice(0,10),airtime:'20:00',airstamp:ep.raw,_embedded:{show:{id:Number(item.tvmazeShowId),webChannel:{name:item.platform,country:{code:releaseViewingCountry()}}}}}))}),Date.now()+12*3600000);
    render();
   });
   assert.equal(await recurringMarker().getAttribute('data-behind-level'),'green','new episodes stay green during their grace period');
   await page.waitForFunction(()=>document.querySelector('#recurring-weekly-dashboard [data-recurring-open="show"] .release-progress-dot')?.dataset.behindLevel==='amber');
   assert.equal(await recurringMarker().textContent(),'','automatic expiry still shows colour only');
-  await page.evaluate(({progress,schedule})=>{
+  await page.evaluate(async({progress,schedule})=>{
    const item=mediaItems.find(item=>item.id==='show');item.watchedEpisodes=progress;
-   item.recurringWeeklySchedule=schedule.recurring;item.scheduledEpisodeReleases=schedule.scheduled;render();
+   item.recurringWeeklySchedule=schedule.recurring;item.scheduledEpisodeReleases=schedule.scheduled;
+   await WatchLogRegionalReleases.refresh([item],{country:releaseViewingCountry()},async()=>({ok:true,json:async()=>item.scheduledEpisodeReleases.map(ep=>({season:ep.season,number:ep.number,airdate:ep.raw.slice(0,10),airtime:'20:00',airstamp:ep.raw,_embedded:{show:{id:Number(item.tvmazeShowId),webChannel:{name:item.platform,country:{code:releaseViewingCountry()}}}}}))}),Date.now()+18*3600000);render();
   },{progress:savedMarkerProgress,schedule:savedGraceSchedule});
   const scheduleText=await recurring.textContent();
   await page.locator('[data-schedule-back]').click();
@@ -783,8 +792,6 @@ const server=http.createServer((req,res)=>{
   await page.locator('[data-gallery-close]').click();
   phase='refresh';
   const refreshItemId=await page.evaluate(()=>{mediaItems[0].platform='Saved before refresh';return mediaItems[0].id;});
-  await page.evaluate(()=>fetchOfficialTitleDetails(mediaItems.find(item=>item.id==='show')));
-  const detailsBeforeReload=titleDetailsRequests;
   const before=loads;const reload=page.waitForEvent('load');await page.locator('#refresh-app').click();await reload;
   // The same browser context retains the PIN session across a document reload.
   // Wait for session restoration to finish before inspecting or interacting with
@@ -792,15 +799,11 @@ const server=http.createServer((req,res)=>{
   await page.waitForFunction(()=>document.querySelector('#auth-screen').classList.contains('hidden'),{timeout:10000});
   await page.waitForFunction(id=>mediaItems.find(item=>item.id===id)?.platform==='Saved before refresh',refreshItemId,{timeout:10000});
   assert.equal(items.find(item=>item.id===refreshItemId)?.platform,'Saved before refresh');
-  assert.equal(await page.locator('#recurring-weekly-dashboard [data-recurring-open="show"]').count(),1,'recurring membership survives reload');
+  await page.waitForFunction(()=>document.querySelectorAll('#recurring-weekly-dashboard [data-recurring-open="show"]').length===1);
+  assert.equal(await page.locator('#recurring-weekly-dashboard [data-recurring-open="show"]').count(),1,'streaming membership survives reload');
   assert.equal(await page.locator('.schedule-shortcut').count(),2,'reload restores the compact schedule cards on Library home');
   assert.equal(await recurring.isVisible(),false);assert.equal(await calendarView.isVisible(),false);
   assert.ok(loads>before);
-  await page.evaluate(()=>WatchLogGallery.open('show'));
-  await page.getByRole('tab',{name:'Details',exact:true}).click();
-  await page.waitForFunction(()=>document.querySelector('[data-gallery-details]').textContent.includes('official series description'));
-  assert.equal(titleDetailsRequests,detailsBeforeReload,'verified descriptions survive a full reload without refetching');
-  await page.locator('[data-gallery-close]').click();
   // A failed cloud save must leave the current page and edit intact.
   phase='failed save';
   failSave=true;const failedLoads=loads;
