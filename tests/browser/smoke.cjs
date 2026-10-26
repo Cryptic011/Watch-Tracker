@@ -293,7 +293,7 @@ const server=http.createServer((req,res)=>{
   assert.equal(await page.getByRole('tab',{name:'Overview',exact:true}).getAttribute('aria-selected'),'true');
   await page.getByRole('tab',{name:'Details',exact:true}).click();
   await page.waitForFunction(()=>document.querySelector('[data-gallery-details]').textContent.includes('coastal town'));
-  assert.equal(await page.locator('[data-gallery-details] a[href="https://www.imdb.com/title/tt1234567/"]').count(),1,'film details show their actual source');
+  assert.equal(await page.locator('[data-gallery-details] a').count(),0,'the compact facts panel omits source rows');
   await page.locator('[data-gallery-close]').click();
   await page.locator('[data-filter="All"]').click();await page.locator('[data-gallery-back]').click();
   await page.evaluate(()=>openEdit(mediaItems[0].id));await page.locator('#platform').fill('Cinema');await page.locator('#save-btn').click();
@@ -382,11 +382,9 @@ const server=http.createServer((req,res)=>{
   assert.equal(await page.locator('[data-gallery-watch-next]').textContent(),'Watch next · S1 E3','Watch next advances past already-watched episodes');
   await page.getByRole('tab',{name:'Details',exact:true}).click();
   await page.waitForFunction(()=>document.querySelector('[data-gallery-details]').textContent.includes('official series description'));
-  assert.match(await page.locator('[data-gallery-details]').textContent(),/Drama · Action/);
-  assert.match(await page.locator('[data-gallery-details]').textContent(),/8\.4\/10/);
-  assert.equal(await page.locator('[data-gallery-details] a[href="https://www.tvmaze.com/shows/12"]').count(),1,'series details link to their TVMaze source');
-  assert.equal(await page.locator('[data-gallery-details] a[href="https://www.imdb.com/title/tt1234568/"]').count(),1,'series details retain the optional IMDb link');
-  assert.match(await page.locator('[data-gallery-details]').textContent(),/TVMaze rating/);
+  assert.deepEqual(await page.locator('[data-gallery-details] dt').allTextContents(),['Release date','Released seasons','Status']);
+  assert.equal(await page.locator('[data-gallery-details] a').count(),0,'extra source rows are removed');
+  assert.doesNotMatch(await page.locator('[data-gallery-details]').textContent(),/Genres|rating|Runtime|Language/);
   if(process.env.BROWSER_SCREENSHOT_DIR){
    fs.mkdirSync(process.env.BROWSER_SCREENSHOT_DIR,{recursive:true});
    await page.screenshot({path:path.join(process.env.BROWSER_SCREENSHOT_DIR,engine.name()+'-details.png')});

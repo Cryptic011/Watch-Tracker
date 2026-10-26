@@ -221,15 +221,15 @@ window.WatchLogGallery=(()=>{
       const decoder=document.createElement('textarea');
       decoder.innerHTML=String(details.description||'').replace(/<[^>]*>/g,' ');
       const description=decoder.value.replace(/[^\S\n]+/g,' ').trim();
+      const released=api.released?.(item)||item.releasedEpisodes||{};
+      const releasedCount=Object.values(released).filter(episodes=>Array.isArray(episodes)&&episodes.length>0).length;
+      const releasedSeasons=releasedCount||item.episodeScheduleVerified===true?releasedCount:(details.releasedSeasons??'Unconfirmed');
+      const premiere=details.premiered||item.seriesReleaseDate||item.filmReleaseDate||'';
       const facts=[
-        ['Release date',details.premiered?api.date(new Date(details.premiered+'T12:00:00')):details.year||''],
-        ['Genres',Array.isArray(details.genres)?details.genres.join(' · '):''],
-        ['Seasons',details.seasons||''],['Status',details.status||''],
-        [details.ratingSource?details.ratingSource+' rating':'Rating',Number.isFinite(details.rating)?details.rating+'/10':''],
-        ['Runtime',details.runtime?details.runtime+' min':''],['Language',details.language||'']
+        ['Release date',premiere?api.date(new Date(premiere.slice(0,10)+'T12:00:00')):details.year||item.releaseYear||''],
+        ['Released seasons',isFilm(item)?'':releasedSeasons],['Status',details.status||'']
       ].filter(([,value])=>value!=='');
-      const sources=api.sourceLinks?.(details)||esc(details.source||'');
-      target.innerHTML=`<h3>About ${esc(item.title)}</h3><p>${esc(description||'A verified description is temporarily unavailable.')}</p>${facts.length?`<dl>${facts.map(([label,value])=>`<div><dt>${esc(label)}</dt><dd>${esc(value)}</dd></div>`).join('')}</dl>`:''}${sources?`<small>Sources: ${sources}</small>`:''}${!description?'<button type="button" class="btn btn-secondary" data-gallery-retry-details>Retry</button>':''}`;
+      target.innerHTML=`<h3>About ${esc(item.title)}</h3><p>${esc(description||'A verified description is temporarily unavailable.')}</p>${facts.length?`<dl>${facts.map(([label,value])=>`<div><dt>${esc(label)}</dt><dd>${esc(value)}</dd></div>`).join('')}</dl>`:''}${!description?'<button type="button" class="btn btn-secondary" data-gallery-retry-details>Retry</button>':''}`;
       const retry=target.querySelector('[data-gallery-retry-details]');if(retry)retry.onclick=()=>loadTitleDetails(item);
     }catch(_){
       if(target!==dialog.querySelector('[data-gallery-details]'))return;

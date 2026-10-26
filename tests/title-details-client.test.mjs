@@ -4,11 +4,11 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 
 const source=fs.readFileSync(new URL('../assets/js/catalogue.js',import.meta.url),'utf8');
-function harness(responses,storage,region='GB'){
+function harness(responses,storage,region='GB',fallback=null){
  let calls=0;
  const cache=source.slice(source.indexOf('  const METADATA_CACHE_TTL_MS='),source.indexOf('  function episodeAirTime('));
  const details=source.slice(source.indexOf('  const titleDetailsCache='),source.indexOf('  function tvMazeShowMatchesSelection('));
- const context=vm.createContext({URL,console,localStorage:storage,releaseViewingCountry:()=>region,esc:String,pinApi:async()=>({details:responses[Math.min(calls++,responses.length-1)]})});
+ const context=vm.createContext({URL,console,fetchOfficialTrackerArtwork:fallback?async()=>({details:fallback}):undefined,localStorage:storage,releaseViewingCountry:()=>region,esc:String,pinApi:async()=>({details:responses[Math.min(calls++,responses.length-1)]})});
  vm.runInContext(cache+details,context);
  return {get:item=>context.fetchOfficialTitleDetails(item),links:info=>context.titleDetailsSourceLinks(info),calls:()=>calls,region:value=>{region=value;}};
 }
@@ -85,4 +85,12 @@ test('Verified fallback sources remain labelled and malicious lookalike domains 
   const api=harness([details]);assert.equal((await api.get({title:'Film',type:'Film'})).description,valid.description);assert.ok(api.links(details).includes(url));
   const fake=new URL(url);fake.hostname+='.evil.test';assert.equal(api.links({sources:[{name,url:fake.href}]}),'');
  }
+});
+
+test('A partial gateway response recovers the identity-checked whole-show TVMaze summary',async()=>{
+ const fallback={description:'Two agents investigate threats to national security.',source:'TVMaze',sources:[{name:'TVMaze',url:'https://www.tvmaze.com/shows/1'}],premiered:'2026-02-23',status:'Running'};
+ const api=harness([{state:'partial',source:'TVMaze',sources:fallback.sources}],deviceStorage(),'GB',fallback);
+ const result=await api.get({title:'CIA',type:'Series',tvmazeShowId:'1'});
+ assert.equal(result.description,fallback.description);assert.equal(result.state,'ready');assert.equal(result.synopsisScope,'series');
+ assert.equal((await api.get({title:'CIA',type:'Series',tvmazeShowId:'1'})).description,fallback.description);assert.equal(api.calls(),1);
 });

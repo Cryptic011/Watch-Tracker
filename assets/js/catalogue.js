@@ -188,6 +188,14 @@
   async function fetchOfficialTitleDetails(item){
     const payload={title:item.title,type:item.type==="Anime"?"Series":item.type||item.format,imdbId:item.imdbId||(item.source==="imdb"?item.externalId:""),tvmazeShowId:item.tvmazeShowId||item.tvmazeId,year:item.releaseYear||item.year,source:item.source,externalId:item.externalId,platform:item.platform||"",officialUrl:item.officialUrl||item.officialSite||"",country:typeof releaseViewingCountry==="function"?releaseViewingCountry()||"GB":"GB"};
     const key="watch-service-v1:"+JSON.stringify(payload);
+    const seriesFallback=async()=>{
+      if(payload.type!=="Series"||typeof fetchOfficialTrackerArtwork!=="function")return null;
+      try{
+        const fallback=(await fetchOfficialTrackerArtwork(item))?.details;
+        if(!fallback?.description?.trim())return null;
+        return {...fallback,synopsisVersion:5,synopsisScope:"series",descriptionSource:"TVMaze",state:"ready"};
+      }catch(_){return null;}
+    };
     return cachedMetadataRequest(titleDetailsCache,key,async()=>{
       try{
         const permitted=source=>["TVMaze","IMDb","Apple TV","CBS","Paramount+","NBC","ABC","FOX","FX","HBO","Max","Disney+","Disney","Hulu","Netflix","Prime Video","Peacock","STARZ","Showtime","AMC","AMC+","The CW","PBS","BBC","ITV","ITVX","Channel 4","Sky","NOW","Crunchyroll","A&E","Freeform","Adult Swim","USA Network","BET","Warner Bros.","Universal","Paramount Pictures","Sony Pictures","20th Century Studios","Marvel","Lionsgate","Focus Features","Discovery+","TNT","TBS","Paramount Global Content","Paramount Press Express","Netflix Media Center","TMDb","JustWatch","Harry Potter","Star Wars","Lucasfilm","MGM","Amazon MGM Studios","Searchlight Pictures","Rakuten TV","Sky Store"].includes(String(source||""));
@@ -208,8 +216,10 @@
           return details;
         }
         titleDetailsCache.delete(key);
-        if(!rejected&&details.sources?.length)return {...details,description:"",descriptionSource:"",state:"partial"};
+        if(!rejected&&details.sources?.length){const fallback=await seriesFallback();if(fallback){storeTitleDetails(key,fallback);return fallback;}return {...details,description:"",descriptionSource:"",state:"partial"};}
       }catch(_) {titleDetailsCache.delete(key);}
+      const fallback=await seriesFallback();
+      if(fallback){storeTitleDetails(key,fallback);return fallback;}
       // Leave unavailable lookups retryable rather than caching empty details.
       return {state:"unavailable",sources:[],imdbUrl:/^tt\d+$/.test(payload.imdbId||"")?`https://www.imdb.com/title/${payload.imdbId}/`:""};
     });
