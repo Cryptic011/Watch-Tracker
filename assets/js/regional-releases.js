@@ -62,13 +62,13 @@
           const show=ep?._embedded?.show||ep?.show,item=tracked.get(String(show?.id)),channel=show?.webChannel;
           if(!item||!channel?.name||Number(ep.season)<1||Number(ep.number)<1)continue;
           if(item.imdbId&&show.externals?.imdb&&item.imdbId!==show.externals.imdb)continue;
-          if(channel.country?.code&&channel.country.code!==region)continue;
-          if(feed===''&&channel.country)continue;
+          if(feed&&channel.country?.code!==region)continue;
+          if(feed===''&&channel.country!==null)continue;
           const raw=ep.airtime&&ep.airstamp?ep.airstamp:ep.airdate;
           if(!raw||!Number.isFinite(Date.parse(raw)))continue;
-          listings.set(region+':'+show.id+':'+ep.season+':'+ep.number,{raw,platform:channel.name,country:region,source:url,expires:now+6*3600000});
+          listings.set(region+':'+show.id+':'+ep.season+':'+ep.number,{raw,platform:channel.name,country:region,source:url,expires:now+3600000});
         }
-      }catch(_){requests.delete(key);}})();requests.set(key,{expires:now+6*3600000,promise});return promise;
+      }catch(_){requests.delete(key);}})();requests.set(key,{expires:now+3600000,promise});return promise;
     })));
   }
   function resolveEvent(item,event,viewer={},now=Date.now()){

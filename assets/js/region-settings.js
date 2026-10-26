@@ -25,7 +25,7 @@ let regionalRefreshAt=0,regionalRefreshCountry='';
 function refreshRegionalReleaseSources(){
   if(!currentUser||!navigator.onLine)return;
   const country=releaseViewingCountry(),now=Date.now(),signature=country+':'+mediaItems.map(item=>item.tvmazeShowId+':'+item.nextEpisodeDate).sort().join('|');
-  if(signature===regionalRefreshCountry&&now-regionalRefreshAt<6*3600000)return;
+  if(signature===regionalRefreshCountry&&now-regionalRefreshAt<3600000)return;
   regionalRefreshCountry=signature;regionalRefreshAt=now;
   void WatchLogRegionalReleases.refresh(mediaItems,{country,timeZone:DEVICE_TIME_ZONE}).then(()=>{if(currentUser&&country===releaseViewingCountry())render();});
 }

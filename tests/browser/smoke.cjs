@@ -671,7 +671,7 @@ const server=http.createServer((req,res)=>{
   assert.deepEqual(await recurring.locator('[data-recurring-day]').evaluateAll(nodes=>nodes.map(node=>Number(node.dataset.recurringDay))),[1,2,3,4,5,6,0]);
   assert.equal(await recurring.locator('[data-recurring-open="show"]').count(),1);
   assert.match(await recurring.textContent(),/S2 E2/);
-  const recurringMarker=()=>recurring.locator('[data-recurring-open="show"] .release-progress-dot');
+  const recurringMarker=()=>recurring.locator('[data-recurring-open="show"] .release-progress-dot').first();
   assert.equal(await recurringMarker().getAttribute('data-behind-level'),'red');
   const savedMarkerProgress=await page.evaluate(()=>structuredClone(mediaItems.find(item=>item.id==='show').watchedEpisodes));
   for(const behind of [0,1,2,3]){
