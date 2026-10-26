@@ -4,3 +4,6 @@ build-info.js
 supabase/.temp/
 
 asset-manifest.json
+www/
+.DS_Store
+!ios/App/App/public/build-info.js

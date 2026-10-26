@@ -1,0 +1,158 @@
+.titles-group.gallery-active{background:transparent;border:0;overflow:visible;border-radius:0}
+.gallery-home{display:grid;grid-template-columns:1fr;gap:16px;padding:8px 0 12px}
+.gallery-category{position:relative;isolation:isolate;overflow:hidden;display:flex;flex-direction:column;justify-content:space-between;min-width:0;min-height:190px;padding:22px;gap:48px;border:0;border-radius:28px;background:var(--inner);color:var(--text);text-align:left;cursor:pointer}
+.gallery-category strong{font-size:1.65rem;font-weight:800;letter-spacing:-.5px}
+.gallery-category small{display:block;margin-top:5px;color:var(--muted);font-size:.8rem}
+.gallery-category>span:not(.gallery-fan){position:relative;z-index:1;max-width:48%}
+.gallery-category-icon{display:grid;place-items:center;width:48px;height:48px;border-radius:14px;color:#ff5666;background:#ff40551c;font-size:1.5rem}
+.gallery-category[data-gallery-category="Series"] .gallery-category-icon{color:#d948ed;background:#d948ed1c}
+.gallery-fan{position:absolute;right:0;bottom:-12px;display:flex;align-items:flex-end;width:47%;height:94%;z-index:-1;pointer-events:none}
+.gallery-fan .gallery-art{width:60%;height:88%;flex-shrink:0;margin-left:-28%;border-radius:12px;box-shadow:0 0 18px #0005}
+.gallery-fan .gallery-art:first-child{margin-left:0}
+.gallery-fan .gallery-art:nth-child(2){height:79%}
+.gallery-fan .gallery-art:nth-child(3){height:83%}
+.gallery-art{position:relative;display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-end;aspect-ratio:2/3;border-radius:13px;overflow:hidden;padding:14px;background:radial-gradient(circle at 65% 15%,#6f9bdd66,transparent 38%),linear-gradient(145deg,#2e4d74 0%,#18263e 55%,#0a101c 100%);color:#eff6ff;border:1px solid #ffffff22;isolation:isolate;box-shadow:inset 0 1px 0 #ffffff12}
+.gallery-art::after{content:"";position:absolute;inset:auto 0 0;height:48%;background:linear-gradient(transparent,#07101ee8);z-index:0;pointer-events:none}
+.gallery-art>span{position:absolute;inset:18% 0 auto;font-size:clamp(2.5rem,11vw,4.6rem);font-weight:900;letter-spacing:-.08em;text-align:center;color:#e6f1ff;opacity:.96;z-index:0}
+.gallery-art-title{position:relative;width:100%;max-width:100%;font-size:.72rem;font-weight:900;line-height:1.15;text-align:left;text-transform:uppercase;letter-spacing:.02em;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden;text-shadow:0 1px 3px #000;z-index:1}
+.gallery-art-meta{position:relative;max-width:100%;margin-top:6px;color:#b6cbea;font-size:.55rem;font-weight:800;letter-spacing:.7px;z-index:1}
+.gallery-art img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:2}
+.gallery-art img[hidden]{display:none}
+.gallery-tile-status{display:inline-flex;align-items:center;width:max-content;max-width:100%;margin-top:8px;padding:5px 9px;border:1px solid #ffffff30;border-radius:999px;background:#141b28;color:#d6deec;font-size:.62rem;line-height:1.1;font-weight:850;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-shadow:0 2px 10px #0004}
+.gallery-tile-status.done{border-color:#2f9f7b88;background:#123d35;color:#a7f3d0}
+.gallery-nav{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:12px;min-height:48px;margin:4px 0 28px}
+.gallery-nav h2{min-width:0;text-align:center;font-size:1.35rem;pointer-events:none}
+.gallery-nav>.gallery-back{justify-self:start}
+.gallery-nav>.gallery-heading-actions{justify-self:end}
+.gallery-back{display:grid;place-items:center;width:44px;height:44px;border:1px solid var(--border);border-radius:50%;background:var(--card);color:var(--text);font-size:2rem;cursor:pointer}
+.gallery-section{margin-bottom:38px}
+.gallery-section h3{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:1.4rem;font-weight:800;letter-spacing:-.25px;margin:0 0 16px}
+.gallery-heading-actions{display:inline-flex;align-items:center;flex-shrink:0;gap:8px}
+.gallery-manage-button{display:inline-grid;place-items:center;flex:0 0 44px;width:44px;height:44px;padding:10px;border:1px solid var(--border);border-radius:50%;background:var(--inner);color:var(--muted);cursor:pointer;touch-action:manipulation}
+.gallery-manage-button svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.gallery-manage-button:disabled{opacity:.4;cursor:default}
+.gallery-manage-button:focus-visible{outline:2px solid var(--blue2);outline-offset:3px}
+.gallery-count{display:grid;place-items:center;min-width:25px;height:25px;padding:0 7px;border-radius:20px;background:var(--inner);color:var(--muted);font-size:.75rem}
+.gallery-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:28px 10px}
+.gallery-grid .gallery-tile-status{display:none}
+.gallery-tile{min-width:0;display:block;border:0;padding:0;background:transparent;color:var(--text);text-align:left;cursor:pointer}
+.gallery-tile strong{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;font-size:.83rem;font-weight:750;line-height:1.3;margin-top:8px}
+.gallery-tile small{display:block;color:var(--muted);font-size:.76rem;line-height:1.4;margin-top:4px}
+.gallery-tile .gallery-art{border:1px solid #ffffff28;box-shadow:0 8px 22px #0005,inset 0 1px 0 #ffffff24}
+.gallery-tile:active .gallery-art{border-color:#60a5fa99}
+.gallery-state{position:absolute;top:9px;right:9px;z-index:3;background:#09101ee8;color:#fff;border:1px solid #ffffff3d;border-radius:999px;padding:5px 8px;font-size:.58rem;line-height:1.1;font-weight:850;max-width:calc(100% - 18px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-shadow:0 3px 10px #0006}
+.gallery-state.done{background:#0b463b;color:#b7ffdf}
+.gallery-carousel{display:grid;grid-auto-flow:column;grid-auto-columns:min(76%,330px);gap:12px;overflow-x:auto;scroll-snap-type:x proximity;padding:0 0 12px;scrollbar-width:thin}
+.gallery-carousel .gallery-tile{scroll-snap-align:start}
+.gallery-carousel .gallery-art{aspect-ratio:16/9}
+.gallery-carousel .gallery-art img{object-position:center 25%}
+.gallery-carousel .gallery-tile strong{font-size:.95rem}
+.gallery-carousel .gallery-tile small{font-size:.8rem}
+.gallery-carousel .gallery-tile-status{font-size:.65rem;border:0;background:var(--inner);color:var(--muted)}
+.gallery-film-carousel{grid-auto-columns:min(40%,180px)}
+.gallery-film-carousel .gallery-art{aspect-ratio:2/3}
+.gallery-caption{color:var(--muted);font-size:.82rem;text-align:center;padding:28px 0}
+.gallery-empty{color:var(--muted);padding:20px 0}
+
+/* Lock the page while a title is open, including native close/reopen paths. */
+html:has(.gallery-detail[open]),body:has(>.gallery-detail[open]){overflow:hidden;overscroll-behavior:none}
+.gallery-detail{position:fixed;inset:0;width:100%;height:100dvh;max-width:none;max-height:100dvh;margin:0;padding:0;border:0;border-radius:0;background:var(--bg);color:var(--text);overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:none}
+.gallery-detail::-webkit-scrollbar{display:none}
+.gallery-detail::backdrop{background:#000b}
+.gallery-detail-header{position:sticky;top:0;z-index:4;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:calc(env(safe-area-inset-top) + 12px) max(26px,env(safe-area-inset-right)) 12px max(18px,env(safe-area-inset-left));background:var(--bg);border-bottom:1px solid var(--border)}
+.gallery-detail-header h2{flex:1;min-width:0;font-size:1.05rem;line-height:1.35;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gallery-detail-header-actions{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.gallery-menu-button,.gallery-detail-header .gallery-back{display:grid;place-items:center;flex:0 0 44px;width:44px;height:44px;border:1px solid var(--border);border-radius:50%;background:var(--inner);color:var(--text);cursor:pointer;touch-action:manipulation}
+.gallery-menu-button{font-size:1.1rem;font-weight:900}
+.gallery-detail-body{display:grid;gap:20px;width:100%;max-width:780px;min-width:0;margin:0 auto;padding:24px 0 calc(36px + env(safe-area-inset-bottom))}
+.gallery-detail-body>.gallery-art{width:min(48vw,200px);margin:0 auto;padding:0;border-radius:18px}
+.gallery-detail-copy{margin:0 18px;padding:16px;border:1px solid var(--border);border-radius:16px;background:var(--card);font-size:.88rem;line-height:1.55;overflow-wrap:anywhere}
+.gallery-detail-copy strong{display:block;margin:0 0 6px}
+.gallery-detail-copy p+p{margin-top:4px}
+.gallery-watch-panel{display:grid;gap:20px;min-width:0}
+.gallery-watch-panel>.reminder{margin:0 18px;flex-wrap:wrap}
+.gallery-detail-tabs{display:flex;gap:4px;margin:0 18px;padding:4px;border-radius:999px;background:var(--inner)}
+.gallery-detail-tabs button{flex:1;min-height:44px;padding:8px 12px;border:0;border-radius:999px;background:transparent;color:var(--muted);font-size:.88rem;font-weight:750;cursor:pointer}
+.gallery-detail-tabs button[aria-selected="true"]{background:var(--card);color:var(--text);box-shadow:0 1px 4px #0002}
+.gallery-detail-tabs button:focus-visible{outline:2px solid var(--blue2);outline-offset:2px}
+.gallery-notes-preview,.gallery-notes-editor{margin:0 18px;border:1px solid var(--border);border-radius:18px;background:var(--card);overflow:hidden;scroll-margin-top:calc(env(safe-area-inset-top) + 96px)}
+.gallery-notes-preview h3{padding:14px 16px;border-bottom:1px solid var(--border);background:var(--inner);font-size:1rem}
+.gallery-notes-preview p{padding:16px;white-space:pre-wrap;overflow-wrap:anywhere;font-size:.9rem;line-height:1.5}
+.gallery-notes-editor{display:grid;gap:12px;padding:16px}
+.gallery-notes-editor h3{font-size:1rem}
+.gallery-notes-actions{display:flex;flex-wrap:wrap;gap:10px}
+.gallery-notes-actions button{min-height:44px}
+.gallery-notes-editor [role="status"]{font-size:.85rem;color:var(--muted);line-height:1.4}
+.gallery-notes-editor [role="status"]:empty{display:none}
+.gallery-info-panel{margin:0 18px;padding:18px;border:1px solid var(--border);border-radius:18px;background:var(--card);font-size:.9rem;line-height:1.6;overflow-wrap:anywhere}
+.gallery-info-panel h3{margin:0 0 12px;font-size:1.1rem;line-height:1.4}
+.gallery-info-panel dl{display:grid;gap:12px;margin-top:20px}
+.gallery-info-panel dl>div{display:grid;grid-template-columns:minmax(90px,30%) minmax(0,1fr);gap:12px;padding-top:12px;border-top:1px solid var(--border)}
+.gallery-info-panel dt,.gallery-info-panel small{color:var(--muted)}
+.gallery-info-panel a{color:var(--blue2);text-decoration:underline;text-underline-offset:3px}
+.gallery-info-panel small{display:block;margin-top:18px}
+.gallery-watch-next{display:block;width:calc(100% - 32px);min-height:48px;margin:16px;white-space:normal;line-height:1.4}
+.gallery-caught-up{margin:16px;color:var(--muted);font-size:.88rem;line-height:1.4}
+.gallery-season-list{min-width:0;padding:0 max(16px,env(safe-area-inset-right)) 0 max(16px,env(safe-area-inset-left))}
+.gallery-episodes-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:4px 2px 18px}
+.gallery-episodes-heading>h3{font-size:1.25rem;font-weight:850;letter-spacing:-.025em;line-height:1.4}
+.gallery-episodes-progress{display:block;flex:0 0 24px;width:24px;height:24px;border-radius:50%;background:conic-gradient(var(--muted) var(--watched-progress),var(--border) 0)}
+.gallery-season{position:relative;margin:0 0 16px;border:0;border-radius:24px;background:transparent;overflow:visible}
+.gallery-season>summary{position:relative;display:grid;grid-template-columns:60px minmax(0,1fr) 44px;align-items:center;gap:14px;min-height:98px;padding:0 12px 8px;list-style:none;cursor:pointer;isolation:isolate}
+.gallery-season>summary::before{content:"";position:absolute;inset:26px 0 0;border-radius:24px;background:var(--card);z-index:-1}
+.gallery-season>summary::-webkit-details-marker{display:none}
+.gallery-season-poster{display:block;width:60px;height:90px;border-radius:10px;overflow:hidden;background:var(--inner);box-shadow:0 3px 12px #0002}
+.gallery-season-poster img,.gallery-episode-art img{display:block;width:100%;height:100%;object-fit:cover}
+.gallery-artwork-placeholder{display:grid;place-items:center;width:100%;height:100%;background:var(--inner);color:var(--muted);font-size:.85rem;font-weight:800}
+.gallery-season-label{display:grid;min-width:0;gap:5px}
+.gallery-season-label strong{font-size:1.05rem;line-height:1.35;font-weight:800}
+.gallery-season-label small{color:var(--muted);font-size:.72rem;line-height:1.4}
+.gallery-season:not([open]) .gallery-season-label small{display:none}
+.gallery-season:not([open]) .gallery-season-label,.gallery-season:not([open]) .gallery-season-state{transform:translateY(14px)}
+.gallery-season[open]{padding-top:12px;background:var(--card);box-shadow:inset 0 0 0 1px var(--border)}
+.gallery-season[open]>summary::before{display:none}
+.gallery-season[open]>summary{padding-bottom:12px}
+.gallery-series-detail .gallery-season[open]>summary{position:sticky;top:calc(env(safe-area-inset-top) + 69px);z-index:2;grid-template-columns:42px minmax(0,1fr) 44px;min-height:83px;padding-top:6px;background:var(--card);border-bottom:1px solid var(--border);border-radius:24px 24px 0 0}
+.gallery-series-detail .gallery-season[open]>summary .gallery-season-poster{width:42px;height:63px}
+.gallery-season-chevron{display:inline-block;margin-left:4px;color:var(--muted);font-size:1.2rem;vertical-align:baseline}
+.gallery-season[open] .gallery-season-chevron{transform:rotate(90deg)}
+.gallery-season-state,.gallery-episode-toggle{display:grid;place-items:center;width:44px;height:44px;padding:0;border:0;border-radius:50%;background:transparent;color:var(--text);cursor:pointer;touch-action:manipulation}
+.gallery-season-state:disabled,.gallery-episode-toggle:disabled{opacity:.55;cursor:wait}
+.gallery-season-check,.gallery-episode-check{display:grid;place-items:center;width:26px;height:26px;border:2px solid var(--muted);border-radius:50%;font-size:.9rem;font-weight:850}
+.gallery-season-state[aria-pressed="true"] .gallery-season-check,.gallery-episode-toggle[aria-pressed="true"] .gallery-episode-check{border-color:var(--muted);background:var(--muted);color:var(--card)}
+.gallery-season-episodes{padding:0 16px 8px}
+.gallery-season-episodes.is-animating{overflow:hidden;overflow-anchor:none}
+.gallery-episode-row{display:grid;grid-template-columns:clamp(84px,24vw,124px) minmax(0,1fr) 44px;align-items:center;gap:12px;min-width:0;min-height:88px;padding:12px 0;border-top:1px solid var(--border)}
+.gallery-episode-art{display:block;width:100%;aspect-ratio:16/9;border-radius:8px;overflow:hidden;background:var(--inner)}
+.gallery-episode-copy{display:grid;min-width:0;gap:5px}
+.gallery-episode-copy strong{font-size:.875rem;line-height:1.4;overflow-wrap:anywhere}
+.gallery-episode-copy small{color:var(--muted);font-size:.75rem;line-height:1.4}
+.gallery-series-detail{background:var(--bg);background:radial-gradient(ellipse at top left,color-mix(in srgb,var(--muted) 22%,transparent),transparent 65%),var(--bg)}
+.gallery-series-detail .gallery-detail-header{display:grid;grid-template-columns:44px minmax(0,1fr) 44px;gap:14px;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
+.gallery-series-detail .gallery-detail-header h2{text-align:center;font-size:1.05rem}
+.gallery-series-detail .gallery-detail-header>[data-gallery-close]{font-size:2rem;line-height:1;padding-bottom:3px}
+.gallery-series-detail .gallery-detail-body{padding-top:16px;gap:16px}
+.gallery-series-detail .gallery-detail-tabs{background:transparent;padding:0;gap:16px;border-radius:0;border-bottom:1px solid var(--border)}
+.gallery-series-detail .gallery-detail-tabs button{flex:0 1 auto;min-width:72px;padding:10px 0;border-radius:0;border-bottom:2px solid transparent}
+.gallery-series-detail .gallery-detail-tabs button[aria-selected="true"]{background:transparent;border-bottom-color:var(--text);box-shadow:none}
+.gallery-series-detail[open]{animation:gallery-series-open 180ms cubic-bezier(.2,.75,.25,1)}
+.gallery-season-chevron{transition:transform 180ms ease}
+.gallery-season>summary{scroll-margin-top:calc(env(safe-area-inset-top) + 80px)}
+.gallery-season-poster{transition:width 180ms ease,height 180ms ease}
+@keyframes gallery-series-open{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.gallery-action-menu{position:fixed;z-index:5;top:calc(env(safe-area-inset-top) + 72px);right:max(24px,env(safe-area-inset-right));display:grid;gap:4px;width:min(260px,calc(100vw - 48px));padding:7px;border:1px solid var(--border);border-radius:18px;background:var(--card);box-shadow:0 18px 60px #0006}
+.gallery-action-menu button{min-height:48px;padding:12px;border:0;border-radius:10px;background:transparent;color:var(--text);text-align:left;font:inherit;font-weight:700;cursor:pointer}
+.gallery-action-menu .danger{color:var(--red)}
+.gallery-action-menu.hidden{display:none!important}
+.gallery-notes{display:block;width:100%;min-height:150px;padding:12px;border:1px solid var(--border);border-radius:12px;background:var(--inner);color:var(--text);font:inherit;line-height:1.5;resize:vertical}
+.gallery-tile:focus-visible,.gallery-category:focus-visible,.gallery-back:focus-visible,.gallery-menu-button:focus-visible,.gallery-season>summary:focus-visible,.gallery-season-state:focus-visible,.gallery-episode-toggle:focus-visible{outline:2px solid var(--blue2);outline-offset:3px}
+
+@media(min-width:700px){.gallery-home{grid-template-columns:1fr 1fr}.gallery-category{min-height:230px}.gallery-grid{grid-template-columns:repeat(5,minmax(0,1fr));gap:28px 16px}}
+@media(max-width:360px){.gallery-season-list{padding-inline:12px}.gallery-season>summary{padding:12px;gap:10px}.gallery-season-episodes{padding:0 12px 8px}.gallery-episode-row{grid-template-columns:76px minmax(0,1fr) 44px;gap:10px}.gallery-season-label strong{font-size:.95rem}}
+@media(max-width:350px){.gallery-category{min-height:175px}.gallery-tile strong{font-size:.75rem}.gallery-tile small{font-size:.68rem}}
+
+/* Preserve the paragraph breaks in full show summaries. */
+.gallery-info-panel [data-gallery-details]>p{white-space:pre-line}
+
+.gallery-detail-copy .gallery-watch-next{width:100%;margin:0 0 14px}
+.gallery-detail-copy .gallery-caught-up{margin:0 0 12px}

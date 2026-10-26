@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' https://api.github.com https://okkwteywtgfsnlrjdyhv.supabase.co wss://okkwteywtgfsnlrjdyhv.supabase.co https://api.tvmaze.com; img-src 'self' data: https://static.tvmaze.com https://m.media-amazon.com https://images-na.ssl-images-amazon.com https://*.mzstatic.com; manifest-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'" />
+  <title>Watched Logger</title>
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Watched Logger" />
+  <meta name="theme-color" content="#000000" />
+  <link rel="apple-touch-icon" type="image/png" href="./assets/img/apple-touch-icon.png?v=1" />
+  <link rel="icon" type="image/png" href="./assets/img/app-icon.png?v=3" />
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="stylesheet" href="assets/css/app.css?v=35">
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=33">
+  <link rel="stylesheet" href="assets/css/discovery.css">
+  <link rel="stylesheet" href="library-gallery.css?v=35">
+<style>/* The native footer uses the same actions; retain web controls as a fallback. */
+html.watchlog-native-controls .bottom-tabs,
+html.watchlog-native-controls .floating-add-button {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+/* Search is a full page, with room for the fixed native navigation. */
+#discovery-view {
+  top: 0 !important;
+  height: 100dvh !important;
+  background: var(--bg);
+  padding: 0;
+}
+#discovery-view .search-sheet {
+  width: 100%;
+  max-width: none;
+  height: min(100%, var(--search-viewport-height, 100dvh));
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+#discovery-view .search-sheet-header {
+  padding-top: calc(env(safe-area-inset-top, 0px) + 16px);
+}
+#discovery-view .search-sheet-close {
+  top: calc(env(safe-area-inset-top, 0px) + 12px);
+}
+#discovery-view .search-sheet-results {
+  padding-bottom: calc(110px + env(safe-area-inset-bottom, 0px));
+}
+html:has(#discovery-view:not(.hidden)) .top-nav,
+html:has(#discovery-view:not(.hidden)) #library-view,
+html:has(#discovery-view:not(.hidden)) #settings-view {
+  visibility: hidden;
+}
+</style>
+</head>
+<body>
+  <div id="auth-screen" class="auth-overlay">
+    <div class="auth-card">
+      <div class="auth-header"><h2 id="auth-title">Welcome Back</h2><p id="auth-sub">Use the same email and 4-digit PIN on any device.</p></div>
+      <div id="maintenance-banner" class="maintenance-banner hidden" role="status" aria-live="polite"><strong>Watched Logger is under maintenance</strong><span id="maintenance-banner-message"></span><button id="maintenance-owner-access" class="maintenance-owner-access" type="button">Owner access</button></div>
+      <div id="auth-message" class="message info hidden"></div>
+      <form id="auth-form">
+        <div id="auth-name-group" class="form-group hidden"><label for="auth-name">Name</label><input id="auth-name" type="text" autocomplete="name" placeholder="Your name" /></div>
+        <div class="form-group"><label for="auth-email">Email</label><input id="auth-email" type="email" autocomplete="email" required placeholder="name@example.com" /></div>
+        <div class="form-group"><label for="auth-pin">4-digit PIN</label><input id="auth-pin" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="one-time-code" required placeholder="••••" /></div>
+        <button id="auth-submit" class="btn btn-primary btn-full" type="submit">Log In</button>
+      </form>
+      <button id="forgot-pin" class="auth-toggle" type="button">Forgot PIN? Use a recovery code</button>
+      <div id="auth-toggle" class="auth-toggle">Don't have an account? Create PIN Account</div>
+      <div class="message info">Your email is the account ID and your library syncs through Watched Logger cloud storage. No verification or reset emails are sent. Create a recovery code in Account &amp; Sync to reset a forgotten PIN.</div>
+    </div>
+  </div>
+  <div class="top-nav">
+    <div class="nav-header"><button id="user-pill" class="user-pill" type="button" aria-label="Open Account and Sync"><span class="profile-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 12a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9Zm0 2c-4.3 0-8 2.2-8 5v2h16v-2c0-2.8-3.7-5-8-5Z"/></svg></span><span id="nav-name">Guest</span></button><button id="refresh-app" class="refresh-app" type="button" aria-label="Refresh Watched Logger">Refresh</button></div>
+    <div class="quick-status" aria-label="App status"><span id="quick-sync-status" class="quick-status-chip" data-state="ok" role="status" aria-live="polite"><i></i><span>Synced</span></span><span id="quick-reminder-status" class="quick-status-chip" data-state="idle"><i></i><span>Reminders</span></span></div>
+    <h1>Watched Logger</h1>
+    <div class="search-box"><svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5z"/></svg><input id="search-input" type="text" placeholder="Search titles or platforms" /></div>
+    <div class="stats-row"><div class="stat-card"><span id="count-planned" class="num">0</span><span class="label">Planned</span></div><div class="stat-card"><span id="count-watching" class="num">0</span><span class="label">Watching</span></div><div class="stat-card"><span id="count-watched" class="num">0</span><span class="label">Watched</span></div></div>
+  </div>
+
+  <main class="container">
+    <div id="library-view"><div id="list-toolbar" class="list-toolbar hidden"><div class="list-toolbar-row"><div id="list-label" class="section-label">Titles</div><label class="sort-control" for="sort-mode"><span>Sort</span><select id="sort-mode" aria-label="Sort titles"><option value="current">Current</option><option value="recent">Recently watched</option><option value="release">Upcoming release</option><option value="title">Title A–Z</option><option value="platform">Platform watched on</option><option value="watched">Date watched</option></select></label></div><div class="filter-pills" aria-label="Filter titles by status"><button class="pill-btn active" data-filter="All">All</button><button class="pill-btn" data-filter="Planned">Planned</button><button class="pill-btn" data-filter="Watching">Watching</button><button class="pill-btn" data-filter="Watched">Watched</button></div></div><div id="library-features" class="hidden"><div id="library-collections" class="library-collections hidden"><label for="library-collection-select">Collection</label><select id="library-collection-select"><option value="">All titles</option></select></div><div id="continue-watching" class="hidden"></div></div><div id="media-list" class="titles-group"></div><div id="library-dashboard" class="hidden"></div><div id="empty-state" class="hidden" style="text-align:center;margin-top:40px;color:var(--muted)">No titles found. Tap <strong>+</strong> to start.</div></div>
+    <div id="settings-view" class="hidden">
+      <header class="preferences-heading"><h2>Settings</h2></header>
+      <div id="settings-category-menu" class="settings-category-menu" aria-label="Settings categories">
+        <button type="button" class="settings-category-row" data-settings-open="general"><span class="settings-category-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 7h7m4 0h5M4 17h3m4 0h9"/><circle cx="13" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg></span><span>General</span><span class="settings-chevron" aria-hidden="true">›</span></button>
+        <button type="button" class="settings-category-row" data-settings-open="reminders"><span class="settings-category-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/><path d="m4 4-1.5-1.5M20 4l1.5-1.5"/></svg></span><span>Release Reminders</span><span class="settings-chevron" aria-hidden="true">›</span></button>
+        <button type="button" class="settings-category-row" data-settings-open="account"><span class="settings-category-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 18h10a4 4 0 0 0 .5-8A6 6 0 0 0 6 8.5 4.8 4.8 0 0 0 7 18Z"/><path d="M8 21h8"/></svg></span><span>Account &amp; Sync</span><span class="settings-chevron" aria-hidden="true">›</span></button>
+        <button type="button" id="maintenance-settings-button" class="settings-category-row hidden" data-settings-open="maintenance"><span class="settings-category-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3 21 20H3L12 3Z"/><path d="M12 9v5m0 3h.01"/></svg></span><span>Maintenance</span><span class="settings-chevron" aria-hidden="true">›</span></button>
+      </div>
+      <div class="settings-quick-actions"><button type="button" id="settings-sync-shortcut" class="settings-category-row"><span class="settings-category-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M20 7v5h-5M4 17v-5h5"/><path d="M5.5 9A7 7 0 0 1 17 5l3 2M4 17l3 2a7 7 0 0 0 11.5-4"/></svg></span><span><strong>Track Sync</strong><small>Sync your Watch Logger library now</small></span><span class="settings-chevron" aria-hidden="true">›</span></button></div>
+      <section class="settings-section settings-detail-panel hidden" data-settings-panel="general" aria-labelledby="general-settings-heading"><button type="button" class="settings-back" data-settings-back>‹ <span>Settings</span></button><h3 id="general-settings-heading" class="section-label">General</h3><div class="profile-card appearance-card"><div class="form-group"><label for="appearance-mode">Colour mode</label><select id="appearance-mode"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select></div><div class="appearance-copy">System follows your iPhone setting. Light and Dark keep your chosen appearance on this device.</div><section class="sync-box"><h4>Offline use</h4><p id="offline-status" class="small-note">Preparing offline availability…</p><button id="refresh-offline-copy" type="button" class="btn btn-secondary">Update offline copy</button></section></div></section>
+      <section class="settings-section settings-detail-panel hidden" data-settings-panel="reminders" aria-labelledby="release-reminders-heading"><button type="button" class="settings-back" data-settings-back>‹ <span>Settings</span></button><h3 id="release-reminders-heading" class="section-label">Release Reminders</h3><div class="profile-card background-reminder-card"><div class="reminder-test-title">Release reminders when the app is closed</div><div id="background-reminder-status" class="notification-status">Checking notification support…</div><div class="notification-rule"><span class="notification-rule-dot"></span><span><strong>Available now</strong> when a tracked episode becomes available to stream in your viewing region</span></div><div class="notification-rule"><span class="notification-rule-dot"></span><span><strong>1 day before</strong> each confirmed streaming episode or Planned release</span></div><div class="notification-rule"><span class="notification-rule-dot"></span><span><strong>6 hours before</strong> each confirmed streaming episode or Planned release</span></div><div class="notification-actions"><button id="enable-background-reminders" class="btn btn-primary btn-full" type="button">Enable Background Reminders</button><button id="disable-background-reminders" class="btn btn-secondary btn-full hidden" type="button">Turn Off on This Device</button></div><div class="small-note" style="margin-top:11px">iPhone delivers these through Web Push, so Watched Logger does not stay running or use background battery. Alerts use confirmed streaming availability in your viewing region, regardless of watch status. Season and film alerts remain for Planned titles. Broadcast times do not trigger streaming reminders. If the streaming date or time is unconfirmed, timed alerts wait for confirmation. Choose your viewing region in General.</div></div></section>
+      <section class="settings-section settings-detail-panel hidden" data-settings-panel="account" aria-labelledby="account-sync-heading"><button type="button" class="settings-back" data-settings-back>‹ <span>Settings</span></button><h3 id="account-sync-heading" class="section-label">Account &amp; Sync</h3><div id="account-sync-card" class="profile-card"><div class="profile-header"><div id="avatar" class="avatar">U</div><div class="profile-info"><h3 id="profile-name">User</h3><p id="profile-email"></p></div></div><div class="sync-box"><div class="sync-title"><div id="sync-dot" class="sync-dot ok"></div>Watched Logger Cloud Sync</div><div id="sync-status" class="sync-text">Your library is linked to this email account and can be loaded on another device with the same 4-digit PIN.</div><button id="sync-now" class="btn btn-secondary btn-full" type="button">Sync Now</button></div><div class="sync-box"><div class="sync-title">Change 4-digit PIN</div><div class="form-group"><label for="new-pin">New PIN</label><input id="new-pin" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" placeholder="••••" /></div><button id="change-pin" class="btn btn-secondary btn-full" type="button">Change PIN</button><div class="small-note">PIN changes apply to every device. Five incorrect PIN attempts temporarily lock sign-in for 15 minutes.</div></div><section class="sync-box"><h4>Account recovery</h4><p class="small-note">Create a single-use recovery code and keep it somewhere safe. A new code replaces the previous one.</p><label for="recovery-current-pin">Current PIN</label><input id="recovery-current-pin" type="password" inputmode="numeric" maxlength="4" autocomplete="off"><button type="button" id="generate-recovery-code" class="btn btn-secondary">Create / replace recovery code</button><p id="recovery-status" class="small-note" role="status"></p></section><button id="logout-btn" class="btn btn-danger btn-full">Log Out</button></div></section>
+      
+      <section id="private-reminder-history" class="dashboard-section hidden"><h3>Reminders</h3><p class="small-note">Upcoming reminders and recent delivery activity.</p><button id="refresh-reminder-history" type="button" class="btn btn-secondary">View reminders</button><dialog id="reminder-history-dialog" class="changelog-dialog"><header class="changelog-heading"><h2>Reminders</h2><button id="close-reminder-history" class="close-btn" type="button" aria-label="Close Reminders">&times;</button></header><div class="changelog-body" id="reminder-history-body"></div></dialog></section>
+    </div>
+    <section id="discovery-view" class="discovery-view hidden" role="dialog" aria-modal="true" aria-labelledby="discovery-heading">
+      <div class="search-sheet"><div class="search-sheet-header">
+      <button id="close-title-search" class="close-btn search-sheet-close" type="button" aria-label="Close search">&times;</button><header class="discovery-heading"><h2 id="discovery-heading">Search &amp; add</h2><p>Find saved titles or add something new.</p></header>
+      <form id="discovery-form" role="search"><label class="discovery-label" for="discovery-query">Search your library and all titles</label><div class="discovery-search"><input id="discovery-query" type="search" placeholder="Search movies and series" autocomplete="off" enterkeyhint="search" maxlength="100"><button type="submit">Search</button></div></form>
+      <div id="discovery-format-filters" class="discovery-filters hidden" role="group" aria-label="Search format"><button type="button" data-discovery-filter="All" aria-pressed="true">All</button><button type="button" data-discovery-filter="Series" aria-pressed="false">Series</button><button type="button" data-discovery-filter="Film" aria-pressed="false">Films</button></div>
+      </div><div class="search-sheet-results" id="search-sheet-results">
+      <p id="discovery-status" class="discovery-status" role="status" aria-live="polite">Search your library instantly. Enter at least two characters to search all titles.</p>
+      <section id="discovery-library" class="discovery-section hidden" aria-labelledby="discovery-library-heading"><h3 id="discovery-library-heading">Your library</h3><div id="discovery-library-results" class="discovery-results"></div></section>
+      <section id="discovery-global" class="discovery-section hidden" aria-labelledby="discovery-global-heading"><h3 id="discovery-global-heading">All titles</h3><div id="discovery-results" class="discovery-results" aria-busy="false"></div></section>
+      <button id="discovery-search-global" type="button" class="btn btn-secondary discovery-global-button hidden">Search all titles</button>
+      <button id="discovery-retry" type="button" class="btn btn-secondary hidden">Try again</button>
+      <div class="discovery-manual"><span>Can’t find a title?</span><button id="discovery-manual" type="button">Add manually</button></div>
+      </div></div>
+    </section>
+  </main>
+  <dialog id="discovery-detail" class="discovery-detail" aria-labelledby="discovery-detail-title"><header><h2 id="discovery-detail-title">Title details</h2><button id="discovery-close" type="button" class="close-btn" aria-label="Close title details">&times;</button></header><div id="discovery-detail-body"></div></dialog>
+
+  <button id="add-btn" class="floating-add-button hidden" type="button" aria-label="Search and add titles"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg></button>
+
+  <nav class="bottom-tabs" aria-label="Main navigation" data-active-tab="library">
+    <button class="tab-btn active" data-tab="library"><div class="tab-icon"><svg viewBox="0 0 24 24"><path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H8V4h12v12z"/></svg></div><span>Library</span></button>
+    <button class="tab-btn" data-tab="settings"><div class="tab-icon"><svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58-1.92-3.32-2.39.96c-.5-.38-1.03-.7-1.62-.94L14.4 2.4h-4.8l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96-1.92 3.32 2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58 1.92 3.32 2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54h4.8l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96 1.92-3.32-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg></div><span>Settings</span></button>
+  </nav>
+
+  <div id="modal" class="modal-overlay hidden"><div class="modal-content"><div class="modal-header"><h2 id="modal-title">Log Title</h2><div class="modal-header-actions"><button id="save-btn" class="header-save-btn" type="submit" form="media-form">Save</button><button id="close-modal" class="close-btn" type="button" aria-label="Close editor">&times;</button></div></div><form id="media-form"><input id="item-id" type="hidden" /><input id="tvmaze-id" type="hidden" /><input id="imdb-id" type="hidden" /><input id="release-year" type="hidden" /><input id="film-release-source" type="hidden" /><div class="form-group suggest-wrap"><label for="title">Title</label><input id="title" type="text" required autocomplete="off" placeholder="e.g. Black Mirror" /><div id="suggest-list" class="suggest-list hidden"></div></div><div class="form-row"><div class="form-group"><label for="type">Format</label><select id="type"><option>Series</option><option>Film</option><option>Anime</option><option>Game</option></select></div><div class="form-group"><label for="status">Status</label><select id="status"><option>Watched</option><option>Watching</option><option>Planned</option></select></div></div><div id="series-section" class="section-box"><span class="section-title">Seasons & Progress</span><div class="form-row"><div class="form-group"><label for="total-seasons">Known / Announced Seasons</label><input id="total-seasons" type="number" min="1" /></div><div class="form-group"><label for="watched-seasons">Fully Watched Seasons</label><input id="watched-seasons" type="number" min="0" /></div></div><div class="form-row"><div class="form-group"><label for="cur-season">Season Watched</label><select id="cur-season"><option value="0">0 — Not started</option></select></div><div class="form-group"><label for="cur-ep">Episode Watched To</label><select id="cur-ep"><option value="0">0 — None watched</option></select></div></div><p id="progress-verify-note" class="small-note">Choose a series to autofill released episodes and valid progress ranges.</p></div><label class="weekly-release-preference"><input id="hide-from-weekly-releases" type="checkbox" /><span class="weekly-release-preference-copy"><strong>Exclude this show from Weekly Releases</strong><small>It stays in your library. Episode tracking continues, but release reminders pause until you include it again.</small></span></label><div id="airing-section" class="section-box" style="display:none"><span class="section-title">📺 Currently Airing</span><p id="airing-note" class="small-note">Series identity is checked with IMDb; episode dates come from TVMaze.</p><div class="form-row"><div class="form-group"><label for="airing-season">Airing Season</label><input id="airing-season" type="number" readonly /></div><div class="form-group"><label for="latest-episode">Latest Available</label><input id="latest-episode" type="text" readonly /></div></div><div class="form-row"><div class="form-group"><label for="next-episode">Next Episode</label><input id="next-episode" type="text" readonly /></div><div class="form-group"><label for="next-episode-date">Release Date / Time</label><input id="next-episode-date" type="datetime-local" readonly /></div></div><input id="latest-episode-num" type="hidden" /><input id="latest-episode-title" type="hidden" /><input id="next-episode-num" type="hidden" /><input id="next-episode-title" type="hidden" /></div><div id="upcoming-section" class="section-box"><span class="section-title">🔔 Verified Upcoming Season</span><p id="season-verify-note" class="small-note">Series identity is checked with IMDb; episode and season data comes from TVMaze.</p><div class="form-row"><div class="form-group"><label for="next-season-num">Upcoming Season #</label><input id="next-season-num" type="number" /></div><div class="form-group"><label for="next-season-date">Premiere Date / Time</label><input id="next-season-date" type="datetime-local" /></div></div></div><div id="film-section" class="section-box" style="display:none"><span class="section-title">🎬 Verified Film Release</span><p id="film-verify-note" class="small-note">Films and series are checked through multiple sources.</p><div class="form-group"><label for="film-release-date">Release Date</label><input id="film-release-date" type="date" /></div></div><div class="form-group"><label for="platform">Watched / Streaming Source</label><input id="platform" type="text" list="platform-options" placeholder="Theatre, Netflix, Apple TV+, etc." /><datalist id="platform-options"><option value="Theatre"></option><option value="Netflix"></option><option value="Disney+"></option><option value="Prime Video"></option><option value="Apple TV+"></option><option value="Max"></option><option value="Hulu"></option><option value="Paramount+"></option><option value="Peacock"></option><option value="BBC iPlayer"></option><option value="ITVX"></option><option value="Channel 4"></option><option value="Blu-ray"></option><option value="DVD"></option><option value="Digital Purchase"></option></datalist></div><button id="delete-btn" type="button" class="btn btn-danger btn-full modal-delete-button hidden">Delete</button></form></div></div>
+
+
+  <dialog id="title-lists-dialog" class="changelog-dialog feature-dialog" data-block-refresh><header class="changelog-heading"><h2>Custom lists</h2><button type="button" id="close-title-lists" class="close-btn" aria-label="Close lists">×</button></header><div class="changelog-body"><div id="title-lists-options"></div><label for="title-new-list">Create and add to a list</label><input id="title-new-list" maxlength="40" placeholder="List name"><p id="title-lists-status" role="status"></p><button type="button" id="save-title-lists" class="btn btn-primary btn-full">Save lists</button></div></dialog>
+  <dialog id="recovery-code-dialog" class="changelog-dialog feature-dialog" data-block-refresh><header class="changelog-heading"><h2>Save your recovery code</h2></header><div class="changelog-body"><p>This code is shown once. Keep it outside Watch Logger. It lets you reset your PIN and replaces any previous recovery code.</p><output id="recovery-code-output" class="recovery-code"></output><button type="button" id="copy-recovery-code" class="btn btn-secondary btn-full">Copy code</button><p id="recovery-copy-status" role="status"></p><label class="list-choice"><input id="recovery-code-saved" type="checkbox"><span>I have saved this code somewhere safe</span></label><button type="button" id="close-recovery-code" class="btn btn-primary btn-full" disabled>Done</button></div></dialog>
+  <dialog id="recover-account-dialog" class="changelog-dialog feature-dialog" data-block-refresh><header class="changelog-heading"><h2>Reset your PIN</h2><button type="button" id="close-recover-account" class="close-btn" aria-label="Close recovery">×</button></header><form id="recover-account-form" class="changelog-body"><p>Use the recovery code you previously saved. Without it, a forgotten PIN cannot be reset.</p><label for="recover-email">Account email</label><input id="recover-email" type="email" autocomplete="email" required><label for="recover-code">Recovery code</label><input id="recover-code" type="password" autocomplete="off" required><label for="recover-pin">New 4-digit PIN</label><input id="recover-pin" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="new-password" required><p id="recover-status" role="status" aria-live="polite"></p><button id="recover-submit" type="submit" class="btn btn-primary">Reset PIN</button></form></dialog>
+
+  <script src="build-info.js"></script>
+  <script src="library-gallery.js?v=36"></script>
+  
+  <script src="assets/js/regional-releases.js"></script>
+  <script src="assets/js/app-core.js?v=31"></script>
+  <script src="assets/js/reminders.js?v=24"></script>
+  <script src="assets/js/sync.js?v=27"></script>
+  <script src="assets/js/library.js?v=31"></script>
+  <script src="assets/js/catalogue.js?v=27"></script>
+  <script src="assets/js/dashboard.js?v=34"></script>
+  <script src="assets/js/discovery.js?v=1"></script>
+  <script src="assets/js/navigation.js"></script>
+  <script src="assets/js/features.js"></script>
+  <script src="assets/js/region-settings.js"></script>
+  <script src="assets/js/editor.js?v=27"></script>
+  <script src="native.js"></script>
+
+</body>
+</html>

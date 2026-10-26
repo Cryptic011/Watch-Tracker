@@ -1,0 +1,7 @@
+{
+  "appId": "com.cryptic011.watchedtracker",
+  "appName": "Watched Tracker",
+  "webDir": "www",
+  "ios": { "contentInset": "never", "backgroundColor": "#0a0a0a", "handleApplicationNotifications": false },
+  "server": { "hostname": "localhost", "iosScheme": "capacitor" }
+}

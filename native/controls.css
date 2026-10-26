@@ -1,0 +1,36 @@
+/* The native footer uses the same actions; retain web controls as a fallback. */
+html.watchlog-native-controls .bottom-tabs,
+html.watchlog-native-controls .floating-add-button {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+/* Search is a full page, with room for the fixed native navigation. */
+#discovery-view {
+  top: 0 !important;
+  height: 100dvh !important;
+  background: var(--bg);
+  padding: 0;
+}
+#discovery-view .search-sheet {
+  width: 100%;
+  max-width: none;
+  height: min(100%, var(--search-viewport-height, 100dvh));
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+#discovery-view .search-sheet-header {
+  padding-top: calc(env(safe-area-inset-top, 0px) + 16px);
+}
+#discovery-view .search-sheet-close {
+  top: calc(env(safe-area-inset-top, 0px) + 12px);
+}
+#discovery-view .search-sheet-results {
+  padding-bottom: calc(110px + env(safe-area-inset-bottom, 0px));
+}
+html:has(#discovery-view:not(.hidden)) .top-nav,
+html:has(#discovery-view:not(.hidden)) #library-view,
+html:has(#discovery-view:not(.hidden)) #settings-view {
+  visibility: hidden;
+}

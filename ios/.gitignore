@@ -1,0 +1,10 @@
+App/build
+App/Pods
+App/output
+DerivedData
+xcuserdata
+
+# Cordova plugins for Capacitor
+capacitor-cordova-ios-plugins
+
+# Bundled web assets and app config are committed so Xcode opens directly.
