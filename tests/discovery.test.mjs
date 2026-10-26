@@ -12,7 +12,7 @@ function harness(){
     querySelectorAll:()=>[],replaceChildren(){this.innerHTML='';},focus(){this.focused=true;},blur(){this.focused=false;},showModal(){this.open=true;},close(){this.open=false;}});
   const $=id=>{if(!nodes.has(id))nodes.set(id,element());return nodes.get(id);};
   const filters=['All','Film','Series'].map(type=>Object.assign(element(),{dataset:{discoveryFilter:type}}));
-  const c=vm.createContext({URL,AbortController,setTimeout,clearTimeout,console,$,currentUser:{id:'a'},currentTab:'search',mediaItems:[],
+  const c=vm.createContext({URL,AbortController,setTimeout,clearTimeout,console,$,currentUser:{id:'a'},currentTab:'search',mediaItems:[],searchInput:element(),searchQuery:'',
     document:{querySelectorAll:()=>filters},esc:value=>String(value).replace(/[&<>"']/g,x=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[x])),
     findTrackedDuplicate:()=>null,searchAllTitles:async()=>[],openAdd:()=>calls.push('new'),selectSuggestion:item=>calls.push(item.title),openEdit:id=>calls.push('edit:'+id),openMediaRow:id=>calls.push('details:'+id),
     switchTab:tab=>calls.push(tab),titleInput:element()});
@@ -111,7 +111,7 @@ test('Search errors expose a retry and clearing input removes results',async()=>
 });
 test('Search is immediately after Library and artwork/update connections are allowed by CSP',()=>{
   const html=fs.readFileSync(new URL('../index.html',import.meta.url),'utf8');
-  assert.deepEqual([...html.matchAll(/class="tab-btn[^"]*" data-tab="([^"]+)"/g)].map(m=>m[1]),['library','settings']);
+  assert.deepEqual([...html.matchAll(/class="tab-btn[^"]*" data-tab="([^"]+)"/g)].map(m=>m[1]),['library','search','settings']);
   assert.match(html,/connect-src[^;]*wss:\/\/okkwteywtgfsnlrjdyhv\.supabase\.co/);
   assert.match(html,/img-src[^;]*https:\/\/\*\.mzstatic\.com/);
   assert.doesNotMatch(html.match(/connect-src[^;]*/)[0],/(?:wikipedia|wikidata|wikimedia)/i);
@@ -139,7 +139,7 @@ test('Catalogue gateway includes TVMaze show summaries alongside film descriptio
 test('Retired History and Watchlist tabs are removed and cannot be activated',()=>{
   const html=fs.readFileSync(new URL('../index.html',import.meta.url),'utf8');
   const library=fs.readFileSync(new URL('../assets/js/library.js',import.meta.url),'utf8');
-  assert.deepEqual([...html.matchAll(/class="tab-btn[^"]*" data-tab="([^"]+)"/g)].map(m=>m[1]),['library','settings']);
+  assert.deepEqual([...html.matchAll(/class="tab-btn[^"]*" data-tab="([^"]+)"/g)].map(m=>m[1]),['library','search','settings']);
   assert.match(library,/const ALLOWED_BOTTOM_TABS=new Set\(\["library","search","settings"\]\)/);
   assert.match(library,/if\(!ALLOWED_BOTTOM_TABS\.has\(tab\)\)tab="library"/);
   assert.match(library,/label==="history"\|\|label==="watchlist"/);

@@ -5,7 +5,7 @@
      ---------------------------------------------------------
      Supabase Auth/email is NOT used. No SMTP, verification or
      password-reset email is required. The browser talks only to
-     Watched Logger's custom PIN API. The API stores a salted PBKDF2 PIN
+     Watch Tracker's custom PIN API. The API stores a salted PBKDF2 PIN
      verifier, rate-limits failed PIN attempts, and returns an
      opaque session token. Libraries are stored per account and
      also cached locally for offline use.
@@ -27,7 +27,7 @@
   let cloudSessionToken = "";
   let isSignUp = false;
   let maintenanceOwnerAccess = false;
-  let publicMaintenance = {enabled:false,message:"Watched Logger is currently under maintenance. Please try again shortly."};
+  let publicMaintenance = {enabled:false,message:"Watch Tracker is currently under maintenance. Please try again shortly."};
   let activeFilter = "All";
   let currentTab = "library";
   let globalSwipeX=0,globalSwipeY=0,globalSwipeAt=0,globalSwipeTarget=null,globalSwipeHandledAt=0;

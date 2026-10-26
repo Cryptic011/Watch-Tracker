@@ -16,7 +16,7 @@ test('Closed-app reminders display the show title above the concise release mess
   assert.equal(shown[0].body,'New episode out now');
   assert.equal(shown[1].title,'Reacher');
   assert.equal(shown[1].body,'New episode out now');
-  assert.equal(shown[0].icon,'./assets/img/app-icon.png?v=3');
+  assert.equal(shown[0].icon,'./assets/img/app-icon.png?v=4');
   assert.equal(shown[0].data.episode,3);
   assert.notEqual(shown[0].tag,shown[1].tag);
 });

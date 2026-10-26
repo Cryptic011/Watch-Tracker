@@ -164,10 +164,35 @@ const server=http.createServer((req,res)=>{
 
   // Add and edit via the real form; external catalogue responses stay mocked.
   phase='search';
+  assert.equal(await page.locator('.bottom-tabs [data-tab="search"]').isVisible(),false,'Search stays out of the island on Library');
+  const fixedDock=await page.evaluate(async()=>{
+    const spacer=document.createElement('div');spacer.style.height='2400px';document.querySelector('main').append(spacer);
+    const bounds=()=>['.bottom-tabs','#add-btn'].map(selector=>{const box=document.querySelector(selector).getBoundingClientRect();return {x:box.x,y:box.y};});
+    const before=bounds();window.scrollTo(0,900);await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+    const after=bounds(),scroll=window.scrollY;spacer.remove();window.scrollTo(0,0);return {before,after,scroll};
+  });
+  assert.ok(fixedDock.scroll>800,'the Library actually scrolled during the fixed-control test');
+  assert.deepEqual(fixedDock.after,fixedDock.before,'the island and Search button stay fixed while Library scrolls');
+  await page.locator('#search-input').click();
+  assert.equal(await page.locator('#discovery-view').isVisible(),true,'Library search opens the Search page');
+  assert.equal(await page.locator('.bottom-tabs [data-tab="search"]').isVisible(),true);
+  assert.equal(await page.locator('.bottom-tabs').getAttribute('data-active-tab'),'search');
+  await page.locator('#discovery-query').fill('B');
+  assert.equal(await page.locator('#discovery-query').inputValue(),'B');
+  await page.locator('.bottom-tabs [data-tab="library"]').click();
+  assert.equal(await page.locator('.bottom-tabs [data-tab="search"]').isVisible(),false,'leaving Search removes its temporary tab');
   const libraryScrollBeforeSearch=await page.evaluate(async()=>{window.scrollTo(0,160);await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));return window.scrollY;});
   await page.locator('#add-btn').click();
-  assert.equal(await page.locator('[data-tab="search"]').count(),0,'Search is a sheet rather than a navigation page');
-  assert.equal(await page.locator('#discovery-view').getAttribute('role'),'dialog');
+  assert.equal(await page.locator('.bottom-tabs [data-tab="search"]').isVisible(),true,'Search joins the island only while active');
+  assert.equal(await page.locator('#discovery-view').getAttribute('role'),'region');
+  const fullSearch=await page.locator('#discovery-view').boundingBox();
+  assert.ok(fullSearch.x<=1&&fullSearch.y<=1&&fullSearch.width>=389&&fullSearch.height>=843,'Search covers the whole page');
+  assert.equal(await page.locator('#library-view').evaluate(node=>getComputedStyle(node).visibility),'hidden','Library artwork cannot show through Search');
+  await page.waitForFunction(()=>{
+    const cursor=getComputedStyle(document.querySelector('.bottom-tabs'),'::before');
+    return Math.abs(new DOMMatrixReadOnly(cursor.transform).m41-parseFloat(cursor.width))<1;
+  });
+  if(process.env.BROWSER_SCREENSHOT_DIR)await page.screenshot({path:path.join(process.env.BROWSER_SCREENSHOT_DIR,engine.name()+'-search.png')});
   await page.locator('#close-title-search').click();
   assert.equal(await page.locator('#discovery-view').isVisible(),false,'closing search returns to Library');
   await page.waitForFunction(expected=>Math.abs(window.scrollY-expected)<=2,libraryScrollBeforeSearch,{timeout:5000});
@@ -747,12 +772,14 @@ const server=http.createServer((req,res)=>{
   assert.equal(await page.locator('.top-nav h1').isVisible(),false,'Series shows its category heading without the app title');
   await page.locator('[data-filter="Watched"]').click();
   await page.locator('#sort-mode').selectOption('platform');
-  await page.locator('#search-input').fill('No matching title at all');
-  await page.waitForFunction(()=>searchQuery==='No matching title at all'&&document.querySelector('.gallery-empty'));
+  await page.locator('#search-input').click();
+  await page.locator('#discovery-query').fill('No matching title at all');
+  await page.waitForFunction(()=>discoveryQuery==='No matching title at all');
+  assert.equal(await page.locator('#discovery-library').isVisible(),false,'searching from a category uses the full Search page');
   assert.equal(await recurring.isVisible(),false,'schedule content stays off the Series browsing page');
   assert.equal(await recurring.textContent(),scheduleText,'Library status, search and sorting cannot remove recurring shows');
-  await page.locator('#search-input').fill('');
-  await page.waitForFunction(()=>searchQuery==='');
+  await page.locator('#close-title-search').click();
+  await page.waitForFunction(()=>currentTab==='library'&&searchQuery==='');
   await page.locator('[data-filter="All"]').click();await page.locator('#sort-mode').selectOption('current');
   await page.locator('[data-gallery-back]').click();
   assert.equal(await recurring.isVisible(),false,'returning from Series shows the compact schedule cards');

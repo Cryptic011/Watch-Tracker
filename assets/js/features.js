@@ -83,7 +83,7 @@ $('generate-recovery-code').onclick=async()=>{
 };
 $('recovery-code-saved').onchange=event=>{$('close-recovery-code').disabled=!event.target.checked;};
 $('copy-recovery-code').onclick=async()=>{
-  try{await navigator.clipboard.writeText(displayedRecoveryCode);$('recovery-copy-status').textContent='Copied. Store this somewhere safe outside Watch Logger.';}
+  try{await navigator.clipboard.writeText(displayedRecoveryCode);$('recovery-copy-status').textContent='Copied. Store this somewhere safe outside Watch Tracker.';}
   catch(_){$('recovery-copy-status').textContent='Select and copy the code above.';}
 };
 $('close-recovery-code').onclick=()=>{displayedRecoveryCode='';$('recovery-code-output').textContent='';$('recovery-code-dialog').close();};

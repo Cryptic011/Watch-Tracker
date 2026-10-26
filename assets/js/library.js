@@ -319,9 +319,12 @@
     const currentTabBtns=document.querySelectorAll(".bottom-tabs .tab-btn");
     const previousTab=currentTab;
     if(tab==="search"&&currentTab!=="search")searchReturnTab=currentTab;
-    const primaryTab=tab==="search"?searchReturnTab:tab;
-    currentTab=tab;currentTabBtns.forEach(b=>{b.classList.toggle("active",b.dataset.tab===primaryTab);b.setAttribute("aria-current",b.dataset.tab===primaryTab?"page":"false");});
-    document.querySelector(".bottom-tabs")?.setAttribute("data-active-tab",primaryTab);
+    currentTab=tab;currentTabBtns.forEach(b=>{
+      b.classList.toggle("hidden",b.dataset.tab==="search"&&tab!=="search");
+      b.classList.toggle("active",b.dataset.tab===tab);
+      b.setAttribute("aria-current",b.dataset.tab===tab?"page":"false");
+    });
+    document.querySelector(".bottom-tabs")?.setAttribute("data-active-tab",tab);
     const search=tab==="search",settings=(search?searchReturnTab:tab)==="settings";
     libraryView.classList.toggle("hidden",settings);settingsView.classList.toggle("hidden",!settings);
     if(!search)dismissTitleSearchKeyboard();
@@ -340,7 +343,10 @@
     if(typeof recordAppNavigation==="function")recordAppNavigation();
   }
   enforceBottomNavigation();
-  document.querySelectorAll(".bottom-tabs .tab-btn").forEach(b=>b.onclick=()=>goToTabHome(b.dataset.tab));
+  document.querySelectorAll(".bottom-tabs .tab-btn").forEach(b=>b.onclick=()=>{
+    if(b.dataset.tab==='search'&&currentTab==='search'){discoveryInput.focus({preventScroll:true});return;}
+    goToTabHome(b.dataset.tab);
+  });
   pillBtns.forEach(b=>b.onclick=()=>{pillBtns.forEach(x=>x.classList.remove("active"));b.classList.add("active");if(typeof saveNavigationPosition==="function")saveNavigationPosition();activeFilter=b.dataset.filter;render();if(typeof recordAppNavigation==="function")recordAppNavigation();});
   sortMode.onchange=e=>{activeSort=e.target.value;safeWriteJSON(SORT_KEY,activeSort);render();if(typeof recordAppNavigation==="function")recordAppNavigation();};
 
@@ -465,11 +471,8 @@
     render();void persistLibrary(mediaItems,{background:true,precleaned:true});bulkDialog.close();showAppToast(`Updated ${ids.length} title(s).`,"success");
   });
   function scheduleRender(){if(renderFrame)return;renderFrame=requestAnimationFrame(()=>{renderFrame=0;render();});}
-  searchInput.oninput=e=>{
-    searchQuery=e.target.value;clearTimeout(librarySearchTimer);
-    if(normalizeTitle(searchQuery)===renderedLibrarySearch)return;
-    librarySearchTimer=setTimeout(()=>{if(normalizeTitle(searchQuery)!==renderedLibrarySearch)scheduleRender();},70);
-  };
+  searchInput.addEventListener('focus',()=>openTitleSearch(searchInput.value.trim()));
+  searchInput.oninput=e=>openTitleSearch(e.target.value.trim());
   function openMediaRow(id,trigger=document.activeElement){
     const item=mediaItems.find(row=>String(row.id)===String(id));if(!item)return;
     const previous=typeof beginTitleNavigation==="function"?beginTitleNavigation():false;

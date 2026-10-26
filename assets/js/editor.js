@@ -482,4 +482,4 @@
       if(!publicMaintenance.enabled)await prefillLegacyAccount();
     }
   }
-  start().catch(err=>{console.error(err);showAuth();showMessage(`Watched Logger could not start: ${err.message||err}`);});
+  start().catch(err=>{console.error(err);showAuth();showMessage(`Watch Tracker could not start: ${err.message||err}`);});

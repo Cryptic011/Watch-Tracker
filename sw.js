@@ -101,7 +101,7 @@ self.addEventListener("push",event=>{
   event.waitUntil((async()=>{
     await self.registration.showNotification(typeof payload.title==="string"&&payload.title.trim()?payload.title.trim():"Release reminder",{
       body:payload.body||"A reminder is ready.",
-      icon:"./assets/img/app-icon.png?v=3",
+      icon:"./assets/img/app-icon.png?v=4",
       tag:payload.tag||"watchlog-reminder",
       renotify:true,
       data:payload.data||{url:"./"}

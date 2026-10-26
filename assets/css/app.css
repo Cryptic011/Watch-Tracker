@@ -232,9 +232,11 @@ html[data-theme="light"] .settings-detail-panel>.profile-card{background:#fff}
 .library-filter-panel .library-collections select{flex:1 1 140px;max-width:100%}
 
 /* Centred floating navigation. The separate search action stays Library-only. */
-.bottom-tabs{left:50%;right:auto;bottom:calc(env(safe-area-inset-bottom,0px) + 12px);transform:translateX(-50%);width:min(252px,calc(100% - 152px));max-width:none;min-height:66px;border:1px solid #ffffff1c;border-radius:999px;padding:6px;gap:0;isolation:isolate;background:linear-gradient(145deg,#262626ed,#181818ed);box-shadow:inset 0 1px 1px #ffffff12,0 8px 30px #0005}
+.bottom-tabs{position:fixed;left:50%;right:auto;bottom:calc(var(--dock-keyboard-offset,0px) + env(safe-area-inset-bottom,0px) + 12px);transform:translate3d(-50%,0,0);backface-visibility:hidden;width:min(252px,calc(100% - 152px));max-width:none;min-height:66px;border:1px solid #ffffff1c;border-radius:999px;padding:6px;gap:0;isolation:isolate;background:linear-gradient(145deg,#262626ed,#181818ed);box-shadow:inset 0 1px 1px #ffffff12,0 8px 30px #0005;z-index:95}
 .bottom-tabs::before{content:"";position:absolute;z-index:-1;left:6px;top:6px;bottom:6px;width:calc((100% - 12px)/2);border-radius:999px;background:#050505;box-shadow:0 1px 4px #0003;transform:translateX(0);transition:transform .3s cubic-bezier(.22,1,.36,1)}
 .bottom-tabs[data-active-tab="settings"]::before{transform:translateX(100%)}
+.bottom-tabs[data-active-tab="search"]{width:min(330px,calc(100% - 32px))}
+.bottom-tabs[data-active-tab="search"]::before{width:calc((100% - 12px)/3);transform:translateX(100%)}
 .bottom-tabs .tab-btn{position:relative;min-width:0;min-height:52px;justify-content:center;gap:3px;border-radius:999px;color:#a8a8ad;font-size:.68rem;line-height:1.15;touch-action:manipulation;transition:color .2s ease}
 .bottom-tabs .tab-btn.active{color:#fff}
 .bottom-tabs .tab-btn .tab-icon,.bottom-tabs .tab-btn.active .tab-icon{display:grid;place-items:center;background:transparent;padding:0;border-radius:0}
@@ -245,5 +247,6 @@ html[data-theme="light"] .bottom-tabs{background:linear-gradient(145deg,#fffffff
 html[data-theme="light"] .bottom-tabs::before{background:#fff;box-shadow:0 1px 5px #1720381a}
 html[data-theme="light"] .bottom-tabs .tab-btn{color:#656b76}
 html[data-theme="light"] .bottom-tabs .tab-btn.active{color:#141821}
-.floating-add-button{left:auto;right:max(16px,env(safe-area-inset-right,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 19px);width:52px;height:52px;padding:13px;border-radius:50%;background:var(--card);color:var(--text);border:1px solid var(--border);z-index:61}
+.floating-add-button{position:fixed;left:auto;right:max(16px,env(safe-area-inset-right,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 19px);width:52px;height:52px;padding:13px;border-radius:50%;background:var(--card);color:var(--text);border:1px solid var(--border);transform:translateZ(0);backface-visibility:hidden;z-index:61}
 .floating-add-button svg{width:26px;height:26px;fill:none;stroke:currentColor;stroke-width:2.5;stroke-linecap:round}
+html,body{overscroll-behavior-y:none}

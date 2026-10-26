@@ -120,8 +120,11 @@
     const query=discoveryInput.value.trim();
     if(query.length>=2&&!discoveryLoading&&discoveryGlobalCompleteQuery!==query&&(discoveryGlobalRequestedQuery===query||!discoveryLibraryMatches(query).length))void runTitleSearch({global:discoveryGlobalRequestedQuery===query});
   }
-  function openTitleSearch(){
-    resetTitleSearch();$("search-sheet-results").scrollTop=0;switchTab("search");discoveryInput.focus({preventScroll:true});
+  function openTitleSearch(query=''){
+    resetTitleSearch();$("search-sheet-results").scrollTop=0;
+    searchInput.value='';searchQuery='';
+    discoveryInput.value=query;discoveryQuery=query;
+    switchTab("search");discoveryInput.focus({preventScroll:true});
   }
   async function runTitleSearch({global=false}={}){
     clearTimeout(discoveryTimer);discoveryController?.abort();
@@ -202,11 +205,6 @@
   $("close-title-search").onclick=closeTitleSearch;
   $("discovery-view").addEventListener("keydown",event=>{
     if(event.key==="Escape"&&!discoveryDialog.open){event.preventDefault();closeTitleSearch();return;}
-    if(event.key!=="Tab")return;
-    const controls=[...$("discovery-view").querySelectorAll('input,button,a[href],summary')].filter(node=>!node.disabled&&node.getClientRects().length);
-    const first=controls[0],last=controls.at(-1);
-    if(event.shiftKey&&document.activeElement===first){event.preventDefault();last?.focus();}
-    else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first?.focus();}
   });
 
   // Keyboard and browser chrome resize the visual viewport independently of
@@ -223,6 +221,7 @@
     const bounds=titleSearchViewportBounds(window.visualViewport,layoutHeight),sheet=$("discovery-view");
     sheet.style.setProperty('--search-viewport-top',bounds.top+'px');
     sheet.style.setProperty('--search-viewport-height',bounds.height+'px');
+    document.documentElement.style?.setProperty('--dock-keyboard-offset',Math.max(0,layoutHeight-bounds.top-bounds.height)+'px');
   }
   function setTitleSearchSheetOpen(open){
     const body=document.body,sheet=$("discovery-view");
@@ -237,6 +236,7 @@
       const previous=titleSearchViewportState;titleSearchViewportState=null;
       Object.assign(body.style,previous.styles);
       sheet.style.removeProperty('--search-viewport-top');sheet.style.removeProperty('--search-viewport-height');
+      document.documentElement.style?.removeProperty('--dock-keyboard-offset');
       window.scrollTo({left:previous.x,top:previous.y,behavior:'instant'});
     }
   }

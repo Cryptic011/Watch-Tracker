@@ -29,8 +29,8 @@
   }
   function pushSupportError(){
     if(!("Notification" in window)||!("serviceWorker" in navigator)||!("PushManager" in window))return"Background notifications are not supported in this browser.";
-    if(/iPhone|iPad|iPod/i.test(navigator.userAgent)&&!isStandaloneWebApp())return"Add Watched Logger to your Home Screen, then open it from the icon to enable iPhone background reminders.";
-    if(Notification.permission==="denied")return"Notifications are blocked. Enable Watched Logger in iPhone Settings → Notifications.";
+    if(/iPhone|iPad|iPod/i.test(navigator.userAgent)&&!isStandaloneWebApp())return"Add Watch Tracker to your Home Screen, then open it from the icon to enable iPhone background reminders.";
+    if(Notification.permission==="denied")return"Notifications are blocked. Enable Watch Tracker in iPhone Settings → Notifications.";
     return"";
   }
   function urlBase64ToUint8Array(value){
@@ -49,7 +49,7 @@
       return data;
     }catch(error){
       if(error?.code)throw error;
-      const wrapped=new Error(error?.name==="AbortError"?"The reminder service took too long to respond.":"Could not reach the Watched Logger reminder service.");wrapped.code=error?.name==="AbortError"?"timeout":"network";throw wrapped;
+      const wrapped=new Error(error?.name==="AbortError"?"The reminder service took too long to respond.":"Could not reach the Watch Tracker reminder service.");wrapped.code=error?.name==="AbortError"?"timeout":"network";throw wrapped;
     }finally{clearTimeout(timeout);}
   }
   async function notificationWorker(){
@@ -164,7 +164,7 @@
       return false;
     }
     if(generation===backgroundReminderGeneration&&token===cloudSessionToken)backgroundReminderPreference("on");
-    report("Enabled — alerts can arrive when Watched Logger is closed.","ok","on");
+    report("Enabled — alerts can arrive when Watch Tracker is closed.","ok","on");
     return true;
     })();
     backgroundReminderRefresh=task;
@@ -205,7 +205,7 @@
     await ensureBackgroundPush({askPermission:true,token,subscriptionPromise});
     if(token!==cloudSessionToken)return;
     backgroundReminderPreference("on");
-    setBackgroundReminderStatus("Enabled — alerts can arrive when Watched Logger is closed.","ok","on");
+    setBackgroundReminderStatus("Enabled — alerts can arrive when Watch Tracker is closed.","ok","on");
   });
   disableBackgroundReminders.onclick=()=>runBackgroundReminderAction(async()=>{
     setBackgroundReminderStatus("Turning reminders off…","","on");
@@ -254,7 +254,7 @@
       }
       if(!data||typeof data!=="object"||Array.isArray(data))throw new Error("Invalid cloud response.");
       if(!response.ok){
-        const err=new Error(data.error||`Watched Logger cloud error (${response.status})`);err.code=data.code||"api_error";err.status=response.status;err.retryAfter=data.retryAfter;err.maintenance=data.maintenance===true;
+        const err=new Error(data.error||`Watch Tracker cloud error (${response.status})`);err.code=data.code||"api_error";err.status=response.status;err.retryAfter=data.retryAfter;err.maintenance=data.maintenance===true;
         Object.assign(err,{items:data.items,revision:data.revision,updatedAt:data.updatedAt});
         if(err.maintenance){
           publicMaintenance={enabled:true,message:err.message||publicMaintenance.message};maintenanceOwnerAccess=false;
@@ -270,7 +270,7 @@
     }catch(e){
       if(e?.code)throw e;
       const externalAbort=externalSignal?.aborted===true;
-      const err=new Error(externalAbort?"Search cancelled.":e?.name==="AbortError"?"Watched Logger cloud took too long to respond. Your change remains saved on this device.":"Could not reach Watched Logger cloud. Check your connection.");err.code=externalAbort?"cancelled":e?.name==="AbortError"?"timeout":"network";throw err;
+      const err=new Error(externalAbort?"Search cancelled.":e?.name==="AbortError"?"Watch Tracker cloud took too long to respond. Your change remains saved on this device.":"Could not reach Watch Tracker cloud. Check your connection.");err.code=externalAbort?"cancelled":e?.name==="AbortError"?"timeout":"network";throw err;
     }finally{
       clearTimeout(timeout);
       externalSignal?.removeEventListener?.("abort",abortFromExternal);
@@ -302,7 +302,7 @@
     maintenanceOwnerAccessButton.classList.toggle("hidden",!enabled||maintenanceOwnerAccess);
     authForm.classList.toggle("hidden",enabled&&!maintenanceOwnerAccess);
     authToggle.classList.toggle("hidden",enabled);
-    if(enabled){authTitle.textContent="Under Maintenance";authSub.textContent=maintenanceOwnerAccess?"Owner sign-in remains available.":"Watched Logger will be back shortly.";}
+    if(enabled){authTitle.textContent="Under Maintenance";authSub.textContent=maintenanceOwnerAccess?"Owner sign-in remains available.":"Watch Tracker will be back shortly.";}
   }
   maintenanceOwnerAccessButton.onclick=()=>{maintenanceOwnerAccess=true;isSignUp=false;authPin.value="";updateAuthMode();authEmail.focus();};
   async function refreshPublicMaintenance(){

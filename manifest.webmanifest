@@ -1,7 +1,7 @@
 {
   "id": "./",
-  "name": "Watched Logger",
-  "short_name": "Watched Logger",
+  "name": "Watch Tracker",
+  "short_name": "Watch Tracker",
   "description": "Plan, track and remember films and series.",
   "start_url": "./",
   "scope": "./",
@@ -10,7 +10,7 @@
   "theme_color": "#000000",
   "icons": [
     {
-      "src": "./assets/img/app-icon.png?v=3",
+      "src": "./assets/img/app-icon.png?v=4",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"

@@ -1,6 +1,6 @@
-# Watched Logger
+# Watch Tracker
 
-Watched Logger is an installable web app for tracking films and television episodes, including release reminders and cross-device library syncing.
+Watch Tracker is an installable web app for tracking films and television episodes, including release reminders and cross-device library syncing.
 
 ## What each project item is for
 
@@ -8,7 +8,7 @@ Watched Logger is an installable web app for tracking films and television episo
 | --- | --- |
 | `index.html` | The website shell. Browser logic and styling live in `assets/`; script order is explicit and startup runs last. |
 | `manifest.webmanifest` | Installation details used when the site is added to a phone or computer as an app. |
-| `sw.js` | The service worker that receives episode-release notifications and opens notification links only inside Watched Logger. Its short conventional name is referenced by the app. |
+| `sw.js` | The service worker that receives episode-release notifications and opens notification links only inside Watch Tracker. Its short conventional name is referenced by the app. |
 | `.github/workflows/pages.yml` | Stages the runtime website files and assets and publishes only those files to GitHub Pages with the Node.js 24-compatible checkout, Pages, artifact, and deploy actions. |
 | `supabase/functions/watchlog-pin/` | Handles secure PIN access, revision-checked syncing, maintenance enforcement, and the safe title-search gateway. The directory name is also the function's public endpoint name. |
 | `supabase/functions/watchlog-reminders/` | Stores notification subscriptions and sends scheduled episode reminders. The directory name is also the function's public endpoint name. |
@@ -92,7 +92,7 @@ Refresh saves the current library locally and synchronizes it to the cloud befor
 reloading. Failed synchronization pauses refresh; incomplete editor forms stay
 open. Episode rows toggle individual released episodes, Watch next fills the
 earliest unwatched gap, and a six-second Undo reverses the latest action.
-Release reminders use “Watch Logger Reminder” with the title and timing in the
+Release reminders use “Watch Tracker Reminder” with the title and timing in the
 body. Supporting installed apps show a reminder badge dot while unopened;
 private tests do not set a badge, and reopening the app clears it.
 
@@ -116,6 +116,8 @@ Granular saves have transactional, account-scoped write receipts. The endpoint h
 Details use the authenticated `catalog_details` endpoint. IMDb structured metadata is preferred when accessible. Series fall back to the selected TVMaze ID (cross-checked against IMDb); films can use a unique Apple TV catalogue match against the IMDb title and release year. JustWatch fallback requires the exact IMDb identity and film/series format. Source links and rating-provider labels accompany the displayed details. Provider failures have bounded timeouts, do not become successful cache entries, and can be retried. Wikipedia and Wikidata are never queried; the browser policy blocks those connections. No paid metadata subscription is required.
 
 ### Library-first search
+The Library search field and the bottom-right magnifying glass open the same full-screen Search page. The fixed bottom island contains Library and Settings, with a temporary Search tab only while Search is active. The page covers the full viewport, keeps its results scrollable above the keyboard and island, and restores Library scroll when closed.
+
 The Search page matches saved titles immediately, including title words, platform, IDs and custom lists. It opens saved records directly and works without a global request. Global search runs after a 350 ms pause when there are no local matches in the selected format, or when Search all titles is selected. Library results stay above the streamed catalogue, with saved-title duplicates removed. Full verified descriptions load when a result is opened.
 
 Duplicate checks use either shared IMDb or TVMaze identity, including when the other provider ID is stale. The cloud rejects duplicate additions from older clients; current clients reconcile simultaneous additions into the original record and preserve watched episodes, history, notes, lists and reminder preferences. Different provider identities and release years keep distinct remakes separate.

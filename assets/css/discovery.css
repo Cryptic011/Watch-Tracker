@@ -18,12 +18,15 @@ html:has(#discovery-view:not(.hidden)),body:has(#discovery-view:not(.hidden)){ov
 .discovery-full-description{white-space:pre-line}
 
 html:has(#discovery-view:not(.hidden)),body:has(#discovery-view:not(.hidden)){overflow:hidden}
-/* Keep the sheet inside the visual viewport, including the iPhone keyboard. */
-.discovery-view{position:fixed;left:0;right:0;top:var(--search-viewport-top,0px);height:var(--search-viewport-height,100dvh);display:flex;align-items:flex-start;justify-content:center;padding:max(12px,env(safe-area-inset-top,0px)) 12px max(12px,env(safe-area-inset-bottom,0px));overflow:hidden;background:#000a;z-index:90;overscroll-behavior:none}
-.search-sheet{display:flex;flex-direction:column;width:100%;max-width:760px;height:640px;max-height:100%;min-height:0;border:1px solid var(--border);border-radius:24px;background:var(--bg);overflow:hidden;box-shadow:0 20px 60px #0006}
-.search-sheet-header{position:relative;flex:0 0 auto;padding:20px 16px 12px;border-bottom:1px solid var(--border)}
+/* A full page covers the home indicator; only results scroll above the dock. */
+.discovery-view{position:fixed;left:0;right:0;top:0;height:100dvh;display:flex;align-items:flex-start;justify-content:center;padding:0;overflow:hidden;background:var(--bg);z-index:90;overscroll-behavior:none}
+.search-sheet{display:flex;flex-direction:column;width:100%;height:var(--search-viewport-height,100dvh);max-height:calc(100% - var(--search-viewport-top,0px));margin-top:var(--search-viewport-top,0px);min-height:0;border:0;border-radius:0;background:var(--bg);overflow:hidden}
+.search-sheet-header{position:relative;flex:0 0 auto;padding:calc(env(safe-area-inset-top,0px) + 16px) 16px 12px;border-bottom:1px solid var(--border)}
 .search-sheet-header .discovery-heading{padding-right:48px;margin:0 0 14px}
 .search-sheet-header .discovery-heading h2{font-size:1.35rem}
 .search-sheet-header .discovery-heading p{font-size:.82rem}
-.search-sheet-results{min-height:0;flex:1;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;padding:0 16px 16px;-webkit-overflow-scrolling:touch}
-.search-sheet-close{position:absolute;right:12px;top:12px;width:44px;height:44px}
+.search-sheet-results{min-height:0;flex:1;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;padding:0 16px calc(110px + env(safe-area-inset-bottom,0px));-webkit-overflow-scrolling:touch}
+.search-sheet-close{position:absolute;right:12px;top:calc(env(safe-area-inset-top,0px) + 12px);width:44px;height:44px}
+html:has(#discovery-view:not(.hidden)) .top-nav,
+html:has(#discovery-view:not(.hidden)) #library-view,
+html:has(#discovery-view:not(.hidden)) #settings-view{visibility:hidden}

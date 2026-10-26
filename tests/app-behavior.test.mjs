@@ -10,15 +10,19 @@ process.env.TZ = "Europe/London";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const html = readAppSource();
 
-test("PWA and iOS home screen use the supplied Watch Logger icon", () => {
+test("PWA and iOS home screen use the Xcode icon and Watch Tracker name", () => {
   const manifest = JSON.parse(fs.readFileSync(path.join(root, "manifest.webmanifest"), "utf8"));
   const appIcon = fs.readFileSync(path.join(root, "assets/img/app-icon.png"));
   const touchIcon = fs.readFileSync(path.join(root, "assets/img/apple-touch-icon.png"));
-  assert.match(html, /apple-touch-icon[^>]+apple-touch-icon\.png\?v=1/);
-  assert.match(html, /rel="icon"[^>]+app-icon\.png\?v=3/);
+  assert.match(html, /apple-touch-icon[^>]+apple-touch-icon\.png\?v=2/);
+  assert.match(html, /rel="icon"[^>]+app-icon\.png\?v=4/);
   assert.equal(new URL(manifest.icons[0].src,"https://example.test/Watched-Tracker/manifest.webmanifest").pathname,"/Watched-Tracker/assets/img/app-icon.png");
   assert.equal(new URL(manifest.start_url,"https://example.test/manifest.webmanifest").pathname,"/");
   assert.equal(manifest.icons[0].purpose, "any");
+  assert.equal(manifest.name,"Watch Tracker");
+  assert.equal(manifest.short_name,"Watch Tracker");
+  assert.match(html,/<title>Watch Tracker<\/title>/);
+  assert.match(html,/apple-mobile-web-app-title" content="Watch Tracker"/);
   assert.deepEqual([appIcon.readUInt32BE(16), appIcon.readUInt32BE(20)], [512, 512]);
   assert.deepEqual([touchIcon.readUInt32BE(16), touchIcon.readUInt32BE(20)], [180, 180]);
 });

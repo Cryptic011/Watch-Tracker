@@ -3,18 +3,8 @@ export function installNativeControls(Native){
   let frame=0,last='',generation=0;
   const hidden=element=>!element||element.hidden||element.classList.contains('hidden');
   function openSearch(query=''){
-    if(currentTab!=='search')openTitleSearch();
-    if(query){discoveryInput.value=query;discoveryInput.dispatchEvent(new Event('input',{bubbles:true}));}
-    searchInput.value='';searchQuery='';
-    discoveryInput.focus({preventScroll:true});
+    openTitleSearch(query);
   }
-  searchInput.placeholder='Search your library and all titles';
-  searchInput.addEventListener('focus',()=>openSearch(searchInput.value.trim()));
-  searchInput.oninput=event=>openSearch(event.target.value.trim());
-  const page=document.getElementById('discovery-view');
-  page.setAttribute('role','region');page.removeAttribute('aria-modal');
-  document.getElementById('discovery-heading').textContent='Search';
-  document.getElementById('close-title-search').setAttribute('aria-label','Leave Search');
   async function sync(){
     frame=0;
     const overlay=Boolean(document.querySelector('dialog[open]'))||['modal','episode-tracker-modal'].some(id=>!hidden(document.getElementById(id)));

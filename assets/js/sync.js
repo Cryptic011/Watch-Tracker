@@ -99,7 +99,7 @@
     const snap=await readLegacyLocalSnapshotById(id);if(!snap?.profile)return;
     if(!authEmail.value&&snap.profile.email)authEmail.value=snap.profile.email;
     if(!authName.value&&snap.profile.display_name)authName.value=snap.profile.display_name;
-    if(Array.isArray(snap.items)&&snap.items.length)showMessage(`Found ${snap.items.length} title(s) from the previous on-device Watched Logger account. Creating a PIN account with this email will carry them into cloud sync.`,"info");
+    if(Array.isArray(snap.items)&&snap.items.length)showMessage(`Found ${snap.items.length} title(s) from the previous on-device Watch Tracker account. Creating a PIN account with this email will carry them into cloud sync.`,"info");
   }
 
   function cloneLibrarySnapshot(items){
@@ -794,7 +794,7 @@
     try{
       if(file.size>10*1024*1024)throw new Error("Backup file is larger than 10 MB.");
       const backup=JSON.parse(await file.text());
-      if(backup?.format!=="watchlog-library-backup"||backup.version!==1||!Array.isArray(backup.items)||backup.items.some(item=>!item||typeof item.title!=="string"||!item.title.trim()))throw new Error("This is not a supported Watched Logger backup.");
+      if(backup?.format!=="watchlog-library-backup"||backup.version!==1||!Array.isArray(backup.items)||backup.items.some(item=>!item||typeof item.title!=="string"||!item.title.trim()))throw new Error("This is not a supported Watch Tracker backup.");
       const before=mediaItems.length;
       mediaItems=cleanLibraryRecords(mergeLibraries(mediaItems,backup.items)).items;
       render();
