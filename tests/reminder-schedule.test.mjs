@@ -60,3 +60,22 @@ test("Weekly Releases opt-out disables episode reminders and re-enabling restore
     "re-including the show restores reminder eligibility without changing its schedule",
   );
 });
+
+test('Release alerts survive an empty schedule, advancing next pointer and provider refresh failure',()=>{
+ const c=vm.createContext({Date,Number,Array,Set,String,Object,Map});
+ vm.runInContext(['plannedEvent','reminderEvents'].map(name=>extract(name).replace(/: Record<string, unknown>/g,'')).join('\n'),c);
+ const raw='2026-10-26T00:00:00Z',later='2026-11-02T00:00:00Z';
+ const item={type:'Series',status:'Watched',airingSeason:3,latestEpisodeNum:4,latestEpisodeDate:raw,nextEpisodeNum:5,nextEpisodeDate:later,scheduledEpisodeReleases:[],recurringWeeklySchedule:{episodes:[{season:3,number:4,raw},{season:3,number:5,raw:later}]}};
+ const original=JSON.stringify(item),events=c.reminderEvents(item);
+ assert.equal(events.length,2);assert.equal(events[0].raw,raw);assert.equal(events[1].raw,later);
+ assert.equal(c.reminderEvents({...item,recurringWeeklySchedule:null,latestEpisodeDate:''}).length,1);
+ assert.equal(c.reminderEvents({...item,scheduledEpisodeReleases:[null,{season:3,number:5,raw:'2026-11-03T00:00:00Z'}]})[1].raw,'2026-11-03T00:00:00Z');
+ assert.equal(c.reminderEvents({...item,hideFromWeeklyReleases:true}).length,0);
+ assert.equal(c.reminderEvents({type:'Series',nextEpisodeNum:2,nextEpisodeDate:raw})[0].raw,raw,'a missing season number does not suppress a known episode date');
+ assert.equal(JSON.stringify(item),original);
+});
+
+test('Planned season and film reminders include an at-release stage in delivery and private history',()=>{
+ assert.match(source,/const leadTimes = \[24, 6, 0\]/);
+ assert.match(source,/for \(const lead of \[24, 6, 0\]\)/);
+});

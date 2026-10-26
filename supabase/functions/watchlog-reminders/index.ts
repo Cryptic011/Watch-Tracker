@@ -386,11 +386,30 @@ function reminderEvents(item: Record<string, unknown>) {
   // cancels pending eligibility without deleting the show or its episode
   // schedule. Clearing the preference makes its events eligible again.
   if (item.hideFromWeeklyReleases === true) return [];
-  if (!["Series", "Anime"].includes(String(item.type)) || !Array.isArray(item.scheduledEpisodeReleases)) {
+  if (!["Series", "Anime"].includes(String(item.type))) {
     const fallback = plannedEvent(item);
     return fallback ? [fallback] : [];
   }
-  const events = item.scheduledEpisodeReleases.map(episode => ({ kind: "episode", raw: String(episode.raw || ""), number: Number(episode.number), season: Number(episode.season) }));
+  // The mutable next pointer can advance before a scheduled scan, and a
+  // provider refresh can fail or leave an empty schedule. Keep all confirmed
+  // sources, preferring the current provider schedule for each episode.
+  const activeSeason = Number(item.airingSeason || item.curSeason || 0);
+  const confirmed = [...(Array.isArray(item.scheduledEpisodeReleases) ? item.scheduledEpisodeReleases : []), ...(Array.isArray(item.recurringWeeklySchedule?.episodes) ? item.recurringWeeklySchedule.episodes : [])];
+  const match = confirmed.find(episode => Number(episode?.number) === Number(item.nextEpisodeNum) && episode?.raw === item.nextEpisodeDate);
+  const nextSeason = Number(match?.season || (Number(item.nextEpisodeNum) === 1 ? item.nextSeasonNum || activeSeason : activeSeason));
+  const rows = [
+    ...(Array.isArray(item.recurringWeeklySchedule?.episodes) ? item.recurringWeeklySchedule.episodes : []),
+    { season: activeSeason, number: item.latestEpisodeNum, raw: item.latestEpisodeDate },
+    { season: nextSeason, number: item.nextEpisodeNum, raw: item.nextEpisodeDate },
+    ...(Array.isArray(item.scheduledEpisodeReleases) ? item.scheduledEpisodeReleases : []),
+  ];
+  const byEpisode = new Map();
+  for (const episode of rows) {
+    const raw = String(episode?.raw || "").trim(), number = Number(episode?.number), season = Number(episode?.season || 0);
+    if (!raw || !Number.isInteger(number) || number < 1 || !Number.isInteger(season) || season < 0) continue;
+    byEpisode.set(`${season}:${number}`, { kind: "episode", raw, number, season });
+  }
+  const events = [...byEpisode.values()];
   if (item.nextSeasonDate && !events.some(event => event.season === Number(item.nextSeasonNum) && event.number === 1)) {
     events.push({ kind: "season", raw: String(item.nextSeasonDate), number: Number(item.nextSeasonNum), season: Number(item.nextSeasonNum) });
   }
@@ -610,7 +629,7 @@ async function processPlannedReminders(
       const eventTime = scheduledEventTime(event.raw, subscription.time_zone);
       if (!Number.isFinite(eventTime)) continue;
 
-      const leadTimes = event.kind === "episode" ? [24, 6, 0] : [24, 6];
+      const leadTimes = [24, 6, 0];
       for (const leadHours of leadTimes) {
         const reminderTime = eventTime - leadHours * 60 * 60 * 1000;
         // Catch up only the current stage. Reconnecting a device must not
@@ -911,7 +930,7 @@ Deno.serve(async (req: Request) => {
       for (const subscription of subscriptions.data || []) for (const item of items) for (const event of reminderEvents(item)) {
         if (event.kind !== "episode" && !["Planned", "Saved"].includes(String(item.status))) continue;
         const release = scheduledEventTime(event.raw, subscription.time_zone);
-        for (const lead of event.kind === "episode" ? [24, 6, 0] : [24, 6]) {
+        for (const lead of [24, 6, 0]) {
           const due = release - lead * 3600000;
           if (!Number.isFinite(due) || due <= now || due >= now + 7 * 86400000) continue;
           const key = `${item.id}:${event.kind}:${event.raw}:${event.number}:${due}`;
