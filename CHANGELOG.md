@@ -1,3 +1,8 @@
+## 2026-10-26 — Keep release notifications minimal
+- Use only the show or film name as the notification title.
+- Use “New episode out in …” or “Film out in …” as the body; at release, use “out now”.
+- Remove platform names, season numbers and estimated-airtime notes from notification text while retaining the release timing rules.
+
 ## 2026-10-26 — Offline reliability and lasting reminder connections
 - Open saved libraries immediately when offline and retain queued edits for automatic sync.
 - Fall back to the complete installed app on failed or stalled navigation; keep up to 150 viewed public artwork images for offline browsing.

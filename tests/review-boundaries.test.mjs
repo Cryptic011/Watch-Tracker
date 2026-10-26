@@ -93,7 +93,7 @@ test("Cron keeps release-time alerts after rollover and advances without opening
   for(const [index,status] of ["Planned","Watching","Watched"].entries()){
     worker.setStatus(status);worker.setTime(episodes[index].airstamp);
     assert.ok((await worker.run()).sent>0);
-    assert.ok(worker.deliveries.some(payload=>payload.body==='New episode now available'&&payload.data.eventKey.includes(`e${index+6}:`)));
+    assert.ok(worker.deliveries.some(payload=>payload.body==='New episode out now'&&payload.data.eventKey.includes(`e${index+6}:`)));
     assert.equal((await worker.run()).sent,0);
   }
   assert.deepEqual(worker.getLibrary().items[0].watchedEpisodes,{1:[1,2,3,4,5]});
@@ -102,7 +102,7 @@ test("Cron keeps release-time alerts after rollover and advances without opening
 test("Every episode in a same-time release receives its own reminder",async()=>{
   const worker=workerHarness([{season:1,number:6,airstamp:"2026-09-06T12:00:00Z"},{season:1,number:7,airstamp:"2026-09-06T12:00:00Z"}]);
   await worker.run();
-  const release=worker.deliveries.filter(payload=>payload.body==='New episode now available');
+  const release=worker.deliveries.filter(payload=>payload.body==='New episode out now');
   assert.equal(release.length,2);
   assert.equal(new Set(release.map(row=>row.data.eventKey)).size,2);
   assert.equal(worker.deliveries.length,2,'a release scan does not also send stale advance reminders');
@@ -112,9 +112,9 @@ test('Background scans catch up only the current reminder stage',async()=>{
   const release='2026-09-06T12:00:00Z';
   for(const [clock,expected] of [
     ['2026-09-05T11:59:59Z',[]],
-    ['2026-09-05T12:00:00Z',['New episode in 1 day']],
-    ['2026-09-06T06:00:00Z',['New episode in 6 hours']],
-    ['2026-09-06T12:00:00Z',['New episode now available']],
+    ['2026-09-05T12:00:00Z',['New episode out in 1 day']],
+    ['2026-09-06T06:00:00Z',['New episode out in 6 hours']],
+    ['2026-09-06T12:00:00Z',['New episode out now']],
     ['2026-09-07T12:00:00Z',[]],
   ]){
     const worker=workerHarness([{season:1,number:6,airstamp:release}]);
@@ -144,12 +144,12 @@ test("UTC instants schedule identically across subscription time zones",()=>{
 test('Reminder notifications use the title as heading and a concise release message',()=>{
  const c=vm.createContext({});vm.runInContext(extractFunction(backend,'reminderCopy'),c);
  for(const [item,event,lead,body] of [
-  [{title:'NCIS'},{kind:'episode',season:23,number:2},6,'New episode in 6 hours'],
-  [{title:'Doomsday'},{kind:'film'},24,'Available in 1 day'],
-  [{title:'Reacher'},{kind:'season',number:4},6,'Season 4 in 6 hours'],
-  [{title:'Ted Lasso'},{kind:'episode',season:3,number:2},0,'New episode now available'],
-  [{title:'Reacher'},{kind:'season',number:4},0,'Season 4 now available'],
-  [{title:'Doomsday'},{kind:'film'},0,'Now available'],
+  [{title:'NCIS'},{kind:'episode',season:23,number:2},6,'New episode out in 6 hours'],
+  [{title:'Doomsday'},{kind:'film'},24,'Film out in 1 day'],
+  [{title:'Reacher'},{kind:'season',number:4},6,'New episode out in 6 hours'],
+  [{title:'Ted Lasso'},{kind:'episode',season:3,number:2},0,'New episode out now'],
+  [{title:'Reacher'},{kind:'season',number:4},0,'New episode out now'],
+  [{title:'Doomsday'},{kind:'film'},0,'Film out now'],
  ]){const copy=c.reminderCopy(item,event,lead);assert.equal(copy.title,item.title);assert.equal(copy.body,body);}
 });
 

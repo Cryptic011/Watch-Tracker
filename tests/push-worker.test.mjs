@@ -9,13 +9,13 @@ test('Closed-app reminders display the show title above the concise release mess
   vm.runInNewContext(source,{self,URL});
   for(const [name,episode] of [['NCIS',3],['Reacher',4]]){
     let work;
-    listeners.push({data:{json:()=>({title:name,body:'New episode now available',tag:name,data:{url:'./',episode}})},waitUntil:p=>work=p});
+    listeners.push({data:{json:()=>({title:name,body:'New episode out now',tag:name,data:{url:'./',episode}})},waitUntil:p=>work=p});
     await work;
   }
   assert.equal(shown[0].title,'NCIS');
-  assert.equal(shown[0].body,'New episode now available');
+  assert.equal(shown[0].body,'New episode out now');
   assert.equal(shown[1].title,'Reacher');
-  assert.equal(shown[1].body,'New episode now available');
+  assert.equal(shown[1].body,'New episode out now');
   assert.equal(shown[0].icon,'./assets/img/app-icon.png?v=3');
   assert.equal(shown[0].data.episode,3);
   assert.notEqual(shown[0].tag,shown[1].tag);

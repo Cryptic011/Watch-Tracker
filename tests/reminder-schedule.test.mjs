@@ -87,7 +87,7 @@ test('Release processing sends at-release alerts for Planned seasons, films and 
  const result=await c.processPlannedReminders([{account_id:'account',time_zone:'Europe/London'}],{});
  assert.equal(result.sent,3);assert.equal(result.failed,0);
  assert.deepEqual(sent.map(p=>p.title),['Season premiere','Film premiere','Returning series']);
- assert.ok(sent.every(p=>/now available/i.test(p.body)),'release alerts must not be replaced with late advance reminders');
+ assert.ok(sent.every(p=>/out now/i.test(p.body)),'release alerts must not be replaced with late advance reminders');
 });
 
 test('Streaming-first worker never sends a UK Marshals release at US broadcast time',async()=>{
@@ -101,14 +101,14 @@ test('Streaming-first worker never sends a UK Marshals release at US broadcast t
  c.claimDelivery=async(row,account,id,key)=>{if(claimed.has(key))return null;claimed.add(key);return{id:'delivery',attempts:1};};c.finishDelivery=async()=>{};c.sendPush=async(row,config,payload)=>sent.push(payload);
  const subscriptions=[{account_id:'account',locale:'en-GB',time_zone:'Europe/London'}];
  await c.processPlannedReminders(subscriptions,{});
- assert.equal(sent.filter(p=>/now available/i.test(p.body)).length,0,'US broadcast midnight is not UK streaming release');
- assert.ok(sent.every(p=>!/now available/i.test(p.body)),'neither show is watchable at the broadcast start');
+ assert.equal(sent.filter(p=>/out now/i.test(p.body)).length,0,'US broadcast midnight is not UK streaming release');
+ assert.ok(sent.every(p=>!/out now/i.test(p.body)),'neither show is watchable at the broadcast start');
  sent.length=0;clock=Date.parse('2026-10-26T04:00:00Z');
  await c.processPlannedReminders(subscriptions,{});
- const available=sent.filter(p=>/now available/i.test(p.body));assert.equal(available.length,1);assert.equal(available[0].title,'Unverified streaming');assert.match(available[0].body,/estimated · airtime \+4h/);
+ const available=sent.filter(p=>/out now/i.test(p.body));assert.equal(available.length,1);assert.equal(available[0].title,'Unverified streaming');assert.equal(available[0].body,'New episode out now');
  sent.length=0;clock=Date.parse('2026-10-26T08:00:00Z');
  await c.processPlannedReminders(subscriptions,{});
- assert.equal(sent.length,1);assert.equal(sent[0].body,'New episode now available on Paramount+');
+ assert.equal(sent.length,1);assert.equal(sent[0].body,'New episode out now');
  assert.match(sent[0].data.eventKey,/2026-10-26T08:00:00.000Z:lead-0h$/);
  assert.equal((await c.processPlannedReminders(subscriptions,{})).sent,0);
 });

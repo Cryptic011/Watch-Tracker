@@ -424,10 +424,8 @@ function reminderCopy(
 ) {
   const title = String(item.title || "").replace(/\s+/g, " ").trim() || "Watched Logger";
   const timing = leadHours === 24 ? "in 1 day" : leadHours === 1 ? "in 1 hour" : `in ${leadHours} hours`;
-  const label = event.kind === "episode" ? "New episode"
-    : event.kind === "season" ? (event.number ? `Season ${event.number}` : "New season") : "";
-  const body = leadHours === 0 ? (label ? `${label} now available` : "Now available")
-    : label ? `${label} ${timing}` : `Available ${timing}`;
+  const label = event.kind === "film" ? "Film" : "New episode";
+  const body = leadHours === 0 ? `${label} out now` : `${label} out ${timing}`;
   return { title, body };
 }
 
@@ -665,7 +663,6 @@ async function processPlannedReminders(
         if (!delivery) continue;
 
         const copy = reminderCopy(item, event, leadHours);
-        if(event.releaseSchedule||item.releaseSchedule)copy.body += ` on ${(event.releaseSchedule||item.releaseSchedule).platform}${(event.releaseSchedule||item.releaseSchedule).estimated?" (estimated · airtime +4h)":""}`;
         const payload = {
           title: copy.title,
           body: copy.body,
