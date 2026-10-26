@@ -1,3 +1,8 @@
+## 2026-10-26 — Centre and animate primary navigation
+- Centre Library and Settings in a floating capsule with a sliding selection highlight and directional page transitions.
+- Keep the separate Library search action clear of the capsule on small screens, with safe-area spacing and light/dark styling.
+- Preserve immediate navigation, repeated Library taps, browser history and reduced-motion preferences.
+
 ## 2026-10-24 — Use TVMaze for whole-series details
 - Load series overviews directly from the matching TVMaze show record across saved titles and search.
 - Include the original premiere, genres, language, runtime, status and clearly labelled TVMaze rating; preserve synopsis paragraphs.

@@ -300,13 +300,28 @@
   }
   enforceBottomNavigation();
   let searchReturnTab="library";
+  let primaryPageAnimation=null;
+  function animatePrimaryPage(from,to){
+    primaryPageAnimation?.cancel();primaryPageAnimation=null;
+    if(from===to||!["library","settings"].includes(from)||!["library","settings"].includes(to))return;
+    if(window.matchMedia?.("(prefers-reduced-motion: reduce)").matches)return;
+    const page=to==="settings"?settingsView:libraryView;
+    if(typeof page.animate!=="function")return;
+    primaryPageAnimation=page.animate([
+      {opacity:.45,transform:`translateX(${to==="settings"?14:-14}px)`},
+      {opacity:1,transform:"translateX(0)"}
+    ],{duration:260,easing:"cubic-bezier(.22,1,.36,1)"});
+  }
   function switchTab(tab){
     if(!ALLOWED_BOTTOM_TABS.has(tab))tab="library";
     if(typeof saveNavigationPosition==="function")saveNavigationPosition();
     enforceBottomNavigation();
     const currentTabBtns=document.querySelectorAll(".bottom-tabs .tab-btn");
+    const previousTab=currentTab;
     if(tab==="search"&&currentTab!=="search")searchReturnTab=currentTab;
-    currentTab=tab;currentTabBtns.forEach(b=>{b.classList.toggle("active",b.dataset.tab===tab);b.setAttribute("aria-current",b.dataset.tab===tab?"page":"false");});
+    const primaryTab=tab==="search"?searchReturnTab:tab;
+    currentTab=tab;currentTabBtns.forEach(b=>{b.classList.toggle("active",b.dataset.tab===primaryTab);b.setAttribute("aria-current",b.dataset.tab===primaryTab?"page":"false");});
+    document.querySelector(".bottom-tabs")?.setAttribute("data-active-tab",primaryTab);
     const search=tab==="search",settings=(search?searchReturnTab:tab)==="settings";
     libraryView.classList.toggle("hidden",settings);settingsView.classList.toggle("hidden",!settings);
     if(!search)dismissTitleSearchKeyboard();
@@ -317,6 +332,7 @@
       document.querySelector(".stats-row").classList.toggle("hidden",settings);
     }
     updateFloatingAddVisibility();
+    animatePrimaryPage(previousTab,tab);
     if(search){activateTitleSearch();if(typeof recordAppNavigation==="function")recordAppNavigation();return;}
     pauseTitleSearch();
     if(settings){renderWatchStatistics();void refreshPrivateReminderHistory();}

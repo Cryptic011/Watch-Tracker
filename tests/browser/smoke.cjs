@@ -504,6 +504,36 @@ const server=http.createServer((req,res)=>{
   assert.equal(await page.getByRole('heading',{name:'Settings',exact:true}).isVisible(),true,'Settings has its own page title');
   assert.equal(await page.locator('.settings-quick-actions').isVisible(),true,'Track Sync shortcut is visible');
   await assertSettingsOnly();
+  phase='centred navigation';
+  await page.emulateMedia({reducedMotion:'no-preference'});
+  for(const width of [320,390,768]){
+   await page.setViewportSize({width,height:844});
+   for(const tab of ['settings','library']){
+    await page.locator('[data-tab="'+tab+'"]').click();
+    const geometry=await page.evaluate(()=>{
+     const bar=document.querySelector('.bottom-tabs').getBoundingClientRect(),search=document.querySelector('#add-btn').getBoundingClientRect();
+     return {centre:bar.x+bar.width/2,viewport:innerWidth,barRight:bar.right,searchLeft:search.left,overflow:document.documentElement.scrollWidth>innerWidth};
+    });
+    assert.ok(Math.abs(geometry.centre-width/2)<1,'navigation is centred on '+tab+' at '+width+'px');
+    assert.equal(geometry.overflow,false,'navigation motion creates no horizontal page overflow');
+    assert.equal(await page.locator('.bottom-tabs').getAttribute('data-active-tab'),tab);
+    assert.equal(await page.locator('[data-tab="'+tab+'"]').getAttribute('aria-current'),'page');
+    if(tab==='library')assert.ok(geometry.searchLeft-geometry.barRight>=7,'search stays clear of the centred capsule');
+    else await assertSettingsOnly();
+   }
+  }
+  await page.setViewportSize({width:390,height:844});
+  assert.equal(await page.evaluate(()=>{goToTabHome('settings');return settingsView.getAnimations().some(animation=>animation.playState==='running');}),true,'switching pages animates the incoming view');
+  const rapid=await page.evaluate(()=>{
+   goToTabHome('library');goToTabHome('settings');goToTabHome('library');
+   return {tab:currentTab,settingsHidden:settingsView.classList.contains('hidden'),oldAnimations:settingsView.getAnimations().length};
+  });
+  assert.deepEqual(rapid,{tab:'library',settingsHidden:true,oldAnimations:0},'rapid switches take effect immediately and cancel old motion');
+  await page.emulateMedia({reducedMotion:'reduce'});
+  assert.equal(await page.evaluate(()=>{goToTabHome('settings');return settingsView.getAnimations().length;}),0,'reduced motion skips page animations');
+  await page.emulateMedia({reducedMotion:'no-preference'});
+  await assertSettingsOnly();
+  phase='settings visibility';
   await page.locator('#whats-new-button').click();
   await page.waitForFunction(()=>!pushStatusesInFlight&&document.querySelector('.changelog-entry'));
   assert.equal(changelogRequests,1,'workflow history loads only when Changelog opens');
