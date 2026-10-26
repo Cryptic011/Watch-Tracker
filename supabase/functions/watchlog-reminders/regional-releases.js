@@ -59,8 +59,10 @@
       const {date,feed}=jobs[cursor++];
       const key=region+':'+feed+':'+date+':'+[...tracked.keys()].sort().join(','),existing=requests.get(key);if(existing&&existing.expires>now){await existing.promise;continue;}
       // Space requests across workers and regions to stay below the public API rate limit.
-      const delay=Math.max(0,nextRequestAt-Date.now());nextRequestAt=Math.max(Date.now(),nextRequestAt)+650;
-      if(delay&&root.setTimeout)await new Promise(resolve=>root.setTimeout(resolve,delay));
+      if(fetcher===root.fetch){
+        const delay=Math.max(0,nextRequestAt-Date.now());nextRequestAt=Math.max(Date.now(),nextRequestAt)+650;
+        if(delay&&root.setTimeout)await new Promise(resolve=>root.setTimeout(resolve,delay));
+      }
       const url='https://api.tvmaze.com/schedule/web?country='+encodeURIComponent(feed)+'&date='+date;
       const promise=(async()=>{try{
         const response=await fetcher(url,{signal:AbortSignal.timeout(5000)});if(!response.ok)throw Error('Regional listing unavailable');
