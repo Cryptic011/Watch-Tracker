@@ -167,6 +167,7 @@ const server=http.createServer((req,res)=>{
   assert.equal(await page.locator('#discovery-view').getAttribute('role'),'dialog');
   await page.locator('#close-title-search').click();
   assert.equal(await page.locator('#discovery-view').isVisible(),false,'closing search returns to Library');
+  await page.waitForFunction(expected=>Math.abs(window.scrollY-expected)<=2,libraryScrollBeforeSearch,{timeout:5000});
   assert.ok(Math.abs(await page.evaluate(()=>window.scrollY)-libraryScrollBeforeSearch)<=2,'closing search restores the original Library scroll');
   await page.locator('#add-btn').click();
   assert.equal(await page.evaluate(()=>document.body.style.position),'fixed','the Library stays pinned behind search');
