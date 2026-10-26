@@ -102,7 +102,10 @@ test('Streaming-first worker never sends a UK Marshals release at US broadcast t
  const subscriptions=[{account_id:'account',locale:'en-GB',time_zone:'Europe/London'}];
  await c.processPlannedReminders(subscriptions,{});
  assert.equal(sent.filter(p=>/now available/i.test(p.body)).length,0,'US broadcast midnight is not UK streaming release');
- assert.ok(sent.every(p=>p.title==='Marshals'),'unverified streaming availability must not use broadcast dates');
+ assert.ok(sent.every(p=>!/now available/i.test(p.body)),'neither show is watchable at the broadcast start');
+ sent.length=0;clock=Date.parse('2026-10-26T04:00:00Z');
+ await c.processPlannedReminders(subscriptions,{});
+ const available=sent.filter(p=>/now available/i.test(p.body));assert.equal(available.length,1);assert.equal(available[0].title,'Unverified streaming');assert.match(available[0].body,/estimated · airtime \+4h/);
  sent.length=0;clock=Date.parse('2026-10-26T08:00:00Z');
  await c.processPlannedReminders(subscriptions,{});
  assert.equal(sent.length,1);assert.equal(sent[0].body,'New episode now available on Paramount+');

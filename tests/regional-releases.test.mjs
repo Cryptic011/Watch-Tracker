@@ -29,16 +29,27 @@ test('Regional web listings cross-check provider country, show identity and epis
  const event={season:2,number:4,raw:'2026-10-26T00:00:00Z'};
  assert.equal(api.resolveEvent(item,event,{country:'GB'},now).raw,'2026-10-26T08:00:00Z');
  assert.equal(api.resolveEvent(item,{...event,number:5},{country:'GB'},now).raw,'2026-10-26');
- for(const number of [6,7,8])assert.equal(api.resolveEvent(item,{...event,number},{country:'GB'},now).releaseSchedule,undefined);
+ for(const number of [6,7,8]){const row=api.resolveEvent(item,{...event,number},{country:'GB'},now);assert.equal(row.releaseSchedule.estimated,true);assert.equal(row.raw,'2026-10-26T04:00:00.000Z');}
  assert.equal(api.resolveEvent(item,{kind:'season',season:2,number:2,raw:event.raw},{country:'GB'},now).raw,'2026-10-26T08:00:00Z','season premiere uses episode one rather than episode two');
- assert.equal(api.resolveEvent(item,event,{country:'US'},now).releaseSchedule,undefined);
+ assert.equal(api.resolveEvent(item,event,{country:'US'},now).releaseSchedule.estimated,true);
  await api.refresh([item],{country:'US'},fetcher,now);
  assert.equal(api.resolveEvent(item,{...event,number:9},{country:'US'},now).platform,'Global stream','cached global feeds remain available after switching regions');
- assert.equal(api.resolveEvent(item,event,{country:'GB'},now+6*3600000).releaseSchedule,undefined);
+ assert.equal(api.resolveEvent(item,event,{country:'GB'},now+6*3600000).releaseSchedule.estimated,true);
 });
 test('A special broadcast outside the checked weekday does not invent a streaming release',()=>{
  const api=engine(),item=api.resolve({...show,nextEpisodeDate:'2026-10-27T00:00:00Z'},{country:'GB'});
  assert.equal(api.resolveEvent(item,{season:2,number:4,raw:item.nextEpisodeDate},{country:'GB'}).streamingUnconfirmed,true);
+});
+test('Four-hour availability applies to old saved episodes, crosses midnight and never compounds',()=>{
+ const api=engine(),item={type:'Series',title:'Existing show',platform:'Saved service'},viewer={country:'GB'};
+ for(const raw of ['2026-10-20T22:00:00Z','2026-10-25T00:30:00+01:00','2026-10-26T01:00:00Z']){
+  const original={season:1,number:3,raw},result=api.resolveEvent(item,original,viewer);
+  assert.equal(Date.parse(result.raw)-Date.parse(raw),4*3600000);assert.equal(result.broadcastRaw,raw);
+  assert.equal(result.releaseSchedule.estimated,true);assert.equal(api.resolveEvent(item,result,viewer).raw,result.raw);
+  assert.equal(original.raw,raw,'the saved broadcast timestamp stays intact');
+ }
+ assert.equal(api.resolveEvent(item,{raw:'2026-10-26'},viewer).releaseSchedule,undefined,'dates without an airtime never acquire an invented clock time');
+ assert.equal(api.resolveEvent({...item,type:'Film'},{raw:'2026-10-26T10:00:00Z'},viewer).releaseSchedule,undefined);
 });
 test('Regional refresh covers every date in the two-week window with bounded concurrency',async()=>{
  const api=engine(),now=Date.parse('2026-10-26T01:00:00Z'),dates=new Set();let active=0,peak=0;

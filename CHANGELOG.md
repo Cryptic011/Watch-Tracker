@@ -1,3 +1,8 @@
+## 2026-10-26 — Apply the four-hour watchable-time rule
+- Prefer confirmed regional streaming times, retaining Marshals at Monday 08:00 UK on Paramount+.
+- Where no streaming time is confirmed, estimate episode availability at broadcast start plus four hours: one hour for the show and three hours to become watchable.
+- Apply the rule to existing episode records, calendar cards and reminders without changing saved broadcast dates or watched history. Label estimates explicitly and never add the delay twice.
+
 ## 2026-10-26 — Keep unresolved streaming shows visible
 - Check every date in the two-week regional streaming window with bounded request concurrency.
 - Show unconfirmed streaming releases explicitly in both schedules, separate from undated releases and confirmed release times.

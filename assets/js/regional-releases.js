@@ -84,8 +84,15 @@
   function resolveEvent(item,event,viewer={},now=Date.now()){
     if(item.releaseSchedule?.key==='marshals-gb-paramount-8')return item.releaseSchedule.confirmedTimes?.includes(event.raw)?{...event,releaseSchedule:item.releaseSchedule,platform:item.releaseSchedule.platform}:{...event,streamingUnconfirmed:true};
     const hit=listings.get(country(viewer)+':'+item.tvmazeShowId+':'+(event.season||(event.kind==='season'?event.number:''))+':'+(event.kind==='season'?1:(event.number??event.episode)));
-    if(!hit||hit.expires<=now)return event;
-    return {...event,broadcastRaw:event.raw,raw:hit.raw,platform:hit.platform,releaseSchedule:{country:hit.country,platform:hit.platform,sources:[hit.source],note:'TVMaze regional streaming listing'}};
+    if(hit&&hit.expires>now)return {...event,broadcastRaw:event.broadcastRaw||event.raw,raw:hit.raw,platform:hit.platform,releaseSchedule:{country:hit.country,platform:hit.platform,sources:[hit.source],note:'TVMaze regional streaming listing'}};
+    // Apply the user's four-hour availability rule to existing records too.
+    // Always start from the original timestamp so rerenders never add it twice.
+    const original=event.broadcastRaw||event.raw,time=Date.parse(original);
+    if(!['Series','Anime'].includes(item.type)||!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}.*(?:Z|[+-]\d{2}:?\d{2})$/i.test(String(original||''))||!Number.isFinite(time))return event;
+    if(event.releaseSchedule&&!event.releaseSchedule.estimated)return event;
+    const platform=item.platform||'Saved service';
+    return {...event,broadcastRaw:original,raw:new Date(time+4*3600000).toISOString(),platform,streamingUnconfirmed:false,
+      releaseSchedule:{key:'broadcast-plus-four-hours',estimated:true,country:country(viewer),platform,timeSource:'User rule',sources:[],note:'Estimated availability · airtime + 4 hours (1 hour show + 3 hours delay)'}};
   }
   function resolve(item,viewer={}){
     if(!item||!['Series','Anime'].includes(item.type)||country(viewer)!=='GB'||!marshals(item))return item;

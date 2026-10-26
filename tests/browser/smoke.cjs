@@ -93,15 +93,18 @@ const server=http.createServer((req,res)=>{
   const pendingSchedule=await page.evaluate(()=>{
    const saved=mediaItems,view=selectedScheduleView,range=selectedCalendarRange;
    try{
-    mediaItems=[{id:'regional-pending',title:'Chicago Fire pending streaming',type:'Series',tvmazeShowId:'999999',platform:'Saved service',scheduledEpisodeReleases:[{season:15,number:3,raw:new Date(Date.now()+2*86400000).toISOString()}]}];
+    mediaItems=[{id:'regional-pending',title:'Chicago Fire pending streaming',type:'Series',tvmazeShowId:'999999',platform:'Saved service',scheduledEpisodeReleases:[{season:15,number:3,raw:new Date(Date.now()+2*86400000).toISOString().slice(0,10)}]}];
+    mediaItems.push({id:'four-hour',title:'Timed episode',type:'Series',platform:'Saved service',scheduledEpisodeReleases:[{season:1,number:2,raw:new Date(Date.now()+2*86400000).toISOString()}]});
     selectedScheduleView='recurring';renderDashboard();
     const recurring=document.querySelector('#recurring-weekly-dashboard'),name=recurring.querySelector('.release-pending')?.textContent,
-     emptyHeights=[...recurring.querySelectorAll('.recurring-weekday')].map(node=>node.getBoundingClientRect().height);
+     estimate=recurring.querySelector('[data-recurring-open="four-hour"]')?.textContent,
+     emptyHeights=[...recurring.querySelectorAll('.recurring-weekday:has(.release-empty)')].map(node=>node.getBoundingClientRect().height);
     selectedScheduleView='calendar';selectedCalendarRange='upcoming';renderDashboard();
     const calendar=document.querySelector('#library-dashboard');
-    return {name,emptyHeights,calendar:calendar.querySelector('.release-pending')?.textContent,undated:calendar.querySelectorAll('[data-dashboard-section="unknown"]').length};
+    return {name,estimate,emptyHeights,calendar:calendar.querySelector('.release-pending')?.textContent,undated:calendar.querySelectorAll('[data-dashboard-section="unknown"]').length};
    }finally{mediaItems=saved;selectedScheduleView=view;selectedCalendarRange=range;renderDashboard();}
   });
+  assert.match(pendingSchedule.estimate,/Estimated · airtime \+4h/,'timed episodes use the user four-hour rule');
   assert.match(pendingSchedule.name,/Chicago Fire pending streaming/,'recurring view retains shows without a regional listing');
   assert.match(pendingSchedule.calendar,/Date and time unconfirmed/,'calendar distinguishes unconfirmed streaming from no release date');
   assert.equal(pendingSchedule.undated,0);assert.ok(pendingSchedule.emptyHeights.every(height=>height<65),'empty weekdays stay compact');

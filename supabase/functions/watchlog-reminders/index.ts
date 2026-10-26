@@ -665,7 +665,7 @@ async function processPlannedReminders(
         if (!delivery) continue;
 
         const copy = reminderCopy(item, event, leadHours);
-        if(event.releaseSchedule||item.releaseSchedule)copy.body += ` on ${(event.releaseSchedule||item.releaseSchedule).platform}`;
+        if(event.releaseSchedule||item.releaseSchedule)copy.body += ` on ${(event.releaseSchedule||item.releaseSchedule).platform}${(event.releaseSchedule||item.releaseSchedule).estimated?" (estimated · airtime +4h)":""}`;
         const payload = {
           title: copy.title,
           body: copy.body,
