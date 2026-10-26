@@ -100,6 +100,8 @@ function isReleaseSpecificText(value){
 function isWholeTitleSynopsis(value,minimumLength=35){
  const description=text(value);
  if(description.length<minimumLength)return false;
+ if(/(?:\.{3}|…)\s*$/.test(description))return false;
+ if(/^(?:genre|release date|runtime|cast|rating|seasons?)\s*:/i.test(description))return false;
  // Do not pass plot or press text about a specific season or episode
  // through the overall Show/Film Details panel.
  if(isReleaseSpecificText(description))return false;
@@ -124,6 +126,19 @@ function aboutPageDescription(markup,title){
    }
  }
  return "";
+}
+function platformAboutDescription(markup,site){
+ if(!['paramountplus.com','intl.paramountplus.com'].includes(site.host))return '';
+ const patterns=[
+  /<(?:div|p)\b[^>]*(?:data-testid|class|id)\s*=\s*["'][^"']*(?:about-description|show-description|series-description|movie-description|about-copy|show-summary)[^"']*["'][^>]*>([\s\S]*?)<\/(?:div|p)\s*>/gi,
+  /<h[1-4]\b[^>]*>\s*About\s*<\/h[1-4]>([\s\S]*?)(?=<h[1-4]\b|<footer\b|$)/gi
+ ];
+ for(const pattern of patterns)for(const match of markup.matchAll(pattern)){
+  const paragraphs=[...match[1].matchAll(/<p\b[^>]*>([\s\S]*?)<\/p\s*>/gi)].map(row=>text(row[1]));
+  const candidates=paragraphs.length?paragraphs:[text(match[1].split(/Featuring:|Starring:|Read more/i)[0])];
+  for(const candidate of candidates)if(isWholeTitleSynopsis(candidate))return candidate;
+ }
+ return '';
 }
 function distributorDescription(markup,site,title){
  if(site.host!=="paramountglobalcontent.com")return "";
@@ -207,6 +222,7 @@ export function parseFirstPartyDetails(markup,url,{title,type,year,requireYear=f
  const descriptions=[
    filmHero?.heroDescription,
    filmCopy.length===1?filmCopy[0]:"",
+   platformAboutDescription(source,site),
    distributorDescription(source,site,title),
    aboutPageDescription(source,title),
    identity?.description,
@@ -299,7 +315,14 @@ async function resolveWatchServiceDetails(selected,get){
     const details=parseFirstPartyDetails(await get(site.url,true),site.url,{...identity,requireYear:identity.type==='Film'});
     return details?{...details,imdbId:identity.imdbId,imdbUrl:identity.imdbId?imdbURL(identity.imdbId):''}:null;
   });
-  const tasks=[];
+  const tasks=[],preferredTasks=[];
+  // A regional service title page is a candidate, never evidence by itself:
+  // readPage still validates format, identity and complete show-level copy.
+  if(selected.type==='Series'&&selected.country==='GB'){
+    const slug=nameKey(selected.title).replace(/ /g,'-');
+    if(slug)preferredTasks.push(readPage('https://www.intl.paramountplus.com/gb/shows/'+slug+'/'));
+  }
+
   if(watchServiceURL(selected.officialUrl))tasks.push(readPage(selected.officialUrl));
   const showTask=selected.type==='Series'?attempt(async()=>{
     const url=selected.tvmazeId?'https://api.tvmaze.com/shows/'+selected.tvmazeId:selected.imdbId?
@@ -317,7 +340,7 @@ async function resolveWatchServiceDetails(selected,get){
     const show=await showTask;if(!show)return null;
     return readPage(show.officialSite,{...selected,imdbId:selected.imdbId||imdbID(show.externals?.imdb),year:yearOf(show.premiered)});
   }));
-  tasks.push(attempt(async()=>{
+  preferredTasks.push(attempt(async()=>{
     let identity=selected;
     if(!identity.imdbId&&showTask){const show=await showTask;if(show)identity={...selected,imdbId:imdbID(show.externals?.imdb),year:yearOf(show.premiered)||selected.year};}
     const listing=await watchListing(identity,get);if(!listing)return null;
@@ -327,7 +350,8 @@ async function resolveWatchServiceDetails(selected,get){
     const urls=[...new Set(offers.map(offer=>watchServiceURL(offer.standardWebURL)?.url).filter(Boolean))].slice(0,4);
     return firstSynopsis(urls.map(url=>readPage(url,matched)));
   }));
-  return firstSynopsis(tasks);
+  const platform=await briefly(firstSynopsis(preferredTasks),2500);
+  return platform||firstSynopsis(tasks);
 }
 async function resolveCatalogueDetails(selected,get,tmdbToken=""){
   const attempt=async task=>{try{return await task();}catch{return null;}};

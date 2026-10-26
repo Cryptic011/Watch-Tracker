@@ -1,3 +1,8 @@
+## 2026-10-26 — Prioritise complete platform About descriptions
+- Look for whole-title About text on regional streaming platforms before broadcaster and catalogue fallbacks.
+- Reject shortened previews and metadata-only text; refresh cached cut-off descriptions.
+- Keep release date, released seasons and status alongside the complete synopsis.
+
 ## 2026-10-26 — Apply the four-hour watchable-time rule
 - Prefer confirmed regional streaming times, retaining Marshals at Monday 08:00 UK on Paramount+.
 - Where no streaming time is confirmed, estimate episode availability at broadcast start plus four hours: one hour for the show and three hours to become watchable.

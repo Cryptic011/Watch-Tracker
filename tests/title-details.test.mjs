@@ -334,6 +334,7 @@ test('A TVMaze outage leaves series details unavailable when all fallbacks fail'
  assert.equal(result.state,'unavailable');assert.deepEqual(result.sources,[]);
  assert.equal(result.imdbUrl,'https://www.imdb.com/title/tt0903747/');
  assert.deepEqual(calls,[
+   'https://www.intl.paramountplus.com/gb/shows/show/',
    'https://api.tvmaze.com/shows/169',
    'https://apis.justwatch.com/graphql',
    'https://www.imdb.com/title/tt0903747/'
@@ -413,7 +414,7 @@ test('TVMaze whole-show details work across Origins, Chicago Fire and other seri
   assert.equal(result.source,'TVMaze');assert.equal(result.premiered,premiered,'stored current-season years do not override the original premiere');
   assert.equal(result.seasons,2);assert.equal(result.ratingSource,'TVMaze');assert.equal(result.runtime,42);
   assert.match(result.description,/\n\nThe team/);assert.doesNotMatch(result.description,/<[^>]*>/);
-  assert.deepEqual(calls,['https://api.tvmaze.com/shows/'+maze,'https://apis.justwatch.com/graphql','https://api.tvmaze.com/shows/'+maze+'/seasons']);
+  assert.deepEqual(calls,['https://www.intl.paramountplus.com/gb/shows/'+title.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'')+'/', 'https://api.tvmaze.com/shows/'+maze,'https://apis.justwatch.com/graphql','https://api.tvmaze.com/shows/'+maze+'/seasons']);
  }
 });
 test('TVMaze title-only discovery requires a unique exact title and matches the original year',async()=>{
@@ -485,4 +486,20 @@ test('An explicitly supplied Wikipedia URL is rejected before any source request
 
 test('Unsupported types never cause provider requests',async()=>{
  const result=await getTitleDetails({type:'Game',imdbId:imdb},()=>{throw Error('Unexpected request');},options);assert.equal(result.state,'unmatched');
+});
+
+test('A shortened provider preview never replaces the complete show-level overview',async()=>{
+ const selected={title:'Example Agency',type:'Series',imdbId:'tt12345678',tvmazeShowId:'12345'};
+ const complete='A team of agents investigates crimes across the coast, solving complex cases while confronting the personal costs of their dangerous work.';
+ const page='<meta property="og:title" content="Example Agency"><meta property="og:description" content="The team starts to inves...">';
+ const result=await getTitleDetails(selected,async url=>url==='https://api.tvmaze.com/shows/12345'?json({id:12345,name:selected.title,externals:{imdb:selected.imdbId},officialSite:'https://www.cbs.com/shows/example-agency/',summary:complete,premiered:'2020-01-01'}):url.includes('cbs.com')?html(page):failure(),options);
+ assert.equal(result.description,complete);assert.equal(result.descriptionSource,'TVMaze');
+});
+
+test('Regional streaming About copy wins over a shorter catalogue synopsis and episode player text',async()=>{
+ const title='Example Agency',full='A coastal investigative team tackles crimes involving naval personnel. The agents travel widely, untangling dangerous cases while supporting one another through the demands of the job.';
+ const page='<h1>Example Agency</h1><meta property="og:description" content="A coastal team begins to inves..."><p>Episode 4: A suspect escapes.</p><div class="show-description">'+full+'</div><p>Featuring: Actor names.</p>';
+ const result=await getTitleDetails({title,type:'Series',imdbId:'tt12345678',tvmazeShowId:'12345',country:'GB',platform:'Paramount+'},async url=>url==='https://www.intl.paramountplus.com/gb/shows/example-agency/'?html(page):url==='https://api.tvmaze.com/shows/12345'?json({id:12345,name:title,externals:{imdb:'tt12345678'},summary:'A shorter complete description of an investigative team.',premiered:'2020-01-01'}):failure(),{...options,providerTimeoutMs:1000});
+ assert.equal(result.description,full);assert.equal(result.descriptionSource,'Paramount+');assert.equal(result.descriptionMethod,'watch-service');
+ assert.doesNotMatch(result.description,/Episode 4|Featuring|\.\.\.$/);
 });

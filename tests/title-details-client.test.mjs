@@ -9,7 +9,8 @@ function harness(responses,storage,region='GB',fallback=null){
  const cache=source.slice(source.indexOf('  const METADATA_CACHE_TTL_MS='),source.indexOf('  function episodeAirTime('));
  const details=source.slice(source.indexOf('  const titleDetailsCache='),source.indexOf('  function tvMazeShowMatchesSelection('));
  const context=vm.createContext({URL,console,fetchOfficialTrackerArtwork:fallback?async()=>({details:fallback}):undefined,localStorage:storage,releaseViewingCountry:()=>region,esc:String,pinApi:async()=>({details:responses[Math.min(calls++,responses.length-1)]})});
- vm.runInContext(cache+details,context);
+ const quality=source.slice(source.indexOf('  function completeTitleSynopsis('),source.indexOf('  const titleDetailsCache='));
+ vm.runInContext(cache+quality+details,context);
  return {get:item=>context.fetchOfficialTitleDetails(item),links:info=>context.titleDetailsSourceLinks(info),calls:()=>calls,region:value=>{region=value;}};
 }
 const item={title:'NCIS',type:'Series',imdbId:'tt0364845'};
@@ -93,4 +94,17 @@ test('A partial gateway response recovers the identity-checked whole-show TVMaze
  const result=await api.get({title:'CIA',type:'Series',tvmazeShowId:'1'});
  assert.equal(result.description,fallback.description);assert.equal(result.state,'ready');assert.equal(result.synopsisScope,'series');
  assert.equal((await api.get({title:'CIA',type:'Series',tvmazeShowId:'1'})).description,fallback.description);assert.equal(api.calls(),1);
+});
+
+test('Truncated service previews fall through to a complete verified series synopsis',async()=>{
+ const full={description:'A team of special agents investigates crimes involving Navy and Marine personnel, balancing dangerous cases with the demands of working together.',source:'TVMaze',sources:[{name:'TVMaze',url:'https://www.tvmaze.com/shows/60'}]};
+ for(const tail of ['...','…','&hellip;']){
+  const storage=deviceStorage(),api=harness([{...valid,description:'The agents investigate threats and uncover'+tail}],storage,'GB',full);
+  assert.equal((await api.get(item)).description,full.description);
+ }
+});
+test('Cached truncated synopses are invalidated even when version and identity match',async()=>{
+ const storage=deviceStorage();await harness([valid],storage).get(item);
+ const rows=JSON.parse(storage.getItem('watchlog_verified_title_details_v1'));rows[0].details.description='Following Gibbs as he begins to forg...';storage.setItem('watchlog_verified_title_details_v1',JSON.stringify(rows));
+ const api=harness([valid],storage);assert.equal((await api.get(item)).description,valid.description);assert.equal(api.calls(),1);
 });

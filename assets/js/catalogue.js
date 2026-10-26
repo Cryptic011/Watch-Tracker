@@ -170,6 +170,10 @@
     });
   }
 
+  function completeTitleSynopsis(value){
+    const description=String(value||'').replace(/<[^>]*>/g,' ').replace(/&hellip;|&#8230;|&#x2026;/gi,'…').trim();
+    return Boolean(description)&&!/(?:\.{3}|…)\s*$/.test(description)&&!/^(?:genre|release date|runtime|cast|rating|seasons?)\s*:/i.test(description);
+  }
   const titleDetailsCache=new Map();
   const TITLE_DETAILS_STORAGE_KEY="watchlog_verified_title_details_v1";
   function readStoredTitleDetails(){
@@ -187,12 +191,12 @@
   }
   async function fetchOfficialTitleDetails(item){
     const payload={title:item.title,type:item.type==="Anime"?"Series":item.type||item.format,imdbId:item.imdbId||(item.source==="imdb"?item.externalId:""),tvmazeShowId:item.tvmazeShowId||item.tvmazeId,year:item.releaseYear||item.year,source:item.source,externalId:item.externalId,platform:item.platform||"",officialUrl:item.officialUrl||item.officialSite||"",country:typeof releaseViewingCountry==="function"?releaseViewingCountry()||"GB":"GB"};
-    const key="watch-service-v1:"+JSON.stringify(payload);
+    const key="watch-service-v2-full:"+JSON.stringify(payload);
     const seriesFallback=async()=>{
       if(payload.type!=="Series"||typeof fetchOfficialTrackerArtwork!=="function")return null;
       try{
         const fallback=(await fetchOfficialTrackerArtwork(item))?.details;
-        if(!fallback?.description?.trim())return null;
+        if(!completeTitleSynopsis(fallback?.description))return null;
         return {...fallback,synopsisVersion:5,synopsisScope:"series",descriptionSource:"TVMaze",state:"ready"};
       }catch(_){return null;}
     };
@@ -205,13 +209,13 @@
         const mismatched=details=>Boolean(payload.imdbId&&details.imdbId&&payload.imdbId!==details.imdbId)||
           Boolean(payload.type==='Film'&&payload.year&&details.year&&String(payload.year)!==String(details.year));
         let stored=readStoredTitleDetails().find(row=>row.key===key)?.details;
-        if(stored&&(!stored.description||stored.state!=="ready"||!current(stored)||mismatched(stored)||rejectedSource(stored)))stored=null;
+        if(stored&&(!completeTitleSynopsis(stored.description)||stored.state!=="ready"||!current(stored)||mismatched(stored)||rejectedSource(stored)))stored=null;
         const response=stored?{details:stored}:await pinApi("catalog_details",payload);
         // Revalidate persisted public metadata with the same identity and
         // whole-title rules as a fresh gateway response.
         const details=response.details||{},rejected=rejectedSource(details);
         if(mismatched(details)){titleDetailsCache.delete(key);return {state:"unmatched",sources:[]};}
-        if(!rejected&&details.description&&current(details)){
+        if(!rejected&&completeTitleSynopsis(details.description)&&current(details)){
           if(!stored)storeTitleDetails(key,details);
           return details;
         }
