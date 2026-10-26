@@ -255,7 +255,7 @@ test('A distributor fallback uses the full matching series synopsis, never its t
  assert.match(result.description,/NCIS \(Naval Criminal Investigative Service\) follows a team/);
  assert.match(result.description,/crimes with Navy or Marine Corps ties\.$/);
  assert.doesNotMatch(result.description,/returns as|Show More|Show Less|\.\.\./);
- assert.equal(result.synopsisScope,'series');assert.equal(result.synopsisVersion,5);
+ assert.equal(result.synopsisScope,'series');assert.equal(result.synopsisVersion,6);
  assert.equal(result.sources[0].url,site);
  assert.equal(parseFirstPartyDetails(page.replace('>NCIS</h2>','>NCIS: Sydney</h2>'),site,{title:'NCIS',type:'Series'}),null);
  assert.ok(urls.includes(site));
@@ -502,4 +502,36 @@ test('Regional streaming About copy wins over a shorter catalogue synopsis and e
  const result=await getTitleDetails({title,type:'Series',imdbId:'tt12345678',tvmazeShowId:'12345',country:'GB',platform:'Paramount+'},async url=>url==='https://www.intl.paramountplus.com/gb/shows/example-agency/'?html(page):url==='https://api.tvmaze.com/shows/12345'?json({id:12345,name:title,externals:{imdb:'tt12345678'},summary:'A shorter complete description of an investigative team.',premiered:'2020-01-01'}):failure(),{...options,providerTimeoutMs:1000});
  assert.equal(result.description,full);assert.equal(result.descriptionSource,'Paramount+');assert.equal(result.descriptionMethod,'watch-service');
  assert.doesNotMatch(result.description,/Episode 4|Featuring|\.\.\.$/);
+});
+
+test('ITV opaque player URLs and landing-page episode metadata cannot describe the whole show',()=>{
+ const info={title:'9-1-1',type:'Series'},plot='The hottest day of the year has the first responders feeling the pressure.';
+ const page='<title>9-1-1</title><meta name="description" content="'+plot+'">';
+ for(const path of ['/watch/9-1-1/10a7152/10a7152a0011','/watch/9-1-1/10a7152']){
+  assert.equal(parseFirstPartyDetails(page,'https://www.itv.com'+path,info),null);
+ }
+ const full='A drama following emergency responders as they balance dangerous rescue work with the challenges of their personal lives.';
+ const about=page+'<h2>About 9-1-1</h2><p>'+full+'</p>';
+ assert.equal(parseFirstPartyDetails(about,'https://www.itv.com/watch/9-1-1/10a7152',info).description,full);
+});
+test('A selected episode description cannot leak through a correctly titled series page',()=>{
+ const plot='A heatwave puts the rescue crew under pressure during a difficult shift.';
+ const page='<title>Rescue Crew</title><meta name="description" content="'+plot+'"><script type="application/ld+json">'+JSON.stringify([{'@type':'TVSeries',name:'Rescue Crew'},{'@type':'TVEpisode',name:'Heatwave',description:plot}])+'</script>';
+ assert.equal(parseFirstPartyDetails(page,'https://www.hulu.com/series/rescue-crew',{title:'Rescue Crew',type:'Series'}),null);
+});
+test('NBC watch-website boilerplate is stripped from the actual programme premise',()=>{
+ const full='A family of federal agents balances their duty to the country and each other.';
+ const page='<title>Line of Fire | NBC</title><h1>Line of Fire</h1><meta name="description" content="Line of Fire - Watch episodes on NBC.com and the NBC App. '+full+'">';
+ const result=parseFirstPartyDetails(page,'https://www.nbc.com/line-of-fire',{title:'Line of Fire',type:'Series'});
+ assert.equal(result.description,full);assert.doesNotMatch(result.description,/Watch episodes|NBC App|NBC.com/);
+});
+test('An ITV episode preview falls back to a verified whole-series synopsis',async()=>{
+ const full='Rescue Crew follows emergency workers through dangerous rescues and the pressures of their personal lives.';
+ const page='<title>Rescue Crew</title><meta name="description" content="A heatwave overwhelms the crew during a difficult shift.">';
+ const result=await getTitleDetails({title:'Rescue Crew',type:'Series',tvmazeShowId:'12345',officialUrl:'https://www.itv.com/watch/rescue-crew/10a1234'},async url=>{
+  if(url.includes('itv.com'))return html(page);
+  if(url==='https://api.tvmaze.com/shows/12345')return json({id:12345,name:'Rescue Crew',premiered:'2020-01-01',summary:full});
+  return failure();
+ },options);
+ assert.equal(result.description,full);assert.equal(result.descriptionSource,'TVMaze');
 });

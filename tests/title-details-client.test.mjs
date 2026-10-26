@@ -15,7 +15,7 @@ function harness(responses,storage,region='GB',fallback=null){
 }
 const item={title:'NCIS',type:'Series',imdbId:'tt0364845'};
 const url='https://www.paramountglobalcontent.com/title/ncis';
-const valid={source:'Paramount Global Content',descriptionSource:'Paramount Global Content',description:'NCIS follows a team investigating crimes with Navy or Marine Corps ties.',sources:[{name:'Paramount Global Content',url}],synopsisVersion:5,synopsisScope:'series',state:'ready'};
+const valid={source:'Paramount Global Content',descriptionSource:'Paramount Global Content',description:'NCIS follows a team investigating crimes with Navy or Marine Corps ties.',sources:[{name:'Paramount Global Content',url}],synopsisVersion:6,synopsisScope:'series',state:'ready'};
 const deviceStorage=()=>{const values=new Map();return {getItem:key=>values.get(key)||null,setItem:(key,value)=>values.set(key,value)};};
 
 test('Verified details reopen immediately after an app restart without another network request',async()=>{

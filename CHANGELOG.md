@@ -1,3 +1,8 @@
+## 2026-10-26 — Keep episode and website text out of About
+- Reject ITV player descriptions and opaque episode URLs as sources of whole-show metadata.
+- Cross-check descriptions against structured episode records and exclude matching episode plots.
+- Remove broadcaster watch-site boilerplate and refresh older cached descriptions; retain the existing details fields.
+
 ## 2026-10-26 — Prioritise complete platform About descriptions
 - Look for whole-title About text on regional streaming platforms before broadcaster and catalogue fallbacks.
 - Reject shortened previews and metadata-only text; refresh cached cut-off descriptions.

@@ -1,6 +1,6 @@
 /* Public metadata only. A provider must match the selected identity before use. */
 const cache=new Map(),inFlight=new Map(),TTL=6*60*60*1000;
-const SYNOPSIS_VERSION=5;
+const SYNOPSIS_VERSION=6;
 const clean=value=>String(value??'').replace(/<[^>]*>/g,' ').replace(/&(?:#(\d+)|#x([0-9a-f]+)|(amp|quot|apos|lt|gt|nbsp));/gi,(all,decimal,hex,name)=>{
   if(name)return {amp:'&',quot:'"',apos:"'",lt:'<',gt:'>',nbsp:' '}[name.toLowerCase()];
   const n=parseInt(decimal||hex,decimal?10:16);return n>0&&n<=0x10ffff?String.fromCodePoint(n):'';
@@ -97,6 +97,10 @@ function isReleaseSpecificText(value){
    ||/\b(?:the|this|next|latest|new|previous|upcoming|final|first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth)\s+episode\b/i.test(value)
    ||/\b(?:season|episode)\s+(?:premiere|finale|recap|guide|trailer)\b/i.test(value);
 }
+function synopsisText(value){
+ // A watch CTA is website copy, not part of the programme's premise.
+ return text(value).replace(/^.{1,160}?\s[-–—|]\s*Watch (?:full )?episodes on [\s\S]*?\bApp\.\s*/i,'').trim();
+}
 function isWholeTitleSynopsis(value,minimumLength=35){
  const description=text(value);
  if(description.length<minimumLength)return false;
@@ -105,6 +109,7 @@ function isWholeTitleSynopsis(value,minimumLength=35){
  // Do not pass plot or press text about a specific season or episode
  // through the overall Show/Film Details panel.
  if(isReleaseSpecificText(description))return false;
+ if(/\bwatch (?:full )?episodes on\b|\b(?:sign up|subscribe) (?:now|today|for)\b/i.test(description))return false;
  // Cast announcements and returning-character promos can describe the current
  // run without saying "season" anywhere (including CBS's NCIS SEO copy).
  if(/\b(?:returns?\s+as|(?:is\s+)?back\s+as|reprises?\s+(?:(?:his|her|their|the)\s+)?role|joins?\s+the\s+cast|guest[- ]stars?|guest[- ]starring)\b/i.test(description))return false;
@@ -230,7 +235,15 @@ export function parseFirstPartyDetails(markup,url,{title,type,year,requireYear=f
    tags.get("description"),
    tags.get("twitter:description")
  ];
- const description=descriptions.map(value=>text(value)).find(value=>isWholeTitleSynopsis(value))||"";
+ // ITV programme landing pages can describe the selected player episode in
+ // their global meta tags, even when the page title names the overall show.
+ // Only a dedicated About section is safe there. Opaque episode IDs are
+ // also rejected independently of the visible title.
+ const itvPlayer=['itv.com','itvx.com'].includes(site.host)&&new URL(site.url).pathname.startsWith('/watch/');
+ if(itvPlayer&&new URL(site.url).pathname.split('/').filter(Boolean).length>3)return null;
+ const episodeDescriptions=structured.filter(row=>[row?.['@type']].flat().includes('TVEpisode')).map(row=>nameKey(row.description)).filter(Boolean);
+ const safeDescriptions=itvPlayer?[aboutPageDescription(source,title)]:descriptions;
+ const description=safeDescriptions.map(synopsisText).find(value=>isWholeTitleSynopsis(value)&&!episodeDescriptions.includes(nameKey(value)))||"";
  if(!description)return null;
  return record({description,year:publishedYear,seasons,
   premiered:/^\d{4}-\d{2}-\d{2}(?:T|$)/.test(published)?published.slice(0,10):"",
