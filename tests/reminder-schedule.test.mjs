@@ -1,4 +1,5 @@
 import test from "node:test";
+import {stripTypeScriptTypes} from "node:module";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -75,7 +76,16 @@ test('Release alerts survive an empty schedule, advancing next pointer and provi
  assert.equal(JSON.stringify(item),original);
 });
 
-test('Planned season and film reminders include an at-release stage in delivery and private history',()=>{
- assert.match(source,/const leadTimes = \[24, 6, 0\]/);
- assert.match(source,/for \(const lead of \[24, 6, 0\]\)/);
+test('Release processing sends at-release alerts for Planned seasons, films and watched episodes',async()=>{
+ const now=Date.parse('2026-10-26T20:00:00Z'),raw=new Date(now).toISOString(),sent=[];
+ class Clock extends Date {static now(){return now;}}
+ const c=vm.createContext({Date:Clock,Number,Array,Set,String,Object,Map,TextEncoder,crypto,Response,URL,AbortSignal,console,Deno:{env:{get:()=>''},serve(){}},createClient:()=>({})});
+ vm.runInContext(stripTypeScriptTypes(source.replace(/^import[\s\S]*?from "npm:web-push-neo@0\.1\.2";\n/m,'')),c);
+ const items=[{id:'season',title:'Season premiere',type:'Series',status:'Planned',nextSeasonNum:2,nextSeasonDate:raw},{id:'film',title:'Film premiere',type:'Film',status:'Planned',filmReleaseDate:raw},{id:'show',title:'Returning series',type:'Series',status:'Watched',airingSeason:2,nextEpisodeNum:3,nextEpisodeDate:raw,scheduledEpisodeReleases:[]}];
+ c.readLibraries=async()=>[{account_id:'account',items}];c.refreshServerEpisodeSchedules=async rows=>rows;
+ c.claimDelivery=async()=>({id:'delivery',attempts:1});c.finishDelivery=async()=>{};c.sendPush=async(row,config,payload)=>sent.push(payload);
+ const result=await c.processPlannedReminders([{account_id:'account',time_zone:'Europe/London'}],{});
+ assert.equal(result.sent,3);assert.equal(result.failed,0);
+ assert.deepEqual(sent.map(p=>p.title),['Season premiere','Film premiere','Returning series']);
+ assert.ok(sent.every(p=>/now available/i.test(p.body)),'release alerts must not be replaced with late advance reminders');
 });
