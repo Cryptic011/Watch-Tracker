@@ -227,7 +227,7 @@ window.WatchLogGallery=(()=>{
       const premiere=details.premiered||item.seriesReleaseDate||item.filmReleaseDate||'';
       const facts=[
         ['Release date',premiere?api.date(new Date(premiere.slice(0,10)+'T12:00:00')):details.year||item.releaseYear||''],
-        ['Released seasons',isFilm(item)?'':releasedSeasons],['Status',details.status||'']
+        ['Released seasons',isFilm(item)?'':releasedSeasons],['Status',details.status||dialog._trackerArtwork?.details?.status||'Unconfirmed']
       ].filter(([,value])=>value!=='');
       target.innerHTML=`<h3>About ${esc(item.title)}</h3><p>${esc(description||'A verified description is temporarily unavailable.')}</p>${facts.length?`<dl>${facts.map(([label,value])=>`<div><dt>${esc(label)}</dt><dd>${esc(value)}</dd></div>`).join('')}</dl>`:''}${!description?'<button type="button" class="btn btn-secondary" data-gallery-retry-details>Retry</button>':''}`;
       const retry=target.querySelector('[data-gallery-retry-details]');if(retry)retry.onclick=()=>loadTitleDetails(item);
