@@ -25,7 +25,7 @@
     if(test)test.disabled=backgroundReminderBusy||connection!=="on";
     const quick=document.getElementById("quick-reminder-status");
     const quickLabel=quick?.querySelector?.("span");
-    if(quick&&quickLabel){const attention=state==="error";quick.dataset.state=attention?"attention":enabled?"ok":"idle";quickLabel.textContent=attention?"Reminder issue":connection==="pending"?"Reminders · awaiting connection":enabled?"Reminders on":connection==="checking"?"Checking reminders":"Reminders off";}
+    if(quick&&quickLabel){const attention=state==="error";quick.dataset.state=attention?"attention":connection==="on"?"ok":"idle";quickLabel.textContent=attention?"Reminder issue":connection==="pending"?"Reminders · awaiting connection":enabled?"Reminders on":connection==="checking"?"Checking reminders":"Reminders off";}
   }
   function pushSupportError(){
     if(!("Notification" in window)||!("serviceWorker" in navigator)||!("PushManager" in window))return"Background notifications are not supported in this browser.";
@@ -137,6 +137,7 @@
     try{
     subscription=await currentPushSubscription();
     if(backgroundReminderPreference()==="off"){
+      if(navigator.onLine!==false)try{await prepareBackgroundPush();}catch(_){}
       report("Background reminders are off on this device.");return false;
     }
     if(navigator.onLine===false){
