@@ -428,13 +428,19 @@ function reminderEvents(item: Record<string, unknown>) {
 
 function reminderCopy(
   item: Record<string, unknown>,
-  event: { kind: string; number: unknown },
+  event: { kind: string; number: unknown; season?: unknown },
   leadHours: number,
 ) {
-  const title = String(item.title || "").replace(/\s+/g, " ").trim() || "Watched Logger";
+  const title = "Watch Logger";
+  const name = String(item.title || "").replace(/\s+/g, " ").trim() || "Untitled";
   const timing = leadHours === 24 ? "in 1 day" : leadHours === 1 ? "in 1 hour" : `in ${leadHours} hours`;
-  const label = event.kind === "film" ? "Film" : "New episode";
-  const body = leadHours === 0 ? `${label} out now` : `${label} out ${timing}`;
+  const season = Number(event.kind === "season" ? event.number : event.season || item.airingSeason || item.curSeason || item.nextSeasonNum);
+  const episode = Number(event.kind === "season" ? 1 : event.number);
+  const premiere = event.kind === "film" || (season === 1 && episode === 1);
+  const label = premiere ? "New show" : "New episode";
+  const numbers = !premiere && Number.isInteger(season) && season > 0 && Number.isInteger(episode) && episode > 0 ? ` (S${season} E${episode})` : "";
+  const message = leadHours === 0 ? `${label} out now` : `${label} out ${timing}`;
+  const body = `${name}\n${message}${numbers}`;
   return { title, body };
 }
 

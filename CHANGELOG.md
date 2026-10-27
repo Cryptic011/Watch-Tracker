@@ -1,3 +1,8 @@
+## 2026-10-27 — App heading and episode numbers in notifications
+- Use “Watch Logger” as the notification heading, followed by the show/film name on its own body line.
+- Add season/episode numbers to episode release and advance reminders; use “New show out now” for premieres and films.
+- Keep platform names and timing notes out of notification text. iOS retains its own web-app attribution.
+
 ## 2026-10-27 — Restore missing recurring calendar entries
 - Resolve saved series without provider IDs instead of skipping their schedule refresh.
 - Include a dated episode or season premiere even when only one future release is announced.
