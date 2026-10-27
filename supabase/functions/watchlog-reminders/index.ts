@@ -264,7 +264,7 @@ function buildServerEpisodeSchedule(item, episodesRaw, now = Date.now()) {
     // pointer, so the release just passed is still eligible for its alert.
     scheduledEpisodeReleases: episodes.filter(episode => {
       const time = episodeReleaseTime(episode);
-      return time > 0 && time >= now - 2 * 86400000 && time <= now + 8 * 86400000;
+      return time > 0 && time >= now - 2 * 86400000 && time <= now + 14 * 86400000;
     }).map(episode => ({ season: episode.season, number: episode.number, raw: episodeUtcValue(episode) })),
     serverScheduleUpdatedAt: new Date(now).toISOString(),
     episodeScheduleVerified: true,
@@ -282,7 +282,7 @@ function buildServerEpisodeSchedule(item, episodesRaw, now = Date.now()) {
 }
 
 function serverScheduleRefreshDue(item: Record<string, unknown>, now = Date.now()) {
-  if (!["Series", "Anime"].includes(String(item?.type || "")) || !item?.tvmazeShowId) return false;
+  if (!["Series", "Anime"].includes(String(item?.type || "")) || !String(item?.title||"").trim()) return false;
   const next = scheduledEventTime(item.nextEpisodeDate, "UTC"), refreshed = new Date(String(item.serverScheduleUpdatedAt || "")).getTime();
   return !Array.isArray(item.scheduledEpisodeReleases) || !Number.isFinite(refreshed) || now - refreshed >= EPISODE_SCHEDULE_REFRESH_MS || (Number.isFinite(next) && next <= now);
 }
@@ -297,24 +297,41 @@ async function privateLibrary(accountId: string) {
 }
 
 async function refreshServerEpisodeSchedules(libraries: LibraryRow[], now = Date.now()) {
-  const requests = new Map<string, Promise<unknown[] | null>>();
-  const load = (showId: unknown) => {
-    const key = String(showId);
-    if (!/^[1-9]\d*$/.test(key)) return Promise.resolve(null);
-    if (!requests.has(key)) requests.set(key, fetch(`https://api.tvmaze.com/shows/${key}/episodes`, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(6000) }).then(async (response) => { if (!response.ok) return null; const data = await response.json(); return Array.isArray(data) ? data : null; }).catch(() => null));
+  const identity=(item: Record<string, unknown>)=>String(item.tvmazeShowId||item.imdbId||item.title||"");
+  const requests = new Map<string, Promise<{showId:string;episodes:unknown[]} | null>>();
+  const load = (item: Record<string, unknown>) => {
+    const key=identity(item);
+    if (!requests.has(key)) requests.set(key,(async()=>{
+      try{
+        let showId=String(item.tvmazeShowId||"");
+        const read=async(url:string)=>{const response=await fetch(url,{headers:{Accept:"application/json"},signal:AbortSignal.timeout(6000)});return response.ok?await response.json():null;};
+        if(!/^[1-9]\d*$/.test(showId)){
+          const normal=(value:unknown)=>String(value||"").toLowerCase().replace(/[^a-z0-9]/g,"");
+          const imdb=String(item.imdbId||""),year=String(item.releaseYear||"");
+          const selected=/^tt\d+$/.test(imdb)?await read(`https://api.tvmaze.com/lookup/shows?imdb=${encodeURIComponent(imdb)}`):null;
+          let matches=selected?[selected]:[];
+          if(!matches.length){const rows=await read(`https://api.tvmaze.com/search/shows?q=${encodeURIComponent(String(item.title))}`);matches=(Array.isArray(rows)?rows:[]).map(row=>row.show).filter(Boolean);}
+          matches=matches.filter(show=>normal(show.name)===normal(item.title)&&(!year||!show.premiered||show.premiered.slice(0,4)===year)&&(!imdb||!show.externals?.imdb||show.externals.imdb===imdb));
+          if(matches.length!==1||!matches[0].id)return null;
+          showId=String(matches[0].id);
+        }
+        const episodes=await read(`https://api.tvmaze.com/shows/${showId}/episodes`);
+        return Array.isArray(episodes)?{showId,episodes}:null;
+      }catch(_){return null;}
+    })());
     return requests.get(key)!;
   };
   // Bound work on cold scans and rotate through larger catalogues fairly.
-  const due = [...new Set(libraries.flatMap(library => (Array.isArray(library.items) ? library.items : []).filter(item => serverScheduleRefreshDue(item, now)).map(item => String(item.tvmazeShowId))))].sort();
+  const due=[...new Map(libraries.flatMap(library=>(Array.isArray(library.items)?library.items:[]).filter(item=>serverScheduleRefreshDue(item,now))).map(item=>[identity(item),item])).values()].sort((a,b)=>identity(a).localeCompare(identity(b)));
   const offset = due.length ? (Math.floor(now / 60000) * 60) % due.length : 0;
   const queue = [...due.slice(offset), ...due.slice(0, offset)].slice(0, 60);
-  const results = new Map<string, unknown[]>();
+  const results = new Map<string, {showId:string;episodes:unknown[]}>();
   let cursor = 0;
   const deadline = Date.now() + 25000;
   await Promise.all(Array.from({ length: Math.min(4, queue.length) }, async () => {
     while (cursor < queue.length && Date.now() < deadline) {
-      const key = queue[cursor++], episodes = await load(key);
-      if (episodes !== null) results.set(key, episodes);
+      const item=queue[cursor++],result=await load(item);
+      if(result)results.set(identity(item),result);
     }
   }));
   const refreshed = [];
@@ -323,9 +340,9 @@ async function refreshServerEpisodeSchedules(libraries: LibraryRow[], now = Date
     let changed = false;
     for (let index = 0; index < items.length; index++) {
       if (!serverScheduleRefreshDue(items[index], now)) continue;
-      const episodes = results.get(String(items[index].tvmazeShowId));
-      if (!episodes) continue;
-      const updated = buildServerEpisodeSchedule(items[index], episodes, now);
+      const result = results.get(identity(items[index]));
+      if (!result) continue;
+      const updated = buildServerEpisodeSchedule({...items[index],tvmazeShowId:result.showId}, result.episodes, now);
       if (JSON.stringify(updated) !== JSON.stringify(items[index])) { items[index] = updated; changed = true; }
     }
     if (changed) {

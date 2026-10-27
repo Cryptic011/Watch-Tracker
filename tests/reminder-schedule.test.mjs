@@ -112,3 +112,21 @@ test('Streaming-first worker never sends a UK Marshals release at US broadcast t
  assert.match(sent[0].data.eventKey,/2026-10-26T08:00:00.000Z:lead-0h$/);
  assert.equal((await c.processPlannedReminders(subscriptions,{})).sent,0);
 });
+
+
+test('Server resolves legacy show identity before refreshing its missing episode schedule',async()=>{
+ const now=Date.parse('2026-10-27T12:00:00Z'),calls=[],writes=[];
+ const c=vm.createContext({Date,Number,Array,Set,String,Object,Map,TextEncoder,crypto,Response,URL,AbortSignal,console,Deno:{env:{get:()=>''},serve(){}},createClient:()=>({rpc:async(name,args)=>{writes.push(args);return {data:{ok:true,revision:2}};}}),fetch:async url=>{
+  calls.push(url);return {ok:true,json:async()=>url.includes('/search/shows')?[{show:{id:59,name:'Chicago Fire',premiered:'2012-10-10',externals:{imdb:'tt2261391'}}}]:[{season:15,number:4,airstamp:'2026-10-29T01:00:00Z'},{season:15,number:5,airstamp:'2026-11-08T01:00:00Z'}]};
+ }});
+ vm.runInContext(stripTypeScriptTypes(source.replace(/^import[\s\S]*?from "npm:web-push-neo@0\.1\.2";\n/m,'')),c);
+ c.db={rpc:async(name,args)=>{writes.push(args);return {data:{ok:true,revision:2}};}};
+ const result=await c.refreshServerEpisodeSchedules([{account_id:'account',revision:1,items:[{id:'legacy',title:'Chicago Fire',type:'Series',status:'Watched',watchedEpisodes:{14:[1,2]}}]}],now);
+ assert.equal(result[0].items[0].tvmazeShowId,'59');assert.equal(result[0].items[0].scheduledEpisodeReleases.length,2,'the complete two-week window is saved');
+ assert.equal(JSON.stringify(result[0].items[0].watchedEpisodes),JSON.stringify({14:[1,2]}));assert.equal(writes.length,1);
+ assert.ok(calls[0].includes('/search/shows'));assert.ok(calls[1].includes('/shows/59/episodes'));
+ c.fetch=async()=>({ok:true,json:async()=>[{show:{id:1,name:'Chicago Fire'}},{show:{id:2,name:'Chicago Fire'}}]});
+ const ambiguous=await c.refreshServerEpisodeSchedules([{account_id:'account',revision:1,items:[{id:'unknown',title:'Chicago Fire',type:'Series'}]}],now);
+ assert.equal(ambiguous[0].items[0].tvmazeShowId,undefined,'ambiguous identities cannot invent a schedule');
+ assert.equal(writes.length,1,'ambiguous matches never write changes');
+});

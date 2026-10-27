@@ -208,14 +208,16 @@ function recurringWeeklyShows(items,now=new Date()){
     const nextSeason=Number(nextMatch?.season||(Number(item.nextEpisodeNum)===1?item.nextSeasonNum:activeSeason)||activeSeason);
     const rows=[...(Array.isArray(stored?.episodes)?stored.episodes:[]),...scheduled,
       {season:activeSeason,number:item.latestEpisodeNum,raw:item.latestEpisodeDate},
-      {season:nextSeason,number:item.nextEpisodeNum,raw:item.nextEpisodeDate}];
+      {season:nextSeason,number:item.nextEpisodeNum,raw:item.nextEpisodeDate},
+      {season:Number(item.nextSeasonNum),number:1,raw:item.nextSeasonDate}];
     const pattern=weeklyReleasePattern(rows);
     const days=[...new Set((Array.isArray(stored?.days)?stored.days:pattern?.days||[]).filter(day=>Number.isInteger(day)&&day>=0&&day<7))];
     const episodes=[...new Map((pattern?.episodes||rows).filter(row=>row&&Number.isInteger(Number(row.season))&&Number(row.season)>0&&Number.isInteger(Number(row.number))&&Number(row.number)>0).map(row=>[row.season+":"+row.number,row])).values()];
     const regionalEpisodes=episodes.map(row=>typeof regionalScheduleEvent==='function'?regionalScheduleEvent(item,row):row).filter(row=>!row.streamingUnconfirmed);
     const dated=regionalEpisodes.map(row=>({...row,date:new Date(/^\d{4}-\d{2}-\d{2}$/.test(row.raw)?row.raw+"T12:00:00Z":row.raw)}))
       .filter(row=>Number.isFinite(row.date.getTime())).sort((left,right)=>left.date-right.date);
-    if(regionalEpisodes.some(row=>row.releaseSchedule))days.splice(0,days.length,...new Set(dated.map(row=>row.date.getUTCDay())));
+    // A dated announcement is enough; a second weekly occurrence is not required.
+    days.splice(0,days.length,...new Set(dated.map(row=>row.date.getUTCDay())));
     for(const day of days){
       const releases=dated.filter(row=>row.date.getUTCDay()===day);
       const next=releases.find(row=>row.date.getTime()+86400000>now.getTime());

@@ -401,3 +401,14 @@ test("Identical series episode entries render once across distinct sync record I
   const calendar=c.calendarEvents([first,second],now,7);
   assert.equal(calendar.events.length,1);
 });
+
+
+test('A single announced episode or season premiere appears without a historical weekly pattern',()=>{
+ const c=app(),now=new Date('2026-10-27T12:00:00Z');
+ const one={id:'single',title:'Chicago Fire',type:'Series',scheduledEpisodeReleases:[{season:15,number:4,raw:'2026-10-29T01:00:00Z'}]};
+ const premiere={id:'premiere',title:'Black Doves',type:'Series',nextSeasonNum:2,nextSeasonDate:'2026-11-05T12:00:00Z'};
+ const rows=c.recurringWeeklyShows([one,premiere],now);
+ assert.equal(rows.length,2);assert.ok(rows.some(row=>row.item.id==='single'&&row.episodes[0].number===4));
+ assert.ok(rows.some(row=>row.item.id==='premiere'&&row.episodes[0].number===1));
+ assert.equal(c.recurringWeeklyShows([{...one,hideFromWeeklyReleases:true}],now).length,0);
+});

@@ -443,6 +443,7 @@ test("Recently refreshed historical shows with empty episode lists are retried",
     totalSeasons:23,seriesReleaseDate:"2003-09-23",latestEpisodeDate:"2026-10-21",
     episodeScheduleVerified:true,releasedEpisodes:{},metadataUpdatedAt:"2026-10-24T11:59:00Z"};
   assert.ok(api.seriesMetadataRefreshCandidate(ncis,now),"empty historical schedules need repair");
+  assert.ok(api.seriesMetadataRefreshCandidate({id:"legacy",title:"Chicago Fire",type:"Series",nextSeasonDate:"2026-10-08T02:00"},now),"legacy titles without provider IDs must be resolved instead of skipped");
   assert.equal(api.seriesMetadataRefreshCandidate({...ncis,releasedEpisodes:{1:[1]}},now),null);
 });
 

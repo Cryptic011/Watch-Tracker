@@ -1,3 +1,8 @@
+## 2026-10-27 — Restore missing recurring calendar entries
+- Resolve saved series without provider IDs instead of skipping their schedule refresh.
+- Include a dated episode or season premiere even when only one future release is announced.
+- Keep the full 14-day schedule in the reminder worker and preserve exclusions and saved watch progress.
+
 ## 2026-10-27 — Consistent Search navigation and keyboard layout
 - Keep the same two-button Library/Settings capsule when Search opens, without adding a temporary third tab.
 - Hide the web or native dock while the Search keyboard is open; restore it when the keyboard closes or Search exits.

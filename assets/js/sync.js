@@ -607,7 +607,7 @@
   }
 
   function seriesMetadataRefreshCandidate(item,now=Date.now(),{ignoreRetry=false}={}){
-    if(!isEpisodeTrackable(item)||!item?.title||(!item.tvmazeShowId&&!item.imdbId))return null;
+    if(!isEpisodeTrackable(item)||!item?.title)return null;
     const id=String(item.id||""),lastAttempt=metadataRefreshAttemptAt.get(id)||0;
     if(!ignoreRetry&&lastAttempt&&now-lastAttempt<SERIES_REFRESH_RETRY_MS)return null;
     const nextEpisodeTime=toMillis(item.nextEpisodeDate),nextSeasonTime=toMillis(item.nextSeasonDate);
