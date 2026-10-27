@@ -14,9 +14,20 @@ test('UK Marshals uses Monday 08:00 Paramount+ without changing saved broadcast 
  assert.equal(api.resolve(show,{country:'US'}),show);assert.equal(api.resolve(show,{country:'CA'}),show);
  assert.equal(api.resolve({...show,imdbId:'tt000001'},{country:'GB'}).platform,'CBS','conflicting identity must not match');
 });
-test('Regional streaming clock stays 08:00 London through UK and US daylight-saving differences',()=>{
+test('Marshals stays 08:00 GMT through UK and US daylight-saving differences',()=>{
  const api=engine();
- for(const [broadcast,expected] of [['2026-03-23T00:00:00Z','2026-03-23T08:00:00.000Z'],['2026-03-30T00:00:00Z','2026-03-30T07:00:00.000Z'],['2026-10-19T00:00:00Z','2026-10-19T07:00:00.000Z'],['2026-10-26T00:00:00Z','2026-10-26T08:00:00.000Z'],['2026-11-02T01:00:00Z','2026-11-02T08:00:00.000Z']])assert.equal(api.resolve({...show,nextEpisodeDate:broadcast},{country:'GB'}).nextEpisodeDate,expected);
+ for(const [broadcast,expected] of [['2026-03-23T00:00:00Z','2026-03-23T08:00:00.000Z'],['2026-03-30T00:00:00Z','2026-03-30T08:00:00.000Z'],['2026-10-19T00:00:00Z','2026-10-19T08:00:00.000Z'],['2026-10-26T00:00:00Z','2026-10-26T08:00:00.000Z'],['2026-11-02T01:00:00Z','2026-11-02T08:00:00.000Z']])assert.equal(api.resolve({...show,nextEpisodeDate:broadcast},{country:'GB'}).nextEpisodeDate,expected);
+});
+test('Marshals Monday dates and existing corrected times remain confirmed at 08:00 GMT',()=>{
+ const api=engine();
+ for(const raw of ['2026-10-26','2026-10-26T04:00:00Z','2026-10-26T08:00:00Z']){
+  const result=api.resolve({...show,nextEpisodeDate:raw},{country:'GB'});
+  assert.equal(result.nextEpisodeDate,'2026-10-26T08:00:00.000Z');
+  const event=api.resolveEvent(result,{raw:result.nextEpisodeDate,season:2,number:4},{country:'GB'});
+  assert.notEqual(event.streamingUnconfirmed,true);
+ }
+ const old=api.resolve({...show,nextEpisodeDate:'2026-06-01T07:00:00Z',releaseSchedule:{key:'marshals-gb-paramount-8',timeZone:'Europe/London'}},{country:'GB'});
+ assert.equal(old.nextEpisodeDate,'2026-06-01T08:00:00.000Z');assert.equal(old.releaseSchedule.timeZone,'UTC');
 });
 test('Device language does not turn France or Ireland into the UK and an explicit viewing region wins',()=>{
  const api=engine();assert.equal(api.country({timeZone:'Europe/Paris',locale:'en-GB'}),'FR');assert.equal(api.country({timeZone:'Europe/Dublin',locale:'en-GB'}),'IE');assert.equal(api.country({timeZone:'Europe/London',locale:'en-US'}),'GB');assert.equal(api.country({country:'US',timeZone:'Europe/London'}),'US');

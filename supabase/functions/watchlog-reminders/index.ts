@@ -81,15 +81,7 @@ function safeEqual(a: string, b: string) {
   return difference === 0;
 }
 
-function validTimeZone(value: unknown) {
-  const candidate = String(value || "UTC").slice(0, 80);
-  try {
-    new Intl.DateTimeFormat("en", { timeZone: candidate }).format(new Date());
-    return candidate;
-  } catch {
-    return "UTC";
-  }
-}
+function validTimeZone(_value: unknown) { return "UTC"; }
 
 function validPushEndpoint(value: unknown) {
   const endpoint = String(value || "").trim();
@@ -215,14 +207,14 @@ function scheduledEventTime(rawValue: unknown, timeZone: string) {
   if (!match) return new Date(raw).getTime();
 
   const [, year, month, day, hour, minute] = match;
-  // A date without a time is treated as noon locally, avoiding midnight alerts.
+  // A date without a time is treated as noon GMT, avoiding midnight alerts.
   return zonedLocalToUtc(
     Number(year),
     Number(month),
     Number(day),
     hour === undefined ? 12 : Number(hour),
     minute === undefined ? 0 : Number(minute),
-    timeZone,
+    "UTC",
   );
 }
 
@@ -612,11 +604,7 @@ async function processPlannedReminders(
       Array.isArray(row.items) ? row.items : [],
     ]),
   );
-  if(globalThis.WatchLogRegionalReleases)await Promise.all([...new Set(subscriptions.map(row=>row.locale+':'+row.time_zone))].map(key=>{
-    const row=subscriptions.find(row=>row.locale+':'+row.time_zone===key)!;
-    let country='';try{country=new Intl.Locale(row.locale).region||'';}catch(_){}
-    return globalThis.WatchLogRegionalReleases.refresh([...byAccount.values()].flat(),{country,timeZone:row.time_zone,locale:row.locale});
-  }));
+  if(globalThis.WatchLogRegionalReleases)await globalThis.WatchLogRegionalReleases.refresh([...byAccount.values()].flat(),{country:"GB",timeZone:"UTC",locale:"en-GB"});
   const now = Date.now();
   let sent = 0;
   let failed = 0;
@@ -624,17 +612,16 @@ async function processPlannedReminders(
   for (const subscription of subscriptions) {
     const items = byAccount.get(subscription.account_id) || [];
     for (const original of items as Record<string, unknown>[]) {
-      const item = globalThis.WatchLogRegionalReleases?.resolve(original, {country: (()=>{try{return new Intl.Locale(subscription.locale).region||"";}catch{return"";}})(),timeZone:subscription.time_zone,locale:subscription.locale}) || original;
+      const item = globalThis.WatchLogRegionalReleases?.resolve(original, {country:"GB",timeZone:"UTC",locale:"en-GB"}) || original;
       const status = String(item?.status || "");
       for (const originalEvent of reminderEvents(item)) {
-      let country="";try{country=new Intl.Locale(subscription.locale).region||"";}catch(_){}
-      const event=globalThis.WatchLogRegionalReleases?.resolveEvent(item,originalEvent,{country,timeZone:subscription.time_zone,locale:subscription.locale})||originalEvent;
+      const event=globalThis.WatchLogRegionalReleases?.resolveEvent(item,originalEvent,{country:"GB",timeZone:"UTC",locale:"en-GB"})||originalEvent;
       if(event.streamingUnconfirmed || (globalThis.WatchLogRegionalReleases && !item.releaseSchedule && !event.releaseSchedule))continue; // Never substitute a broadcast for streaming availability.
       const isPlanned = status === "Planned" || status === "Saved";
       // Every dated episode gets advance and release-time alerts regardless of
       // whether the tracked title is Planned, Watching, or Watched.
       if (!isPlanned && event.kind !== "episode") continue;
-      const eventTime = scheduledEventTime(event.raw, subscription.time_zone);
+      const eventTime = scheduledEventTime(event.raw, "UTC");
       if (!Number.isFinite(eventTime)) continue;
 
       const leadTimes = [24, 6, 0];
@@ -881,7 +868,7 @@ Deno.serve(async (req: Request) => {
                 ? null
                 : Number(input.expirationTime),
             time_zone: validTimeZone(body.timeZone),
-            locale: String(body.locale || "en").slice(0, 40),
+            locale: "en-GB",
             enabled: true,
             last_seen_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
@@ -937,14 +924,13 @@ Deno.serve(async (req: Request) => {
       ].sort((a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at)).slice(0, 50);
       const now = Date.now(), upcoming = [], seen = new Set<string>();
       for (const subscription of subscriptions.data || []) for (const original of items) {
-        let country="";try{country=new Intl.Locale(subscription.locale).region||"";}catch(_){}
-        const viewer={country,timeZone:subscription.time_zone,locale:subscription.locale};
+        const viewer={country:"GB",timeZone:"UTC",locale:"en-GB"};
         const item=globalThis.WatchLogRegionalReleases?.resolve(original,viewer)||original;
         for (const originalEvent of reminderEvents(item)) {
         const event=globalThis.WatchLogRegionalReleases?.resolveEvent(item,originalEvent,viewer)||originalEvent;
         if(event.streamingUnconfirmed||(globalThis.WatchLogRegionalReleases&&!item.releaseSchedule&&!event.releaseSchedule))continue;
         if (event.kind !== "episode" && !["Planned", "Saved"].includes(String(item.status))) continue;
-        const release = scheduledEventTime(event.raw, subscription.time_zone);
+        const release = scheduledEventTime(event.raw, "UTC");
         for (const lead of [24, 6, 0]) {
           const due = release - lead * 3600000;
           if(/^\d{4}-\d{2}-\d{2}$/.test(event.raw))continue;

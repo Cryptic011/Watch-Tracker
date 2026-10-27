@@ -121,3 +121,6 @@ The Library search field and the bottom-right magnifying glass open the same ful
 The Search page matches saved titles immediately, including title words, platform, IDs and custom lists. It opens saved records directly and works without a global request. Global search runs after a 350 ms pause when there are no local matches in the selected format, or when Search all titles is selected. Library results stay above the streamed catalogue, with saved-title duplicates removed. Full verified descriptions load when a result is opened.
 
 Duplicate checks use either shared IMDb or TVMaze identity, including when the other provider ID is stale. The cloud rejects duplicate additions from older clients; current clients reconcile simultaneous additions into the original record and preserve watched episodes, history, notes, lists and reminder preferences. Different provider identities and release years keep distinct remakes separate.
+
+### GMT release times
+All release clocks, calendar days, date entry and reminder delivery use GMT (UTC) throughout the year, independent of device location or daylight saving. There is no viewing-region or timezone setting. Streaming availability uses UK listings. Marshals uses Monday 08:00 GMT on Paramount+, including previously saved Monday dates.

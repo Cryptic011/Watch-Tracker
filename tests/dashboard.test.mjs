@@ -1,3 +1,4 @@
+process.env.TZ = "UTC";
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -79,7 +80,7 @@ test('Grace never hides an older backlog and expires for all episodes in a batch
  assert.equal(c.scheduleBehindLevel({...item,releasedEpisodes:{1:[1,2,3],2:[1,2,3]},watchedEpisodes:{}},new Date(air+3600000)),'red');
 });
 
-test('Date-only releases use local noon and daylight-saving changes do not shorten the 24-hour grace',()=>{
+test('Date-only releases use GMT noon and daylight-saving changes do not shorten the 24-hour grace',()=>{
  const c=app(),item={type:'Series',episodeScheduleVerified:true,releasedEpisodes:{1:[1]},watchedEpisodes:{},scheduledEpisodeReleases:[{season:1,number:1,raw:'2026-10-23'}]};
  const noon=new Date(2026,9,23,12).getTime();
  assert.equal(c.scheduleBehindLevel(item,new Date(noon+86400000-1)),'green');

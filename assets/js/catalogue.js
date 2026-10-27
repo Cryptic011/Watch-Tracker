@@ -1,8 +1,8 @@
-  function toLocalInput(v){if(!v)return"";if(/^\d{4}-\d{2}-\d{2}$/.test(String(v)))return`${v}T12:00`;const d=new Date(v);if(Number.isNaN(d.getTime()))return"";const p=n=>String(n).padStart(2,"0");return`${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;}
+  function toLocalInput(v){if(!v)return"";if(/^\d{4}-\d{2}-\d{2}$/.test(String(v)))return`${v}T12:00`;const d=new Date(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?$/.test(String(v))?v+"Z":v);if(Number.isNaN(d.getTime()))return"";const p=n=>String(n).padStart(2,"0");return`${d.getUTCFullYear()}-${p(d.getUTCMonth()+1)}-${p(d.getUTCDate())}T${p(d.getUTCHours())}:${p(d.getUTCMinutes())}`;}
   function storedDateFromInput(value,previous=""){
     if(!value)return"";
     if(previous&&value===toLocalInput(previous))return previous;
-    const time=new Date(value).getTime();
+    const time=new Date(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?$/.test(value)?value+"Z":value).getTime();
     return Number.isFinite(time)?new Date(time).toISOString():"";
   }
   function dateOnlyInput(v){return v?`${v}T12:00`:"";}
@@ -24,7 +24,7 @@
     if(!episode)return 0;
     const stamped=episode.airstamp?new Date(episode.airstamp).getTime():0;
     if(Number.isFinite(stamped)&&stamped>0)return stamped;
-    const dated=episode.airdate?new Date(`${episode.airdate}T23:59:59`).getTime():0;
+    const dated=episode.airdate?new Date(`${episode.airdate}T23:59:59Z`).getTime():0;
     return Number.isFinite(dated)?dated:0;
   }
 
@@ -43,7 +43,7 @@
     const unique=new Map();
     for(const row of Array.isArray(episodes)?episodes:[]){
       const season=Number(row?.season),number=Number(row?.number),raw=String(row?.raw||"");
-      const date=new Date(/^\d{4}-\d{2}-\d{2}$/.test(raw)?raw+"T12:00:00":raw);
+      const date=new Date(/^\d{4}-\d{2}-\d{2}$/.test(raw)?raw+"T12:00:00Z":raw);
       if(!Number.isInteger(season)||season<1||!Number.isInteger(number)||number<1||!Number.isFinite(date.getTime()))continue;
       unique.set(season+":"+number,{season,number,raw,date});
     }
@@ -51,13 +51,13 @@
     if(!rows.length)return null;
     const current=rows.filter(row=>row.season===rows.at(-1).season).slice(-40),days=[];
     for(let day=0;day<7;day++){
-      const matches=current.filter(row=>row.date.getDay()===day);
+      const matches=current.filter(row=>row.date.getUTCDay()===day);
       if(matches.some((row,index)=>matches.slice(index+1).some(next=>next.date-row.date>=6*86400000&&next.date-row.date<=8*86400000)))days.push(day);
     }
     const officialDays=(Array.isArray(broadcastDays)?broadcastDays:[]).filter(day=>["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"].includes(day));
     if(!days.length&&officialDays.length){
       const counts=new Map();
-      for(const row of current)counts.set(row.date.getDay(),(counts.get(row.date.getDay())||0)+1);
+      for(const row of current)counts.set(row.date.getUTCDay(),(counts.get(row.date.getUTCDay())||0)+1);
       days.push(...[...counts].sort((left,right)=>right[1]-left[1]).slice(0,officialDays.length).map(([day])=>day));
     }
     return days.length?{days,episodes:rows.slice(-100).map(({season,number,raw})=>({season,number,raw}))}:null;
@@ -100,7 +100,7 @@
       const hasAired=seasonEpisodes.some(ep=>{const t=episodeAirTime(ep);return t>0&&t<=now;});
       const hasFuture=seasonEpisodes.some(ep=>episodeAirTime(ep)>now);
       const endDate=seasonMap.get(n)?.endDate;
-      const endPassed=endDate?new Date(`${endDate}T23:59:59`).getTime()<now:false;
+      const endPassed=endDate?new Date(`${endDate}T23:59:59Z`).getTime()<now:false;
       completion.set(n,Boolean(hasAired&&!hasFuture&&(n<(activeSeason||Infinity)||endPassed||String(show?.status||"").toLowerCase()==="ended")));
     }
     let completedSeasons=0;
@@ -110,7 +110,7 @@
       upcomingSeason=seasonMap.get(Number(nextEpisode.season))||{number:Number(nextEpisode.season),premiereDate:nextEpisode.airdate||null};
     }
     if(!upcomingSeason){
-      upcomingSeason=seasons.filter(s=>s.number>(latestAired||0)&&s.premiereDate&&new Date(`${s.premiereDate}T23:59:59`).getTime()>now).sort((a,b)=>a.number-b.number)[0]||null;
+      upcomingSeason=seasons.filter(s=>s.number>(latestAired||0)&&s.premiereDate&&new Date(`${s.premiereDate}T23:59:59Z`).getTime()>now).sort((a,b)=>a.number-b.number)[0]||null;
     }
     for(const season of Object.keys(releasedEpisodes))releasedEpisodes[season]=[...new Set(releasedEpisodes[season])].sort((a,b)=>a-b);
     return {seasons,episodes,known,highest,latestAired,currentEpisode,currentEpisodeRow,nextEpisode,airing,upcomingSeason,episodeCounts,airedEpisodeCounts,releasedEpisodes,completedSeasons};
@@ -269,7 +269,7 @@
         if(String(embedded?.id)===String(showId)&&Array.isArray(embedded?._embedded?.episodes)&&embedded._embedded.episodes.length)episodes=embedded._embedded.episodes;
       }catch(error){console.warn("TVMaze embedded episode fallback unavailable",error);}
     }
-    const started=Boolean(show?.premiered&&new Date(`${show.premiered}T00:00:00`).getTime()<Date.now());
+    const started=Boolean(show?.premiered&&new Date(`${show.premiered}T00:00:00Z`).getTime()<Date.now());
     const episodeAvailable=episodes.length>0||(episodeResult.status==="fulfilled"&&Array.isArray(episodeResult.value)&&!started);
     return {
       tvAvailable:seasonAvailable||showAvailable||episodeAvailable,
@@ -840,7 +840,7 @@ function duplicateCleanupMessage(cleanup){
   }
 
   const TITLE_SEARCH_STOP_WORDS=new Set(["the","a","an","and","of","for","to","in","on","with"]);
-  const TITLE_SEARCH_CURRENT_YEAR=new Date().getFullYear();
+  const TITLE_SEARCH_CURRENT_YEAR=new Date().getUTCFullYear();
 
   function titleTokens(value){
     return normalizeTitle(value).split(" ").filter(Boolean);
@@ -1115,7 +1115,7 @@ function duplicateCleanupMessage(cleanup){
 
   function isFutureDateOnly(value){
     if(!/^\d{4}-\d{2}-\d{2}$/.test(String(value||"")))return false;
-    const t=new Date(`${value}T23:59:59`).getTime();
+    const t=new Date(`${value}T23:59:59Z`).getTime();
     return Number.isFinite(t)&&t>Date.now();
   }
 

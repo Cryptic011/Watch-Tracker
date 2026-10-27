@@ -12,15 +12,9 @@
     if(/^America\/(New_York|Chicago|Denver|Los_Angeles|Phoenix|Anchorage)|^Pacific\/Honolulu$/.test(timeZone))return'US';
     try{return new Intl.Locale(locale).region||'';}catch{return'';}
   }
-  function localTime(date,hour,timeZone){
-    const [y,m,d]=date.split('-').map(Number),wanted=Date.UTC(y,m-1,d,hour),formatter=new Intl.DateTimeFormat('en-CA',{timeZone,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'});
-    let guess=wanted;
-    for(let pass=0;pass<4;pass++){
-      const p=Object.fromEntries(formatter.formatToParts(new Date(guess)).filter(p=>p.type!=='literal').map(p=>[p.type,Number(p.value)]));
-      const delta=Date.UTC(p.year,p.month-1,p.day,p.hour,p.minute,p.second)-wanted;
-      if(!delta)break;guess-=delta;
-    }
-    return new Date(guess).toISOString();
+  function localTime(date,hour){
+    const [y,m,d]=date.split('-').map(Number);
+    return new Date(Date.UTC(y,m-1,d,hour)).toISOString();
   }
   function marshals(item){
     const imdb=String(item.imdbId||''),tv=String(item.tvmazeShowId||'');
@@ -29,18 +23,16 @@
   }
   function ukMarshalsTime(raw){
     if(!raw)return'';
-    let date=String(raw).slice(0,10);
-    if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!Number.isFinite(Date.parse(date)))return raw;
-    if(/[zZ]$|[+-]\d\d:?\d\d$/.test(raw)){
-      const p=Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date(raw)).filter(p=>p.type!=='literal').map(p=>[p.type,p.value]));
-      date=`${p.year}-${p.month}-${p.day}`;
-    }
+    const text=String(raw),time=Date.parse(text);
+    if(!Number.isFinite(time))return'';
+    const date=/[zZ]$|[+-]\d\d:?\d\d$/.test(text)?new Date(time).toISOString().slice(0,10):text.slice(0,10);
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(date))return'';
     const day=new Date(date+'T12:00:00Z');
-    // Move the confirmed US Sunday episode to its UK Monday; never invent
-    // episodes for a hiatus or infer dates from a historical weekday alone.
-    if(day.getUTCDay()!==0)return raw;
-    day.setUTCDate(day.getUTCDate()+1);
-    return localTime(day.toISOString().slice(0,10),8,'Europe/London');
+    // Both source broadcasts and saved Monday listings use Monday 08:00 GMT.
+    // Existing dates establish the episode; never invent releases during a hiatus.
+    if(![0,1].includes(day.getUTCDay()))return'';
+    if(day.getUTCDay()===0)day.setUTCDate(day.getUTCDate()+1);
+    return localTime(day.toISOString().slice(0,10),8);
   }
   const listings=new Map(),requests=new Map();
   let nextRequestAt=0;
@@ -48,7 +40,7 @@
     const region=country(viewer);if(!region||!fetcher)return;
     const tracked=new Map(items.filter(item=>['Series','Anime'].includes(item.type)&&item.tvmazeShowId).map(item=>[String(item.tvmazeShowId),item]));
     if(!tracked.size)return;
-    const zone=viewer.timeZone||({'GB':'Europe/London','US':'America/New_York','CA':'America/Toronto','AU':'Australia/Sydney','NZ':'Pacific/Auckland'}[region])||'UTC';
+    const zone='UTC';
     const dateAt=time=>{const p=Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone:zone,year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date(time)).filter(p=>p.type!=='literal').map(p=>[p.type,p.value]));return `${p.year}-${p.month}-${p.day}`;};
     // Check the complete displayed window, not just today and one title's
     // nearest episode. Otherwise a missing feed date silently removes shows.
@@ -96,17 +88,17 @@
   }
   function resolve(item,viewer={}){
     if(!item||!['Series','Anime'].includes(item.type)||country(viewer)!=='GB'||!marshals(item))return item;
-    if(item.releaseSchedule?.key==='marshals-gb-paramount-8')return item;
-    const convert=raw=>ukMarshalsTime(String(raw||''));
+    if(item.releaseSchedule?.key==='marshals-gb-paramount-8'&&item.releaseSchedule.version===2)return item;
+    const convert=raw=>ukMarshalsTime(String(raw||''))||raw||'';
     const originals=[item.nextEpisodeDate,item.latestEpisodeDate,item.nextSeasonDate,...(item.scheduledEpisodeReleases||[]).filter(Boolean).map(ep=>ep.raw),...(item.recurringWeeklySchedule?.episodes||[]).filter(Boolean).map(ep=>ep.raw)].filter(Boolean);
-    const confirmedTimes=[...new Set(originals.map(convert).filter((raw,index)=>raw!==originals[index]))];
+    const confirmedTimes=[...new Set(originals.map(raw=>ukMarshalsTime(raw)).filter(Boolean))];
     const mapRows=rows=>Array.isArray(rows)?rows.map(ep=>ep?{...ep,broadcastRaw:ep.raw,raw:convert(ep.raw)}:ep):rows;
     const recurring=item.recurringWeeklySchedule;
     return {...item,platform:'Paramount+',broadcastPlatform:item.platform,
       nextEpisodeDate:convert(item.nextEpisodeDate),latestEpisodeDate:convert(item.latestEpisodeDate),nextSeasonDate:convert(item.nextSeasonDate),
       scheduledEpisodeReleases:mapRows(item.scheduledEpisodeReleases),
       recurringWeeklySchedule:recurring?{...recurring,days:[1],episodes:mapRows(recurring.episodes)}:recurring,
-      releaseSchedule:{key:'marshals-gb-paramount-8',confirmedTimes,country:'GB',platform:'Paramount+',timeZone:'Europe/London',time:'08:00',weekday:1,timeSource:'User-confirmed',checkedAt:'2026-10-26',sources:[UK_SOURCE,EPISODE_SOURCE],note:'UK streaming · Monday 08:00 · time confirmed by you'}};
+      releaseSchedule:{key:'marshals-gb-paramount-8',version:2,confirmedTimes,country:'GB',platform:'Paramount+',timeZone:'UTC',time:'08:00',weekday:1,timeSource:'User-confirmed',checkedAt:'2026-10-26',sources:[UK_SOURCE,EPISODE_SOURCE],note:'Monday 08:00 GMT · time confirmed by you'}};
   }
   root.WatchLogRegionalReleases={country,localTime,resolve,refresh,resolveEvent};
 })(globalThis);

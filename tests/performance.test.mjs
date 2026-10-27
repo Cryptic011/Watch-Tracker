@@ -1,3 +1,4 @@
+process.env.TZ = "UTC";
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -57,7 +58,7 @@ test('Hidden Settings does not calculate watch statistics',()=>{
  const c=functions(['renderWatchStatistics'],{currentUser:{id:'account'},currentTab:'library',watchStatistics(){reads++;throw Error('Hidden statistics');}});
  c.renderWatchStatistics();c.currentTab='search';c.renderWatchStatistics();c.currentUser=null;c.currentTab='settings';c.renderWatchStatistics();assert.equal(reads,0);
 });
-test('Recurring schedule wakes at airing, 24-hour rollover, or local midnight',()=>{
+test('Recurring schedule wakes at airing, 24-hour rollover, or GMT midnight',()=>{
  const c=functions(['recurringScheduleDelay']);
  const now=new Date(2026,9,23,12),air=new Date(now.getTime()+2*3600000);
  assert.equal(c.recurringScheduleDelay([{date:air}],now),2*3600000);

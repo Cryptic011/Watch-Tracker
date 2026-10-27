@@ -602,7 +602,7 @@
     const announcedStart=Number(String(item.seriesReleaseDate||"").slice(0,4)||item.releaseYear||0);
     const historicallyAired=Object.keys(positiveEpisodeMap(item.airedEpisodeCounts)).length>0||
       Number(item.curSeason||0)>0||Number(item.curEp||0)>0||
-      (Number(item.totalSeasons||0)>0&&announcedStart>0&&announcedStart<new Date(now).getFullYear());
+      (Number(item.totalSeasons||0)>0&&announcedStart>0&&announcedStart<new Date(now).getUTCFullYear());
     // A verified flag with an empty episode list for an established programme
     // is incomplete metadata, not proof that the programme has no releases.
     const missingHistoricalEpisodes=historicallyAired&&!hasReleases;
@@ -855,11 +855,11 @@
     return{key:normalized,label:title};
   }
   function watchedSortTime(item){
-    const value=item?.date?new Date(`${item.date}T12:00:00`).getTime():0;
+    const value=item?.date?new Date(`${item.date}T12:00:00Z`).getTime():0;
     return Number.isFinite(value)?value:0;
   }
   function addedSortTime(item){
-    const value=new Date(item?.createdAt||item?.updatedAt||(item?.date?`${item.date}T12:00:00`:0)).getTime();
+    const value=new Date(item?.createdAt||item?.updatedAt||(item?.date?`${item.date}T12:00:00Z`:0)).getTime();
     return Number.isFinite(value)?value:0;
   }
   function releaseSortInfo(item,now=Date.now()){
@@ -868,7 +868,7 @@
     else value=item?.latestEpisodeDate||item?.seriesReleaseDate||item?.nextEpisodeDate||"";
     if(!value&&item?.releaseYear&&/^\d{4}$/.test(String(item.releaseYear)))value=`${item.releaseYear}-01-01`;
     const dateOnly=/^\d{4}-\d{2}-\d{2}$/.test(String(value));
-    const time=value?new Date(dateOnly?`${value}T12:00:00`:value).getTime():0;
+    const time=value?new Date(dateOnly?`${value}T12:00:00Z`:value).getTime():0;
     if(!Number.isFinite(time)||time<=0)return{bucket:0,time:0};
     return{bucket:time>now?1:2,time};
   }
@@ -886,9 +886,9 @@
       if(!raw)return{time:0,dateOnly:false,dayStart:0,validThrough:0};
       const dateOnly=/^\d{4}-\d{2}-\d{2}$/.test(raw)||/^\d{4}-\d{2}-\d{2}T12:00(?::00)?$/.test(raw);
       const datePart=raw.slice(0,10);
-      const time=new Date(dateOnly?`${datePart}T12:00:00`:raw).getTime();
-      const dayStart=dateOnly?new Date(`${datePart}T00:00:00`).getTime():time;
-      const validThrough=dateOnly?new Date(`${datePart}T23:59:59.999`).getTime():time;
+      const time=new Date(dateOnly?`${datePart}T12:00:00Z`:raw).getTime();
+      const dayStart=dateOnly?new Date(`${datePart}T00:00:00Z`).getTime():time;
+      const validThrough=dateOnly?new Date(`${datePart}T23:59:59.999Z`).getTime():time;
       return{
         time:Number.isFinite(time)?time:0,
         dateOnly,
@@ -973,16 +973,17 @@
     return /^\d{4}-\d{2}-\d{2}$/.test(raw)?`${raw}T12:00`:"";
   }
   function upcomingSortInfo(item,now=Date.now()){
+    if(typeof regionalScheduleItem==='function')item=regionalScheduleItem(item);
     const events=[],announcements=[],releaseRetentionMs=24*60*60*1000,graceStart=now-releaseRetentionMs;
     const eventTime=value=>{
       const raw=String(value||""),dateOnly=/^\d{4}-\d{2}-\d{2}$/.test(raw)||/^\d{4}-\d{2}-\d{2}T12:00(?::00)?$/.test(raw);
-      const day=raw.slice(0,10),time=raw?new Date(dateOnly?`${day}T12:00:00`:raw).getTime():0;
+      const day=raw.slice(0,10),time=raw?new Date(dateOnly?`${day}T12:00:00Z`:raw).getTime():0;
       const validThrough=time+releaseRetentionMs;
       return{time:Number.isFinite(time)?time:0,dateOnly,validThrough:Number.isFinite(validThrough)?validThrough:0};
     };
     if(item?.type==="Film"){
       if(item.filmReleaseDate){
-        const value=eventTime(item.filmReleaseDate),today=new Date(now);today.setHours(0,0,0,0);
+        const value=eventTime(item.filmReleaseDate),today=new Date(now);today.setUTCHours(0,0,0,0);
         if(value.time>=today.getTime())events.push({kind:"film",...value});
       }
     }else{

@@ -6,7 +6,7 @@ import path from "node:path";
 import vm from "node:vm";
 import { fileURLToPath } from "node:url";
 
-process.env.TZ = "Europe/London";
+process.env.TZ = "UTC";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const html = readAppSource();
 
@@ -110,8 +110,8 @@ test("Upcoming TV releases remain visible for 24 hours after their release time"
   const api = loadFunctions(["upcomingSortInfo", "dateOnlyInput"]);
   const dateOnlyItem = { type: "Series", nextSeasonNum: 3, nextSeasonDate: api.dateOnlyInput("2026-09-02") };
   const evening = new Date("2026-09-02T20:00:00+01:00").getTime();
-  const nextDay = new Date("2026-09-03T00:01:00+01:00").getTime();
-  const nextDayAfter24Hours = new Date("2026-09-03T12:01:00+01:00").getTime();
+  const nextDay = new Date("2026-09-03T00:01:00Z").getTime();
+  const nextDayAfter24Hours = new Date("2026-09-03T12:01:00Z").getTime();
   assert.equal(dateOnlyItem.nextSeasonDate, "2026-09-02T12:00");
   assert.equal(api.upcomingSortInfo(dateOnlyItem, evening).rank, 2);
   assert.equal(api.upcomingSortInfo(dateOnlyItem, evening).dateOnly, true);

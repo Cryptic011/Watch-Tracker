@@ -410,7 +410,7 @@
   function titleCardMarkup(item){
     const isFilm=item.type==="Film",trackable=isEpisodeTrackable(item),id=esc(item.id),title=esc(item.title);
     const icon=isFilm?`<svg viewBox="0 0 24 24"><path d="M18 4l2 4h-3l-2-4h-2l2 4h-3l-2-4H8l2 4H7L5 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4h-4z"/></svg>`:`<svg viewBox="0 0 24 24"><path d="M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h5v2h8v-2h5c1.1 0 1.99-.9 1.99-2L23 5c0-1.1-.9-2-2-2zm0 14H3V5h18v12z"/></svg>`;
-    const release=isFilm&&item.filmReleaseDate?`${new Date(`${item.filmReleaseDate}T12:00:00`).getTime()>Date.now()?"Releases":"Released"} ${formatLocalDate(item.filmReleaseDate)}`:"";
+    const release=isFilm&&item.filmReleaseDate?`${new Date(`${item.filmReleaseDate}T12:00:00Z`).getTime()>Date.now()?"Releases":"Released"} ${formatLocalDate(item.filmReleaseDate)}`:"";
     const progress=!isFilm&&Number(item.curSeason)===0?"Not started":(!isFilm&&item.curSeason?`S${item.curSeason}${item.curEp!==null&&item.curEp!==undefined&&item.curEp!==""?` E${item.curEp}`:""}`:"");
     const known=!isFilm?knownSeasonTotal(item):0,summary=!isFilm?`${item.watchedSeasons??0} of ${known} seasons fully watched`:"",season=isFilm?release:[progress,summary].filter(Boolean).join(" • ");
     const pct=isFilm?100:Math.min(100,Math.max(0,(Number(item.watchedSeasons||0)/known)*100));

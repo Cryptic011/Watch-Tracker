@@ -89,14 +89,14 @@ window.WatchLogGallery=(()=>{
     return `<div class="gallery-art"><span aria-hidden="true">${esc(initials)}</span><div class="gallery-art-title">${esc(item.title||'Untitled')}</div><div class="gallery-art-meta">${esc(isFilm(item)?'FILM':'SERIES')} · ${esc(item.releaseYear||'WATCH TRACKER')}</div><img hidden alt="" data-art="${esc(key(item))}" decoding="async"></div>`;
   }
   function stateBadge(item){const last=api.last(item);return last?`<span class="gallery-tile-status done">✓ S${esc(last.season)} E${esc(last.episode)} watched</span>`:`<span class="gallery-tile-status">${esc(item.status==='Saved'?'Planned':item.status||'Planned')}</span>`;}
-  function releaseTime(item){const value=isFilm(item)?item.filmReleaseDate:item.seriesReleaseDate;const time=Date.parse(value?`${String(value).slice(0,10)}T12:00:00`:'');return Number.isFinite(time)?time:0;}
-  function releaseYear(item){const time=releaseTime(item);return time?String(new Date(time).getFullYear()):/^\d{4}$/.test(String(item.releaseYear||''))?String(item.releaseYear):'Date unknown';}
+  function releaseTime(item){const value=isFilm(item)?item.filmReleaseDate:item.seriesReleaseDate;const time=Date.parse(value?`${String(value).slice(0,10)}T12:00:00Z`:'');return Number.isFinite(time)?time:0;}
+  function releaseYear(item){const time=releaseTime(item);return time?String(new Date(time).getUTCFullYear()):/^\d{4}$/.test(String(item.releaseYear||''))?String(item.releaseYear):'Date unknown';}
   function releaseGroups(items){
     const groups=new Map();
     for(const item of items){const year=releaseYear(item);if(!groups.has(year))groups.set(year,[]);groups.get(year).push(item);}
     return [...groups].sort(([a],[b])=>(Number(b)||0)-(Number(a)||0)).map(([year,rows])=>({year,rows:rows.slice().sort((a,b)=>releaseTime(b)-releaseTime(a)||String(a.title).localeCompare(String(b.title)))}));
   }
-  function releasedByYear(item,now){return /^\d{4}$/.test(String(item.releaseYear||''))&&Number(item.releaseYear)<new Date(now).getFullYear();}
+  function releasedByYear(item,now){return /^\d{4}$/.test(String(item.releaseYear||''))&&Number(item.releaseYear)<new Date(now).getUTCFullYear();}
   function sections(items,upcoming,now=Date.now()){
     const future=[],released=[],remaining=[],events=new Map();
     for(const item of items){
@@ -151,7 +151,7 @@ window.WatchLogGallery=(()=>{
   }
   function episodeRow(item,season,episode,watched){
     const complete=watched.has(episode),title=item.episodeTitles?.[season]?.[episode]||'Episode '+episode;
-    const date=item.episodeReleaseDates?.[season]?.[episode]||'',dateText=date?api.date(new Date(/^\d{4}-\d{2}-\d{2}$/.test(date)?date+'T12:00:00':date)):'';
+    const date=item.episodeReleaseDates?.[season]?.[episode]||'',dateText=date?api.date(new Date(/^\d{4}-\d{2}-\d{2}$/.test(date)?date+'T12:00:00Z':date)):'';
     return `<div class="gallery-episode-row" data-gallery-episode="${season}:${episode}">
       <span class="gallery-episode-art"><span class="gallery-artwork-placeholder">E${episode}</span></span>
       <span class="gallery-episode-copy"><strong>${episode}. ${esc(title)}</strong>${dateText?`<small>${esc(dateText)}</small>`:''}</span>
@@ -226,7 +226,7 @@ window.WatchLogGallery=(()=>{
       const releasedSeasons=releasedCount||item.episodeScheduleVerified===true?releasedCount:(details.releasedSeasons??'Unconfirmed');
       const premiere=details.premiered||item.seriesReleaseDate||item.filmReleaseDate||'';
       const facts=[
-        ['Release date',premiere?api.date(new Date(premiere.slice(0,10)+'T12:00:00')):details.year||item.releaseYear||''],
+        ['Release date',premiere?api.date(new Date(premiere.slice(0,10)+'T12:00:00Z')):details.year||item.releaseYear||''],
         ['Released seasons',isFilm(item)?'':releasedSeasons],['Status',details.status||dialog._trackerArtwork?.details?.status||'Unconfirmed']
       ].filter(([,value])=>value!=='');
       target.innerHTML=`<h3>About ${esc(item.title)}</h3><p>${esc(description||'A verified description is temporarily unavailable.')}</p>${facts.length?`<dl>${facts.map(([label,value])=>`<div><dt>${esc(label)}</dt><dd>${esc(value)}</dd></div>`).join('')}</dl>`:''}${!description?'<button type="button" class="btn btn-secondary" data-gallery-retry-details>Retry</button>':''}`;

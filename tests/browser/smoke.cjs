@@ -89,6 +89,20 @@ const server=http.createServer((req,res)=>{
   await page.goto(base);
   await page.locator('#auth-email').fill(account.email);await page.locator('#auth-pin').fill('1234');await page.locator('#auth-submit').click();
   await page.waitForFunction(()=>document.querySelector('#auth-screen').classList.contains('hidden'));
+  const gmt=await page.evaluate(()=>{
+   const item={id:'marshals-gmt',title:'Marshals',type:'Series',imdbId:'tt36849871',tvmazeShowId:'84526',platform:'Paramount+',airingSeason:2,nextEpisodeNum:5,nextEpisodeDate:'2026-11-02T01:30:00Z',scheduledEpisodeReleases:[{season:2,number:5,raw:'2026-11-02T01:30:00Z'}]};
+   const result=calendarEvents([item],new Date('2026-11-02T00:00:00Z'),1).events[0];
+   return {summer:formatLocalDateTime('2026-06-01T08:00:00Z'),clock:DASHBOARD_TIME_FORMATTER.format(result.date),date:result.date.toISOString(),card:upcomingSortInfo(item,Date.parse('2026-11-01T00:00:00Z')).time,zone:DEVICE_TIME_ZONE};
+  });
+  assert.equal(gmt.summer,'01/06/2026, 08:00','British Summer Time does not shift the GMT clock');
+  assert.equal(gmt.clock,'08:00');assert.equal(gmt.date,'2026-11-02T08:00:00.000Z');
+  assert.equal(gmt.card,Date.parse(gmt.date),'title cards and the calendar agree on Marshals at 08:00 GMT');
+  assert.equal(gmt.zone,'UTC');
+  await page.locator('.bottom-tabs [data-tab="settings"]').click();
+  await page.locator('[data-settings-open="general"]').click();
+  assert.equal(await page.locator('#release-viewing-region').count(),0,'General has no region or timezone selector');
+  if(process.env.BROWSER_SCREENSHOT_DIR)await page.screenshot({path:path.join(process.env.BROWSER_SCREENSHOT_DIR,engine.name()+'-gmt-settings.png')});
+  await page.locator('.bottom-tabs [data-tab="library"]').click();
   assert.equal(changelogRequests,0,'startup does not request workflow history');
   const pendingSchedule=await page.evaluate(()=>{
    const saved=mediaItems,view=selectedScheduleView,range=selectedCalendarRange;

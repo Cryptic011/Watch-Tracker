@@ -381,35 +381,26 @@
   mediaForm.addEventListener("change",markEditorUserChange);
 
   function nowISO(){return new Date().toISOString();}
-  const DEVICE_TIME_ZONE=Intl.DateTimeFormat().resolvedOptions().timeZone||"";
+  const DEVICE_TIME_ZONE="UTC"; // All app clocks use GMT year-round.
   const USER_LOCALE=(()=>{
     const candidates=[...((Array.isArray(navigator.languages)&&navigator.languages)||[]),navigator.language].filter(Boolean);
     let locale="en-GB";
     for(const candidate of candidates){try{new Intl.DateTimeFormat(candidate);locale=candidate;break;}catch(_){}}
-    const language=String(locale).split(/[-_]/)[0].toLowerCase();
-    if(language!=="en")return locale;
-    if(["Europe/London","Europe/Belfast","Europe/Guernsey","Europe/Isle_of_Man","Europe/Jersey"].includes(DEVICE_TIME_ZONE))return"en-GB";
-    if(DEVICE_TIME_ZONE==="Europe/Dublin")return"en-IE";
-    if(DEVICE_TIME_ZONE.startsWith("Europe/"))return"en-GB";
-    if(DEVICE_TIME_ZONE.startsWith("Australia/"))return"en-AU";
-    if(["Pacific/Auckland","Pacific/Chatham"].includes(DEVICE_TIME_ZONE))return"en-NZ";
-    if(["America/Toronto","America/Vancouver","America/Edmonton","America/Winnipeg","America/Halifax","America/St_Johns","America/Regina"].includes(DEVICE_TIME_ZONE))return"en-CA";
-    if(["America/New_York","America/Chicago","America/Denver","America/Los_Angeles","America/Phoenix","America/Anchorage","Pacific/Honolulu"].includes(DEVICE_TIME_ZONE)||DEVICE_TIME_ZONE.startsWith("America/Indiana/")||DEVICE_TIME_ZONE.startsWith("America/Kentucky/")||DEVICE_TIME_ZONE.startsWith("America/North_Dakota/"))return"en-US";
     return locale;
   })();
   document.documentElement.lang=USER_LOCALE;
-  const LOCAL_DATE_FORMATTER=new Intl.DateTimeFormat(USER_LOCALE,{day:"2-digit",month:"2-digit",year:"numeric"});
-  const LOCAL_DATE_TIME_FORMATTER=new Intl.DateTimeFormat(USER_LOCALE,{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"});
-  const LOCAL_WEEKDAY_DATE_FORMATTER=new Intl.DateTimeFormat(USER_LOCALE,{weekday:"short",day:"2-digit",month:"2-digit",year:"numeric"});
+  const LOCAL_DATE_FORMATTER=new Intl.DateTimeFormat(USER_LOCALE,{timeZone:"UTC",day:"2-digit",month:"2-digit",year:"numeric"});
+  const LOCAL_DATE_TIME_FORMATTER=new Intl.DateTimeFormat(USER_LOCALE,{timeZone:"UTC",day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"});
+  const LOCAL_WEEKDAY_DATE_FORMATTER=new Intl.DateTimeFormat(USER_LOCALE,{timeZone:"UTC",weekday:"short",day:"2-digit",month:"2-digit",year:"numeric"});
   function validLocalDate(year,month,day,hour=12,minute=0){
-    const d=new Date(year,month-1,day,hour,minute);
-    return d.getFullYear()===year&&d.getMonth()===month-1&&d.getDate()===day&&d.getHours()===hour&&d.getMinutes()===minute?d:null;
+    const d=new Date(Date.UTC(year,month-1,day,hour,minute));
+    return d.getUTCFullYear()===year&&d.getUTCMonth()===month-1&&d.getUTCDate()===day&&d.getUTCHours()===hour&&d.getUTCMinutes()===minute?d:null;
   }
   function localISODate(value=new Date()){
     const d=value instanceof Date?value:new Date(value);
     if(Number.isNaN(d.getTime()))return"";
     const p=n=>String(n).padStart(2,"0");
-    return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`;
+    return `${d.getUTCFullYear()}-${p(d.getUTCMonth()+1)}-${p(d.getUTCDate())}`;
   }
   function dateFromLocalValue(value){
     if(value instanceof Date)return Number.isNaN(value.getTime())?null:new Date(value.getTime());
@@ -423,7 +414,7 @@
       const month=months[match[2].slice(0,3).toLowerCase()];
       if(month)return validLocalDate(Number(match[3]),month,Number(match[1]));
     }
-    const parsed=new Date(text);
+    const parsed=new Date(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?$/.test(text)?text+'Z':text);
     return Number.isNaN(parsed.getTime())?null:parsed;
   }
   function formatLocalDate(value){const d=dateFromLocalValue(value);return d?LOCAL_DATE_FORMATTER.format(d):String(value||"");}
@@ -496,7 +487,7 @@
   }
   openDuplicateBtn.onclick=()=>{const id=duplicateWarningItemId;hideDuplicateWarning();if(id){closeEditor();openMediaRow(id);}};
   function uuid(){return crypto.randomUUID?crypto.randomUUID():`item_${Date.now()}_${Math.random().toString(36).slice(2)}`;}
-  function toMillis(v){const n=new Date(v||0).getTime();return Number.isFinite(n)?n:0;}
+  function toMillis(v){const n=new Date(typeof v==='string'&&/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?$/.test(v)?v+'Z':v||0).getTime();return Number.isFinite(n)?n:0;}
   function isEmail(v){return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v||"").trim());}
   function normalizeEmail(v){return String(v||"").trim().toLowerCase();}
   function validPin(v){return /^\d{4}$/.test(String(v||""));}
