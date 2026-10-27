@@ -3,19 +3,19 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 const source=fs.readFileSync(new URL('../sw.js',import.meta.url),'utf8');
-test('Closed-app reminders retain the app heading and two-line numbered release body',async()=>{
+test('Closed-app reminders retain the show heading and numbered release body',async()=>{
   const listeners={},shown=[];
   const self={addEventListener:(event,fn)=>listeners[event]=fn,registration:{showNotification:async(title,options)=>shown.push({title,...options})}};
   vm.runInNewContext(source,{self,URL});
   for(const [name,episode] of [['NCIS',3],['Reacher',4]]){
     let work;
-    listeners.push({data:{json:()=>({title:'Watch Logger',body:`${name}\nNew episode out now (S1 E${episode})`,tag:name,data:{url:'./',episode}})},waitUntil:p=>work=p});
+    listeners.push({data:{json:()=>({title:name,body:`New episode out now (S1 E${episode})`,tag:name,data:{url:'./',episode}})},waitUntil:p=>work=p});
     await work;
   }
-  assert.equal(shown[0].title,'Watch Logger');
-  assert.equal(shown[0].body,'NCIS\nNew episode out now (S1 E3)');
-  assert.equal(shown[1].title,'Watch Logger');
-  assert.equal(shown[1].body,'Reacher\nNew episode out now (S1 E4)');
+  assert.equal(shown[0].title,'NCIS');
+  assert.equal(shown[0].body,'New episode out now (S1 E3)');
+  assert.equal(shown[1].title,'Reacher');
+  assert.equal(shown[1].body,'New episode out now (S1 E4)');
   assert.equal(shown[0].icon,'./assets/img/app-icon.png?v=4');
   assert.equal(shown[0].data.episode,3);
   assert.notEqual(shown[0].tag,shown[1].tag);

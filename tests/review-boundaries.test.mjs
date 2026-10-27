@@ -96,8 +96,8 @@ test('Closed-app backend refreshes episode and regional schedules before sending
   assert.equal((await worker.run()).sent,1);
   assert.equal(worker.getCalls(),1,'the server fetches fresh episode metadata itself');
   assert.equal(worker.getRegionalCalls(),30,'browser visibility cancellation cannot stop the backend feed queue');
-  assert.equal(worker.deliveries[0].title,'Watch Logger');
-  assert.equal(worker.deliveries[0].body,'Example\nNew episode out now (S1 E6)');
+  assert.equal(worker.deliveries[0].title,'Example');
+  assert.equal(worker.deliveries[0].body,'New episode out now (S1 E6)');
   assert.ok(worker.getLibrary().items[0].serverScheduleUpdatedAt,'the server persists its own schedule refresh');
   assert.deepEqual(worker.getLibrary().items[0].watchedEpisodes,{1:[1,2,3,4,5]});
   assert.equal((await worker.run()).sent,0,'later cron scans cannot resend the same reminder');
@@ -109,7 +109,7 @@ test("Cron keeps release-time alerts after rollover and advances without opening
   for(const [index,status] of ["Planned","Watching","Watched"].entries()){
     worker.setStatus(status);worker.setTime(episodes[index].airstamp);
     assert.ok((await worker.run()).sent>0);
-    assert.ok(worker.deliveries.some(payload=>payload.body===`Example\nNew episode out now (S1 E${index+6})`&&payload.data.eventKey.includes(`e${index+6}:`)));
+    assert.ok(worker.deliveries.some(payload=>payload.body===`New episode out now (S1 E${index+6})`&&payload.data.eventKey.includes(`e${index+6}:`)));
     assert.equal((await worker.run()).sent,0);
   }
   assert.deepEqual(worker.getLibrary().items[0].watchedEpisodes,{1:[1,2,3,4,5]});
@@ -118,7 +118,7 @@ test("Cron keeps release-time alerts after rollover and advances without opening
 test("Every episode in a same-time release receives its own reminder",async()=>{
   const worker=workerHarness([{season:1,number:6,airstamp:"2026-09-06T12:00:00Z"},{season:1,number:7,airstamp:"2026-09-06T12:00:00Z"}]);
   await worker.run();
-  const release=worker.deliveries.filter(payload=>/^Example\nNew episode out now \(S1 E\d+\)$/.test(payload.body));
+  const release=worker.deliveries.filter(payload=>/^New episode out now \(S1 E\d+\)$/.test(payload.body));
   assert.equal(release.length,2);
   assert.equal(new Set(release.map(row=>row.data.eventKey)).size,2);
   assert.equal(worker.deliveries.length,2,'a release scan does not also send stale advance reminders');
@@ -157,7 +157,7 @@ test("UTC instants schedule identically across subscription time zones",()=>{
   }
 });
 
-test('Reminder notifications use the app heading, title line and numbered episode message',()=>{
+test('Reminder notifications use the show title and numbered episode message',()=>{
  const c=vm.createContext({});vm.runInContext(extractFunction(backend,'reminderCopy'),c);
  for(const [item,event,lead,body] of [
   [{title:'NCIS'},{kind:'episode',season:23,number:2},6,'New episode out in 6 hours (S23 E2)'],
@@ -169,7 +169,7 @@ test('Reminder notifications use the app heading, title line and numbered episod
   [{title:'CIA'},{kind:'episode',season:1,number:2},0,'New episode out now (S1 E2)'],
   [{title:'CIA'},{kind:'episode',season:1,number:1},0,'New show out now'],
   [{title:'Unknown season'},{kind:'episode',number:2},0,'New episode out now'],
- ]){const copy=c.reminderCopy(item,event,lead);assert.equal(copy.title,'Watch Logger');assert.equal(copy.body,item.title+'\n'+body);}
+ ]){const copy=c.reminderCopy(item,event,lead);assert.equal(copy.title,item.title);assert.equal(copy.body,body);}
 });
 
 test('Saving an older edit form preserves episode ticks received from another device',async()=>{
