@@ -54,7 +54,7 @@ test("Actual editor save keeps legacy ticks and stored UTC while updating progre
 });
 
 function workerHarness(episodes,options={}){
-  let clock=Date.parse("2026-09-06T12:00:00Z"),calls=0;
+  let clock=Date.parse("2026-09-06T12:00:00Z"),calls=0,regionalCalls=0;
   let library={account_id:"a",revision:0,items:[{...baseShow(),nextEpisodeNum:6,nextEpisodeDate:"2026-09-06T12:00:00Z"}]};
   const deliveries=[],claimed=new Set();
   function query(payload=null){
@@ -67,8 +67,8 @@ function workerHarness(episodes,options={}){
         library={...library,...copy(payload)};return{data:{account_id:library.account_id}};
       }};
   }
-  const context=vm.createContext({console,AbortSignal,Date:class extends Date{static now(){return clock;}},
-    fetch:async()=>{calls++;if(options.fail)throw Error("offline");if(options.conflict)library={...library,revision:library.revision+1,items:[]};return{ok:true,json:async()=>episodes};},
+  const context=vm.createContext({console,AbortSignal,URL,Date:class extends Date{static now(){return clock;}},
+    fetch:async url=>{if(new URL(url).pathname==='/schedule/web'){regionalCalls++;return{ok:true,json:async()=>[]};}calls++;if(options.fail)throw Error("offline");if(options.conflict)library={...library,revision:library.revision+1,items:[]};return{ok:true,json:async()=>episodes};},
     db:{from:()=>({select:()=>query(),update:payload=>query(payload)}),rpc:async(name,args)=>{
       if(name==='watchlog_read_libraries')return {data:[copy(library)]};
       if(args.p_revision!==library.revision)return {data:{ok:false,code:'revision_conflict'}};
@@ -77,15 +77,30 @@ function workerHarness(episodes,options={}){
     }},
     claimDelivery:async(_sub,_account,_id,key)=>{if(claimed.has(key))return null;claimed.add(key);return{id:key};},
     sendPush:async(_sub,_config,payload)=>deliveries.push(payload),finishDelivery:async()=>{},sha256:async value=>value});
+  if(options.regional)vm.runInContext(fs.readFileSync(new URL('../supabase/functions/watchlog-reminders/regional-releases.js',import.meta.url),'utf8'),context);
   const asyncNames=["readLibraries","refreshServerEpisodeSchedules","processPlannedReminders"];
   const names=["episodeUtcValue","episodeReleaseTime","buildServerEpisodeSchedule","zonedLocalToUtc","scheduledEventTime","serverScheduleRefreshDue",...asyncNames,"plannedEvent","reminderEvents","reminderCopy","reminderStageIsDue"];
   // extractFunction retains the declaration's own async keyword. Do not
   // prepend it again: "async async function" fails to parse before any
   // reminder-worker regression tests can execute.
   vm.runInContext("const EPISODE_SCHEDULE_REFRESH_MS=21600000;\n"+names.map(name=>extractFunction(backend,name)).join("\n"),context);
-  return{context,deliveries,setTime:value=>clock=Date.parse(value),setStatus:value=>library.items[0].status=value,getLibrary:()=>library,getCalls:()=>calls,
+  return{context,deliveries,setTime:value=>clock=Date.parse(value),setStatus:value=>library.items[0].status=value,getLibrary:()=>library,getCalls:()=>calls,getRegionalCalls:()=>regionalCalls,
     run:()=>context.processPlannedReminders([{account_id:"a",time_zone:"Europe/London"}],{})};
 }
+
+test('Closed-app backend refreshes episode and regional schedules before sending a reminder',async()=>{
+  const worker=workerHarness([{season:1,number:6,airstamp:'2026-09-06T12:00:00Z'}],{regional:true});
+  worker.setTime('2026-09-06T16:00:00Z'); // Existing airtime + four-hour availability rule.
+  assert.equal(vm.runInContext('typeof document',worker.context),'undefined');
+  assert.equal(vm.runInContext('typeof window',worker.context),'undefined');
+  assert.equal((await worker.run()).sent,1);
+  assert.equal(worker.getCalls(),1,'the server fetches fresh episode metadata itself');
+  assert.equal(worker.getRegionalCalls(),30,'browser visibility cancellation cannot stop the backend feed queue');
+  assert.equal(worker.deliveries[0].body,'New episode out now');
+  assert.ok(worker.getLibrary().items[0].serverScheduleUpdatedAt,'the server persists its own schedule refresh');
+  assert.deepEqual(worker.getLibrary().items[0].watchedEpisodes,{1:[1,2,3,4,5]});
+  assert.equal((await worker.run()).sent,0,'later cron scans cannot resend the same reminder');
+});
 
 test("Cron keeps release-time alerts after rollover and advances without opening the app",async()=>{
   const episodes=[6,7,8].map((number,index)=>({season:1,number,airstamp:new Date(Date.parse("2026-09-06T12:00:00Z")+index*7*86400000).toISOString()}));

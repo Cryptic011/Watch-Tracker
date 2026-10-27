@@ -476,8 +476,9 @@
     applyAppearance();
     activeSort=savedSortMode();sortMode.value=activeSort;
     updateAuthMode();
-    await refreshPublicMaintenance();
+    const maintenance=refreshPublicMaintenance();
     if(!await restorePinSession()){
+      await maintenance;
       showAuth();
       if(!publicMaintenance.enabled)await prefillLegacyAccount();
     }

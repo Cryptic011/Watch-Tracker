@@ -10,13 +10,14 @@ function harness({permission='granted',missing=false}={}){
   const nodes={'test-background-reminder':testButton,'quick-reminder-status':quick};
   let subscription,serial=0,registered=0,permissionRequests=0,subscribes=0,serverEnabled=!missing,failStatus=false,expireTest=false,localFailure=false,statusGate=null,testGate=null;
   const calls=[],prefs=new Map();
+  const testTimeout=(fn,ms,...args)=>ms===60000?0:setTimeout(fn,ms,...args);
   const makeSubscription=()=>({endpoint:`https://web.push.apple.com/${++serial}`,toJSON(){return {endpoint:this.endpoint,keys:{auth:'auth',p256dh:'key'}};},unsubscribe:async()=>{if(localFailure)throw Error('Device unavailable');subscription=null;return true;}});
   subscription=missing?null:makeSubscription();
   const worker={active:{},pushManager:{getSubscription:async()=>subscription,subscribe:async()=>{subscribes++;return subscription||=makeSubscription();}}};
   const Notification={permission,requestPermission:async()=>{permissionRequests++;return Notification.permission='granted';}};
   const window={Notification,PushManager:{},addEventListener(){},matchMedia:()=>({matches:true})};
   const navigator={userAgent:'iPhone',standalone:true,serviceWorker:{getRegistration:async()=>worker,register:async()=>{registered++;throw Error('Update download failed');},ready:Promise.resolve(worker)}};
-  const context=vm.createContext({window,navigator,Notification,document:{visibilityState:'visible',addEventListener(){},querySelectorAll:()=>[],getElementById:id=>nodes[id]},backgroundReminderStatus:status,enableBackgroundReminders:enable,disableBackgroundReminders:disable,currentUser:{id:'account'},cloudSessionToken:'session',DEVICE_TIME_ZONE:'Europe/London',USER_LOCALE:'en-GB',REMINDER_API:'https://example.test/reminders',CLOUD_REQUEST_TIMEOUT_MS:1000,AbortController,setTimeout,clearTimeout,setInterval:()=>0,Uint8Array,atob,crypto:{randomUUID:()=> '12345678-1234-1234-1234-123456789012'},localStorage:{getItem:key=>prefs.get(key)||null,setItem:(key,value)=>prefs.set(key,value)},fetch:async(_url,request)=>{
+  const context=vm.createContext({window,navigator,Notification,document:{visibilityState:'visible',addEventListener(){},querySelectorAll:()=>[],getElementById:id=>nodes[id]},backgroundReminderStatus:status,enableBackgroundReminders:enable,disableBackgroundReminders:disable,currentUser:{id:'account'},cloudSessionToken:'session',DEVICE_TIME_ZONE:'Europe/London',USER_LOCALE:'en-GB',REMINDER_API:'https://example.test/reminders',CLOUD_REQUEST_TIMEOUT_MS:1000,AbortController,setTimeout:testTimeout,clearTimeout,setInterval:()=>0,Uint8Array,atob,crypto:{randomUUID:()=> '12345678-1234-1234-1234-123456789012'},localStorage:{getItem:key=>prefs.get(key)||null,setItem:(key,value)=>prefs.set(key,value)},fetch:async(_url,request)=>{
     const body=JSON.parse(request.body);calls.push(body);
     if(body.action==='status'&&statusGate)await statusGate;
     if(body.action==='test_reminder'&&testGate)await testGate;

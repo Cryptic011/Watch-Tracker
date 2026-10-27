@@ -103,6 +103,7 @@
   const CLOUD_REQUEST_TIMEOUT_MS = 12 * 1000;
   const CLOUD_SYNC_INTERVAL_MS = 10 * 1000;
   let cloudSyncTimer=null,cloudSyncInFlight=null,cloudSyncFailures=0,cloudSyncAuthBlocked=false;
+  let cloudSyncIdleRounds=0,cloudSyncLastActivity=0;
   const pendingCloudAccounts=new Set();
   let authPausedDialogs=[];
   const EXTERNAL_REQUEST_TIMEOUT_MS = 8 * 1000;

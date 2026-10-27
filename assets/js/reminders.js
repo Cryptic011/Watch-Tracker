@@ -9,9 +9,10 @@
     return window.matchMedia?.("(display-mode: standalone)")?.matches||navigator.standalone===true;
   }
   let backgroundReminderBusy=false,backgroundReminderGeneration=0,backgroundReminderRefresh=null;
-  let backgroundReminderConnection="off";
+  let backgroundReminderConnection="off",backgroundReminderRetryTimer=null;
   function setBackgroundReminderStatus(message,state="",connection="off"){
     backgroundReminderConnection=connection;
+    scheduleReminderStatusRetry();
     if(!backgroundReminderStatus)return;
     backgroundReminderStatus.textContent=message;
     backgroundReminderStatus.dataset.state=state||connection;
@@ -232,7 +233,15 @@
     lastReminderReturnCheck=now;void refreshBackgroundReminderStatus();
   }
   // A transient failure recovers even if the device never emits online again.
-  setInterval(()=>{if(backgroundReminderConnection==="pending")refreshRemindersOnReturn();},60000);
+  function scheduleReminderStatusRetry(){
+    clearTimeout(backgroundReminderRetryTimer);backgroundReminderRetryTimer=null;
+    if(backgroundReminderConnection!=='pending'||!currentUser||navigator.onLine===false||document.visibilityState==='hidden')return;
+    backgroundReminderRetryTimer=setTimeout(()=>{backgroundReminderRetryTimer=null;refreshRemindersOnReturn();scheduleReminderStatusRetry();},60000);
+  }
+  window.addEventListener('pagehide',()=>{clearTimeout(backgroundReminderRetryTimer);backgroundReminderRetryTimer=null;});
+  window.addEventListener('offline',scheduleReminderStatusRetry);
+  window.addEventListener('pageshow',()=>{scheduleReminderStatusRetry();refreshRemindersOnReturn();});
+  document.addEventListener('visibilitychange',scheduleReminderStatusRetry);
   window.addEventListener("focus",refreshRemindersOnReturn);
   window.addEventListener("online",refreshRemindersOnReturn);
   document.addEventListener("visibilitychange",refreshRemindersOnReturn);
@@ -305,16 +314,22 @@
     if(enabled){authTitle.textContent="Under Maintenance";authSub.textContent=maintenanceOwnerAccess?"Owner sign-in remains available.":"Watch Tracker will be back shortly.";}
   }
   maintenanceOwnerAccessButton.onclick=()=>{maintenanceOwnerAccess=true;isSignUp=false;authPin.value="";updateAuthMode();authEmail.focus();};
-  async function refreshPublicMaintenance(){
-    try{
+  let publicMaintenanceInFlight=null,publicMaintenanceCheckedAt=0;
+  function refreshPublicMaintenance(){
+    if(publicMaintenanceInFlight)return publicMaintenanceInFlight;
+    if(publicMaintenanceCheckedAt&&Date.now()-publicMaintenanceCheckedAt<60000)return Promise.resolve(publicMaintenance);
+    publicMaintenanceInFlight=(async()=>{try{
       const result=await pinApi("app_status",{},"");
-      publicMaintenance={enabled:result.maintenance===true,message:String(result.message||publicMaintenance.message)};
-      updateAuthMode();
+      const next={enabled:result.maintenance===true,message:String(result.message||publicMaintenance.message)};
+      const changed=next.enabled!==publicMaintenance.enabled||next.message!==publicMaintenance.message;
+      publicMaintenance=next;publicMaintenanceCheckedAt=Date.now();
+      if(changed){updateAuthMode();if(typeof scheduleMetadataMaintenance==='function')scheduleMetadataMaintenance();}
       return publicMaintenance;
     }catch(error){
       console.warn("Maintenance status check skipped",error);
       return publicMaintenance;
-    }
+    }finally{publicMaintenanceInFlight=null;}})();
+    return publicMaintenanceInFlight;
   }
   async function refreshMaintenanceAdmin(){
     maintenanceAdminSection.classList.add("hidden");

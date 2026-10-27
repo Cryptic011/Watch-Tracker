@@ -13,6 +13,25 @@ function functions(names,globals={}){
  vm.runInContext(names.map(name=>extractFunction(html,name)).join('\n'),c);
  return c;
 }
+test('Quiet sync backs off to one minute but tracker activity and pending saves retain fast polling',()=>{
+ let time=100000,tracker=null,pending=false;
+ const c=functions(['cloudSyncPollDelay'],{Date:{now:()=>time},document:{querySelector:()=>tracker},cloudSyncLastActivity:0,cloudSyncIdleRounds:0,CLOUD_SYNC_INTERVAL_MS:10000,hasPending:()=>pending,localSyncPending:()=>false});
+ for(const [round,delay] of [[0,10000],[1,20000],[2,40000],[3,60000],[99,60000]]){c.cloudSyncIdleRounds=round;assert.equal(c.cloudSyncPollDelay(),delay);}
+ tracker={};assert.equal(c.cloudSyncPollDelay(),10000);tracker=null;
+ pending=true;assert.equal(c.cloudSyncPollDelay(),10000);pending=false;
+ c.cloudSyncLastActivity=time-1000;assert.equal(c.cloudSyncPollDelay(),10000);
+});
+test('Metadata maintenance and pending-reminder retries leave no recurring timer while hidden',()=>{
+ for(const name of ['scheduleMetadataMaintenance','scheduleReminderStatusRetry']){
+  const timers=new Map();let serial=0;
+  const c=functions([name],{metadataMaintenanceTimer:null,backgroundReminderRetryTimer:null,backgroundReminderConnection:'pending',publicMaintenance:{enabled:false},currentUser:{id:'a'},navigator:{onLine:true},document:{visibilityState:'visible'},SERIES_RELEASE_CHECK_MS:60000,setTimeout:(fn,ms)=>{timers.set(++serial,{fn,ms});return serial;},clearTimeout:id=>timers.delete(id)});
+  c[name]();assert.equal(timers.size,1);assert.equal([...timers.values()][0].ms,60000);
+  c.document.visibilityState='hidden';c[name]();assert.equal(timers.size,0);
+  c.document.visibilityState='visible';c.navigator.onLine=false;c[name]();assert.equal(timers.size,0);
+  c.navigator.onLine=true;c.currentUser=null;c[name]();assert.equal(timers.size,0);
+  if(name==='scheduleMetadataMaintenance'){c.publicMaintenance.enabled=true;c[name]();assert.equal(timers.size,1,'an open maintenance notice can recover without reloading');}
+ }
+});
 const sortNames=['isEpisodeTrackable','currentSortInfo','releaseSortInfo','addedSortTime','watchedSortTime','compareCurrentOrder','compareRecentOrder','compareReleaseRecency','sortMediaRows'];
 test('Timeline sorts calculate expensive keys once per title and retain existing order',()=>{
  const now=Date.now();

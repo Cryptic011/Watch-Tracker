@@ -37,6 +37,8 @@
   const listings=new Map(),requests=new Map();
   let nextRequestAt=0;
   async function refresh(items,viewer={},fetcher=root.fetch,now=Date.now()){
+    const stopped=()=>viewer.signal?.aborted||root.document?.visibilityState==='hidden';
+    if(stopped())return;
     const region=country(viewer);if(!region||!fetcher)return;
     const tracked=new Map(items.filter(item=>['Series','Anime'].includes(item.type)&&item.tvmazeShowId).map(item=>[String(item.tvmazeShowId),item]));
     if(!tracked.size)return;
@@ -48,16 +50,24 @@
     const jobs=dates.flatMap(date=>[region,''].map(feed=>({date,feed})));
     let cursor=0;
     const run=async()=>{while(cursor<jobs.length){
+      if(stopped())return;
       const {date,feed}=jobs[cursor++];
       const key=region+':'+feed+':'+date+':'+[...tracked.keys()].sort().join(','),existing=requests.get(key);if(existing&&existing.expires>now){await existing.promise;continue;}
       // Space requests across workers and regions to stay below the public API rate limit.
       if(fetcher===root.fetch){
         const delay=Math.max(0,nextRequestAt-Date.now());nextRequestAt=Math.max(Date.now(),nextRequestAt)+650;
-        if(delay&&root.setTimeout)await new Promise(resolve=>root.setTimeout(resolve,delay));
+        if(delay&&root.setTimeout)await new Promise(resolve=>{
+          let timer;
+          const finish=()=>{root.clearTimeout?.(timer);viewer.signal?.removeEventListener('abort',finish);resolve();};
+          timer=root.setTimeout(finish,delay);viewer.signal?.addEventListener('abort',finish,{once:true});
+          if(stopped())finish();
+        });
       }
+      if(stopped())return;
       const url='https://api.tvmaze.com/schedule/web?country='+encodeURIComponent(feed)+'&date='+date;
       const promise=(async()=>{try{
-        const response=await fetcher(url,{signal:AbortSignal.timeout(5000)});if(!response.ok)throw Error('Regional listing unavailable');
+        const timeout=AbortSignal.timeout(5000),signal=viewer.signal?AbortSignal.any([viewer.signal,timeout]):timeout;
+        const response=await fetcher(url,{signal});if(!response.ok)throw Error('Regional listing unavailable');
         const rows=await response.json();if(!Array.isArray(rows))throw Error('Invalid regional listing');
         for(const ep of rows){
           const show=ep?._embedded?.show||ep?.show,item=tracked.get(String(show?.id)),channel=show?.webChannel;
@@ -84,7 +94,7 @@
     if(event.releaseSchedule&&!event.releaseSchedule.estimated)return event;
     const platform=item.platform||'Saved service';
     return {...event,broadcastRaw:original,raw:new Date(time+4*3600000).toISOString(),platform,streamingUnconfirmed:false,
-      releaseSchedule:{key:'broadcast-plus-four-hours',estimated:true,country:country(viewer),platform,timeSource:'User rule',sources:[],note:'Estimated availability · airtime + 4 hours (1 hour show + 3 hours delay)'}};
+      releaseSchedule:{key:'broadcast-plus-four-hours',estimated:true,country:country(viewer),platform,timeSource:'User rule',sources:[],note:'Release time follows your saved availability rule'}};
   }
   function resolve(item,viewer={}){
     if(!item||!['Series','Anime'].includes(item.type)||country(viewer)!=='GB'||!marshals(item))return item;

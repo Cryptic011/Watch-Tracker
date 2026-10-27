@@ -54,6 +54,11 @@ const server=http.createServer((req,res)=>{
       await page.waitForFunction(()=>document.getElementById('auth-screen').classList.contains('hidden'));
       await page.waitForFunction(()=>_native.controls?.visible===true&&document.documentElement.classList.contains('watchlog-native-controls'));
       assert.equal(await page.locator('.bottom-tabs').evaluate(element=>getComputedStyle(element).visibility),'hidden','native dock replaces web controls');
+      await page.evaluate(()=>{const dialog=document.createElement('dialog');dialog.id='native-dialog-check';document.body.append(dialog);dialog.showModal();});
+      await page.waitForFunction(()=>_native.controls.visible===false);
+      await page.evaluate(()=>document.getElementById('native-dialog-check').close());
+      await page.waitForFunction(()=>_native.controls.visible===true);
+      await page.evaluate(()=>document.getElementById('native-dialog-check').remove());
       await page.evaluate(()=>{const spacer=document.createElement('div');spacer.id='scroll-fixture';spacer.style.height='2400px';document.querySelector('main').append(spacer);});
       const dockBefore=await page.evaluate(()=>JSON.stringify(_native.controls));
       await page.evaluate(()=>window.scrollTo(0,1200));await page.waitForFunction(()=>window.scrollY>1000);

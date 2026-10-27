@@ -57,7 +57,13 @@ if(Capacitor.isNativePlatform()){
     await Native.testReminder();report('Test reminder scheduled for this iPhone.','ok','on');
   });
   const originalRender=render;
-  render=function(...args){const result=originalRender(...args);clearTimeout(timer);timer=setTimeout(()=>void reconcile().catch(error=>report(error.message,'error','repair')),600);return result;};
+  render=function(...args){
+    const result=originalRender(...args);clearTimeout(timer);
+    if(pendingItem)openPendingItem();
+    if(document.visibilityState!=='hidden'&&currentUser&&preference()==='on')timer=setTimeout(()=>void reconcile().catch(error=>report(error.message,'error','repair')),600);
+    return result;
+  };
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')clearTimeout(timer);});
   const originalClear=clearUserState;
   clearUserState=async function(...args){
     clearTimeout(timer);
@@ -90,7 +96,6 @@ if(Capacitor.isNativePlatform()){
     if(String(item.accountId)!==String(currentUser.id))return;
     if(mediaItems.some(row=>String(row.id)===String(item.itemId)))openMediaRow(String(item.itemId));
   }
-  setInterval(openPendingItem,1500);
   void takeNotification();
   void refresh().catch(error=>report(error.message,'error','repair'));
 }

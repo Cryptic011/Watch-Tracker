@@ -424,7 +424,7 @@
     if(typeof refreshTitleSearchBadges==="function")refreshTitleSearchBadges();
     $("list-toolbar").classList.toggle("hidden",!currentUser||!categoryControlsVisible());
     updateCounts();updateFloatingAddVisibility();renderDashboard();
-    if(!currentUser){const features=$("library-features"),progress=$("continue-watching");if(features&&progress&&mediaList.contains(progress))features.append(progress);if(mediaList.contains(features))mediaList.before(features);mediaList.replaceChildren();mediaList._galleryMarkup=null;emptyState.classList.add("hidden");return;}
+    if(!currentUser){window.WatchLogGallery?.clearArtwork?.();const features=$("library-features"),progress=$("continue-watching");if(features&&progress&&mediaList.contains(progress))features.append(progress);if(mediaList.contains(features))mediaList.before(features);mediaList.replaceChildren();mediaList._galleryMarkup=null;emptyState.classList.add("hidden");return;}
     if(currentTab!=="library"){updateEpisodeTracker();return;}
     const {rows,groups}=currentVisibleMediaRows();emptyState.classList.toggle("hidden",Boolean(selectedScheduleView)||rows.length>0);
     if(currentTab==="library"&&window.WatchLogGallery){

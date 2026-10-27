@@ -408,6 +408,16 @@
   }
   function localSyncPending(){return Boolean(latestLocalSnapshot&&activePersistenceContext(latestLocalSnapshot)&&latestLocalSnapshot.json!==lastCloudLibraryJSON);}
   function cloudSyncRetryDelay(){return Math.min(60000,1000*2**Math.min(6,Math.max(0,cloudSyncFailures-1)))+Math.floor(Math.random()*500);}
+  function cloudSyncPollDelay(){
+    const tracker=document.querySelector?.('.gallery-detail[open], #episode-tracker-modal:not(.hidden)');
+    const active=tracker||Date.now()-cloudSyncLastActivity<30000||hasPending()||localSyncPending();
+    return active?CLOUD_SYNC_INTERVAL_MS:Math.min(60000,CLOUD_SYNC_INTERVAL_MS*2**Math.min(3,cloudSyncIdleRounds));
+  }
+  function noteCloudActivity(){
+    const wasIdle=Date.now()-cloudSyncLastActivity>=30000;
+    cloudSyncLastActivity=Date.now();cloudSyncIdleRounds=0;
+    if(wasIdle&&currentUser)scheduleCloudSync(CLOUD_SYNC_INTERVAL_MS);
+  }
   function scheduleCloudSync(delay=CLOUD_SYNC_INTERVAL_MS){
     clearTimeout(cloudSyncTimer);cloudSyncTimer=null;
     if(!currentUser||!cloudSessionToken||cloudSyncAuthBlocked||navigator.onLine===false||document.visibilityState==="hidden")return;
@@ -463,12 +473,14 @@
           if(hasPending()||localSaveInFlight||cloudSaveInFlight||queuedCloudSnapshot||localSyncPending())return false;
           const recovered=cloudSyncFailures>0;
           cloudSyncFailures=0;
+          cloudSyncIdleRounds=recovered?0:cloudSyncIdleRounds+1;
           if(manual||recovered)setSync("Synced. This library is available on your other devices.","ok");
           return true;
         }
         // Saves can advance the revision while a read is in flight.
         if(Number(result.revision)<cloudRevision)return true;
         const conflicts=detectSyncConflicts(cloudBaseItems,mediaItems,result.items);
+        cloudSyncIdleRounds=0;
         const merged=replayLocalChanges(cloudBaseItems,mediaItems,result.items);
         const migration=migratePlannedStatuses(merged),cleanup=cleanLibraryRecords(migration.rows);
         applyAccount(result.account);setCloudBaseline(result.items,result.revision,context.accountId);
@@ -484,11 +496,15 @@
         if(activePersistenceContext(context)&&!cloudSyncAuthBlocked)setSync("Could not check cloud changes. Your library is retained; retrying automatically.","warn");
         return false;
       }
-    })().finally(()=>{cloudSyncInFlight=null;scheduleCloudSync(cloudSyncFailures?cloudSyncRetryDelay():CLOUD_SYNC_INTERVAL_MS);});
+    })().finally(()=>{cloudSyncInFlight=null;scheduleCloudSync(cloudSyncFailures?cloudSyncRetryDelay():cloudSyncPollDelay());});
     return cloudSyncInFlight;
   }
   window.addEventListener("online",()=>{scheduleCloudSync(0);void refreshLibraryEpisodeMetadata({force:true});});
-  window.addEventListener("focus",()=>scheduleCloudSync(0));
+  window.addEventListener("focus",()=>{cloudSyncIdleRounds=0;scheduleCloudSync(0);});
+  document.addEventListener('pointerdown',noteCloudActivity,{passive:true});
+  document.addEventListener('keydown',noteCloudActivity,{passive:true});
+  window.addEventListener('pagehide',()=>{clearTimeout(cloudSyncTimer);cloudSyncTimer=null;});
+  window.addEventListener('pageshow',()=>scheduleCloudSync(0));
   window.addEventListener("offline",()=>{clearTimeout(cloudSyncTimer);cloudSyncTimer=null;});
   document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"){void refreshPublicMaintenance();scheduleCloudSync(0);void refreshLibraryEpisodeMetadata();}else{clearTimeout(cloudSyncTimer);cloudSyncTimer=null;}});
 
@@ -625,12 +641,13 @@
     const candidates=mediaItems.map(item=>seriesMetadataRefreshCandidate(item,now,{ignoreRetry:force})).filter(Boolean);
     const due=candidates.filter(row=>row.due).sort((a,b)=>a.dueTime-b.dueTime||b.score-a.score);
     const stale=candidates.filter(row=>!row.due).sort((a,b)=>b.score-a.score).slice(0,MAX_STALE_SERIES_PER_SWEEP);
-    const queue=[...due,...stale].map(row=>row.item);
+    const queue=[...due,...stale].map(row=>row.item),account=String(currentUser.id);
     if(!queue.length)return Promise.resolve(false);
     const task=(async()=>{
       let cursor=0,updated=0;
       const worker=async()=>{
         while(cursor<queue.length){
+          if(document.visibilityState==='hidden'||String(currentUser?.id)!==account||navigator.onLine===false)return;
           const item=queue[cursor++];
           if(await scheduleMetadataRefresh(item,{deferCommit:true}))updated++;
         }
@@ -643,7 +660,19 @@
     return task;
   }
 
-  setInterval(()=>{if(document.visibilityState==="visible"){void refreshPublicMaintenance();void refreshLibraryEpisodeMetadata();}},SERIES_RELEASE_CHECK_MS);
+  let metadataMaintenanceTimer=null;
+  function scheduleMetadataMaintenance(){
+    clearTimeout(metadataMaintenanceTimer);metadataMaintenanceTimer=null;
+    if((!currentUser&&!publicMaintenance.enabled)||navigator.onLine===false||document.visibilityState==='hidden')return;
+    metadataMaintenanceTimer=setTimeout(()=>{
+      metadataMaintenanceTimer=null;void refreshPublicMaintenance();void refreshLibraryEpisodeMetadata();scheduleMetadataMaintenance();
+    },SERIES_RELEASE_CHECK_MS);
+  }
+  document.addEventListener('visibilitychange',scheduleMetadataMaintenance);
+  window.addEventListener('online',scheduleMetadataMaintenance);
+  window.addEventListener('offline',scheduleMetadataMaintenance);
+  window.addEventListener('pagehide',()=>{clearTimeout(metadataMaintenanceTimer);metadataMaintenanceTimer=null;});
+  window.addEventListener('pageshow',scheduleMetadataMaintenance);
 
   function storePinSession(account,token,expiresAt,revision=cloudRevision){safeWriteJSON(PIN_SESSION_KEY,{token,expiresAt,account,revision});}
   function applyAccount(account){
@@ -662,7 +691,8 @@
     if(typeof initAppNavigation==="function")initAppNavigation();
     const cleanupMessage=duplicateCleanupMessage(cleanup);if(cleanupMessage)showAppToast(cleanupMessage,"success",6000);
     if(migration.changed||cleanup.removedCount||cleanup.repairedCount||cleaned.length!==original.length)await persistLibrary(cleaned,{background:true,precleaned:true});
-    setTimeout(()=>{void refreshLibraryEpisodeMetadata({force:true});},0);
+    scheduleMetadataMaintenance();
+    setTimeout(()=>{void refreshLibraryEpisodeMetadata();},0);
     try{await syncExistingBackgroundPush();}catch(error){console.warn("Background reminder sync skipped",error);}
     if(navigator.onLine!==false)await refreshMaintenanceAdmin();
     cloudSyncAuthBlocked=false;cloudSyncFailures=0;resumeDialogsAfterAuth();scheduleCloudSync(0);
@@ -744,7 +774,7 @@
     }
   }
 
-  async function clearUserState(){clearTimeout(cloudSyncTimer);cloudSyncTimer=null;cloudSyncAuthBlocked=false;persistenceGeneration++;mediaItems=[];currentProfile=null;currentUser=null;cloudSessionToken="";queuedLocalSnapshot=null;queuedCloudSnapshot=null;latestLocalSnapshot=null;lastLocalLibraryJSON="";lastCloudLibraryJSON="";lastLocalAccountId="";lastCloudAccountId="";cloudBaseItems=[];cloudRevision=0;localSaveSequence=0;notificationTestSettings?.classList.add("hidden");document.getElementById("private-reminder-history")?.classList.add("hidden");document.getElementById("reminder-history-body")?.replaceChildren();document.getElementById("library-save-status")?.classList.add("hidden");setBackgroundReminderStatus("Sign in to manage background reminders.");if(cacheDB){try{cacheDB.close();}catch(_){}}cacheDB=null;render();}
+  async function clearUserState(){clearTimeout(cloudSyncTimer);cloudSyncTimer=null;cloudSyncAuthBlocked=false;persistenceGeneration++;mediaItems=[];currentProfile=null;currentUser=null;scheduleMetadataMaintenance();cloudSyncIdleRounds=0;cloudSyncLastActivity=0;cloudSessionToken="";queuedLocalSnapshot=null;queuedCloudSnapshot=null;latestLocalSnapshot=null;lastLocalLibraryJSON="";lastCloudLibraryJSON="";lastLocalAccountId="";lastCloudAccountId="";cloudBaseItems=[];cloudRevision=0;localSaveSequence=0;notificationTestSettings?.classList.add("hidden");document.getElementById("private-reminder-history")?.classList.add("hidden");document.getElementById("reminder-history-body")?.replaceChildren();document.getElementById("library-save-status")?.classList.add("hidden");setBackgroundReminderStatus("Sign in to manage background reminders.");if(cacheDB){try{cacheDB.close();}catch(_){}}cacheDB=null;render();}
   function showAuth(){authScreen.classList.remove("hidden");}
   function updateAuthMode(){
     hideMessage();authNameGroup.classList.toggle("hidden",!isSignUp);

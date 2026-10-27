@@ -203,11 +203,11 @@ test('Clearing a field to undefined removes its stored value',()=>{
 
 function autoSyncHarness(extra={}){
  const scheduled=[],statuses=[];
- const app=harness({cloudSyncTimer:null,cloudSyncInFlight:null,cloudSyncFailures:0,cloudSyncAuthBlocked:false,
+ const app=harness({cloudSyncTimer:null,cloudSyncInFlight:null,cloudSyncFailures:0,cloudSyncAuthBlocked:false,cloudSyncIdleRounds:0,cloudSyncLastActivity:0,cloudSyncPollDelay:()=>10000,
   navigator:{onLine:true},document:{visibilityState:'visible',addEventListener(){}},window:{addEventListener(){}},authPin:{value:''},authEmail:{value:''},isSignUp:false,updateAuthMode(){},pauseDialogsForAuth(){},showAuth(){},showMessage(){},
   applyAccount(account){app.currentUser={id:account.id};},loadCacheRecord:async()=>app.cacheDB.records.get('library'),
   setSync:(text,state)=>statuses.push({text,state}),...extra});
- vm.runInContext(['retryPendingCloudSave','cloudSyncRetryDelay','scheduleCloudSync','noteCloudSyncFailure','synchronizeCloudLibrary'].map(declaration).join('\n'),app);
+ vm.runInContext(['retryPendingCloudSave','cloudSyncRetryDelay','cloudSyncPollDelay','noteCloudActivity','scheduleCloudSync','noteCloudSyncFailure','synchronizeCloudLibrary'].map(declaration).join('\n'),app);
  app.scheduleCloudSync=delay=>scheduled.push(delay);
  return {app,scheduled,statuses};
 }

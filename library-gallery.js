@@ -1,7 +1,7 @@
 /* Library presentation only. All progress, edits and reminders use the existing app. */
 window.WatchLogGallery=(()=>{
   let category='',api=null,host=null,observer=null,dialog=null,returnFocus=null,active=0;
-  const cache=new Map(),pending=new Set(),queue=[];
+  const cache=new Map(),pending=new Set(),queue=[],artTargets=new Map();
   const ARTWORK_CACHE_MS=6*60*60*1000;
   const freshArt=id=>{const entry=cache.get(id);return entry&&Date.now()-entry.checkedAt<(entry.url?ARTWORK_CACHE_MS:5*60*1000)?entry:null;};
   const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -15,7 +15,7 @@ window.WatchLogGallery=(()=>{
     img._galleryImageFailedAt=0;
     img.onload=()=>{img.hidden=false;img._galleryImageFailedAt=0;};
     img.onerror=()=>{img.hidden=true;img._galleryImageFailedAt=Date.now();};
-    img.src=url;
+    img.decoding='async';img.src=url;
   }
   async function fetchArt(item){
     const signal=AbortSignal.timeout(6500);
@@ -33,7 +33,7 @@ window.WatchLogGallery=(()=>{
         return normalized(show?.name)===normalized(title)&&(!item.releaseYear||String(show?.premiered||'').slice(0,4)===String(item.releaseYear));
       };
       const url=/^\d+$/.test(showId)?`https://api.tvmaze.com/shows/${showId}`:/^tt\d+$/.test(imdbId)?`https://api.tvmaze.com/lookup/shows?imdb=${encodeURIComponent(imdbId)}`:'';
-      if(url)try{const response=await fetch(url,{signal});if(response.ok){const show=await response.json();if(matches(show)){if(/^tt\d+$/.test(String(show.externals?.imdb||'')))artworkImdbId=show.externals.imdb;const image=safeImage(show.image?.original||show.image?.medium);if(image)return image;}}}catch(_){}
+      if(url)try{const response=await fetch(url,{signal});if(response.ok){const show=await response.json();if(matches(show)){if(/^tt\d+$/.test(String(show.externals?.imdb||'')))artworkImdbId=show.externals.imdb;const image=safeImage(show.image?.medium||show.image?.original);if(image)return image;}}}catch(_){}
       // Never replace a known identity with the first same-name search result.
       if(!imdbId&&!showId&&query)try{
         const response=await fetch(`https://api.tvmaze.com/search/shows?q=${query}`,{signal});
@@ -56,11 +56,16 @@ window.WatchLogGallery=(()=>{
     }catch(_){}
     return direct;
   }
-  function pump(){while(active<3&&queue.length){const item=queue.shift(),id=key(item);active++;fetchArt(item).catch(()=>'').then(url=>{
+  function pump(){
+    if(document.visibilityState==='hidden'||window.navigator?.onLine===false)return;
+    while(active<3&&queue.length){const item=queue.shift(),id=key(item),targets=artTargets.get(id);
+    if(!targets?.size||![...targets].some(img=>typeof img.parentElement?.getClientRects!=='function'||img.parentElement.getClientRects().length)){pending.delete(id);continue;}
+    active++;fetchArt(item).catch(()=>'').then(url=>{
     cache.set(id,{url,checkedAt:Date.now()});if(cache.size>250)cache.delete(cache.keys().next().value);
-    document.querySelectorAll('.gallery-art img').forEach(img=>{if(img.dataset.art===id)applyImage(img,url);});
+    artTargets.get(id)?.forEach(img=>applyImage(img,url));
   }).finally(()=>{active--;pending.delete(id);pump();});}}
   function observe(root,items){
+    observer?.disconnect();artTargets.clear();
     const byKey=new Map(items.map(item=>[key(item),item]));
     const enqueue=(img,item)=>{
       const id=key(item),cached=freshArt(id);
@@ -78,12 +83,16 @@ window.WatchLogGallery=(()=>{
     for(const img of root.querySelectorAll('[data-art]')){
       const item=byKey.get(img.dataset.art);img._galleryItem=item;
       if(!item)continue;
+      if(!artTargets.has(img.dataset.art))artTargets.set(img.dataset.art,new Set());
+      artTargets.get(img.dataset.art).add(img);
       const cached=freshArt(img.dataset.art);
       if(cached)applyImage(img,cached.url||savedArt(item));
       else if(observer)observer.observe(img.parentElement);
       else enqueue(img,item);
     }
   }
+  if(typeof document!=='undefined')document.addEventListener?.('visibilitychange',()=>{if(document.visibilityState!=='hidden')pump();});
+  window.addEventListener?.('online',pump);
   function art(item){
     const initials=String(item.title||'?').split(/\s+/).slice(0,2).map(s=>s[0]).join('');
     return `<div class="gallery-art"><span aria-hidden="true">${esc(initials)}</span><div class="gallery-art-title">${esc(item.title||'Untitled')}</div><div class="gallery-art-meta">${esc(isFilm(item)?'FILM':'SERIES')} · ${esc(item.releaseYear||'WATCH TRACKER')}</div><img hidden alt="" data-art="${esc(key(item))}" decoding="async"></div>`;
@@ -413,5 +422,6 @@ window.WatchLogGallery=(()=>{
     }
     observe(host,rows);
   }
-  return {mount,open,sections,releaseGroups,back,refreshCurrent,getCategory:()=>category,setCategory:value=>{category=['Film','Series'].includes(value)?value:'';},hasCategory:()=>Boolean(category)};
+  function clearArtwork(){observer?.disconnect();artTargets.clear();queue.length=0;pending.clear();cache.clear();}
+  return {mount,open,sections,releaseGroups,back,refreshCurrent,clearArtwork,getCategory:()=>category,setCategory:value=>{category=['Film','Series'].includes(value)?value:'';},hasCategory:()=>Boolean(category)};
 })();

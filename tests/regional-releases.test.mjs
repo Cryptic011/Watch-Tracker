@@ -4,6 +4,14 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 const source=fs.readFileSync(new URL('../assets/js/regional-releases.js',import.meta.url),'utf8');
 function engine(){const c=vm.createContext({Intl,Date,URL,AbortSignal});vm.runInContext(source,c);return c.WatchLogRegionalReleases;}
+test('Hiding a schedule cancels the active requests and stops the remaining regional feed queue',async()=>{
+ const api=engine(),controller=new AbortController();let calls=0;
+ const work=api.refresh([{type:'Series',tvmazeShowId:'59'}],{country:'GB',signal:controller.signal},(_url,{signal})=>{
+  calls++;return new Promise((resolve,reject)=>signal.addEventListener('abort',()=>reject(Error('Paused')),{once:true}));
+ });
+ assert.equal(calls,3);controller.abort();await work;assert.equal(calls,3,'the other 27 requests are never started');
+ await api.refresh([{type:'Series',tvmazeShowId:'59'}],{country:'GB',signal:controller.signal},()=>{throw Error('Hidden work must stay stopped');});
+});
 const show={id:'marshals',title:'Marshals',type:'Series',imdbId:'tt36849871',tvmazeShowId:'84526',releaseYear:'2026',platform:'CBS',airingSeason:2,nextEpisodeNum:4,nextEpisodeDate:'2026-10-26T00:00:00Z',scheduledEpisodeReleases:[{season:2,number:4,raw:'2026-10-26T00:00:00Z'}],recurringWeeklySchedule:{days:[0],episodes:[{season:2,number:4,raw:'2026-10-26T00:00:00Z'}]}};
 test('UK Marshals uses Monday 08:00 Paramount+ without changing saved broadcast metadata',()=>{
  const api=engine(),before=JSON.stringify(show),result=api.resolve(show,{country:'GB'});

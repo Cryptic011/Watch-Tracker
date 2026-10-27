@@ -17,7 +17,11 @@ export function installNativeControls(Native){
     }catch(_){if(request===generation){last='';document.documentElement.classList.remove('watchlog-native-controls');}}
   }
   function schedule(){if(!frame)frame=requestAnimationFrame(sync);}
-  new MutationObserver(schedule).observe(document.documentElement,{subtree:true,childList:true,attributes:true,attributeFilter:['class','hidden','open','data-theme','data-active-tab']});
+  const observer=new MutationObserver(schedule);
+  for(const element of [document.documentElement,authScreen,document.getElementById('add-btn'),document.getElementById('modal'),document.getElementById('episode-tracker-modal'),document.querySelector('.bottom-tabs')]){
+    if(element)observer.observe(element,{attributes:true,attributeFilter:['class','hidden','data-theme','data-active-tab']});
+  }
+  document.addEventListener('toggle',event=>{if(event.target.tagName==='DIALOG')schedule();},true);
   window.addEventListener('watchlog:native-control',event=>{
     if(event.detail==='search'||event.detail==='add')openSearch();
     else if(['library','settings'].includes(event.detail))document.querySelector(`.bottom-tabs [data-tab="${event.detail}"]`)?.click();

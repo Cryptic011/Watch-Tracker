@@ -111,14 +111,17 @@ const server=http.createServer((req,res)=>{
     mediaItems.push({id:'four-hour',title:'Timed episode',type:'Series',platform:'Saved service',scheduledEpisodeReleases:[{season:1,number:2,raw:new Date(Date.now()+2*86400000).toISOString()}]});
     selectedScheduleView='recurring';renderDashboard();
     const recurring=document.querySelector('#recurring-weekly-dashboard'),name=recurring.querySelector('.release-pending')?.textContent,
-     estimate=recurring.querySelector('[data-recurring-open="four-hour"]')?.textContent,
+     timedRelease=recurring.querySelector('[data-recurring-open="four-hour"]')?.textContent,
+     recurringText=recurring.textContent,
      emptyHeights=[...recurring.querySelectorAll('.recurring-weekday:has(.release-empty)')].map(node=>node.getBoundingClientRect().height);
     selectedScheduleView='calendar';selectedCalendarRange='upcoming';renderDashboard();
     const calendar=document.querySelector('#library-dashboard');
-    return {name,estimate,emptyHeights,calendar:calendar.querySelector('.release-pending')?.textContent,undated:calendar.querySelectorAll('[data-dashboard-section="unknown"]').length};
+    return {name,timedRelease,recurringText,calendarText:calendar.textContent,emptyHeights,calendar:calendar.querySelector('.release-pending')?.textContent,undated:calendar.querySelectorAll('[data-dashboard-section="unknown"]').length};
    }finally{mediaItems=saved;selectedScheduleView=view;selectedCalendarRange=range;renderDashboard();}
   });
-  assert.match(pendingSchedule.estimate,/Estimated · airtime \+4h/,'timed episodes use the user four-hour rule');
+  assert.match(pendingSchedule.timedRelease,/Timed episode/,'timed releases remain listed');
+  assert.doesNotMatch(pendingSchedule.recurringText,/estimated|airtime/i,'recurring view omits the removed wording');
+  assert.doesNotMatch(pendingSchedule.calendarText,/estimated|airtime/i,'calendar omits the removed wording');
   assert.match(pendingSchedule.name,/Chicago Fire pending streaming/,'recurring view retains shows without a regional listing');
   assert.match(pendingSchedule.calendar,/Date and time unconfirmed/,'calendar distinguishes unconfirmed streaming from no release date');
   assert.equal(pendingSchedule.undated,0);assert.ok(pendingSchedule.emptyHeights.every(height=>height<65),'empty weekdays stay compact');
@@ -129,7 +132,7 @@ const server=http.createServer((req,res)=>{
   // week vs 01:00 next week); an undated old show must not appear at all.
   phase='weekly schedule';
   const weeklyScreen=await page.evaluate(async()=>{
-   const original=mediaItems,now=new Date(),target=new Date(now);
+   const original=mediaItems,previousSchedule=selectedScheduleView,now=new Date(),target=new Date(now);
    target.setHours(12,0,0,0);
    target.setDate(target.getDate()+((4-target.getDay()+7)%7||7));
    const day=target.getDay();
@@ -153,7 +156,7 @@ const server=http.createServer((req,res)=>{
    cachedReturn.recurringWeeklySchedule=weeklyReleasePattern(cachedReturn.scheduledEpisodeReleases);
    cachedReturn.scheduledEpisodeReleases=[];
    try{
-    mediaItems=[evening,overnight,untimed,expired,distant,cachedReturn,{...evening,id:'duplicate-clock',imdbId:'tt1234999'}];
+    selectedScheduleView="recurring";mediaItems=[evening,overnight,untimed,expired,distant,cachedReturn,{...evening,id:'duplicate-clock',imdbId:'tt1234999'}];
     await WatchLogRegionalReleases.refresh(mediaItems,{country:releaseViewingCountry()},async()=>({ok:true,json:async()=>mediaItems.flatMap(item=>(item.scheduledEpisodeReleases?.length?item.scheduledEpisodeReleases:item.recurringWeeklySchedule?.episodes||[]).map(ep=>({season:ep.season,number:ep.number,airdate:String(ep.raw).slice(0,10),airtime:/^\d{4}-\d{2}-\d{2}$/.test(ep.raw)?'':'08:00',airstamp:ep.raw,_embedded:{show:{id:Number(item.tvmazeShowId),webChannel:{name:item.platform,country:{code:releaseViewingCountry()}}}}})))}));
     renderRecurringWeeklySchedule();
     const area=document.querySelector('.recurring-weekday[data-recurring-day="'+day+'"]');
@@ -165,7 +168,7 @@ const server=http.createServer((req,res)=>{
     distantReturns:document.querySelectorAll('#recurring-weekly-dashboard [data-recurring-open="distant-return"],#recurring-weekly-dashboard [data-recurring-open="cached-return"]').length,
     total:document.querySelector('#recurring-weekly-dashboard .weekly-total')?.textContent,
     noHorizontalOverflow:document.documentElement.scrollWidth<=window.innerWidth};
-   }finally{mediaItems=original;renderRecurringWeeklySchedule();}
+   }finally{mediaItems=original;selectedScheduleView=previousSchedule;renderRecurringWeeklySchedule();}
   });
   assert.deepEqual(weeklyScreen.cards.map(card=>card.title),['01:00 programme','17:00 programme','Time unknown programme'],'recurring cards are ordered by local time before the next calendar week');
   assert.ok(weeklyScreen.cards.at(-1).time.includes('TBA'),'a confirmed date without a time sorts last');
@@ -833,8 +836,13 @@ const server=http.createServer((req,res)=>{
   await page.locator('[data-gallery-close]').click();
   await page.waitForFunction(()=>location.hash.startsWith('#/library/calendar'));
   assert.equal(await page.locator('[data-calendar-range="upcoming"]').getAttribute('aria-pressed'),'true','closing episode details restores the calendar range');
-  assert.equal(await recurringMarker().getAttribute('data-behind-level'),'green','watching released episodes makes the recurring marker green');
   assert.equal(await page.locator('#library-dashboard [data-dashboard-open="show"] .release-progress-dot').first().getAttribute('data-behind-level'),'green','watching released episodes makes the release-calendar marker green');
+  await page.locator('[data-schedule-back]').click();
+  await page.locator('[data-schedule-open="recurring"]').click();
+  assert.equal(await recurringMarker().getAttribute('data-behind-level'),'green','opening the recurring page shows the saved progress immediately');
+  await page.locator('[data-schedule-back]').click();
+  await page.locator('[data-schedule-open="calendar"]').click();
+  await page.locator('[data-calendar-range="upcoming"]').click();
   phase='duplicate prevention';
   await page.locator('#add-btn').click();await page.locator('#discovery-query').fill('Browser Test Series');
   await page.locator('[data-discovery-filter="Series"]').click();
@@ -857,8 +865,11 @@ const server=http.createServer((req,res)=>{
   await page.waitForFunction(()=>document.querySelector('#auth-screen').classList.contains('hidden'),{timeout:10000});
   await page.waitForFunction(id=>mediaItems.find(item=>item.id===id)?.platform==='Saved before refresh',refreshItemId,{timeout:10000});
   assert.equal(items.find(item=>item.id===refreshItemId)?.platform,'Saved before refresh');
+  assert.equal(await page.locator('#recurring-weekly-dashboard [data-recurring-open="show"]').count(),0,'hidden schedule rows are not built during startup');
+  await page.locator('[data-schedule-open="recurring"]').click();
   await page.waitForFunction(()=>document.querySelectorAll('#recurring-weekly-dashboard [data-recurring-open="show"]').length===1);
   assert.equal(await page.locator('#recurring-weekly-dashboard [data-recurring-open="show"]').count(),1,'streaming membership survives reload');
+  await page.locator('[data-schedule-back]').click();
   assert.equal(await page.locator('.schedule-shortcut').count(),2,'reload restores the compact schedule cards on Library home');
   assert.equal(await recurring.isVisible(),false);assert.equal(await calendarView.isVisible(),false);
   assert.ok(loads>before);
