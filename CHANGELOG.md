@@ -1,3 +1,9 @@
+## 2026-10-27 — Prevent repeat library loss and retain recovery versions
+- Reject unexpected sync requests that remove most or all saved titles, including requests from older app versions.
+- Block direct bulk deletions and preserve prior versions of changed/deleted titles in private server storage.
+- Recover the protected cloud library automatically after a blocked save while retaining independent edits and additions.
+- Keep the five most recent nonempty on-device library copies before replacing the local cache.
+
 ## 2026-10-27 — Show headings and episode numbers in notifications
 - Use only the show/film name as the notification heading, avoiding a repeated app name beside iOS’s attribution.
 - Add season/episode numbers to episode release and advance reminders; use “New show out now” for premieres and films.

@@ -380,7 +380,23 @@
       r.onerror=()=>reject(r.error);
     });
   }
-  function cachePut(value,db=cacheDB){return new Promise((resolve,reject)=>{if(!db)return resolve(false);const tx=db.transaction("data","readwrite");tx.objectStore("data").put(value);tx.oncomplete=()=>resolve(true);tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error||new Error("On-device save was interrupted."));});}
+  function cachePut(value,db=cacheDB){return new Promise((resolve,reject)=>{
+    if(!db)return resolve(false);
+    const tx=db.transaction("data","readwrite"),store=tx.objectStore("data");
+    if(value.key==="library"){
+      const previous=store.get("library");
+      previous.onsuccess=()=>{
+        const old=previous.result;
+        if(old?.userId===value.userId&&Array.isArray(old.items)&&old.items.length&&JSON.stringify(old.items)!==JSON.stringify(value.items)){
+          const recovery=store.get("library-recovery");
+          recovery.onsuccess=()=>store.put({key:"library-recovery",userId:value.userId,versions:[old,...(recovery.result?.userId===value.userId?recovery.result.versions||[]:[])].slice(0,5)});
+        }
+        store.put(value);
+      };
+    }else store.put(value);
+    tx.oncomplete=()=>resolve(true);tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error||new Error("On-device save was interrupted."));
+  });}
+
   function cacheGet(key,db=cacheDB){return new Promise((resolve,reject)=>{if(!db)return resolve(null);const tx=db.transaction("data","readonly");const r=tx.objectStore("data").get(key);r.onsuccess=()=>resolve(r.result||null);r.onerror=()=>reject(r.error);tx.onabort=()=>reject(tx.error||new Error("On-device read was interrupted."));});}
   function activePersistenceContext(snapshot){return Boolean(snapshot&&String(currentUser?.id||"")===snapshot.accountId&&cloudSessionToken===snapshot.token&&persistenceGeneration===snapshot.generation);}
   function setCloudBaseline(items,revision,accountId=String(currentUser?.id||"")){

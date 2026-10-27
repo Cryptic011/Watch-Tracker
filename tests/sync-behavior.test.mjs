@@ -280,3 +280,28 @@ test('A failed device write cannot upload an older cached copy and is retried be
  app.queueLocalLibrarySave=save;assert.equal(await app.synchronizeCloudLibrary(),true);
  assert.equal(writes.length,1);assert.equal(writes[0].changes[0].set.notes,'new');assert.equal(db.records.get('library').items[0].notes,'new');assert.equal(db.records.get('library').dirty,false);
 });
+
+
+test('A safety-blocked empty save restores cloud titles while retaining an independent new title',async()=>{
+ const original=[{id:'a',title:'A'},{id:'b',title:'B'}],server=[{id:'a',title:'A updated remotely'},original[1]],local=[{id:'c',title:'New title'}];
+ const db=memoryDB({library:{key:'library',userId:'account',items:local,localSequence:1,cloudItems:original,cloudRevision:1}});
+ const app=harness({cacheDB:db,mediaItems:local,cloudBaseItems:original,cloudRevision:1,localSaveSequence:1});let calls=0;
+ app.pinApi=async(action,payload,token,body)=>{
+  if(++calls===1)throw Object.assign(Error('Removal blocked'),{code:'library_safety_block',items:server,revision:2});
+  const request=JSON.parse(body);assert.equal(request.expectedRevision,2);
+  assert.equal(request.changes.length,1);assert.equal(request.changes[0].create.title,'New title');return{ok:true,revision:3};
+ };
+ await app.uploadCloudLibrary(app.createLibrarySnapshot(local,{sequence:1}));
+ assert.equal(calls,2);assert.equal(app.mediaItems.length,3);
+ assert.equal(app.mediaItems.find(row=>row.id==='a').title,'A updated remotely');assert.equal(db.records.get('library').items.length,3);
+});
+
+test('Device recovery copies survive an empty overwrite and retain the five most recent nonempty versions',async()=>{
+ const db=memoryDB({library:{key:'library',userId:'account',items:[{id:'a',title:'A'}]}}),app=harness({cacheDB:db});
+ await app.cachePut({key:'library',userId:'account',items:[]},db);
+ assert.equal(db.records.get('library-recovery').versions[0].items[0].title,'A');
+ for(let i=0;i<7;i++)await app.cachePut({key:'library',userId:'account',items:[{id:'a',title:'Version '+i}]},db);
+ assert.equal(db.records.get('library-recovery').versions.length,5);assert.equal(db.records.get('library-recovery').versions[0].items[0].title,'Version 5');
+ await app.cachePut({key:'library',userId:'different-account',items:[]},db);
+ assert.equal(db.records.get('library-recovery').userId,'account','another account cannot overwrite this recovery history');
+});

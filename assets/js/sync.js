@@ -281,6 +281,16 @@
         await acknowledgeCloudSnapshot(snapshot,outgoing,result);
         return result;
       }catch(error){
+        if(error?.code==="library_safety_block"&&Array.isArray(error.items)&&Number.isSafeInteger(Number(error.revision))&&attempt<2){
+          // Discard only the unexpected deletions. Preserve title edits/adds
+          // and merge against the server library protected by its revision lock.
+          const retained=new Map(outgoing.items.map(item=>[String(item.id),item]));
+          for(const item of error.items)if(!retained.has(String(item.id)))retained.set(String(item.id),item);
+          const merged=replayLocalChanges(outgoing.baseItems,[...retained.values()],error.items);
+          outgoing=createLibrarySnapshot(merged,{...outgoing,sequence:snapshot.sequence,baseItems:error.items,expectedRevision:Number(error.revision)});
+          showAppToast("Protected your library: unexpected removals were blocked and your saved titles restored.","warn",8000);
+          continue;
+        }
         if(!["revision_conflict","duplicate_title"].includes(error?.code)||!Array.isArray(error.items)||!Number.isSafeInteger(Number(error.revision))||attempt===2)throw error;
         detectedSyncConflictCount+=detectSyncConflicts(outgoing.baseItems,outgoing.items,error.items).length;
         const merged=deduplicateLibrary(replayLocalChanges(outgoing.baseItems,outgoing.items,error.items)).items;
