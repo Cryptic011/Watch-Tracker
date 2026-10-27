@@ -37,16 +37,17 @@ test('Search viewport follows keyboard height and discards stale offsets after d
  }
 });
 test('Search pins the background once, resizes independently, and restores its original scroll and styles',()=>{
- const {c,$}=harness(),properties=new Map(),scrolls=[];
+ const {c,$}=harness(),properties=new Map(),scrolls=[],classes=new Set();
  const styles={position:'relative',top:'2px',left:'',width:'',overflow:''};
- c.document.body={style:{...styles}};c.document.documentElement={clientHeight:844};
+ c.document.body={style:{...styles}};c.document.documentElement={clientHeight:844,classList:{toggle:(name,on)=>on?classes.add(name):classes.delete(name),remove:name=>classes.delete(name)}};
  $('discovery-view').style={setProperty:(key,value)=>properties.set(key,value),removeProperty:key=>properties.delete(key)};
  c.window={innerHeight:844,scrollX:0,scrollY:280,visualViewport:{height:844,offsetTop:0},scrollTo:options=>scrolls.push(options)};
  c.setTitleSearchSheetOpen(true);assert.equal(c.document.body.style.position,'fixed');assert.equal(c.document.body.style.top,'-280px');
  c.window.scrollY=0;c.setTitleSearchSheetOpen(true);
  c.window.visualViewport={height:380,offsetTop:60};c.updateTitleSearchViewport();
+ assert.equal(classes.has('search-keyboard-open'),true);
  assert.equal(properties.get('--search-viewport-height'),'380px');assert.equal(properties.get('--search-viewport-top'),'60px');
- c.setTitleSearchSheetOpen(false);assert.deepEqual(c.document.body.style,styles);
+ c.setTitleSearchSheetOpen(false);assert.equal(classes.has('search-keyboard-open'),false);assert.deepEqual(c.document.body.style,styles);
  assert.equal(scrolls[0].top,280);assert.equal(properties.size,0);
  c.updateTitleSearchViewport();assert.equal(properties.size,0,'closed search cannot move the Library on a late keyboard resize');
 });
@@ -111,7 +112,7 @@ test('Search errors expose a retry and clearing input removes results',async()=>
 });
 test('Search is immediately after Library and artwork/update connections are allowed by CSP',()=>{
   const html=fs.readFileSync(new URL('../index.html',import.meta.url),'utf8');
-  assert.deepEqual([...html.matchAll(/class="tab-btn[^"]*" data-tab="([^"]+)"/g)].map(m=>m[1]),['library','search','settings']);
+  assert.deepEqual([...html.matchAll(/class="tab-btn[^"]*" data-tab="([^"]+)"/g)].map(m=>m[1]),['library','settings']);
   assert.match(html,/connect-src[^;]*wss:\/\/okkwteywtgfsnlrjdyhv\.supabase\.co/);
   assert.match(html,/img-src[^;]*https:\/\/\*\.mzstatic\.com/);
   assert.doesNotMatch(html.match(/connect-src[^;]*/)[0],/(?:wikipedia|wikidata|wikimedia)/i);
@@ -139,7 +140,7 @@ test('Catalogue gateway includes TVMaze show summaries alongside film descriptio
 test('Retired History and Watchlist tabs are removed and cannot be activated',()=>{
   const html=fs.readFileSync(new URL('../index.html',import.meta.url),'utf8');
   const library=fs.readFileSync(new URL('../assets/js/library.js',import.meta.url),'utf8');
-  assert.deepEqual([...html.matchAll(/class="tab-btn[^"]*" data-tab="([^"]+)"/g)].map(m=>m[1]),['library','search','settings']);
+  assert.deepEqual([...html.matchAll(/class="tab-btn[^"]*" data-tab="([^"]+)"/g)].map(m=>m[1]),['library','settings']);
   assert.match(library,/const ALLOWED_BOTTOM_TABS=new Set\(\["library","search","settings"\]\)/);
   assert.match(library,/if\(!ALLOWED_BOTTOM_TABS\.has\(tab\)\)tab="library"/);
   assert.match(library,/label==="history"\|\|label==="watchlist"/);

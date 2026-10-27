@@ -8,7 +8,7 @@ export function installNativeControls(Native){
   async function sync(){
     frame=0;
     const overlay=Boolean(document.querySelector('dialog[open]'))||['modal','episode-tracker-modal'].some(id=>!hidden(document.getElementById(id)));
-    const state={visible:Boolean(currentUser&&authScreen.classList.contains('hidden')&&!overlay),tab:['settings','search'].includes(currentTab)?currentTab:'library',searchVisible:currentTab==='library'&&!hidden(document.getElementById('add-btn')),dark:document.documentElement.dataset.theme==='dark'};
+    const state={visible:Boolean(currentUser&&authScreen.classList.contains('hidden')&&!overlay&&!document.documentElement.classList.contains('search-keyboard-open')),tab:document.querySelector('.bottom-tabs')?.dataset.activeTab||'library',searchVisible:currentTab==='library'&&!hidden(document.getElementById('add-btn')),dark:document.documentElement.dataset.theme==='dark'};
     const key=JSON.stringify(state);if(key===last)return;
     last=key;const request=++generation;
     try{

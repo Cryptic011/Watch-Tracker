@@ -319,12 +319,12 @@
     const currentTabBtns=document.querySelectorAll(".bottom-tabs .tab-btn");
     const previousTab=currentTab;
     if(tab==="search"&&currentTab!=="search")searchReturnTab=currentTab;
+    const primaryTab=tab==="search"?searchReturnTab:tab;
     currentTab=tab;currentTabBtns.forEach(b=>{
-      b.classList.toggle("hidden",b.dataset.tab==="search"&&tab!=="search");
-      b.classList.toggle("active",b.dataset.tab===tab);
-      b.setAttribute("aria-current",b.dataset.tab===tab?"page":"false");
+      b.classList.toggle("active",b.dataset.tab===primaryTab);
+      b.setAttribute("aria-current",b.dataset.tab===primaryTab?"page":"false");
     });
-    document.querySelector(".bottom-tabs")?.setAttribute("data-active-tab",tab);
+    document.querySelector(".bottom-tabs")?.setAttribute("data-active-tab",primaryTab);
     const search=tab==="search",settings=(search?searchReturnTab:tab)==="settings";
     libraryView.classList.toggle("hidden",settings);settingsView.classList.toggle("hidden",!settings);
     if(!search)dismissTitleSearchKeyboard();

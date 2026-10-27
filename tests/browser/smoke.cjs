@@ -192,22 +192,22 @@ const server=http.createServer((req,res)=>{
   assert.deepEqual(fixedDock.after,fixedDock.before,'the island and Search button stay fixed while Library scrolls');
   await page.locator('#search-input').click();
   assert.equal(await page.locator('#discovery-view').isVisible(),true,'Library search opens the Search page');
-  assert.equal(await page.locator('.bottom-tabs [data-tab="search"]').isVisible(),true);
-  assert.equal(await page.locator('.bottom-tabs').getAttribute('data-active-tab'),'search');
+  assert.equal(await page.locator('.bottom-tabs [data-tab="search"]').count(),0,'Search keeps the same two navigation tabs');
+  assert.equal(await page.locator('.bottom-tabs').getAttribute('data-active-tab'),'library');
   await page.locator('#discovery-query').fill('B');
   assert.equal(await page.locator('#discovery-query').inputValue(),'B');
   await page.locator('.bottom-tabs [data-tab="library"]').click();
   assert.equal(await page.locator('.bottom-tabs [data-tab="search"]').isVisible(),false,'leaving Search removes its temporary tab');
   const libraryScrollBeforeSearch=await page.evaluate(async()=>{window.scrollTo(0,160);await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));return window.scrollY;});
   await page.locator('#add-btn').click();
-  assert.equal(await page.locator('.bottom-tabs [data-tab="search"]').isVisible(),true,'Search joins the island only while active');
+  assert.equal(await page.locator('.bottom-tabs [data-tab="search"]').count(),0,'Search never expands the navigation capsule');
   assert.equal(await page.locator('#discovery-view').getAttribute('role'),'region');
   const fullSearch=await page.locator('#discovery-view').boundingBox();
   assert.ok(fullSearch.x<=1&&fullSearch.y<=1&&fullSearch.width>=389&&fullSearch.height>=843,'Search covers the whole page');
   assert.equal(await page.locator('#library-view').evaluate(node=>getComputedStyle(node).visibility),'hidden','Library artwork cannot show through Search');
   await page.waitForFunction(()=>{
     const cursor=getComputedStyle(document.querySelector('.bottom-tabs'),'::before');
-    return Math.abs(new DOMMatrixReadOnly(cursor.transform).m41-parseFloat(cursor.width))<1;
+    return Math.abs(new DOMMatrixReadOnly(cursor.transform).m41)<1;
   });
   if(process.env.BROWSER_SCREENSHOT_DIR)await page.screenshot({path:path.join(process.env.BROWSER_SCREENSHOT_DIR,engine.name()+'-search.png')});
   await page.locator('#close-title-search').click();
@@ -222,6 +222,7 @@ const server=http.createServer((req,res)=>{
     Object.defineProperty(window,'visualViewport',{configurable:true,value:window._searchKeyboardViewport});
     window.dispatchEvent(new Event('resize'));
   });
+  assert.equal(await page.locator('.bottom-tabs').isVisible(),false,'navigation is hidden above the keyboard');
   const keyboardInput=await page.locator('#discovery-query').boundingBox();
   await page.evaluate(()=>{
     document.querySelector('#discovery-global').classList.remove('hidden');
@@ -237,6 +238,7 @@ const server=http.createServer((req,res)=>{
     window._searchKeyboardViewport.height=window.innerHeight;window._searchKeyboardViewport.offsetTop=40;
     window.dispatchEvent(new Event('resize'));
   });
+  assert.equal(await page.locator('.bottom-tabs').isVisible(),true,'navigation returns after keyboard dismissal');
   assert.equal(await page.locator('#discovery-view').evaluate(node=>node.style.getPropertyValue('--search-viewport-top')),'0px','stale iOS keyboard offsets are cleared');
   await page.evaluate(()=>{
     if(window._searchOriginalViewport)Object.defineProperty(window,'visualViewport',window._searchOriginalViewport);else delete window.visualViewport;

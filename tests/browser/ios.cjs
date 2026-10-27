@@ -68,7 +68,7 @@ const server=http.createServer((req,res)=>{
       await page.evaluate(()=>window.dispatchEvent(new CustomEvent('watchlog:native-control',{detail:'library'})));
       await page.waitForFunction(()=>_native.controls.tab==='library'&&_native.controls.searchVisible===true);
       await page.evaluate(()=>window.dispatchEvent(new CustomEvent('watchlog:native-control',{detail:'search'})));
-      await page.waitForFunction(()=>_native.controls.visible===true&&_native.controls.tab==='search'&&!document.getElementById('discovery-view').classList.contains('hidden'));
+      await page.waitForFunction(()=>_native.controls.visible===true&&currentTab==='search'&&_native.controls.tab==='library'&&!document.getElementById('discovery-view').classList.contains('hidden'));
       const searchBounds=await page.locator('.search-sheet').boundingBox();
       assert.ok(searchBounds.x<=1&&searchBounds.width>=388,'Search fills the page width');
       assert.ok(searchBounds.height>=800,'Search fills the page height');
@@ -78,7 +78,7 @@ const server=http.createServer((req,res)=>{
       const backgroundBounds=await page.locator('#discovery-view').boundingBox();assert.ok(backgroundBounds.height>=843,'Search background covers the home-indicator area even when visual viewport is shorter');
       await page.locator('#close-title-search').click();await page.waitForFunction(()=>_native.controls.tab==='library');
       await page.locator('#search-input').click();
-      await page.waitForFunction(()=>_native.controls.tab==='search');
+      await page.waitForFunction(()=>currentTab==='search'&&_native.controls.tab==='library');
       await page.locator('#discovery-query').fill('Silo');
       assert.equal(await page.locator('#discovery-query').inputValue(),'Silo','Library search opens the same searchable page');
       await page.evaluate(()=>window.dispatchEvent(new CustomEvent('watchlog:native-control',{detail:'settings'})));

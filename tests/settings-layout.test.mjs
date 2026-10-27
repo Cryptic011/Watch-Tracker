@@ -43,10 +43,10 @@ test('Settings surfaces share the Changelog theme colour rather than fixed light
  assert.ok(!css.includes('background:#292929')&&!css.includes('background:#2b2b2d'));
 });
 
-test('A compact Search action opens a full page with a temporary island tab',()=>{
+test('A compact Search action opens a full page without changing primary navigation',()=>{
  const html=read('index.html');
  assert.match(html,/id="add-btn"[^>]*aria-label="Search titles"/);
- assert.match(html,/class="tab-btn hidden" data-tab="search"/);
+ assert.doesNotMatch(html,/class="tab-btn[^"]*" data-tab="search"/);
  assert.doesNotMatch(html,/aria-label="Add show or film"/);
  assert.match(html,/id="discovery-view"[^>]*role="region"/);
  assert.match(html,/id="close-title-search"/);

@@ -30,3 +30,5 @@ html:has(#discovery-view:not(.hidden)),body:has(#discovery-view:not(.hidden)){ov
 html:has(#discovery-view:not(.hidden)) .top-nav,
 html:has(#discovery-view:not(.hidden)) #library-view,
 html:has(#discovery-view:not(.hidden)) #settings-view{visibility:hidden}
+
+html.search-keyboard-open .search-sheet-results{padding-bottom:16px}

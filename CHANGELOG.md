@@ -1,3 +1,8 @@
+## 2026-10-27 — Consistent Search navigation and keyboard layout
+- Keep the same two-button Library/Settings capsule when Search opens, without adding a temporary third tab.
+- Hide the web or native dock while the Search keyboard is open; restore it when the keyboard closes or Search exits.
+- Let results use the freed space above the keyboard and preserve Search close, page history and Library scroll restoration.
+
 ## 2026-10-26 — Keep release notifications minimal
 - Use only the show or film name as the notification title.
 - Use “New episode out in …” or “Film out in …” as the body; at release, use “out now”.

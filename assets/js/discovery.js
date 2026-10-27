@@ -221,7 +221,7 @@
     const bounds=titleSearchViewportBounds(window.visualViewport,layoutHeight),sheet=$("discovery-view");
     sheet.style.setProperty('--search-viewport-top',bounds.top+'px');
     sheet.style.setProperty('--search-viewport-height',bounds.height+'px');
-    document.documentElement.style?.setProperty('--dock-keyboard-offset',Math.max(0,layoutHeight-bounds.top-bounds.height)+'px');
+    document.documentElement.classList?.toggle('search-keyboard-open',layoutHeight-bounds.height>120);
   }
   function setTitleSearchSheetOpen(open){
     const body=document.body,sheet=$("discovery-view");
@@ -236,7 +236,7 @@
       const previous=titleSearchViewportState;titleSearchViewportState=null;
       Object.assign(body.style,previous.styles);
       sheet.style.removeProperty('--search-viewport-top');sheet.style.removeProperty('--search-viewport-height');
-      document.documentElement.style?.removeProperty('--dock-keyboard-offset');
+      document.documentElement.classList?.remove('search-keyboard-open');
       window.scrollTo({left:previous.x,top:previous.y,behavior:'instant'});
     }
   }
