@@ -48,6 +48,21 @@ test('Odoo packages the complete versioned app and a valid standalone homepage',
   execFileSync(python,['-c','import sys,xml.etree.ElementTree as E; E.parse(sys.argv[1])',path.join(output,'homepage.xml')]);
 });
 
+test('Public homepage resources keep their correct paths through Odoo QWeb URL rewriting',()=>{
+  const xml=fs.readFileSync(path.join(output,'homepage.xml'),'utf8');
+  const urls=[...xml.matchAll(/\b(?:src|href)="([^"]+)"/g)].map(match=>match[1]).filter(url=>/\.(?:css|js|png|webmanifest)(?:\?|$)/.test(url));
+  assert.ok(urls.length>=21);
+  for(const url of urls){
+    // QWeb turns relative values into root-relative ones. A <base> tag does
+    // not help after that conversion, so emitted URLs must already be right.
+    const qwebOutput=url.startsWith('/')?url:'/'+url.replace(/^\.\//,'');
+    assert.ok(qwebOutput.startsWith(prefix),qwebOutput);
+  }
+  const check=Buffer.from(files['hosting-check.html'][1],'base64').toString();
+  assert.ok(check.includes("credentials:'omit'"));
+  assert.ok(check.includes('publicResourcePaths'));
+});
+
 test('Odoo HTTP action serves only fixed public files and returns 404 for unknown paths',()=>{
   const result=execFileSync(python,['-c',`
 import base64,json,sys,types
@@ -82,7 +97,7 @@ test('Odoo offline install loads assets from the hosting route and serves the ro
 
 test('The root-scoped app worker leaves Odoo login, admin, contact and private routes alone',async()=>{
   const app=worker();
-  for(const pathname of ['/odoo','/odoo/settings','/web/login','/web/content/private','/contactus']){
+  for(const pathname of ['/odoo','/odoo/settings','/web/login','/web/content/private','/contactus','/?update=first-visit']){
     let claimed=false;
     app.listeners.fetch({request:{url:origin+pathname,method:'GET',mode:'navigate'},respondWith(){claimed=true;}});
     assert.equal(claimed,false,pathname);

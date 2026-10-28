@@ -24,6 +24,15 @@ install an additional Odoo app, or use Odoo's external Models API.
    `/odoo` and `/web/login`. Sign into the tracker with an existing tracker email
    and PIN to load the existing Supabase library.
 
+The homepage uses explicit `/website/action/watchlog/` resource URLs. Odoo
+rewrites relative `src` and `href` values before the browser applies `<base>`,
+so testing only the action URL or an installed offline shell misses a broken
+first visit. Open `/website/action/watchlog/hosting-check.html` to check the
+actual public homepage and uncached asset requests without Odoo credentials.
+Use `/?update=first-visit` for a rendered homepage check that bypasses the worker.
+Visitors use the tracker's Supabase email/PIN accounts; an Odoo account is not
+required to view, create an app account, or sign into the tracker.
+
 The service worker is served with the required JavaScript content type and
 `Service-Worker-Allowed: /`. Its root scope supports the clean homepage URL;
 navigation handling is restricted to the tracker homepage and its app route.

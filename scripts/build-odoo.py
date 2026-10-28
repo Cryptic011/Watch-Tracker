@@ -16,6 +16,7 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
+from urllib.parse import urljoin, urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]
 PREFIX = '/website/action/watchlog/'
@@ -29,6 +30,13 @@ class HomepageXML(HTMLParser):
         self.output = ['<t name="Watch Tracker" t-name="website.homepage">']
 
     def handle_starttag(self, tag, attrs):
+        # Odoo's QWeb renderer rewrites relative src/href values against the
+        # page URL before the browser can apply <base>. Pin public file URLs
+        # here so first-time visitors receive the same app as the worker cache.
+        attrs = [(key, urljoin(PREFIX, value)
+                  if key in ('src', 'href') and value and
+                  not value.startswith(('/', '#')) and not urlsplit(value).scheme
+                  else value) for key, value in attrs]
         attributes = ''.join(' ' + key + '="' + escape(value if value is not None else key, quote=True) + '"' for key, value in attrs)
         self.output.append('<' + tag + attributes + ('/>' if tag in self.VOID else '>'))
 
@@ -96,7 +104,11 @@ def build(output):
     worker = replace_once(worker, 'if(request.mode==="navigate"){', '''if(request.mode==="navigate"){
     // This worker controls the app at the origin root but must never cache,
     // replace, or interfere with Odoo administration, login, or other pages.
-    const navigationPath=new URL(request.url).pathname;
+    const navigationUrl=new URL(request.url);
+    // A fresh public-page check must reach Odoo instead of being replaced
+    // by the already installed shell, which could hide a broken homepage.
+    if(navigationUrl.searchParams.has("update"))return;
+    const navigationPath=navigationUrl.pathname;
     if(!["/","/index.html",SHELL_BASE.pathname.slice(0,-1),SHELL_BASE.pathname,SHELL_BASE.pathname+"index.html"].includes(navigationPath))return;
     const navigationRequest=new Request(new URL("index.html",SHELL_BASE),{cache:"no-store"});''')
     worker = replace_once(worker, 'fetch(request,{cache:"no-store",signal:controller.signal})', 'fetch(navigationRequest,{cache:"no-store",signal:controller.signal})')
@@ -104,19 +116,28 @@ def build(output):
 
     # A public, read-only deployment check: it never signs in, requests push
     # permission, or reads account/library state. Keep it out of app navigation.
-    (runtime / 'hosting-check.html').write_text('''<!doctype html><html lang="en"><meta charset="utf-8"><title>Watch Tracker hosting check</title>
+    (runtime / 'hosting-check.html').write_text(r'''<!doctype html><html lang="en"><meta charset="utf-8"><title>Watch Tracker hosting check</title>
 <h1>Watch Tracker hosting check</h1><pre id="checks">Checking public hosting and offline installation…</pre>
 <script>
 (async()=>{
  const result={}; const prefix='/website/action/watchlog/';
+ const publicRead=path=>fetch(path+(path.includes('?')?'&':'?')+'update=hosting-check',{cache:'no-store',credentials:'omit'});
  try{
-  const response=await fetch(prefix+'sw.js',{cache:'no-store'});
+  const homepage=await publicRead('/'),html=await homepage.text();
+  const homeDocument=new DOMParser().parseFromString(html,'text/html');
+  const resources=[...homeDocument.querySelectorAll('link[rel=stylesheet],script[src],link[rel=manifest],link[rel=apple-touch-icon],link[rel=icon]')]
+    .map(element=>element.getAttribute(element.tagName==='SCRIPT'?'src':'href'));
+  result.publicHomepage=homepage.ok&&html.includes('id="auth-screen"');
+  result.publicResourcePaths=resources.length>0&&resources.every(path=>path.startsWith(prefix));
+  result.invalidHomepagePaths=resources.filter(path=>!path.startsWith(prefix));
+  const response=await publicRead(prefix+'sw.js');
   result.workerFile=response.ok&&/javascript/.test(response.headers.get('content-type')||'');
   result.workerScope=response.headers.get('service-worker-allowed');
-  const manifest=await(await fetch(prefix+'asset-manifest.json',{cache:'no-store'})).json();
+  const manifest=await(await publicRead(prefix+'asset-manifest.json')).json();
   const files=await Promise.all(manifest.assets.map(async name=>{
-   const response=await fetch(prefix+name,{cache:'no-store'});
-   return {name,ok:response.ok,type:response.headers.get('content-type')};
+   const response=await publicRead(prefix+name),type=response.headers.get('content-type')||'';
+   const expected=/\.css(?:\?|$)/.test(name)?/text\/css/:/\.js(?:\?|$)/.test(name)?/javascript/:/\.html(?:\?|$)/.test(name)?/text\/html/:null;
+   return {name,ok:response.ok&&(!expected||expected.test(type)),type};
   }));
   result.assetCount=files.length;result.missingAssets=files.filter(file=>!file.ok);
   const registration=await navigator.serviceWorker.register(prefix+'sw.js',{scope:'/',updateViaCache:'none'});
@@ -126,7 +147,7 @@ def build(output):
   const cached=await Promise.all(manifest.assets.map(name=>cache.match(new URL(prefix+name,location.origin).href)));
   result.offlineAssetsReady=cached.filter(Boolean).length===manifest.assets.length;
   result.cachedAssets=cached.filter(Boolean).length;
-  result.pass=result.workerFile&&result.workerScope==='/'&&result.missingAssets.length===0&&result.offlineAssetsReady;
+  result.pass=result.publicHomepage&&result.publicResourcePaths&&result.workerFile&&result.workerScope==='/'&&result.missingAssets.length===0&&result.offlineAssetsReady;
  }catch(error){result.error=error.message;result.pass=false;}
  document.getElementById('checks').textContent=JSON.stringify(result,null,2);
 })();
