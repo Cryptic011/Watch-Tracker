@@ -1,0 +1,273 @@
+<t name="Homepage" t-name="website.homepage">
+    <t t-call="website.layout" pageName.f="homepage">
+        <div id="wrap" class="oe_structure"><section class="s_split_intro o_cc o_cc1" data-snippet="s_split_intro">
+        <div class="container-fluid">
+            <div class="row">
+                <div class="col-lg-4 offset-lg-1 order-lg-0 pt144 pb152" style="order: 1;">
+        <p class="small" style="text-align: center;"><font class="text-o-color-2">EXPLORE</font></p>
+                    <h1 class="display-3" style="text-align: center">Track every show</h1>
+                    <p class="lead" style="text-align: center">Keep up with every show you love with a simple tracker built for your watchlist, reminders and progress.</p>
+                    <p><br/></p>
+                    <p style="text-align: center">
+                        <a class="btn btn-lg btn-primary o_translate_inline" href="/contactus">Discover more</a>
+                    </p>
+                </div>
+                <div class="o_not_editable oe_img_bg o_bg_img_center col-lg-6 offset-lg-1 pt120 order-lg-0 pb160" style="background-image: url('/web/image/website.set_2_square_md_2'); order: 0;"/>
+            </div>
+        </div>
+    </section><section class="s_references_lite o_cc o_cc1 pt32 pb32" data-snippet="s_references_lite">
+        <div class="container">
+            <div class="row align-items-center">
+    <div class="col-6 col-lg-2 pt16 pb16">
+        <img src="/web/image/website.s_reference_demo_image_1" class="img img-fluid mx-auto" alt="" loading="lazy"/>
+    </div>
+    <div class="col-6 col-lg-2 pt16 pb16">
+        <img src="/web/image/website.s_reference_demo_image_2" class="img img-fluid mx-auto" alt="" loading="lazy"/>
+    </div>
+    <div class="col-6 col-lg-2 pt16 pb16">
+        <img src="/web/image/website.s_reference_demo_image_3" class="img img-fluid mx-auto" alt="" loading="lazy"/>
+    </div>
+    <div class="col-6 col-lg-2 pt16 pb16">
+        <img src="/web/image/website.s_reference_demo_image_4" class="img img-fluid mx-auto" alt="" loading="lazy"/>
+    </div>
+    <div class="col-6 col-lg-2 pt16 pb16">
+        <img src="/web/image/website.s_reference_demo_image_5" class="img img-fluid mx-auto" alt="" loading="lazy"/>
+    </div>
+    <div class="col-6 col-lg-2 pt16 pb16">
+        <img src="/web/image/website.s_reference_default_image_6" class="img img-fluid mx-auto" alt="" loading="lazy"/>
+    </div>
+            </div>
+        </div>
+    </section><section class="s_services_grid pb64 pt40" data-snippet="s_services_grid">
+        <div class="container">
+        <p class="small"><font class="text-o-color-2">STAY UP TO DATE</font></p>
+            <h2>Our Features</h2>
+            <p class="lead">We help you keep up with every show you love, all in one place.</p>
+            <div class="row">
+                <div class="col-lg-4">
+                    <p><img src="/web/image/website.landscape_md_1" class="img img-fluid" alt="" loading="lazy"/></p>
+                    <h3 class="h5-fs">Reliability</h3>
+                    <p>Reliable tracking, smart reminders and tidy watchlists keep your viewing organised through premieres, rewatches and busy weeks.</p>
+                </div>
+                <div class="col-lg-4">
+                    <p><img src="/web/image/website.landscape_md_2" class="img img-fluid" alt="" loading="lazy"/></p>
+                    <h3 class="h5-fs">Reliability</h3>
+                    <p>Smart automation and streamlined content tools help you publish faster, reduce manual work, and focus on customers today.</p>
+                </div>
+                <div class="col-lg-4">
+                    <p><img src="/web/image/website.landscape_md_3" class="img img-fluid" alt="" loading="lazy"/></p>
+                    <h3 class="h5-fs">Quality</h3>
+                    <p>Track every show with a clean, intuitive layout that keeps schedules, cast details, and updates easy to find at a glance.</p>
+                </div>
+                <div class="col-lg-4">
+    <div class="s_hr pt32 pb32" data-snippet="s_hr" data-name="Separator">
+        <hr class="w-100 mx-auto"/>
+    </div>
+                    
+                    <p><img src="/web/image/website.landscape_md_4" class="img img-fluid" alt="" loading="lazy"/></p>
+                    <h3 class="h5-fs">Updates</h3>
+                    <p>New schedules, smart tools, and flexible workflows let you plan confidently, update quickly, and stay ahead in live entertainment.</p>
+                </div>
+                <div class="col-lg-4">
+    <div class="s_hr pt32 pb32" data-snippet="s_hr" data-name="Separator">
+        <hr class="w-100 mx-auto"/>
+    </div>
+                    
+                    <p><img src="/web/image/website.landscape_md_5" class="img img-fluid" alt="" loading="lazy"/></p>
+                    <h3 class="h5-fs">Privacy</h3>
+                    <p>Secure sign-ins, role-based access, and reliable hosting keep your listings, users, and data protected from everyday threats.</p>
+                </div>
+                <div class="col-lg-4">
+    <div class="s_hr pt32 pb32" data-snippet="s_hr" data-name="Separator">
+        <hr class="w-100 mx-auto"/>
+    </div>
+                    
+                    <p><img src="/web/image/website.landscape_md_6" class="img img-fluid" alt="" loading="lazy"/></p>
+                    <h3 class="h5-fs">Help</h3>
+                    <p>Helpful guidance, quick answers, and proactive monitoring ensure issues are resolved fast, with minimal disruption for your team.</p>
+                </div>
+            </div>
+        </div>
+    </section><div class="s_hr pt32 pb32" data-snippet="s_hr">
+        <hr class="w-100 mx-auto"/>
+    </div><section class="s_text_image_full pt80 pb80" data-snippet="s_text_image_full">
+        <div class="container-fluid">
+            <div class="row o_grid_mode" data-row-count="12">
+                <div class="o_grid_item g-height-8 g-col-lg-4 col-lg-4" style="grid-area: 4 / 2 / 12 / 6; z-index: 1; --grid-item-padding-x: 16px; --grid-item-padding-y: 16px;">
+                    <p class="small" style="text-align: center;"><font class="text-o-color-2">EXPLORE</font></p>
+                    <h2 style="text-align: center;">Enhance your experience</h2>
+                    <p style="text-align: center;">Discover a smarter way to follow your favourite shows. Our platform helps you track episodes, air dates, cast changes, and viewing progress with ease.</p>
+                    <p style="text-align: center;">
+                        <a href="#" class="btn btn-primary o_translate_inline">Discover more</a>
+                    </p>
+                </div>
+                <div class="o_grid_item o_grid_item_image g-height-12 g-col-lg-6 col-lg-6" style="grid-area: 1 / 7 / 13 / 13; z-index: 2; --grid-item-padding-y: 0px; --grid-item-padding-x: 0px;">
+                    <img src="/web/image/website.landscape_md_9" class="img img-fluid mx-auto" alt="" loading="lazy"/>
+                </div>
+            </div>
+        </div>
+    </section><section class="s_text_bold pt112 pb112" data-snippet="s_text_bold">
+        <div class="container s_allow_columns">
+            <h2 class="h1-fs">Track every episode, season and special with confidence. Your trusted guide for organised viewing, reminders and progress.</h2>
+        </div>
+    </section><section class="s_text_image_full pt80 pb80" data-snippet="s_image_text_full">
+        <div class="container-fluid">
+            <div class="row o_grid_mode" data-row-count="12">
+                <div class="o_grid_item o_grid_item_image g-height-12 g-col-lg-6 col-lg-6" style="grid-area: 1 / 1 / 13 / 7; z-index: 0; --grid-item-padding-y: 0px; --grid-item-padding-x: 0px;">
+                    <img src="/web/image/website.landscape_md_8" class="img img-fluid mx-auto" alt="" loading="lazy"/>
+                </div>
+                <div class="o_grid_item g-height-8 g-col-lg-4 col-lg-4" style="grid-area: 4 / 8 / 12 / 12; z-index: 1; --grid-item-padding-x: 16px; --grid-item-padding-y: 16px;">
+                    <p class="small" style="text-align: center;"><font class="text-o-color-2">WHY CHOOSE US</font></p>
+                    <h2 style="text-align: center;">Designed for every viewer</h2>
+                    <p style="text-align: center;">Track every episode, season and special in one clear, easy-to-use place.</p>
+                    <p style="text-align: center;">
+                        <a href="#" class="btn btn-primary o_translate_inline">Book now</a>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section><section class="s_company_team_detail o_cc o_cc1 pt64" data-snippet="s_company_team_detail">
+        <div class="container">
+        <p class="small" style="text-align: center;"><font class="text-o-color-2">TEAMWORK</font></p>
+            <h2 class="h3-fs" style="text-align: center;">Meet our team</h2>
+            <p class="lead" style="text-align: center;">Tracking every show with care</p>
+            <div class="row">
+                <div class="col-lg-4 pt32 pb32 text-center" data-name="Team Member">
+                    <div class="o_not_editable" contenteditable="false">
+                        <img class="o_editable_media img img-fluid rounded-circle d-block mx-auto" src="/web/image/website.set_avatars_square_md_1" alt="" style="width: 25% !important;" loading="lazy"/>
+                    </div>
+                    <h3 class="h5-fs"><br/>James Mitchell</h3>
+                    <p class="text-muted">Show Operations Lead</p>
+                    <p>Leah leads product and platform innovation for live show tracking.</p>
+                    <div class="s_social_media o_not_editable no_icon_color text-center" data-snippet="s_social_media" data-name="Social Media">
+                        <h5 class="s_social_media_title d-none">Social Media</h5>
+                        <a href="#" class="s_social_media_github" target="_blank" aria-label="GitHub">
+                            <i class="oi oi-stack o_editable_media" data-icon="oi_github"/>
+                        </a>
+                        <a href="#" class="s_social_media_linkedin" target="_blank" aria-label="LinkedIn">
+                            <i class="oi oi-stack o_editable_media" data-icon="oi_linkedin"/>
+                        </a>
+                        <a href="#" class="s_social_media_instagram" target="_blank" aria-label="Instagram">
+                            <i class="oi oi-stack o_editable_media" data-icon="oi_instagram"/>
+                        </a>
+                    </div>
+                </div>
+                <div class="col-lg-4 pt32 pb32 text-center" data-name="Team Member">
+                    <div class="o_not_editable" contenteditable="false">
+                        <img class="o_editable_media img img-fluid rounded-circle d-block mx-auto" src="/web/image/website.set_avatars_square_md_6" alt="" style="width: 25% !important;" loading="lazy"/>
+                    </div>
+                    <h3 class="h5-fs"><br/>Sophia Benett</h3>
+                    <p class="text-muted">Data Analyst</p>
+                    <p>Sophia analyses audience data and provides strategic insights.</p>
+                    <div class="s_social_media o_not_editable no_icon_color text-center" data-snippet="s_social_media" data-name="Social Media">
+                        <h4 class="s_social_media_title d-none h5-fs">Social Media</h4>
+                        <a href="#" class="s_social_media_github" target="_blank" aria-label="GitHub">
+                            <i class="oi oi-stack o_editable_media" data-icon="oi_github"/>
+                        </a>
+                        <a href="#" class="s_social_media_linkedin" target="_blank" aria-label="LinkedIn">
+                            <i class="oi oi-stack o_editable_media" data-icon="oi_linkedin"/>
+                        </a>
+                        <a href="#" class="s_social_media_instagram" target="_blank" aria-label="Instagram">
+                            <i class="oi oi-stack o_editable_media" data-icon="oi_instagram"/>
+                        </a>
+                    </div>
+                </div>
+                <div class="col-lg-4 pt32 pb32 text-center" data-name="Team Member">
+                    <div class="o_not_editable" contenteditable="false">
+                        <img class="o_editable_media img img-fluid rounded-circle d-block mx-auto" src="/web/image/website.set_avatars_square_md_3" alt="" style="width: 25% !important;" loading="lazy"/>
+                    </div>
+                    <h3 class="h5-fs"><br/>Olivia Reed</h3>
+                    <p class="text-muted">Product Manager</p>
+                    <p>Olivia shapes new features from watchlist ideas to launch.</p>
+                    <div class="s_social_media o_not_editable no_icon_color text-center" data-snippet="s_social_media" data-name="Social Media">
+                        <h4 class="s_social_media_title d-none h5-fs">Social Media</h4>
+                        <a href="#" class="s_social_media_github" target="_blank" aria-label="GitHub">
+                            <i class="oi oi-stack o_editable_media" data-icon="oi_github"/>
+                        </a>
+                        <a href="#" class="s_social_media_linkedin" target="_blank" aria-label="LinkedIn">
+                            <i class="oi oi-stack o_editable_media" data-icon="oi_linkedin"/>
+                        </a>
+                        <a href="#" class="s_social_media_instagram" target="_blank" aria-label="Instagram">
+                            <i class="oi oi-stack o_editable_media" data-icon="oi_instagram"/>
+                        </a>
+                    </div>
+                </div>
+                <div class="col-lg-4 pt32 pb32 text-center" data-name="Team Member">
+                    <div class="o_not_editable" contenteditable="false">
+                        <img class="o_editable_media img img-fluid rounded-circle d-block mx-auto" src="/web/image/website.set_avatars_square_md_4" alt="" style="width: 25% !important;" loading="lazy"/>
+                    </div>
+                    <h3 class="h5-fs"><br/>Ava Bennett</h3>
+                    <p class="text-muted">Human Resources Manager</p>
+                    <p>Emily oversees show listings, partnerships and audience growth.</p>
+                    <div class="s_social_media o_not_editable no_icon_color text-center" data-snippet="s_social_media" data-name="Social Media">
+                        <h4 class="s_social_media_title d-none h5-fs">Social Media</h4>
+                        <a href="#" class="s_social_media_github" target="_blank" aria-label="GitHub">
+                            <i class="oi oi-stack o_editable_media" data-icon="oi_github"/>
+                        </a>
+                        <a href="#" class="s_social_media_linkedin" target="_blank" aria-label="LinkedIn">
+                            <i class="oi oi-stack o_editable_media" data-icon="oi_linkedin"/>
+                        </a>
+                        <a href="#" class="s_social_media_instagram" target="_blank" aria-label="Instagram">
+                            <i class="oi oi-stack o_editable_media" data-icon="oi_instagram"/>
+                        </a>
+                    </div>
+                </div>
+                <div class="col-lg-4 pt32 pb32 text-center" data-name="Team Member">
+                    <div class="o_not_editable" contenteditable="false">
+                        <img class="o_editable_media img img-fluid rounded-circle d-block mx-auto" src="/web/image/website.set_avatars_square_md_5" alt="" style="width: 25% !important;" loading="lazy"/>
+                    </div>
+                    <h3 class="h5-fs"><br/>Alexander Rivera</h3>
+                    <p class="text-muted">Programming Lead</p>
+                    <p>Alexander leads our outreach and grows the ShowTrack community.</p>
+                    <div class="s_social_media o_not_editable no_icon_color text-center" data-snippet="s_social_media" data-name="Social Media">
+                        <h4 class="s_social_media_title d-none h5-fs">Social Media</h4>
+                        <a href="#" class="s_social_media_github" target="_blank" aria-label="GitHub">
+                            <i class="oi oi-stack o_editable_media" data-icon="oi_github"/>
+                        </a>
+                        <a href="#" class="s_social_media_linkedin" target="_blank" aria-label="LinkedIn">
+                            <i class="oi oi-stack o_editable_media" data-icon="oi_linkedin"/>
+                        </a>
+                        <a href="#" class="s_social_media_instagram" target="_blank" aria-label="Instagram">
+                            <i class="oi oi-stack o_editable_media" data-icon="oi_instagram"/>
+                        </a>
+                    </div>
+                </div>
+                <div class="col-lg-4 pt32 pb32 text-center" data-name="Team Member">
+                    <div class="o_not_editable" contenteditable="false">
+                        <img class="o_editable_media img img-fluid rounded-circle d-block mx-auto" src="/web/image/website.set_avatars_square_md_2" alt="" style="width: 25% !important;" loading="lazy"/>
+                    </div>
+                    <h3 class="h5-fs"><br/>Daniel Foster</h3>
+                    <p class="text-muted">Operations Manager</p>
+                    <p>Daniel keeps the platform running smoothly and the tracking data accurate.</p>
+                    <div class="s_social_media o_not_editable no_icon_color text-center" data-snippet="s_social_media" data-name="Social Media">
+                        <h4 class="s_social_media_title d-none h5-fs">Social Media</h4>
+                        <a href="#" class="s_social_media_github" target="_blank" aria-label="GitHub">
+                            <i class="oi oi-stack o_editable_media" data-icon="oi_github"/>
+                        </a>
+                        <a href="#" class="s_social_media_linkedin" target="_blank" aria-label="LinkedIn">
+                            <i class="oi oi-stack o_editable_media" data-icon="oi_linkedin"/>
+                        </a>
+                        <a href="#" class="s_social_media_instagram" target="_blank" aria-label="Instagram">
+                            <i class="oi oi-stack o_editable_media" data-icon="oi_instagram"/>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section><section class="s_cta_centered pt80 pb80" data-snippet="s_cta_centered">
+        <div class="container">
+            <div class="s_card card o_cc o_cc4 oe_img_bg o_bg_img_center o_bg_img_origin_border_box rounded" data-snippet="s_card" data-vxml="001" data-name="Card" style="--card-spacer-x: 64px;--card-spacer-y: 64px;border-width: 0px !important;background-image: url('/web/image/website.landscape_xl_1');border-radius: 2px !important">
+        <div class="o_we_bg_filter bg-black-50"/>
+                <div class="card-body">
+                    <h2 class="card-title display-4-fs" style="text-align: center;">Track 10,000+ shows<br/>to stay in the loop.</h2>
+                    <p class="card-text" style="text-align: center;">Join us and keep every show on track.</p>
+                    <p><br/></p>
+                    <p style="text-align: center;">
+                        <a class="btn btn-lg btn-secondary" href="/contactus">Contact us</a>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section></div>
+    </t>
+</t>
