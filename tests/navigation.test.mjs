@@ -3,7 +3,16 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 const source=fs.readFileSync(new URL('../assets/js/navigation.js',import.meta.url),'utf8');
-function router(){const c=vm.createContext({window:{},URLSearchParams});vm.runInContext(source,c);return c;}
+function router(){const c=vm.createContext({window:{},URLSearchParams,URL});vm.runInContext(source,c);return c;}
+test('Reminder routes beat saved navigation and never open a colliding title in another account',()=>{
+ for(const owner of ['account','another-account']){
+  const c=router(),applied=[],messages=[];
+  c.currentUser={id:'account'};c.window.location=new URL('https://app.test/?reminderAccount='+owner+'#/title/shared-id');
+  c.history={state:{watchlog:true,owner:'account',page:{tab:'settings',title:'old'}},replaceState(){}};
+  c.applyAppPage=page=>applied.push({...page});c.currentAppPage=()=>applied.at(-1);c.showAppToast=message=>messages.push(message);
+  c.initAppNavigation();assert.equal(applied[0].title,owner==='account'?'shared-id':'');assert.equal(applied[0].tab,'library');assert.equal(messages.length,owner==='account'?0:1);
+ }
+});
 test('App URLs round-trip titles, collections, Library filters and sort order',()=>{
  const c=router(),page={tab:'library',category:'Series',scope:'list:My shows & films',query:'NCIS',filter:'Watching',sort:'title'};
  const hash=c.appPageHash(page),parsed=c.parseAppHash(hash);

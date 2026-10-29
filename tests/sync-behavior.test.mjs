@@ -62,6 +62,16 @@ function harness(extra={}){
   return context;
 }
 
+test('Confirmed removals are durable offline and acknowledgement clears only accepted deletion intent',async()=>{
+ const base=[{id:'a',title:'A'},{id:'b',title:'B'}],db=memoryDB({}),confirmed=new Set(['a']);
+ const app=harness({cacheDB:db,cloudBaseItems:base,mediaItems:[base[1]],confirmedLibraryDeletes:confirmed});
+ const snapshot=app.createLibrarySnapshot(app.mediaItems);await app.queueLocalLibrarySave(snapshot);
+ assert.deepEqual(db.records.get('library').confirmedDeletes,['a']);
+ app.pinApi=async(_action,_payload,_token,raw)=>{const body=JSON.parse(raw);assert.deepEqual(body.confirmedDeletes,['a']);assert.deepEqual(body.changes,[{id:'a',delete:true}]);return {ok:true,revision:1};};
+ await app.uploadCloudLibrary(snapshot);
+ assert.equal(confirmed.size,0);assert.deepEqual(db.records.get('library').confirmedDeletes,[]);assert.equal(db.records.get('library').dirty,false);
+});
+
 test("An old acknowledgement preserves newer edits and rebases the next request",async()=>{
   const base=[{id:"a",title:"A"},{id:"b",title:"B"}];
   const first=[{id:"a",title:"A edited"},{id:"b",title:"B"}];

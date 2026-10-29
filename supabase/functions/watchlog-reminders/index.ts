@@ -1,6 +1,7 @@
 import "./regional-releases.js";
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.112.4";
+import {createRemoteJWKSet,jwtVerify} from "npm:jose@6.1.3";
 import {
   generateVAPIDKeys,
   sendNotification,
@@ -20,7 +21,7 @@ const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const db = createClient(supabaseUrl, serviceKey, {
   auth: { persistSession: false, autoRefreshToken: false },
 });
-// Deployment-status requests authenticate by verifying the completed run against GitHub Actions below.
+// Deployment requests require a signed GitHub job identity plus run verification.
 // Deploy this function with platform JWT verification disabled; other actions enforce their own session/cron checks.
 const enc = new TextEncoder();
 const VAPID_SUBJECT = "mailto:push@watched-logger.app";
@@ -79,6 +80,23 @@ function safeEqual(a: string, b: string) {
     difference |= a.charCodeAt(index) ^ b.charCodeAt(index);
   }
   return difference === 0;
+}
+
+let githubSigningKeys:ReturnType<typeof createRemoteJWKSet>|null=null;
+async function verifyDeploymentToken(req:Request,body:Record<string,unknown>){
+  const token=req.headers.get('x-watchlog-deployment')||'';
+  if(!token||token.length>20000)return false;
+  try{
+    githubSigningKeys||=createRemoteJWKSet(new URL('https://token.actions.githubusercontent.com/.well-known/jwks'),{timeoutDuration:5000});
+    const {payload}=await jwtVerify(token,githubSigningKeys,{
+      issuer:'https://token.actions.githubusercontent.com',audience:'watchlog-deployments',algorithms:['RS256'],clockTolerance:5,
+      requiredClaims:['exp','iat','nbf','repository_id','repository_owner_id','run_id','run_number','run_attempt','sha','workflow_ref','ref','environment','event_name'],
+    });
+    return payload.repository_id==='1346271034'&&payload.repository_owner_id==='321054300'&&
+      payload.ref==='refs/heads/main'&&payload.environment==='github-pages'&&['push','workflow_dispatch'].includes(String(payload.event_name))&&
+      payload.workflow_ref===`${payload.repository}/.github/workflows/pages.yml@refs/heads/main`&&
+      payload.run_id===String(body.runId)&&payload.run_number===String(body.runNumber)&&payload.run_attempt===String(body.runAttempt||'1')&&payload.sha===body.sha;
+  }catch(_){return false;}
 }
 
 function validTimeZone(_value: unknown) { return "UTC"; }
@@ -483,16 +501,6 @@ async function sendPush(
   );
 }
 
-async function disableExpiredSubscription(row: PushRow) {
-  await db
-    .from("watchlog_push_subscriptions")
-    .update({
-      enabled: false,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", row.id);
-}
-
 async function claimDelivery(
   row: PushRow,
   accountId: string,
@@ -506,108 +514,29 @@ async function claimDelivery(
     if (error) throw error;
     if (sent?.length) return null;
   }
-  const nowIso = new Date().toISOString();
-  const { data: existing } = await db
-    .from("watchlog_push_deliveries")
-    .select("id,status,attempts,next_attempt_at")
-    .eq("subscription_id", row.id)
-    .eq("event_key", eventKey)
-    .maybeSingle();
-
-  if (existing) {
-    if (existing.status === "sent" || existing.status === "expired") return null;
-    if (Number(existing.attempts || 0) >= MAX_PUSH_ATTEMPTS) return null;
-    if (
-      existing.next_attempt_at &&
-      new Date(existing.next_attempt_at).getTime() > Date.now()
-    ) {
-      return null;
-    }
-    const attempts = Number(existing.attempts || 0) + 1;
-    const { data, error } = await db
-      .from("watchlog_push_deliveries")
-      .update({
-        status: "pending",
-        attempts,
-        next_attempt_at: null,
-        updated_at: nowIso,
-      })
-      .eq("id", existing.id)
-      .select("id,attempts")
-      .single();
-    if (error) throw error;
-    return data;
-  }
-
-  const { data, error } = await db
-    .from("watchlog_push_deliveries")
-    .insert({
-      subscription_id: row.id,
-      account_id: accountId,
-      item_id: itemId,
-      event_key: eventKey,
-      scheduled_for: scheduledFor,
-      status: "pending",
-      attempts: 1,
-    })
-    .select("id,attempts")
-    .single();
-
-  if (error?.code === "23505") return null;
-  if (error) throw error;
+  const {data,error}=await db.rpc("watchlog_claim_delivery",{
+    p_subscription:row.id,p_account:accountId,p_item:itemId,p_event:eventKey,p_scheduled:scheduledFor,
+  });
+  if(error)throw error;
   return data;
 }
 
 async function finishDelivery(
-  delivery: { id: string; attempts: number },
-  row: PushRow,
+  delivery: {id:string;attempts:number;leaseToken:string},
+  _row: PushRow,
   error?: unknown,
 ) {
-  const now = new Date();
-  if (!error) {
-    await db
-      .from("watchlog_push_deliveries")
-      .update({
-        status: "sent",
-        sent_at: now.toISOString(),
-        next_attempt_at: null,
-        last_error: null,
-        updated_at: now.toISOString(),
-      })
-      .eq("id", delivery.id);
-    return;
-  }
-
-  const code = statusCodeFor(error);
-  if (code === 404 || code === 410) {
-    await disableExpiredSubscription(row);
-    await db
-      .from("watchlog_push_deliveries")
-      .update({
-        status: "expired",
-        last_error: `Push subscription expired (${code})`,
-        updated_at: now.toISOString(),
-      })
-      .eq("id", delivery.id);
-    return;
-  }
-
-  const exhausted = Number(delivery.attempts || 0) >= MAX_PUSH_ATTEMPTS;
-  const retryMinutes = Math.min(60, Math.max(5, Number(delivery.attempts || 1) * 5));
-  await db
-    .from("watchlog_push_deliveries")
-    .update({
-      status: exhausted ? "expired" : "retry",
-      next_attempt_at: exhausted
-        ? null
-        : new Date(now.getTime() + retryMinutes * 60000).toISOString(),
-      last_error: String((error as Error)?.message || error || "Push failed").slice(
-        0,
-        500,
-      ),
-      updated_at: now.toISOString(),
-    })
-    .eq("id", delivery.id);
+  const code=statusCodeFor(error),expired=code===404||code===410;
+  const exhausted=Number(delivery.attempts||0)>=MAX_PUSH_ATTEMPTS;
+  const status=!error?"sent":expired||exhausted?"expired":"retry";
+  const retryMinutes=Math.min(60,Math.max(5,Number(delivery.attempts||1)*5));
+  const {data,error:writeError}=await db.rpc("watchlog_finish_delivery",{
+    p_delivery:delivery.id,p_token:delivery.leaseToken,p_status:status,
+    p_error:error?String((error as Error)?.message||error||"Push failed").slice(0,500):null,
+    p_retry:status==="retry"?new Date(Date.now()+retryMinutes*60000).toISOString():null,p_disable:expired,
+  });
+  if(writeError)throw writeError;
+  if(data!==true)throw new Error("Notification acknowledgement lost its delivery lease.");
 }
 
 async function processPlannedReminders(
@@ -676,18 +605,20 @@ async function processPlannedReminders(
           title: copy.title,
           body: copy.body,
           tag: `watchlog-${await sha256(eventKey).then((v) => v.slice(0, 24))}`,
-          data: { url: "./", itemId, eventKey, kind: "reminder" },
+          data: { url: "./", itemId, accountId:subscription.account_id, eventKey, kind: "reminder" },
         };
 
         try {
           await sendPush(subscription, config, payload);
-          await finishDelivery(delivery, subscription);
-          sent++;
         } catch (pushError) {
           console.error("Planned reminder push failed", statusCodeFor(pushError));
           await finishDelivery(delivery, subscription, pushError);
-          failed++;
+          failed++;continue;
         }
+        // A failed database acknowledgement must not be mistaken for a push
+        // failure or clear the lease. Report it and retain the uncertain send.
+        await finishDelivery(delivery, subscription);
+        sent++;
       }
       }
     }
@@ -775,6 +706,7 @@ Deno.serve(async (req: Request) => {
     }
 
     if (action === "deployment_status") {
+      if(!await verifyDeploymentToken(req,body))return json({error:"A signed deployment workflow identity is required."},401);
       const runId = String(body.runId || "").slice(0, 24);
       const runNumber = String(body.runNumber || "").slice(0, 24);
       const runAttempt = String(body.runAttempt || "1").slice(0, 12);
@@ -838,13 +770,13 @@ Deno.serve(async (req: Request) => {
         if (!delivery) continue;
         try {
           await sendPush(row, config, { title, body: bodyText, tag: `watchlog-change-${runId}-${runAttempt}`, data: { url: "./", workflowRunNumber: runNumber, runAttempt, failureSummary, sha, status, commitUrl } });
-          await finishDelivery(delivery, row);
-          delivered++;
         } catch (pushError) {
           await finishDelivery(delivery, row, pushError);
           failed++;
           console.error("Owner push-status delivery failed", statusCodeFor(pushError) || String((pushError as Error)?.message || pushError).slice(0, 200));
+          continue;
         }
+        await finishDelivery(delivery, row);delivered++;
       }
       const duplicate = (subscriptions || []).length > 0 && delivered === 0 && failed === 0;
       return json({ ok: true, delivered, failed, status, duplicate });
@@ -981,8 +913,6 @@ Deno.serve(async (req: Request) => {
       if (!delivery) return json({ ok: true, duplicate: true, status: "already_sent" });
       try {
         await sendPush(row as PushRow, config, { title: "Test reminder", body: "Notifications are connected.", tag: `watchlog-test-${requestId}`, data: { url: "./", test: true } });
-        await finishDelivery(delivery, row as PushRow);
-        return json({ ok: true, status: "sent" });
       } catch (error) {
         await finishDelivery(delivery, row as PushRow, error);
         const code = statusCodeFor(error);
@@ -990,6 +920,8 @@ Deno.serve(async (req: Request) => {
           ? json({ error: "This device's notification connection expired. Reconnect reminders.", code: "push_subscription_expired" }, 410)
           : json({ error: "The push service could not accept the test. Try again shortly.", code: "push_delivery_failed" }, 502);
       }
+      await finishDelivery(delivery, row as PushRow);
+      return json({ ok: true, status: "sent" });
     }
 
     return json({ error: "Unknown action." }, 400);

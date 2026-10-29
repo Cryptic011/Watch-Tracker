@@ -84,6 +84,13 @@
     await Promise.all(Array.from({length:3},run));
   }
   function resolveEvent(item,event,viewer={},now=Date.now()){
+    if(item.type==='Film'){
+      const raw=String(event.raw||'');
+      if(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}.*(?:Z|[+-]\d{2}:?\d{2})$/i.test(raw)&&Number.isFinite(Date.parse(raw))&&String(item.filmReleaseSource||'').trim()){
+        return {...event,releaseSchedule:{key:'film-release',country:country(viewer),platform:item.platform||'Saved release',timeSource:item.filmReleaseSource,note:'Confirmed film release time'}};
+      }
+      return {...event,streamingUnconfirmed:true};
+    }
     if(item.releaseSchedule?.key==='marshals-gb-paramount-8')return item.releaseSchedule.confirmedTimes?.includes(event.raw)?{...event,releaseSchedule:item.releaseSchedule,platform:item.releaseSchedule.platform}:{...event,streamingUnconfirmed:true};
     const hit=listings.get(country(viewer)+':'+item.tvmazeShowId+':'+(event.season||(event.kind==='season'?event.number:''))+':'+(event.kind==='season'?1:(event.number??event.episode)));
     if(hit&&hit.expires>now)return {...event,broadcastRaw:event.broadcastRaw||event.raw,raw:hit.raw,platform:hit.platform,releaseSchedule:{country:hit.country,platform:hit.platform,sources:[hit.source],note:'TVMaze regional streaming listing'}};

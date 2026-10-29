@@ -8,7 +8,7 @@ const source=stripTypeScriptTypes(fs.readFileSync(new URL('../supabase/functions
 function endpoint({statusError=false,expiredPush=false}={}){
   let handler,subscriptionEnabled=true;
   const row={id:'device',account_id:'account',endpoint:'https://web.push.apple.com/test',p256dh:'key',auth:'auth',enabled:true};
-  const db={from(table){
+  const db={async rpc(name,args){if(name==='watchlog_claim_delivery')return {data:{id:'delivery',attempts:1,leaseToken:'lease'}};if(name==='watchlog_finish_delivery'){if(args.p_disable)subscriptionEnabled=false;return {data:true};}throw Error('Unexpected RPC '+name);},from(table){
     let operation='select';
     const result=()=>{
       if(table==='watchlog_pin_sessions')return {data:{account_id:'account',expires_at:'2099-01-01T00:00:00Z'}};

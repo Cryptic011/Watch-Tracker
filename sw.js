@@ -132,7 +132,13 @@ function notificationUrlWithinScope(value){
 
 self.addEventListener("notificationclick",event=>{
   event.notification.close();
-  const appUrl=notificationUrlWithinScope(event.notification.data?.url);
+  const data=event.notification.data||{};
+  const target=new URL(notificationUrlWithinScope(data.url));
+  if(data.kind==='reminder'&&typeof data.itemId==='string'&&data.itemId.length<=200){
+    target.hash='/title/'+encodeURIComponent(data.itemId);
+    if(typeof data.accountId==='string')target.searchParams.set('reminderAccount',data.accountId);
+  }
+  const appUrl=target.href;
   event.waitUntil(
     (async()=>{
       const windows=await self.clients.matchAll({type:"window",includeUncontrolled:true});

@@ -406,10 +406,10 @@
     lastCloudLibraryJSON=JSON.stringify(cloudBaseItems);
     lastCloudAccountId=accountId;
   }
-  async function saveCache(items,serialized="",{dirty=false,baseItems=cloudBaseItems,baseRevision=cloudRevision,sequence=localSaveSequence,accountId=String(currentUser?.id||""),db=cacheDB}={}){
+  async function saveCache(items,serialized="",{dirty=false,baseItems=cloudBaseItems,baseRevision=cloudRevision,sequence=localSaveSequence,accountId=String(currentUser?.id||""),db=cacheDB,confirmedDeletes=[]}={}){
     if(!accountId||!db)return false;
     const json=serialized||JSON.stringify(items);
-    await cachePut({key:"library",userId:accountId,items,json,dirty,cloudItems:baseItems,cloudRevision:Math.max(0,Number(baseRevision)||0),localSequence:sequence,updatedAt:nowISO()},db);
+    await cachePut({key:"library",userId:accountId,items,json,dirty,cloudItems:baseItems,cloudRevision:Math.max(0,Number(baseRevision)||0),localSequence:sequence,confirmedDeletes,updatedAt:nowISO()},db);
     if(String(currentUser?.id||"")===accountId&&cacheDB===db){lastLocalLibraryJSON=json;lastLocalAccountId=accountId;}
     return true;
   }

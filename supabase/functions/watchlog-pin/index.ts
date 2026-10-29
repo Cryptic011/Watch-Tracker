@@ -475,8 +475,11 @@ Deno.serve(async (req: Request) => {
           if(duplicate)return json({error:`“${duplicate.title}” is already in your library.`,code:"duplicate_title",duplicateId:duplicate.duplicateId,...current},409);
         }
       }
-      const requestHash=await sha256(JSON.stringify({expectedRevision:body.expectedRevision,changes}));
-      const {data:saved,error}=await db.rpc("watchlog_patch_library_once",{p_account:session.accountId,p_revision:body.expectedRevision,p_changes:changes,p_request_hash:requestHash});
+      const confirmedDeletes=body.confirmedDeletes;
+      if(confirmedDeletes!==undefined&&(!Array.isArray(confirmedDeletes)||confirmedDeletes.length>10000||confirmedDeletes.some((id:any)=>typeof id!=="string"||id.length<1||id.length>200)))return json({error:"Invalid confirmed removals."},400);
+      const confirmed=Array.isArray(confirmedDeletes)&&confirmedDeletes.length>0;
+      const requestHash=await sha256(JSON.stringify({expectedRevision:body.expectedRevision,changes,...(confirmed?{confirmedDeletes}:{})}));
+      const {data:saved,error}=await db.rpc(confirmed?"watchlog_patch_confirmed_once":"watchlog_patch_library_once",{p_account:session.accountId,p_revision:body.expectedRevision,p_changes:changes,p_request_hash:requestHash,...(confirmed?{p_confirmed_deletes:confirmedDeletes}:{})});
       if(error)throw error;
       if(!saved?.ok)return json({error:"Library changed on another device. Both changes will be kept.",...saved},409);
       return json(saved);

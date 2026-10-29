@@ -80,8 +80,9 @@ test('Release processing sends at-release alerts for Planned seasons, films and 
  const now=Date.parse('2026-10-26T20:00:00Z'),raw=new Date(now).toISOString(),sent=[];
  class Clock extends Date {static now(){return now;}}
  const c=vm.createContext({Date:Clock,Number,Array,Set,String,Object,Map,TextEncoder,crypto,Response,URL,AbortSignal,console,Deno:{env:{get:()=>''},serve(){}},createClient:()=>({})});
+ vm.runInContext(fs.readFileSync(path.join(root,'assets/js/regional-releases.js'),'utf8'),c);
  vm.runInContext(stripTypeScriptTypes(source.replace(/^import[\s\S]*?from "npm:web-push-neo@0\.1\.2";\n/m,'')),c);
- const items=[{id:'season',title:'Season premiere',type:'Series',status:'Planned',nextSeasonNum:2,nextSeasonDate:raw},{id:'film',title:'Film premiere',type:'Film',status:'Planned',filmReleaseDate:raw},{id:'show',title:'Returning series',type:'Series',status:'Watched',airingSeason:2,nextEpisodeNum:3,nextEpisodeDate:raw,scheduledEpisodeReleases:[]}];
+ const items=[{id:'season',title:'Season premiere',type:'Series',status:'Planned',nextSeasonNum:2,nextSeasonDate:new Date(now-4*3600000).toISOString()},{id:'film',title:'Film premiere',type:'Film',status:'Planned',filmReleaseDate:raw,filmReleaseSource:'Manual'},{id:'show',title:'Returning series',type:'Series',status:'Watched',airingSeason:2,nextEpisodeNum:3,nextEpisodeDate:new Date(now-4*3600000).toISOString(),scheduledEpisodeReleases:[]}];
  c.readLibraries=async()=>[{account_id:'account',items}];c.refreshServerEpisodeSchedules=async rows=>rows;
  c.claimDelivery=async()=>({id:'delivery',attempts:1});c.finishDelivery=async()=>{};c.sendPush=async(row,config,payload)=>sent.push(payload);
  const result=await c.processPlannedReminders([{account_id:'account',time_zone:'Europe/London'}],{});

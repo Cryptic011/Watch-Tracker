@@ -38,9 +38,17 @@ async function broadcast(event,payload){
     }catch(error){if(attempt===2)throw error;await sleep(2000);}
   }
 }
+try{
+const identityUrl=new URL(process.env.ACTIONS_ID_TOKEN_REQUEST_URL||'');
+if(identityUrl.protocol!=='https:'||!identityUrl.hostname.endsWith('.actions.githubusercontent.com')||!process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN)throw Error('GitHub workflow identity is unavailable');
+identityUrl.searchParams.set('audience','watchlog-deployments');
+const identityResponse=await fetch(identityUrl,{headers:{Authorization:`Bearer ${process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN}`},signal:AbortSignal.timeout(10000)});
+if(!identityResponse.ok)throw Error('GitHub workflow identity request failed');
+const identity=await identityResponse.json();
+if(typeof identity.value!=='string'||!identity.value)throw Error('GitHub workflow identity was incomplete');
 const response=await fetch(`${config.url}/functions/v1/watchlog-reminders`,{
   method:'POST',
-  headers:{apikey:config.key,Authorization:`Bearer ${config.key}`,'Content-Type':'application/json'},
+  headers:{apikey:config.key,Authorization:`Bearer ${config.key}`,'Content-Type':'application/json','X-WatchLog-Deployment':identity.value},
   body:JSON.stringify({action:'deployment_status',runId,runNumber,runAttempt,failureSummary,sha,status,commitUrl:`https://github.com/Cryptic011/Watched-Tracker/commit/${sha}`}),
   signal:AbortSignal.timeout(15000),
 });
@@ -53,6 +61,7 @@ if(!response.ok){
   console.log(`Private run-status notification processed: ${status}; delivered ${delivered}; failed ${failed}`);
   if(!delivery.ok||(!delivery.duplicate&&delivered<1)||failed>0)console.warn(`Private run-status notification was not fully delivered: ${JSON.stringify({ok:delivery.ok,delivered,failed,reason:delivery.reason||null})}`);
 }
+}catch(_){console.warn('Private run-status notification unavailable: signed workflow identity or notification service could not be verified.');}
 
 if(status!=='success'||!page){console.log(`Deployment status sent: ${status} for ${sha}`);if(healthCheckFailed)process.exit(1);process.exit(0);}
 await broadcast(config.event,{sha});
