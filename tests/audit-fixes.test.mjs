@@ -11,10 +11,10 @@ const stripped=stripTypeScriptTypes(source.replace(/^import[\s\S]*?from "npm:web
 const regional=fs.readFileSync(new URL('assets/js/regional-releases.js',root),'utf8');
 const now=Date.parse('2026-10-29T12:00:00Z');
 class Clock extends Date {static now(){return now;}}
-function worker({db={},key}={}){
+function worker({db={},key,fetcher=async()=>{throw Error('Unexpected network request');}}={}){
  let handler;
  const c=vm.createContext({Date:Clock,Intl,Number,Array,Set,String,Object,Map,TextEncoder,crypto,Response,Request,URL,AbortSignal,setTimeout,clearTimeout,
-  console:{error(){},log(){}},fetch:async()=>{throw Error('Unexpected network request');},jwtVerify,
+  console:{error(){},log(){}},fetch:fetcher,jwtVerify,
   createRemoteJWKSet:url=>{assert.equal(url.href,'https://token.actions.githubusercontent.com/.well-known/jwks');return key;},
   Deno:{env:{get:()=>''},serve:fn=>handler=fn},createClient:()=>db});
  vm.runInContext(regional,c);vm.runInContext(stripped,c);
@@ -70,6 +70,10 @@ test('Deployment status requires a valid signed job for this exact repository, w
  for(const change of [{repository_id:'999'},{ref:'refs/pull/1/merge'},{event_name:'pull_request'},{run_id:'999'},{run_attempt:'2'},{sha:'b'.repeat(40)},{workflow_ref:'Cryptic011/Watch-Tracker/.github/workflows/other.yml@refs/heads/main'},{environment:'other'}])assert.equal(await verify(await sign(change)),false);
  assert.equal(await verify(await sign({},other.privateKey)),false);assert.equal(await verify(await sign({},privateKey,Math.floor(Date.now()/1000)-60)),false);
  for(const token of ['', 'forged-token'])assert.equal((await request({action:'deployment_status',...body,status:'failure',failureSummary:'Forged'},token)).status,401);
+  let lookups=0;
+  const publicRun=worker({key:publicKey,fetcher:async(url,options)=>{lookups++;assert.equal(options.headers.Authorization,undefined);assert.equal(String(url),'https://api.github.com/repos/Cryptic011/Watch-Tracker/actions/runs/123');return new Response(JSON.stringify({id:123,run_number:456,run_attempt:1,head_sha:body.sha,status:'in_progress',conclusion:null,workflow_id:344533582}));}});
+  const accepted=await publicRun.request({action:'deployment_status',...body,status:'failure'},await sign());
+  assert.equal(accepted.status,200);assert.equal(lookups,1,'signed jobs can verify this public repository without a server PAT');
 });
 test('Archiving retains the same explicit reminder preference on web and native',()=>{
  const {c}=worker(),item={id:'show',title:'Archived',type:'Series',status:'Watching',archived:true,scheduledEpisodeReleases:[{season:1,number:2,raw:'2026-10-31T12:00:00Z'}]};

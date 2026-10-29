@@ -719,14 +719,13 @@ Deno.serve(async (req: Request) => {
       if (!/^\d+$/.test(runId) || !/^\d+$/.test(runNumber) || !/^\d+$/.test(runAttempt) || !/^[a-f0-9]{40}$/.test(sha) || !allowedStatuses.has(status)) return json({ error: "Invalid workflow status payload" }, 400);
       // Keep the GitHub credential server-side; never forward the workflow token.
       const githubToken = Deno.env.get("WATCHLOG_GITHUB_TOKEN") || "";
-      if (!githubToken) return json({ error: "Run verification is not configured" }, 503);
       const githubHeaders = {
         "Accept": "application/vnd.github+json",
-        "Authorization": `Bearer ${githubToken}`,
+        ...(githubToken?{"Authorization": `Bearer ${githubToken}`}:{ }),
         "X-GitHub-Api-Version": "2022-11-28",
         "User-Agent": "WatchLogger-Run-Status",
       };
-      const verification = await fetch(`https://api.github.com/repos/Cryptic011/Watched-Tracker/actions/runs/${runId}`, {
+      const verification = await fetch(`https://api.github.com/repos/Cryptic011/Watch-Tracker/actions/runs/${runId}`, {
         headers: githubHeaders,
         signal: AbortSignal.timeout(10000),
       });
