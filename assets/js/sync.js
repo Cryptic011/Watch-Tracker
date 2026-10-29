@@ -917,6 +917,7 @@
     return Number.isFinite(value)?value:0;
   }
   function releaseSortInfo(item,now=Date.now()){
+    if(typeof releaseTimelineItem==='function')item=releaseTimelineItem(item);
     let value="";
     if(item?.type==="Film")value=item.filmReleaseDate||"";
     else value=item?.latestEpisodeDate||item?.seriesReleaseDate||item?.nextEpisodeDate||"";
@@ -934,6 +935,7 @@
     return addedSortTime(b)-addedSortTime(a)||titleCollator.compare(a.title||"",b.title||"");
   }
   function currentSortInfo(item,now=Date.now()){
+    if(typeof releaseTimelineItem==='function')item=releaseTimelineItem(item);
     const day=24*60*60*1000;
     const eventInfo=value=>{
       const raw=String(value||"").trim();
@@ -1027,6 +1029,7 @@
     return /^\d{4}-\d{2}-\d{2}$/.test(raw)?`${raw}T12:00`:"";
   }
   function upcomingSortInfo(item,now=Date.now()){
+    if(typeof releaseTimelineItem==='function')item=releaseTimelineItem(item);
     if(typeof regionalScheduleItem==='function')item=regionalScheduleItem(item);
     const events=[],announcements=[],releaseRetentionMs=24*60*60*1000,graceStart=now-releaseRetentionMs;
     const eventTime=value=>{
@@ -1043,11 +1046,11 @@
     }else{
       const episodeDate=String(item?.nextEpisodeDate||"").trim(),seasonDate=String(item?.nextSeasonDate||"").trim();
       const episodeTime=eventTime(episodeDate),seasonTime=eventTime(seasonDate);
-      const scheduledRecent=(Array.isArray(item?.scheduledEpisodeReleases)?item.scheduledEpisodeReleases:[])
+      const scheduledEvents=(Array.isArray(item?.scheduledEpisodeReleases)?item.scheduledEpisodeReleases:[])
         .map(ep=>({ep,time:eventTime(ep?.raw)}))
-        .filter(entry=>entry.time.time>0&&entry.time.time<=now&&entry.time.time>=graceStart)
+        .filter(entry=>entry.time.time>0&&entry.time.time>=graceStart)
         .map(entry=>({kind:"episode",...entry.time,number:entry.ep?.number||null,season:Number(entry.ep?.season)||null}));
-      events.push(...scheduledRecent);
+      events.push(...scheduledEvents);
       if(episodeTime.time>0&&(episodeTime.dateOnly?episodeTime.validThrough>=now:episodeTime.time>=graceStart)){
         const scheduled=(Array.isArray(item?.scheduledEpisodeReleases)?item.scheduledEpisodeReleases:[]).find(ep=>Number(ep.number)===Number(item.nextEpisodeNum)&&String(ep.raw||"")===episodeDate);
         const season=Number(scheduled?.season||item?.nextSeasonNum||item?.airingSeason||item?.curSeason||0)||null;

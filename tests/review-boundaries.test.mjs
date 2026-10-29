@@ -13,7 +13,7 @@ const {extractFunction}=new Function("html","assert","vm",helper+"\nreturn {extr
 const copy=value=>JSON.parse(JSON.stringify(value));
 const baseShow=()=>({id:"show",title:"Example",type:"Series",status:"Watching",tvmazeShowId:"1",totalSeasons:1,curSeason:1,curEp:5,watchedSeasons:0,watchedEpisodes:{1:[1,2,3,4,5]},airedEpisodeCounts:{1:6},episodeCounts:{1:8},episodeScheduleVerified:true,verifiedCompletedSeasons:0});
 function frontend(extra={}){
-  const names=["canonicalRecordJSON","sameSyncValue","mergeEpisodeSetChanges","mergeEpisodeHistory","mergeRecordChanges","replayLocalChanges","toMillis","toLocalInput","storedDateFromInput","episodeReleaseTimestamp","normalizeReleasedEpisodeMap","positiveEpisodeMap","isEpisodeTrackable","releasedEpisodeMap","normalizeWatchedEpisodeMap","progressWatchedEpisodeMap","highestWatchedEpisode","migratePlannedStatuses","knownSeasonTotal","isWeakFilmRecord"];
+  const names=["canonicalRecordJSON","sameSyncValue","mergeEpisodeSetChanges","mergeEpisodeHistory","mergeRecordChanges","replayLocalChanges","toMillis","toLocalInput","storedDateFromInput","storedReleaseInput","episodeReleaseTimestamp","normalizeReleasedEpisodeMap","positiveEpisodeMap","isEpisodeTrackable","releasedEpisodeMap","normalizeWatchedEpisodeMap","progressWatchedEpisodeMap","highestWatchedEpisode","migratePlannedStatuses","knownSeasonTotal","isWeakFilmRecord"];
   const context=vm.createContext({console,nowISO:()=>"2026-09-06T12:00:00Z",localISODate:()=>"2026-09-06",...extra});
   vm.runInContext(names.map(name=>extractFunction(html,name)).join("\n"),context);
   return context;

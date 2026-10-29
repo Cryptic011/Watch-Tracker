@@ -98,7 +98,7 @@ window.WatchLogGallery=(()=>{
     return `<div class="gallery-art"><span aria-hidden="true">${esc(initials)}</span><div class="gallery-art-title">${esc(item.title||'Untitled')}</div><div class="gallery-art-meta">${esc(isFilm(item)?'FILM':'SERIES')} · ${esc(item.releaseYear||'WATCH TRACKER')}</div><img hidden alt="" data-art="${esc(key(item))}" decoding="async"></div>`;
   }
   function stateBadge(item){const last=api.last(item);return last?`<span class="gallery-tile-status done">✓ S${esc(last.season)} E${esc(last.episode)} watched</span>`:`<span class="gallery-tile-status">${esc(item.status==='Saved'?'Planned':item.status||'Planned')}</span>`;}
-  function releaseTime(item){const value=isFilm(item)?item.filmReleaseDate:item.seriesReleaseDate;const time=Date.parse(value?`${String(value).slice(0,10)}T12:00:00Z`:'');return Number.isFinite(time)?time:0;}
+  function releaseTime(item){if(typeof releaseTimelineItem==='function')item=releaseTimelineItem(item);const value=isFilm(item)?item.filmReleaseDate:item.seriesReleaseDate;const time=Date.parse(value?(/^\d{4}-\d{2}-\d{2}$/.test(String(value))?`${value}T12:00:00Z`:value):'');return Number.isFinite(time)?time:0;}
   function releaseYear(item){const time=releaseTime(item);return time?String(new Date(time).getUTCFullYear()):/^\d{4}$/.test(String(item.releaseYear||''))?String(item.releaseYear):'Date unknown';}
   function releaseGroups(items){
     const groups=new Map();
@@ -123,7 +123,7 @@ window.WatchLogGallery=(()=>{
   function tile(item,upcoming=false){
     const event=api.upcoming(item);
     let subtitle=releaseTime(item)?api.date(new Date(releaseTime(item))):item.releaseYear||'Date unknown';
-    if(upcoming){const season=event.season||item.nextSeasonNum||item.airingSeason||item.curSeason||'?';const label=event.kind==='episode'?`S${season} E${event.number||'?'}`:event.kind==='season'?`Season ${event.number||'?'}`:'Film release';subtitle=`${label} · ${event.rank===2?api.dateTime(new Date(event.time)):'Date TBA'}`;}
+    if(upcoming){const season=event.season||item.nextSeasonNum||item.airingSeason||item.curSeason||'?';const label=event.kind==='episode'?`S${season} E${event.number||'?'}`:event.kind==='season'?`Season ${event.number||'?'}`:'Film release';subtitle=`${label} · ${event.rank===2?(event.dateOnly?api.date(new Date(event.time)):api.dateTime(new Date(event.time))):'Date TBA'}`;}
     return `<button type="button" class="gallery-tile" data-gallery-item="${esc(item.id)}" aria-label="Open ${esc(item.title)}">${art(item)}${stateBadge(item)}<strong>${esc(item.title)}</strong><small>${esc(subtitle)}</small></button>`;
   }
   function manageButton(items,label){

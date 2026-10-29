@@ -5,6 +5,25 @@
     const time=new Date(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?$/.test(value)?value+"Z":value).getTime();
     return Number.isFinite(time)?new Date(time).toISOString():"";
   }
+  function setReleaseInput(input,item,raw,event){
+    const field=event.kind==='season'?'nextSeasonDate':'nextEpisodeDate';
+    const source=typeof regionalScheduleItem==='function'?regionalScheduleItem({...item,[field]:raw}):item;
+    const resolved=typeof regionalScheduleEvent==='function'?regionalScheduleEvent(source,{...event,raw:source[field]??raw}):{raw};
+    input.value=resolved.raw?toLocalInput(resolved.raw):"";
+    input.dataset.releaseDisplay=input.value;
+    input.dataset.releaseSource=raw||"";
+    input.dataset.releaseDelay=resolved.releaseSchedule?.key==='broadcast-plus-four-hours'?String(4*3600000):"0";
+  }
+  function storedReleaseInput(input,previous=""){
+    if(input.dataset&&input.value===input.dataset.releaseDisplay)return input.dataset.releaseSource||"";
+    const raw=storedDateFromInput(input.value,previous),delay=Number(input.dataset?.releaseDelay)||0;
+    return raw&&delay?new Date(Date.parse(raw)-delay).toISOString():raw;
+  }
+  function catalogueReleaseItem(result){
+    return {type:$("type").value||"Series",title:$("title").value,tvmazeShowId:result.resolvedShowId||$("tvmaze-id").value,
+      imdbId:result.imdbId||$("imdb-id").value,releaseYear:$("release-year").value,
+      scheduledEpisodeReleases:result.scheduledEpisodeReleases||[]};
+  }
   function dateOnlyInput(v){return v?`${v}T12:00`:"";}
   async function imdbVerify(title,season,premiereDate){if(!IMDB_VERIFY_ENDPOINT)return{confirmed:null};try{const u=new URL(IMDB_VERIFY_ENDPOINT,location.href);u.searchParams.set("title",title);u.searchParams.set("season",String(season));if(premiereDate)u.searchParams.set("premiereDate",premiereDate);return await fetchJSONWithTimeout(u.toString());}catch(_){return{confirmed:null};}}
 
@@ -422,7 +441,7 @@
     $("next-episode-num").value=next?.number?String(next.number):"";
     $("next-episode-title").value=next?.name||"";
     $("next-episode").value=next?.number?`Episode ${next.number}${next.name?` • ${next.name}`:""}`:"Date TBA";
-    $("next-episode-date").value=episodeLocalInput(next);
+    setReleaseInput($("next-episode-date"),catalogueReleaseItem(result),episodeReleaseTimestamp(next),{kind:"episode",season:next?.season,number:next?.number});
     if(result?.provisional){airingNote.textContent="TVMaze episode schedule loaded. Cross-checking the remaining sources…";return;}
     const checked=result.imdbConfirmed?"Matched to IMDb; ":"";
     airingNote.textContent=`${checked}episode dates and season information checked with TVMaze.`;
@@ -476,8 +495,8 @@
       return r;
     }
     $("next-season-num").value=String(r.upcoming.number);
-    if(r.nextEpisode&&Number(r.nextEpisode.season)===r.upcoming.number)$("next-season-date").value=episodeLocalInput(r.nextEpisode);
-    else $("next-season-date").value=r.upcoming.premiereDate?dateOnlyInput(r.upcoming.premiereDate):"";
+    const seasonRaw=r.nextEpisode&&Number(r.nextEpisode.season)===r.upcoming.number?episodeReleaseTimestamp(r.nextEpisode):(r.upcoming.premiereDate||"");
+    setReleaseInput($("next-season-date"),catalogueReleaseItem(r),seasonRaw,{kind:"season",season:r.upcoming.number,number:r.upcoming.number});
     if(remember)rememberEditorVerification("Series",r);
     return r;
   }

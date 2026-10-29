@@ -294,9 +294,10 @@ function recurringScheduleDelay(rows,now=new Date(),items=[]){
       if(time>now.getTime())deadline=Math.min(deadline,time);
     }
   }
-  for(const item of items){
+  for(const original of items){
+    const item=typeof releaseTimelineItem==='function'?releaseTimelineItem(original):original;
     if(!isEpisodeTrackable(item))continue;
-    const airTimes=[...scheduleEpisodeAirTimes(item).values()];
+    const airTimes=[...scheduleEpisodeAirTimes(original).values()];
     if(item.nextEpisodeDate)airTimes.push(new Date(/^\d{4}-\d{2}-\d{2}$/.test(item.nextEpisodeDate)?item.nextEpisodeDate+"T12:00:00Z":item.nextEpisodeDate).getTime());
     for(const airTime of airTimes){
       // Hidden releases enter the two-week window without requiring a reload.
