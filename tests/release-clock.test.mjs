@@ -56,5 +56,18 @@ test('A saved broadcaster-released episode stays unavailable until release witho
  const map={2:[1,2,3]};
  assert.deepEqual(Array.from(c.releaseAvailableEpisodeMap(item,map,now)[2]),[1,2]);
  assert.deepEqual(Array.from(c.releaseAvailableEpisodeMap({...item,watchedEpisodes:{2:[3]}},map,now)[2]),[1,2,3]);
+ assert.deepEqual(Array.from(c.releaseAvailableEpisodeMap({...item,watchedEpisodes:{2:{3:true}}},map,now)[2]),[1,2,3]);
  assert.deepEqual(Array.from(c.releaseAvailableEpisodeMap(item,map,Date.parse(release))[2]),[1,2,3]);
+});
+
+test('Verified regional release clocks override the broadcast fallback throughout the timeline',async()=>{
+ const c=app(),now=Date.now(),verified='2026-10-30T08:00:00Z',tracked={...item,tvmazeShowId:'123'};
+ await c.WatchLogRegionalReleases.refresh([tracked],{country:'GB'},async()=>({ok:true,json:async()=>[{season:2,number:3,airdate:'2026-10-30',airtime:'08:00',airstamp:verified,_embedded:{show:{id:123,webChannel:{name:'Verified stream',country:{code:'GB'}}}}}]}),now);
+ const timeline=c.releaseTimelineItem(tracked);
+ assert.equal(timeline.nextEpisodeDate,verified);
+ assert.equal(c.upcomingSortInfo(tracked,Date.parse('2026-10-29T23:01:00Z')).time,Date.parse(verified));
+ const input={value:'',dataset:{}};
+ c.setReleaseInput(input,tracked,broadcast,{kind:'episode',season:2,number:3});
+ assert.equal(input.value,'2026-10-30T08:00');
+ assert.equal(c.storedReleaseInput(input),broadcast);
 });
