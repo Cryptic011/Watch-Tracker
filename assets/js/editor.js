@@ -61,8 +61,10 @@
       pending.resolvedImdbId=String(result.imdbId||"");
       if(!canApply())return result;
       if(result.imdbId)$("imdb-id").value=result.imdbId;
-      setFilmReleaseInputs(result.date||"");
-      filmReleaseSource.value=result.date?(result.source||"Verified sources"):"";
+      // An unavailable provider result cannot erase a previously saved date
+      // or confirmed clock time just because the editor was opened.
+      if(result.date){setFilmReleaseInputs(result.date);filmReleaseSource.value=result.source||"Verified sources";}
+      else if(seedDate){setFilmReleaseInputs(seedDate);filmReleaseSource.value=seedSource||"Saved release";}
       updateFilmVerifyNote(result);
       rememberEditorVerification("Film",result);
       return result;
@@ -324,7 +326,7 @@
     if(film){clearAiringFields();if(filmVerifyNote)filmVerifyNote.textContent="Films and series are checked through multiple sources.";}
     else{setFilmReleaseInputs("");filmReleaseSource.value="";}
   };
-  const filmReleaseChanged=()=>{editorVerification=null;if(typeSelect.value==="Film")filmReleaseSource.value="Manual";updateFilmVerifyNote();};
+  const filmReleaseChanged=()=>{editorApplyRevision++;editorVerification=null;if(typeSelect.value==="Film")filmReleaseSource.value="Manual";updateFilmVerifyNote();};
   filmReleaseDate.addEventListener("input",filmReleaseChanged);
   $('film-release-time').addEventListener('input',filmReleaseChanged);
 
