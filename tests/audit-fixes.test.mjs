@@ -91,3 +91,10 @@ test('Film editor preserves date-only uncertainty and round-trips a confirmed GM
  c.setFilmReleaseInputs('2026-10-31T08:30:00Z');assert.equal(c.storedFilmRelease(),'2026-10-31T08:30:00.000Z');
   c.setFilmReleaseInputs('2026-10-31T00:30:00+01:00');assert.equal(c.storedFilmRelease(),'2026-10-30T23:30:00.000Z');
 });
+test('An unavailable film verification cannot erase a saved release time on opening the editor',async()=>{
+ const s=fs.readFileSync(new URL('assets/js/editor.js',root),'utf8'),date={value:''},source={value:''},time={value:''};
+ const c=vm.createContext({filmReleaseDate:date,filmReleaseSource:source,filmVerifyNote:{},$:id=>id==='film-release-time'?time:{value:''},normalizeTitle:value=>value.toLowerCase(),verifiedFilmReleaseData:async()=>({date:'',source:''}),rememberEditorVerification(){},toLocalInput:raw=>new Date(raw).toISOString().slice(0,16),storedDateFromInput:raw=>new Date(raw+'Z').toISOString()});
+ vm.runInContext(s.slice(s.indexOf('  function setFilmReleaseInputs('),s.indexOf('  function editorVerificationKey('))+s.slice(s.indexOf('  async function fillFilmReleaseData('),s.indexOf('  function balancedSuggestions(')),c);
+ await c.fillFilmReleaseData('Saved film',{seedDate:'2026-10-31T08:30:00Z',seedSource:'Verified service'});
+ assert.equal(c.storedFilmRelease(),'2026-10-31T08:30:00.000Z');assert.equal(source.value,'Verified service');
+});

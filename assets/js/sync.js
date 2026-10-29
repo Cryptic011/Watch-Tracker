@@ -563,6 +563,7 @@
 
       const index=mediaItems.findIndex(item=>String(item.id)===id),current=mediaItems[index];
       if(index<0||!current||mediaVerificationIdentity(current)!==seedIdentity)return false;
+      if(seed.type==='Film'&&(current.filmReleaseDate!==seed.filmReleaseDate||current.filmReleaseSource!==seed.filmReleaseSource))return false;
       let refreshed;
       if(seed.type==="Film"){
         refreshed={
