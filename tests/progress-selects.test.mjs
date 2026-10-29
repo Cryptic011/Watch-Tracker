@@ -72,7 +72,7 @@ test("Saving a new show records zero ticks, then only the selected season's epis
     freshEditorVerification:()=>schedule,pendingEditorVerification:()=>null,scheduleMetadataRefresh(){},
     findTrackedDuplicate:()=>null,normalizeTitle:value=>value.toLowerCase(),sameRecordWithoutUpdateTime:()=>false,
     render(){},closeEditor(){},showAppToast(){},persistLibrary:async()=>{},alert:message=>{throw Error(message);}});
-  const names=["toMillis","toLocalInput","storedDateFromInput","episodeReleaseTimestamp","positiveEpisodeMap","isEpisodeTrackable","releasedEpisodeMap","normalizeWatchedEpisodeMap","progressWatchedEpisodeMap","highestWatchedEpisode","migratePlannedStatuses","knownSeasonTotal","isWeakFilmRecord"];
+  const names=["toMillis","toLocalInput","storedDateFromInput","storedReleaseInput","episodeReleaseTimestamp","positiveEpisodeMap","isEpisodeTrackable","releasedEpisodeMap","normalizeWatchedEpisodeMap","progressWatchedEpisodeMap","highestWatchedEpisode","migratePlannedStatuses","knownSeasonTotal","isWeakFilmRecord"];
   vm.runInContext(names.map(name=>extractFunction(html,name)).join("\n")+"\n"+html.slice(html.indexOf("mediaForm.onsubmit=async e=>{"),html.indexOf("  deleteBtn.onclick=")),app);
   $("title").value="Example";$("type").value="Series";$("status").value="Planned";
   app.applySeasonDataResult(schedule);

@@ -885,6 +885,23 @@ const server=http.createServer((req,res)=>{
   await page.evaluate(id=>{mediaItems.find(item=>item.id===id).platform='Keep this change';},refreshItemId);await page.locator('#refresh-app').click();
   await page.waitForFunction(()=>document.querySelector('#app-toast').textContent.includes('Refresh paused'));
   assert.equal(loads,failedLoads);assert.equal(await page.evaluate(id=>mediaItems.find(item=>item.id===id)?.platform,refreshItemId),'Keep this change');
+  phase='consistent release clock';
+  const releaseClock=await page.evaluate(()=>{
+    const broadcast=new Date(Date.now()+86400000);broadcast.setUTCMinutes(0,0,0);
+    const raw=broadcast.toISOString(),fixture={type:'Series',title:'Release clock regression',airingSeason:2,nextEpisodeNum:3,nextEpisodeDate:raw,scheduledEpisodeReleases:[{season:2,number:3,raw}]};
+    const event=regionalScheduleEvent(fixture,{raw,kind:'episode',season:2,number:3});
+    const popup=document.createElement('div');popup.innerHTML=reminderMarkup(fixture,false);
+    const input=document.createElement('input');input.type='datetime-local';
+    setReleaseInput(input,fixture,raw,{kind:'episode',season:2,number:3});
+    return {expected:Date.parse(event.raw),upcoming:upcomingSortInfo(fixture).time,current:currentSortInfo(fixture).time,
+      popup:popup.querySelector('small').textContent,formatted:formatLocalDateTime(new Date(event.raw)),
+      input:input.value,expectedInput:toLocalInput(event.raw),saved:storedReleaseInput(input),raw};
+  });
+  assert.equal(releaseClock.upcoming,releaseClock.expected);
+  assert.equal(releaseClock.current,releaseClock.expected);
+  assert.equal(releaseClock.popup,releaseClock.formatted);
+  assert.equal(releaseClock.input,releaseClock.expectedInput);
+  assert.equal(releaseClock.saved,releaseClock.raw);
   assert.ok(saves>=4);assert.deepEqual(errors,[]);
   console.log(`${engine.name()}: visual search, filters, descriptions, duplicate badges, add/edit, episode mark/undo, unreleased guard and refresh persistence passed`);
  }finally{await browser.close();}

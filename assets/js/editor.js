@@ -341,7 +341,7 @@
     $("next-episode-num").value=item.nextEpisodeNum??"";
     $("next-episode-title").value=item.nextEpisodeTitle||"";
     $("next-episode").value=item.nextEpisodeNum?`Episode ${item.nextEpisodeNum}${item.nextEpisodeTitle?` • ${item.nextEpisodeTitle}`:""}`:"Date TBA";
-    $("next-episode-date").value=item.nextEpisodeDate?toLocalInput(item.nextEpisodeDate):"";
+    setReleaseInput($("next-episode-date"),item,item.nextEpisodeDate,{kind:"episode",season:item.airingSeason||item.curSeason||item.nextSeasonNum,number:item.nextEpisodeNum});
     if(airingNote)airingNote.textContent="Refreshing the current episode schedule…";
   }
 
@@ -367,7 +367,7 @@
     $("item-id").value=item.id;$("tvmaze-id").value=item.tvmazeShowId||"";$("imdb-id").value=item.imdbId||"";$("release-year").value=item.releaseYear||"";
     $("title").value=item.title||"";$("type").value=item.type||"Series";$("status").value=item.status==="Saved"?"Planned":(item.status||"Planned");$("hide-from-weekly-releases").checked=item.hideFromWeeklyReleases===true;
     $("total-seasons").value=item.totalSeasons??"";$("watched-seasons").value=item.watchedSeasons??"";$("cur-season").value=item.curSeason??"";$("cur-ep").value=item.curEp??"";
-    $("next-season-num").value=item.nextSeasonNum??"";$("next-season-date").value=item.nextSeasonDate?toLocalInput(item.nextSeasonDate):"";
+    $("next-season-num").value=item.nextSeasonNum??"";setReleaseInput($("next-season-date"),item,item.nextSeasonDate,{kind:"season",season:item.nextSeasonNum,number:item.nextSeasonNum});
     setFilmReleaseInputs(item.filmReleaseDate||"");filmReleaseSource.value=item.filmReleaseSource||"";$("platform").value=item.platform||"";updateFilmVerifyNote();
     void loadUKAvailability();
     configureProgressOptions({highest:item.totalSeasons,episodeCounts:item.episodeCounts||{},airedEpisodeCounts:item.airedEpisodeCounts||{[item.curSeason]:item.currentSeasonEpisodeCount||0},releasedEpisodes:item.releasedEpisodes||{},latestAired:item.curSeason,currentEpisode:item.curEp,completedSeasons:item.verifiedCompletedSeasons,episodeScheduleAvailable:item.episodeScheduleVerified===true||Boolean(Object.keys(item.airedEpisodeCounts||{}).length)},{season:item.curSeason,episode:item.curEp});
@@ -434,8 +434,8 @@
         episodeScheduleVerified:type==="Film"?false:(verified?.episodeScheduleAvailable===true||previous?.episodeScheduleVerified===true),
         airingSeason:type==="Film"?null:numOrNull("airing-season"),latestEpisodeNum:type==="Film"?null:numOrNull("latest-episode-num"),latestEpisodeTitle:type==="Film"?"":$("latest-episode-title").value||"",
         latestEpisodeDate:type==="Film"?"":(verified?.latestEpisodeDate||previous?.latestEpisodeDate||""),seriesReleaseDate:type==="Film"?"":(verified?.seriesReleaseDate||previous?.seriesReleaseDate||""),
-        nextEpisodeNum:type==="Film"?null:numOrNull("next-episode-num"),nextEpisodeTitle:type==="Film"?"":$("next-episode-title").value||"",nextEpisodeDate:type==="Film"?"":storedDateFromInput($("next-episode-date").value,verified?.nextEpisode?episodeReleaseTimestamp(verified.nextEpisode):(previous?.nextEpisodeDate||"")),
-        nextSeasonNum:type==="Film"?"":($("next-season-num").value?Number($("next-season-num").value):""),nextSeasonDate:type==="Film"?"":storedDateFromInput($("next-season-date").value,verified?.upcoming?(verified.nextEpisode&&Number(verified.nextEpisode.season)===Number(verified.upcoming.number)?episodeReleaseTimestamp(verified.nextEpisode):(verified.upcoming.premiereDate||"")):(previous?.nextSeasonDate||"")),
+        nextEpisodeNum:type==="Film"?null:numOrNull("next-episode-num"),nextEpisodeTitle:type==="Film"?"":$("next-episode-title").value||"",nextEpisodeDate:type==="Film"?"":storedReleaseInput($("next-episode-date"),verified?.nextEpisode?episodeReleaseTimestamp(verified.nextEpisode):(previous?.nextEpisodeDate||"")),
+        nextSeasonNum:type==="Film"?"":($("next-season-num").value?Number($("next-season-num").value):""),nextSeasonDate:type==="Film"?"":storedReleaseInput($("next-season-date"),verified?.upcoming?(verified.nextEpisode&&Number(verified.nextEpisode.season)===Number(verified.upcoming.number)?episodeReleaseTimestamp(verified.nextEpisode):(verified.upcoming.premiereDate||"")):(previous?.nextSeasonDate||"")),
         filmReleaseDate:type==="Film"?storedFilmRelease():"",filmReleaseSource:type==="Film"?(filmReleaseDate.value?(filmReleaseSource.value||"Manual"):""):"",
         verifiedCompletedSeasons:type==="Film"?null:(Number.isFinite(Number(verified?.completedSeasons))?Number(verified.completedSeasons):Number(previous?.verifiedCompletedSeasons||0)),
         episodeHistory:type==="Film"?[]:episodeHistory,...(type==="Film"?{watchedEpisodes:{}}:(Object.prototype.hasOwnProperty.call(previous||{},"watchedEpisodes")?{watchedEpisodes:Object.keys(airedEpisodeCounts).length?normalizeWatchedEpisodeMap(previous.watchedEpisodes,airedEpisodeCounts):previous.watchedEpisodes}:{})),lastEpisodeWatchedAt:type==="Film"?"":(previous?.lastEpisodeWatchedAt||""),
