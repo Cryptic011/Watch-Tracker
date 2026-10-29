@@ -102,6 +102,7 @@
     if(Array.isArray(snap.items)&&snap.items.length)showMessage(`Found ${snap.items.length} title(s) from the previous on-device Watch Tracker account. Creating a PIN account with this email will carry them into cloud sync.`,"info");
   }
 
+  const confirmedLibraryDeletes=new Set();
   function cloneLibrarySnapshot(items){
     try{if(typeof structuredClone==="function")return structuredClone(Array.isArray(items)?items:[]);}catch(_){}
     return JSON.parse(JSON.stringify(Array.isArray(items)?items:[]));
@@ -118,7 +119,8 @@
       db:overrides.db??cacheDB,
       sequence:Number(overrides.sequence??++localSaveSequence),
       baseItems:Array.isArray(overrides.baseItems)?overrides.baseItems:cloudBaseItems,
-      expectedRevision:Math.max(0,Number(overrides.expectedRevision??cloudRevision)||0)
+      expectedRevision:Math.max(0,Number(overrides.expectedRevision??cloudRevision)||0),
+      confirmedDeletes:overrides.confirmedDeletes||(typeof confirmedLibraryDeletes==='undefined'?[]:[...confirmedLibraryDeletes])
     };
   }
 
@@ -209,6 +211,7 @@
         ? replayLocalChanges(originalSnapshot.items,mediaItems,savedSnapshot.items)
         : cloneLibrarySnapshot(savedSnapshot.items);
       setCloudBaseline(savedSnapshot.items,revision,originalSnapshot.accountId);
+      if(typeof confirmedLibraryDeletes!=='undefined')for(const id of originalSnapshot.confirmedDeletes||[])if(!savedSnapshot.items.some(item=>String(item.id)===id)&&!(latestLocalSnapshot?.sequence>originalSnapshot.sequence&&latestLocalSnapshot.confirmedDeletes?.includes(id)))confirmedLibraryDeletes.delete(id);
       render();
       if(!sameSyncValue(originalSnapshot.items,savedSnapshot.items))window.WatchLogGallery?.refreshCurrent?.();
     }
@@ -235,7 +238,8 @@
           ? replayLocalChanges(originalSnapshot.items,record.items,savedSnapshot.items)
           : savedSnapshot.items;
         const json=JSON.stringify(items);
-        acknowledged={...record,items,json,dirty:json!==savedSnapshot.json,cloudItems:savedSnapshot.items,cloudRevision:revision,localSequence:sequence,updatedAt:nowISO()};
+        const acceptedDeletes=new Set(Number(record.localSequence||0)>originalSnapshot.sequence?[]:originalSnapshot.confirmedDeletes||[]);
+        acknowledged={...record,items,json,dirty:json!==savedSnapshot.json,cloudItems:savedSnapshot.items,cloudRevision:revision,localSequence:sequence,confirmedDeletes:(record.confirmedDeletes||[]).filter(id=>!acceptedDeletes.has(id)),updatedAt:nowISO()};
         store.put(acknowledged);
       };
       tx.oncomplete=()=>{
@@ -275,7 +279,9 @@
   async function uploadCloudLibrary(snapshot){
     let outgoing=snapshot;
     for(let attempt=0;attempt<3;attempt++){
-      const requestBody=JSON.stringify({action:"save",expectedRevision:outgoing.expectedRevision,changes:libraryChangeSet(outgoing.baseItems,outgoing.items)});
+      const changes=libraryChangeSet(outgoing.baseItems,outgoing.items),removed=new Set(changes.filter(change=>change.delete).map(change=>change.id));
+      const confirmedDeletes=(outgoing.confirmedDeletes||[]).filter(id=>removed.has(id));
+      const requestBody=JSON.stringify({action:"save",expectedRevision:outgoing.expectedRevision,changes,...(confirmedDeletes.length?{confirmedDeletes}:{})});
       try{
         const result=await pinApi("save",{},outgoing.token,requestBody);
         await acknowledgeCloudSnapshot(snapshot,outgoing,result);
@@ -312,7 +318,7 @@
         const snapshot=queuedLocalSnapshot;
         queuedLocalSnapshot=null;
         if(snapshot.accountId===lastLocalAccountId&&snapshot.json===lastLocalLibraryJSON)continue;
-        await saveCache(snapshot.items,snapshot.json,{dirty:true,baseItems:snapshot.baseItems,baseRevision:snapshot.expectedRevision,sequence:snapshot.sequence,accountId:snapshot.accountId,db:snapshot.db});
+        await saveCache(snapshot.items,snapshot.json,{dirty:true,baseItems:snapshot.baseItems,baseRevision:snapshot.expectedRevision,sequence:snapshot.sequence,accountId:snapshot.accountId,db:snapshot.db,confirmedDeletes:snapshot.confirmedDeletes});
       }
       return true;
     })().finally(()=>{
@@ -372,6 +378,9 @@
 
   function persistLibrary(items,{background=false,precleaned=false}={}){
     const source=Array.isArray(items)?items:[];
+    // Undo/re-adding a title cancels its old deletion intent. A later cleanup
+    // must never inherit permission from an earlier, reversed user action.
+    if(typeof confirmedLibraryDeletes!=='undefined')for(const item of source)confirmedLibraryDeletes.delete(String(item.id));
     const migration=migratePlannedStatuses(source);
     // Fast-path writes must still enforce unique title identity. Otherwise a
     // search add, backup restore or second device can reintroduce duplicates.
@@ -413,6 +422,7 @@
       if(latestLocalSnapshot&&activePersistenceContext(latestLocalSnapshot))await queueLocalLibrarySave(latestLocalSnapshot);
       const cached=await loadCacheRecord();
       if(!activePersistenceContext(context))return;
+      if(typeof confirmedLibraryDeletes!=='undefined')for(const id of cached?.confirmedDeletes||[])confirmedLibraryDeletes.add(id);
       if(cached?.items)await queueCloudLibrarySave(createLibrarySnapshot(cached.items,{baseItems:Array.isArray(cached.cloudItems)?cached.cloudItems:cloudBaseItems,expectedRevision:Number(cached.cloudRevision??cloudRevision),sequence:Number(cached.localSequence||++localSaveSequence)}));
     }catch(error){console.warn("Automatic cloud retry postponed",error);}
   }
@@ -688,6 +698,7 @@
   function applyAccount(account){
     if(String(currentUser?.id||"")!==String(account.id)){
       persistenceGeneration++;localSaveSequence=0;
+      confirmedLibraryDeletes.clear();
       lastLocalLibraryJSON="";lastCloudLibraryJSON="";lastLocalAccountId="";lastCloudAccountId="";cloudBaseItems=[];cloudRevision=0;queuedLocalSnapshot=null;queuedCloudSnapshot=null;latestLocalSnapshot=null;
     }
     currentUser={id:account.id,email:normalizeEmail(account.email)};
@@ -722,6 +733,7 @@
     await openCache(currentUser.id);
     const cached=await loadCacheRecord();
     localSaveSequence=Math.max(localSaveSequence,Number(cached?.localSequence)||0);
+    for(const id of cached?.confirmedDeletes||[])confirmedLibraryDeletes.add(id);
     mediaItems=mergePendingCache(cached,Array.isArray(items)?items:[]);
     await saveProfile(currentProfile);
     const pending=JSON.stringify(mediaItems)!==lastCloudLibraryJSON;
@@ -746,9 +758,9 @@
 
   async function loginPinAccount(email,pin){
     const result=await pinApi("login",{email,pin},"");
-    const legacy=await collectPreviousLocalItems(email);
-    const merged=mergeLibraries(result.items||[],legacy);
-    await establishCloudSession(result,merged,result.items||[]);
+    // Legacy storage is imported when creating an account, never on every
+    // sign-in: an old copy must not resurrect a deliberately deleted title.
+    await establishCloudSession(result,result.items||[],result.items||[]);
   }
 
   async function restorePinSession(){
@@ -756,6 +768,7 @@
     cloudSessionToken=saved.token;applyAccount(saved.account);await openCache(currentUser.id);currentProfile=await loadProfile()||currentProfile;
     const cached=await loadCacheRecord();
     if(cached?.dirty===true)markPending(true);
+    for(const id of cached?.confirmedDeletes||[])confirmedLibraryDeletes.add(id);
     localSaveSequence=Math.max(localSaveSequence,Number(cached?.localSequence)||0);
     if(cached?.items)setCloudBaseline(Array.isArray(cached.cloudItems)?cached.cloudItems:cached.items,Number(cached.cloudRevision??saved.revision??0),currentUser.id);
     if(navigator.onLine===false&&Array.isArray(cached?.items)){
@@ -784,7 +797,7 @@
     }
   }
 
-  async function clearUserState(){clearTimeout(cloudSyncTimer);cloudSyncTimer=null;cloudSyncAuthBlocked=false;persistenceGeneration++;mediaItems=[];currentProfile=null;currentUser=null;scheduleMetadataMaintenance();cloudSyncIdleRounds=0;cloudSyncLastActivity=0;cloudSessionToken="";queuedLocalSnapshot=null;queuedCloudSnapshot=null;latestLocalSnapshot=null;lastLocalLibraryJSON="";lastCloudLibraryJSON="";lastLocalAccountId="";lastCloudAccountId="";cloudBaseItems=[];cloudRevision=0;localSaveSequence=0;notificationTestSettings?.classList.add("hidden");document.getElementById("private-reminder-history")?.classList.add("hidden");document.getElementById("reminder-history-body")?.replaceChildren();document.getElementById("library-save-status")?.classList.add("hidden");setBackgroundReminderStatus("Sign in to manage background reminders.");if(cacheDB){try{cacheDB.close();}catch(_){}}cacheDB=null;render();}
+  async function clearUserState(){confirmedLibraryDeletes.clear();clearTimeout(cloudSyncTimer);cloudSyncTimer=null;cloudSyncAuthBlocked=false;persistenceGeneration++;mediaItems=[];currentProfile=null;currentUser=null;scheduleMetadataMaintenance();cloudSyncIdleRounds=0;cloudSyncLastActivity=0;cloudSessionToken="";queuedLocalSnapshot=null;queuedCloudSnapshot=null;latestLocalSnapshot=null;lastLocalLibraryJSON="";lastCloudLibraryJSON="";lastLocalAccountId="";lastCloudAccountId="";cloudBaseItems=[];cloudRevision=0;localSaveSequence=0;notificationTestSettings?.classList.add("hidden");document.getElementById("private-reminder-history")?.classList.add("hidden");document.getElementById("reminder-history-body")?.replaceChildren();document.getElementById("library-save-status")?.classList.add("hidden");setBackgroundReminderStatus("Sign in to manage background reminders.");if(cacheDB){try{cacheDB.close();}catch(_){}}cacheDB=null;render();}
   function showAuth(){authScreen.classList.remove("hidden");}
   function updateAuthMode(){
     hideMessage();authNameGroup.classList.toggle("hidden",!isSignUp);

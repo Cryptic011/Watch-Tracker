@@ -1,3 +1,12 @@
+## 2026-10-29 — Fix the nine code-review findings
+- Stop fresh sign-ins from reimporting deleted legacy titles; account creation retains the original import flow.
+- Save confirmed film release times in GMT, send timed Planned-film reminders, and keep date-only releases explicitly unconfirmed.
+- Preserve explicitly confirmed removals through offline saves and revision conflicts without weakening accidental-loss protection or recovery history.
+- Claim reminder deliveries atomically with expiring leases, check acknowledgement writes, and reject stale senders.
+- Require signed GitHub workflow identity for deployment alerts and keep notification failures separate from successful publication.
+- Open the notified title with account checks, and retain explicit reminder preferences when archiving on both web and native iOS.
+- Update the Capacitor CLI and its lockfile to remove the reported development dependency advisory.
+
 ## 2026-10-27 — Prevent repeat library loss and retain recovery versions
 - Reject unexpected sync requests that remove most or all saved titles, including requests from older app versions.
 - Block direct bulk deletions and preserve prior versions of changed/deleted titles in private server storage.

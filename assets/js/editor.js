@@ -1,5 +1,16 @@
+  function setFilmReleaseInputs(raw){
+    const stamped=/T\d{2}:\d{2}.*(?:Z|[+-]\d{2}:?\d{2})$/i.test(String(raw||''));
+    const input=stamped?toLocalInput(raw):String(raw||'');
+    filmReleaseDate.value=input.slice(0,10);
+    const time=$('film-release-time');
+    if(time)time.value=stamped?input.slice(11,16):'';
+  }
+  function storedFilmRelease(){
+    const date=filmReleaseDate.value,time=$('film-release-time')?.value||'';
+    return date?(time?storedDateFromInput(date+'T'+time):date):'';
+  }
   function updateFilmVerifyNote(result){
-    if(filmVerifyNote)filmVerifyNote.textContent="Films and series are checked through multiple sources.";
+    if(filmVerifyNote)filmVerifyNote.textContent=$('film-release-time')?.value?'Release time saved in GMT. Planned films can receive timed reminders.':'Release date only. Add a confirmed GMT release time to receive timed film reminders.';
   }
 
   function editorVerificationKey(type=typeSelect.value,title=titleInput.value){
@@ -37,7 +48,7 @@
     const canApply=typeof shouldApply==="function"?shouldApply:()=>true;
     if(preserveManual&&filmReleaseDate.value){
       if(filmVerifyNote)filmVerifyNote.textContent="Films and series are checked through multiple sources.";
-      const manual={date:filmReleaseDate.value,source:"Manual",sources:[]};
+      const manual={date:storedFilmRelease(),source:"Manual",sources:[]};
       if(canApply())rememberEditorVerification("Film",manual);
       return manual;
     }
@@ -50,7 +61,7 @@
       pending.resolvedImdbId=String(result.imdbId||"");
       if(!canApply())return result;
       if(result.imdbId)$("imdb-id").value=result.imdbId;
-      filmReleaseDate.value=result.date||"";
+      setFilmReleaseInputs(result.date||"");
       filmReleaseSource.value=result.date?(result.source||"Verified sources"):"";
       updateFilmVerifyNote(result);
       rememberEditorVerification("Film",result);
@@ -251,12 +262,12 @@
     void loadUKAvailability();
     const film=item.format==="Film";seriesSection.style.display=film?"none":"flex";if(film)clearAiringFields();upcomingSection.style.display=film?"none":"flex";filmSection.style.display=film?"flex":"none";
     if(film){
-      $("total-seasons").value="";$("watched-seasons").value="";$("cur-season").value="";$("cur-ep").value="";$("next-season-num").value="";$("next-season-date").value="";filmReleaseDate.value="";filmReleaseSource.value="";
+      $("total-seasons").value="";$("watched-seasons").value="";$("cur-season").value="";$("cur-ep").value="";$("next-season-num").value="";$("next-season-date").value="";setFilmReleaseInputs("");filmReleaseSource.value="";
       try{await fillFilmReleaseData(item.title,{imdbId:$("imdb-id").value||"",seedDate:item.releaseDate||"",seedSource:item.releaseSource||item.source||"Film catalogue",year:item.year||"",platform:item.platform||"",shouldApply});}
       catch(e){if(shouldApply()){console.warn("Film release verification failed",e);filmReleaseDate.value=isFutureDateOnly(item.releaseDate)?item.releaseDate:"";filmReleaseSource.value=filmReleaseDate.value?(item.releaseSource||item.source||"Film catalogue"):"";}}
       if(shouldApply())refreshEditorDuplicateWarning();return;
     }
-    filmReleaseDate.value="";filmReleaseSource.value="";
+    setFilmReleaseInputs("");filmReleaseSource.value="";
     const sid=item.tvmazeId||(item.source==="tvmaze"?item.externalId:"");
     $("tvmaze-id").value=sid||"";
     try{await fillSeasonData(sid||"",item.title,{imdbId:selectedImdbId,year:item.year||"",platform:item.platform||"",shouldApply});}catch(e){console.warn(e);}
@@ -311,9 +322,11 @@
     upcomingSection.style.display=film?"none":"flex";
     filmSection.style.display=film?"flex":"none";
     if(film){clearAiringFields();if(filmVerifyNote)filmVerifyNote.textContent="Films and series are checked through multiple sources.";}
-    else{filmReleaseDate.value="";filmReleaseSource.value="";}
+    else{setFilmReleaseInputs("");filmReleaseSource.value="";}
   };
-  filmReleaseDate.addEventListener("input",()=>{editorVerification=null;if(typeSelect.value==="Film")filmReleaseSource.value="Manual";});
+  const filmReleaseChanged=()=>{editorVerification=null;if(typeSelect.value==="Film")filmReleaseSource.value="Manual";updateFilmVerifyNote();};
+  filmReleaseDate.addEventListener("input",filmReleaseChanged);
+  $('film-release-time').addEventListener('input',filmReleaseChanged);
 
   function loadStoredAiringFields(item){
     if(!item?.airingSeason&&!item?.nextEpisodeNum&&!item?.nextEpisodeDate){clearAiringFields();return;}
@@ -353,7 +366,7 @@
     $("title").value=item.title||"";$("type").value=item.type||"Series";$("status").value=item.status==="Saved"?"Planned":(item.status||"Planned");$("hide-from-weekly-releases").checked=item.hideFromWeeklyReleases===true;
     $("total-seasons").value=item.totalSeasons??"";$("watched-seasons").value=item.watchedSeasons??"";$("cur-season").value=item.curSeason??"";$("cur-ep").value=item.curEp??"";
     $("next-season-num").value=item.nextSeasonNum??"";$("next-season-date").value=item.nextSeasonDate?toLocalInput(item.nextSeasonDate):"";
-    filmReleaseDate.value=item.filmReleaseDate||"";filmReleaseSource.value=item.filmReleaseSource||"";$("platform").value=item.platform||"";
+    setFilmReleaseInputs(item.filmReleaseDate||"");filmReleaseSource.value=item.filmReleaseSource||"";$("platform").value=item.platform||"";updateFilmVerifyNote();
     void loadUKAvailability();
     configureProgressOptions({highest:item.totalSeasons,episodeCounts:item.episodeCounts||{},airedEpisodeCounts:item.airedEpisodeCounts||{[item.curSeason]:item.currentSeasonEpisodeCount||0},releasedEpisodes:item.releasedEpisodes||{},latestAired:item.curSeason,currentEpisode:item.curEp,completedSeasons:item.verifiedCompletedSeasons,episodeScheduleAvailable:item.episodeScheduleVerified===true||Boolean(Object.keys(item.airedEpisodeCounts||{}).length)},{season:item.curSeason,episode:item.curEp});
     loadStoredAiringFields(item);
@@ -421,7 +434,7 @@
         latestEpisodeDate:type==="Film"?"":(verified?.latestEpisodeDate||previous?.latestEpisodeDate||""),seriesReleaseDate:type==="Film"?"":(verified?.seriesReleaseDate||previous?.seriesReleaseDate||""),
         nextEpisodeNum:type==="Film"?null:numOrNull("next-episode-num"),nextEpisodeTitle:type==="Film"?"":$("next-episode-title").value||"",nextEpisodeDate:type==="Film"?"":storedDateFromInput($("next-episode-date").value,verified?.nextEpisode?episodeReleaseTimestamp(verified.nextEpisode):(previous?.nextEpisodeDate||"")),
         nextSeasonNum:type==="Film"?"":($("next-season-num").value?Number($("next-season-num").value):""),nextSeasonDate:type==="Film"?"":storedDateFromInput($("next-season-date").value,verified?.upcoming?(verified.nextEpisode&&Number(verified.nextEpisode.season)===Number(verified.upcoming.number)?episodeReleaseTimestamp(verified.nextEpisode):(verified.upcoming.premiereDate||"")):(previous?.nextSeasonDate||"")),
-        filmReleaseDate:type==="Film"?(filmReleaseDate.value||""):"",filmReleaseSource:type==="Film"?(filmReleaseDate.value?(filmReleaseSource.value||"Manual"):""):"",
+        filmReleaseDate:type==="Film"?storedFilmRelease():"",filmReleaseSource:type==="Film"?(filmReleaseDate.value?(filmReleaseSource.value||"Manual"):""):"",
         verifiedCompletedSeasons:type==="Film"?null:(Number.isFinite(Number(verified?.completedSeasons))?Number(verified.completedSeasons):Number(previous?.verifiedCompletedSeasons||0)),
         episodeHistory:type==="Film"?[]:episodeHistory,...(type==="Film"?{watchedEpisodes:{}}:(Object.prototype.hasOwnProperty.call(previous||{},"watchedEpisodes")?{watchedEpisodes:Object.keys(airedEpisodeCounts).length?normalizeWatchedEpisodeMap(previous.watchedEpisodes,airedEpisodeCounts):previous.watchedEpisodes}:{})),lastEpisodeWatchedAt:type==="Film"?"":(previous?.lastEpisodeWatchedAt||""),
         lastWatchedSeason:type==="Film"?null:(previous?.lastWatchedSeason??null),lastWatchedEpisode:type==="Film"?null:(previous?.lastWatchedEpisode??null),
@@ -460,7 +473,7 @@
   deleteBtn.onclick=async()=>{
     const id=$("item-id").value,index=mediaItems.findIndex(x=>String(x.id)===String(id)),item=mediaItems[index];if(!item)return;
     const generation=persistenceGeneration;
-    mediaItems=mediaItems.filter(x=>String(x.id)!==String(id));render();closeEditor();
+    confirmedLibraryDeletes.add(String(id));mediaItems=mediaItems.filter(x=>String(x.id)!==String(id));render();closeEditor();
     try{
       await persistLibrary(mediaItems,{background:true,precleaned:true});
       showAppToast(`${item.title} removed`,"success",6000,async()=>{

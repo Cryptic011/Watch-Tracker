@@ -77,7 +77,12 @@ function initAppNavigation(){
   const account=String(currentUser.id);if(navigationReady&&navigationAccount===account)return;
   navigationAccount=account;navigationReady=true;
   const saved=history.state?.watchlog&&history.state.owner===account?history.state.page:null;
-  const page=saved||parseAppHash(window.location.hash);
+  const notificationUrl=new URL(window.location.href),notificationOwner=notificationUrl.searchParams.get('reminderAccount');
+  const page=notificationOwner?parseAppHash(window.location.hash):saved||parseAppHash(window.location.hash);
+  if(notificationOwner){
+    if(notificationOwner!==account){page.title='';page.tab='library';showAppToast('This reminder belongs to another account. Sign in to that account to view it.','warn');}
+    notificationUrl.searchParams.delete('reminderAccount');history.replaceState(history.state,'',notificationUrl.href);
+  }
   applyAppPage(page);
   history.replaceState({watchlog:true,owner:account,depth:0,page:currentAppPage()},'',appPageHash(currentAppPage()));
 }

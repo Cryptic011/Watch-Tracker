@@ -15,8 +15,9 @@ test('uncertain dates, unknown offsets and unconfirmed streaming do not produce 
   assert.deepEqual(reminderPlan([series],'account',{now,resolveEvent:(_item,event)=>({...event,streamingUnconfirmed:true})}),[]);
   assert.deepEqual(reminderPlan([{...series,releaseSchedule:null}],'account',{now}),[]);
 });
-test('opted-out, archived and past releases are removed from the complete replacement plan',()=>{
-  assert.deepEqual(reminderPlan([{...series,hideFromWeeklyReleases:true},{...series,archived:true}],'account',{now}),[]);
+test('explicit opt-out and past releases cancel alerts; archiving keeps reminder preferences',()=>{
+  assert.deepEqual(reminderPlan([{...series,hideFromWeeklyReleases:true}],'account',{now}),[]);
+  assert.equal(reminderPlan([{...series,archived:true}],'account',{now}).length,3);
   assert.deepEqual(reminderPlan([series],'account',{now:Date.parse('2026-10-29T12:00:00Z')}),[]);
 });
 test('scheduled releases win over stale next pointers, and repeated source episodes are deduplicated',()=>{

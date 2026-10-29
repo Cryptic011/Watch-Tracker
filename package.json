@@ -12,8 +12,9 @@
     "test:ios": "npm run ios:build && node tests/browser/ios.cjs"
   },
   "devDependencies": {
-    "@capacitor/cli": "8.5.3",
+    "@capacitor/cli": "8.6.0",
     "esbuild": "0.25.12",
+    "jose": "6.1.3",
     "playwright": "1.62.1"
   },
   "dependencies": {

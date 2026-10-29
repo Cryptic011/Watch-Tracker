@@ -1,6 +1,7 @@
 // Local iOS reminders use confirmed times only, matching the web reminder rules.
 export function reminderEvents(item){
-  if(item.hideFromWeeklyReleases===true||item.archived===true)return [];
+  // Archive controls library visibility; the explicit reminder opt-out wins.
+  if(item.hideFromWeeklyReleases===true)return [];
   if(!['Series','Anime'].includes(String(item.type))){
     const raw=item.nextEpisodeDate||item.nextSeasonDate||item.filmReleaseDate;
     return raw?[{kind:item.nextEpisodeDate?'episode':item.nextSeasonDate?'season':'film',raw,number:item.nextEpisodeNum||item.nextSeasonNum}]:[];
