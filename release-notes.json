@@ -96,7 +96,7 @@
     "number": 274
   },
   "737498912c0ad423cc4de25468de8bc2a79b80a0": {
-    "title": "Weekly Releases opt-out regression test — failed build",
+    "title": "Weekly Releases opt-out regression test \u2014 failed build",
     "changes": [
       "Attempted to add regression coverage for the per-show Hide from Weekly Releases preference.",
       "The build failed because the assertion expected the wrong checkbox selector; corrected by commit 91cd960."
@@ -104,7 +104,7 @@
     "number": 273
   },
   "052cc746bdcbaff93e343a177532b69f7d611a01": {
-    "title": "Add per-show Weekly Releases visibility setting — cancelled build",
+    "title": "Add per-show Weekly Releases visibility setting \u2014 cancelled build",
     "changes": [
       "Added a per-show checkbox to hide a series from Weekly Releases without removing it from the Library.",
       "Kept episode tracking and reminders attached to the existing media record.",
@@ -120,7 +120,7 @@
       "Open the new title page from upcoming releases, Prior Releases, TBA entries, recurring shows and saved search results instead of the old episode tracker or editor.",
       "Keep series on Episodes by default, with Details to the right, and restore focus to the clicked link on close.",
       "Move Recurring weekly shows to a collapsed dropdown at the top of Library home, with keyboard-accessible expansion and preserved open state during updates.",
-      "Add Recurring weekly shows as a separate Monday–Sunday section unaffected by Library filters, search, sorting, or the release-calendar range.",
+      "Add Recurring weekly shows as a separate Monday\u2013Sunday section unaffected by Library filters, search, sorting, or the release-calendar range.",
       "Keep each show listed, hold its aired episode for 24 hours, then advance to the next confirmed episode; retain Next episode TBA when no date is announced.",
       "Save verified recurring patterns across edits, metadata refreshes and reloads, respecting explicit Weekly Releases exclusions and showing device-local dates.",
       "Match Settings categories, Track Sync, and detail panels to the same grey as Changelog, with consistent separators and theme-aware light-mode colours.",
@@ -220,6 +220,18 @@
       "Prepare the push key and service worker before the reconnect tap.",
       "Start Safari subscription directly from the tap and preserve existing valid subscriptions.",
       "Check that the browser retained the subscription before showing reminders as enabled."
+    ]
+  },
+  "6bca1747cbab7d82337ff9b3e2068798a9f68362": {
+    "changes": [
+      "Stopped deleted legacy titles returning on sign-in.",
+      "Enabled Planned film reminders for explicit GMT release times; date-only releases stay unconfirmed.",
+      "Allowed explicitly confirmed removals while retaining offline sync, revision checks, accidental-loss guards and recovery history.",
+      "Added atomic notification delivery leases and checked acknowledgements.",
+      "Required signed GitHub workflow identity for deployment alerts.",
+      "Opened the notified title with account checks.",
+      "Kept explicit reminder preferences when archiving on web and native iOS.",
+      "Updated Capacitor CLI and cleared the reported dependency advisory."
     ]
   }
 }

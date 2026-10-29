@@ -149,7 +149,9 @@ const server=http.createServer((req,res)=>{
    const evening=make('later-clock','17:00 programme',[-2,-1,0],17);
    const overnight=make('earlier-clock','01:00 programme',[-4,-3,1],1);
    const untimed=make('date-only','Time unknown programme',[-2,-1,0],null);
-   const expired=make('expired','Unannounced returning programme',[-3,-2,-1],21);
+   // On Thursday, target is next Thursday and target-1 week is still today.
+   // Keep this fixture genuinely expired on every weekday, beyond the 24h grace.
+   const expired=make('expired','Unannounced returning programme',[-4,-3,-2],21);
    expired.nextEpisodeNum=4;expired.nextEpisodeDate='';
    const distant=make('distant-return','The Rookie',[8,9],20);
    const cachedReturn={...make('cached-return','The Rookie North',[8,9],21)};
@@ -344,8 +346,10 @@ const server=http.createServer((req,res)=>{
   assert.equal(await page.locator('[data-gallery-details] a').count(),0,'the compact facts panel omits source rows');
   await page.locator('[data-gallery-close]').click();
   await page.locator('[data-filter="All"]').click();await page.locator('[data-gallery-back]').click();
-  await page.evaluate(()=>openEdit(mediaItems[0].id));await page.locator('#platform').fill('Cinema');await page.locator('#save-btn').click();
+  await page.evaluate(()=>openEdit(mediaItems[0].id));await page.locator('#platform').fill('Cinema');await page.locator('#film-release-time').fill('08:30');await page.locator('#save-btn').click();
   await page.waitForFunction(()=>mediaItems[0]?.platform==='Cinema'&&!cloudSaveInFlight&&!localSaveInFlight&&!queuedCloudSnapshot&&!queuedLocalSnapshot,null,{timeout:10000});assert.equal(items[0].platform,'Cinema');
+  assert.equal(items[0].filmReleaseDate,'2020-02-14T08:30:00.000Z','the real film form saves the confirmed GMT instant');
+  await page.evaluate(()=>openEdit(mediaItems[0].id));assert.equal(await page.locator('#film-release-date').inputValue(),'2020-02-14');assert.equal(await page.locator('#film-release-time').inputValue(),'08:30');await page.locator('#close-modal').click();
   // Seed a verified schedule through the same persistence code used by imports.
   phase='episode tracking';
   await page.evaluate(async()=>{
