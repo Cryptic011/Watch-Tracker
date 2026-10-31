@@ -266,6 +266,10 @@ export function parseIMDbDetails(html,id,type,selected={}){
   if(type==='Film'&&selected.year&&yearOf(row.datePublished)&&selected.year!==yearOf(row.datePublished))return null;
   return record({description:isWholeTitleSynopsis(row.description,1)?text(row.description):"",premiered:/^\d{4}-\d{2}-\d{2}$/.test(row.datePublished||'')?row.datePublished:'',year:yearOf(row.datePublished),genres:[row.genre||[]].flat().filter(v=>typeof v==='string').map(clean).slice(0,15),runtime:duration?Number(duration[1]||0)*60+Number(duration[2]||0)||null:null,rating:Number.isFinite(rating)&&rating>0&&rating<=10?rating:null},'IMDb',imdbURL(id));
 }
+function anchoredTVMazeIdentity(show,selected){
+  return Boolean(selected.tvmazeId&&String(show?.id)===selected.tvmazeId&&selected.year&&
+    yearOf(show?.premiered)===selected.year&&nameKey(show?.name)===nameKey(selected.title));
+}
 export async function getTitleDetails(input,request=fetch,{useCache=true,tmdbToken="",providerTimeoutMs=12000}={}){
   const type=input.type==='Film'?'Film':input.type==='Series'?'Series':null;
   if(!type)return {state:'unmatched',sources:[]};
@@ -346,7 +350,7 @@ async function resolveWatchServiceDetails(selected,get){
     if(candidates.length!==1)return null;
     const show=candidates[0];
     if(!show?.id||nameKey(show.name)!==nameKey(selected.title)||(selected.tvmazeId&&String(show.id)!==selected.tvmazeId)||
-      (selected.imdbId&&show.externals?.imdb&&selected.imdbId!==show.externals.imdb))return null;
+      (selected.imdbId&&show.externals?.imdb&&selected.imdbId!==show.externals.imdb&&!anchoredTVMazeIdentity(show,selected)))return null;
     return show;
   }):null;
   if(showTask)tasks.push(attempt(async()=>{
@@ -416,7 +420,7 @@ async function resolveCatalogueDetails(selected,get,tmdbToken=""){
     const matches=Array.isArray(data)?data.map(row=>row.show).filter(show=>nameKey(show?.name)===nameKey(selected.title)&&(!selected.year||yearOf(show?.premiered)===selected.year)):[];
     const show=Array.isArray(data)?matches.length===1?matches[0]:null:data;
     if(!show?.id||(selected.tvmazeId&&String(show.id)!==selected.tvmazeId)||
-      (id&&show.externals?.imdb&&show.externals.imdb!==id)||
+      (id&&show.externals?.imdb&&show.externals.imdb!==id&&!anchoredTVMazeIdentity(show,selected))||
       !matchesFirstPartyTitle(show.name,selected.title)||
       (!selected.tvmazeId&&!id&&selected.year&&yearOf(show.premiered)&&yearOf(show.premiered)!==selected.year))return null;
     if(!id)id=imdbID(show.externals?.imdb);

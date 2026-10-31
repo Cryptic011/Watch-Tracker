@@ -34,6 +34,8 @@ const server=http.createServer((req,res)=>{
     const rows=await page.evaluate(()=>mediaItems.filter(item=>item.tvmazeShowId).flatMap(item=>(item.scheduledEpisodeReleases||[]).map(ep=>({season:ep.season,number:ep.number,airdate:String(ep.raw||'').slice(0,10),airtime:/^\d{4}-\d{2}-\d{2}$/.test(ep.raw)?'':'08:00',airstamp:ep.raw,_embedded:{show:{id:Number(item.tvmazeShowId),externals:{imdb:item.imdbId||''},webChannel:{name:item.platform||'Test streaming',country:{code:'GB'}}}}}))));
     return route.fulfill({headers,json:rows});
    }
+   if(url.hostname==='api.tvmaze.com'&&url.pathname==='/shows/91405')return route.fulfill({headers,json:{id:91405,name:'NCIS: New York',premiered:'2026-10-06',status:'Running',externals:{imdb:'tt41814911'},summary:'<p>A team investigates crimes affecting a major city and port.</p>'}});
+   if(url.hostname==='api.tvmaze.com'&&/^\/shows\/91405\/(?:episodes|seasons)$/.test(url.pathname))return route.fulfill({headers,json:[]});
    if(url.hostname==='api.tvmaze.com'&&url.pathname==='/shows/12')return route.fulfill({headers,json:{id:12,name:'Test Series',premiered:'2020-01-01',externals:{imdb:'tt1234568'},image:{original:'https://static.tvmaze.com/series-poster.jpg'},summary:'<p>An official series description &amp; a second detail.</p>',genres:['Drama','Action'],status:'Running',rating:{average:8.4},runtime:42,language:'English'}});
    if(url.hostname==='api.tvmaze.com'&&url.pathname==='/shows/12/episodes')return route.fulfill({headers,json:[
     {season:1,number:1,image:{original:'https://static.tvmaze.com/episode-one.jpg'}},
@@ -65,11 +67,16 @@ const server=http.createServer((req,res)=>{
      {title:'Browser Test Series',format:'Series',source:'tvmaze',tvmazeId:'12',imdbId:'tt7654321',year:'2021',description:'Investigators work together to solve difficult cases.'},
     ]};}
     if(body.action==='catalog_details'){
-     const series=body.type==='Series',id=series?'tt1234568':'tt1234567',url='https://www.imdb.com/title/'+id+'/';
+     if(body.tvmazeShowId==='91405')return route.fulfill({headers,json:{ok:true,details:{state:'unavailable',sources:[]}}});
+    const series=body.type==='Series',id=series?'tt1234568':'tt1234567',url='https://www.imdb.com/title/'+id+'/';
      data={ok:true,details:{state:'ready',synopsisVersion:6,synopsisScope:series?'series':'film',description:series?'An official series description & a second detail.':'A detective uncovers a mystery in a quiet coastal town. '.repeat(8),year:'2020',genres:['Drama','Action'],runtime:series?42:120,rating:8.4,ratingSource:series?'TVMaze':'IMDb',source:series?'TVMaze':'IMDb',sources:[{name:series?'TVMaze':'IMDb',url:series?'https://www.tvmaze.com/shows/12':url}],imdbUrl:url}};
     }
     if(body.action==='save'){
      if(failSave)return route.fulfill({status:503,headers,json:{error:'Offline'}});
+     if(body.expectedRevision!==revision)return route.fulfill({status:409,headers,json:{error:'Library changed',code:'revision_conflict',items,revision}});
+     const deleted=new Set((body.changes||[]).filter(change=>change.delete&&!body.confirmedDeletes?.includes(change.id)).map(change=>change.id));
+     const removed=items.filter(item=>deleted.has(String(item.id))).length;
+     if((removed>=5&&removed*2>=items.length)||(items.length>1&&removed===items.length))return route.fulfill({status:409,headers,json:{error:'Unexpected library removal blocked',code:'library_safety_block',items,revision}});
      if(body.items)items=body.items;
      else for(const change of body.changes||[]){
       const index=items.findIndex(item=>String(item.id)===change.id);
@@ -863,7 +870,7 @@ const server=http.createServer((req,res)=>{
   await page.locator('#open-duplicate').click();await page.locator('.gallery-detail[open]').waitFor();
   await page.locator('[data-gallery-close]').click();
   phase='refresh';
-  const refreshItemId=await page.evaluate(()=>{mediaItems[0].platform='Saved before refresh';return mediaItems[0].id;});
+  const refreshItemId=await page.evaluate(()=>{const item=mediaItems.find(item=>item.id==='show');item.platform='Saved before refresh';return item.id;});
   const before=loads;const reload=page.waitForEvent('load');await page.locator('#refresh-app').click();await reload;
   // The same browser context retains the PIN session across a document reload.
   // Wait for session restoration to finish before inspecting or interacting with
@@ -881,9 +888,12 @@ const server=http.createServer((req,res)=>{
   assert.ok(loads>before);
   // A failed cloud save must leave the current page and edit intact.
   phase='failed save';
+  // Reload starts background metadata persistence. Finish that successful
+  // save before injecting the failure intended for the explicit refresh.
+  await page.waitForFunction(()=>!appRefreshInFlight&&!localSaveInFlight&&!cloudSaveInFlight&&!queuedLocalSnapshot&&!queuedCloudSnapshot);
   failSave=true;const failedLoads=loads;
-  await page.evaluate(id=>{mediaItems.find(item=>item.id===id).platform='Keep this change';},refreshItemId);await page.locator('#refresh-app').click();
-  await page.waitForFunction(()=>document.querySelector('#app-toast').textContent.includes('Refresh paused'));
+  await page.evaluate(id=>{const item=mediaItems.find(item=>item.id===id);if(!item)throw Error('Refresh fixture missing: '+JSON.stringify({id,ids:mediaItems.map(row=>row.id),user:currentUser?.id,revision:cloudRevision,visible:document.visibilityState}));item.platform='Keep this change';},refreshItemId);await page.locator('#refresh-app').click();
+  await page.waitForFunction(()=>document.querySelector('#app-toast').textContent.includes('Refresh paused')).catch(async error=>{console.error('Failed refresh state',await page.evaluate(()=>({toast:document.querySelector('#app-toast').textContent,refresh:!!appRefreshInFlight,local:!!localSaveInFlight,cloud:!!cloudSaveInFlight,modal:!modal.classList.contains('hidden'),saveDisabled:saveBtn.disabled})));throw error;});
   assert.equal(loads,failedLoads);assert.equal(await page.evaluate(id=>mediaItems.find(item=>item.id===id)?.platform,refreshItemId),'Keep this change');
   phase='consistent release clock';
   const releaseClock=await page.evaluate(()=>{
@@ -902,6 +912,10 @@ const server=http.createServer((req,res)=>{
   assert.equal(releaseClock.popup,releaseClock.formatted);
   assert.equal(releaseClock.input,releaseClock.expectedInput);
   assert.equal(releaseClock.saved,releaseClock.raw);
+  const recoveredDetails=await page.evaluate(()=>fetchOfficialTitleDetails({title:'NCIS: New York',type:'Series',tvmazeShowId:'91405',imdbId:'tt41814550',releaseYear:'2026'}));
+  assert.equal(recoveredDetails.state,'ready');
+  assert.equal(recoveredDetails.status,'Running');
+  assert.match(recoveredDetails.description,/major city and port/);
   assert.ok(saves>=4);assert.deepEqual(errors,[]);
   console.log(`${engine.name()}: visual search, filters, descriptions, duplicate badges, add/edit, episode mark/undo, unreleased guard and refresh persistence passed`);
  }finally{await browser.close();}

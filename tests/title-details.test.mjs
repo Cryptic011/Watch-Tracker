@@ -535,3 +535,14 @@ test('An ITV episode preview falls back to a verified whole-series synopsis',asy
  },options);
  assert.equal(result.description,full);assert.equal(result.descriptionSource,'TVMaze');
 });
+
+test('Saved TVMaze ID, exact title and year recover details across conflicting IMDb provider IDs',async()=>{
+ const show={id:91405,name:'NCIS: New York',premiered:'2026-10-06',status:'Running',externals:{imdb:'tt41814911'},summary:'A team of investigators protects a major city and its port.'};
+ const selected={title:show.name,type:'Series',tvmazeShowId:'91405',year:'2026',imdbId:'tt41814550'};
+ const request=async url=>url==='https://api.tvmaze.com/shows/91405'?json(show):url.endsWith('/seasons')?json([{number:1}]):failure();
+ const result=await getTitleDetails(selected,request,options);
+ assert.equal(result.description,show.summary);assert.equal(result.status,'Running');assert.equal(result.source,'TVMaze');
+ for(const changed of [{...selected,title:'NCIS: Origins'},{...selected,year:'2025'},{...selected,year:''},{...selected,tvmazeShowId:''}]){
+  assert.ok(!(await getTitleDetails(changed,request,options)).description,'conflicting IDs require all three independent anchors');
+ }
+});
