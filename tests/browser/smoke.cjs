@@ -73,6 +73,10 @@ const server=http.createServer((req,res)=>{
     }
     if(body.action==='save'){
      if(failSave)return route.fulfill({status:503,headers,json:{error:'Offline'}});
+     if(body.expectedRevision!==revision)return route.fulfill({status:409,headers,json:{error:'Library changed',code:'revision_conflict',items,revision}});
+     const deleted=new Set((body.changes||[]).filter(change=>change.delete&&!body.confirmedDeletes?.includes(change.id)).map(change=>change.id));
+     const removed=items.filter(item=>deleted.has(String(item.id))).length;
+     if((removed>=5&&removed*2>=items.length)||(items.length>1&&removed===items.length))return route.fulfill({status:409,headers,json:{error:'Unexpected library removal blocked',code:'library_safety_block',items,revision}});
      if(body.items)items=body.items;
      else for(const change of body.changes||[]){
       const index=items.findIndex(item=>String(item.id)===change.id);
