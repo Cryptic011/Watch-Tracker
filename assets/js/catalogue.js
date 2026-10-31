@@ -169,7 +169,12 @@
         const matches=(Array.isArray(rows)?rows:[]).map(row=>row.show).filter(candidate=>normalizeTitle(candidate?.name)===normalizeTitle(item.title)&&(!item.releaseYear||String(candidate?.premiered||"").slice(0,4)===String(item.releaseYear)));
         if(matches.length===1)show=matches[0];
       }
-      if(!show?.id||(showId&&String(show.id)!==showId)||(imdbId&&show.externals?.imdb!==imdbId))return {};
+      // A saved TVMaze identity plus exact name/year can verify a show even
+      // when providers retain different IMDb IDs. Never use a title alone.
+      const anchored=Boolean(showId&&String(show?.id)===showId&&item.releaseYear&&
+        String(show?.premiered||"").slice(0,4)===String(item.releaseYear)&&
+        normalizeTitle(show?.name)===normalizeTitle(item.title));
+      if(!show?.id||(showId&&String(show.id)!==showId)||(imdbId&&show.externals?.imdb!==imdbId&&!anchored))return {};
       const results=await Promise.allSettled([
         fetchJSONWithTimeout(`https://api.tvmaze.com/shows/${encodeURIComponent(show.id)}/episodes`,{credentials:"omit"}),
         fetchJSONWithTimeout(`https://api.tvmaze.com/shows/${encodeURIComponent(show.id)}/seasons`,{credentials:"omit"})

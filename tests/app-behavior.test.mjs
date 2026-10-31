@@ -531,3 +531,21 @@ test("Duplicate cleanup merges released episodes and watched progress without dr
   assert.equal(item.episodeHistory.length,2);
   assert.deepEqual(a.watchedEpisodes,{1:[1,2]});
 });
+
+test('Tracker details recover a conflicting IMDb link only with the saved show ID, exact title and year',async()=>{
+ const api=loadFunctions(["officialEpisodeImageMap","officialSeasonImageMap","fetchOfficialTrackerArtwork"],`
+   const trackerArtworkCache=new Map();
+   function cachedMetadataRequest(cache,key,task){return task();}
+   function normalizeTitle(value){return String(value||'').toLowerCase();}
+   async function fetchJSONWithTimeout(url){
+     if(url.endsWith('/seasons'))return [{number:1}];
+     if(url.endsWith('/episodes'))return [];
+     return {id:91405,name:'NCIS: New York',premiered:'2026-10-06',status:'Running',summary:'A team investigates crimes affecting a major city and port.',externals:{imdb:'tt41814911'}};
+   }
+ `);
+ const selected={title:'NCIS: New York',type:'Series',tvmazeShowId:'91405',imdbId:'tt41814550',releaseYear:'2026'};
+ assert.equal((await api.fetchOfficialTrackerArtwork(selected)).details.status,'Running');
+ for(const change of [{title:'NCIS: Origins'},{releaseYear:'2025'},{releaseYear:''},{tvmazeShowId:'13'}]){
+  assert.deepEqual(JSON.parse(JSON.stringify(await api.fetchOfficialTrackerArtwork({...selected,...change}))),{});
+ }
+});
