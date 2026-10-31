@@ -866,7 +866,7 @@ const server=http.createServer((req,res)=>{
   await page.locator('#open-duplicate').click();await page.locator('.gallery-detail[open]').waitFor();
   await page.locator('[data-gallery-close]').click();
   phase='refresh';
-  const refreshItemId=await page.evaluate(()=>{mediaItems[0].platform='Saved before refresh';return mediaItems[0].id;});
+  const refreshItemId=await page.evaluate(()=>{const item=mediaItems.find(item=>item.id==='show');item.platform='Saved before refresh';return item.id;});
   const before=loads;const reload=page.waitForEvent('load');await page.locator('#refresh-app').click();await reload;
   // The same browser context retains the PIN session across a document reload.
   // Wait for session restoration to finish before inspecting or interacting with
