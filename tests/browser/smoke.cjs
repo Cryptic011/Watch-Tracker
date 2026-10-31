@@ -884,9 +884,12 @@ const server=http.createServer((req,res)=>{
   assert.ok(loads>before);
   // A failed cloud save must leave the current page and edit intact.
   phase='failed save';
+  // Reload starts background metadata persistence. Finish that successful
+  // save before injecting the failure intended for the explicit refresh.
+  await page.waitForFunction(()=>!appRefreshInFlight&&!localSaveInFlight&&!cloudSaveInFlight&&!queuedLocalSnapshot&&!queuedCloudSnapshot);
   failSave=true;const failedLoads=loads;
   await page.evaluate(id=>{mediaItems.find(item=>item.id===id).platform='Keep this change';},refreshItemId);await page.locator('#refresh-app').click();
-  await page.waitForFunction(()=>document.querySelector('#app-toast').textContent.includes('Refresh paused'));
+  await page.waitForFunction(()=>document.querySelector('#app-toast').textContent.includes('Refresh paused')).catch(async error=>{console.error('Failed refresh state',await page.evaluate(()=>({toast:document.querySelector('#app-toast').textContent,refresh:!!appRefreshInFlight,local:!!localSaveInFlight,cloud:!!cloudSaveInFlight,modal:!modal.classList.contains('hidden'),saveDisabled:saveBtn.disabled})));throw error;});
   assert.equal(loads,failedLoads);assert.equal(await page.evaluate(id=>mediaItems.find(item=>item.id===id)?.platform,refreshItemId),'Keep this change');
   phase='consistent release clock';
   const releaseClock=await page.evaluate(()=>{
