@@ -888,7 +888,7 @@ const server=http.createServer((req,res)=>{
   // save before injecting the failure intended for the explicit refresh.
   await page.waitForFunction(()=>!appRefreshInFlight&&!localSaveInFlight&&!cloudSaveInFlight&&!queuedLocalSnapshot&&!queuedCloudSnapshot);
   failSave=true;const failedLoads=loads;
-  await page.evaluate(id=>{mediaItems.find(item=>item.id===id).platform='Keep this change';},refreshItemId);await page.locator('#refresh-app').click();
+  await page.evaluate(id=>{const item=mediaItems.find(item=>item.id===id);if(!item)throw Error('Refresh fixture missing: '+JSON.stringify({id,ids:mediaItems.map(row=>row.id),user:currentUser?.id,revision:cloudRevision,visible:document.visibilityState}));item.platform='Keep this change';},refreshItemId);await page.locator('#refresh-app').click();
   await page.waitForFunction(()=>document.querySelector('#app-toast').textContent.includes('Refresh paused')).catch(async error=>{console.error('Failed refresh state',await page.evaluate(()=>({toast:document.querySelector('#app-toast').textContent,refresh:!!appRefreshInFlight,local:!!localSaveInFlight,cloud:!!cloudSaveInFlight,modal:!modal.classList.contains('hidden'),saveDisabled:saveBtn.disabled})));throw error;});
   assert.equal(loads,failedLoads);assert.equal(await page.evaluate(id=>mediaItems.find(item=>item.id===id)?.platform,refreshItemId),'Keep this change');
   phase='consistent release clock';
