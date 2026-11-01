@@ -108,3 +108,11 @@ test('Cached truncated synopses are invalidated even when version and identity m
  const rows=JSON.parse(storage.getItem('watchlog_verified_title_details_v1'));rows[0].details.description='Following Gibbs as he begins to forg...';storage.setItem('watchlog_verified_title_details_v1',JSON.stringify(rows));
  const api=harness([valid],storage);assert.equal((await api.get(item)).description,valid.description);assert.equal(api.calls(),1);
 });
+
+test('A wrong gateway identity still permits an independently verified series fallback',async()=>{
+ const fallback={description:'A verified team of investigators protects a coastal city.',status:'Running',source:'TVMaze',sources:[{name:'TVMaze',url:'https://www.tvmaze.com/shows/60'}]};
+ const api=harness([{...valid,imdbId:'tt9999999'}],deviceStorage(),'GB',fallback);
+ const result=await api.get(item);
+ assert.equal(result.description,fallback.description);assert.equal(result.status,'Running');assert.equal(result.state,'ready');
+ assert.notEqual(result.imdbId,'tt9999999');
+});

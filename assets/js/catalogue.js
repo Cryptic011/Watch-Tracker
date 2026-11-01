@@ -174,7 +174,7 @@
       const anchored=Boolean(showId&&String(show?.id)===showId&&item.releaseYear&&
         String(show?.premiered||"").slice(0,4)===String(item.releaseYear)&&
         normalizeTitle(show?.name)===normalizeTitle(item.title));
-      if(!show?.id||(showId&&String(show.id)!==showId)||(imdbId&&show.externals?.imdb!==imdbId&&!anchored))return {};
+      if(!show?.id||(showId&&String(show.id)!==showId)||(imdbId&&show.externals?.imdb!==imdbId&&!anchored)){trackerArtworkCache.delete(key);return {};}
       const results=await Promise.allSettled([
         fetchJSONWithTimeout(`https://api.tvmaze.com/shows/${encodeURIComponent(show.id)}/episodes`,{credentials:"omit"}),
         fetchJSONWithTimeout(`https://api.tvmaze.com/shows/${encodeURIComponent(show.id)}/seasons`,{credentials:"omit"})
@@ -238,7 +238,7 @@
         // Revalidate persisted public metadata with the same identity and
         // whole-title rules as a fresh gateway response.
         const details=response.details||{},rejected=rejectedSource(details);
-        if(mismatched(details)){titleDetailsCache.delete(key);return {state:"unmatched",sources:[]};}
+        if(mismatched(details)){titleDetailsCache.delete(key);const fallback=await seriesFallback();if(fallback){storeTitleDetails(key,fallback);return fallback;}return {state:"unmatched",sources:[]};}
         if(!rejected&&completeTitleSynopsis(details.description)&&current(details)){
           if(!stored)storeTitleDetails(key,details);
           return details;
