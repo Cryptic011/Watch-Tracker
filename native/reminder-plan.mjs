@@ -2,10 +2,8 @@
 export function reminderEvents(item){
   // Archive controls library visibility; the explicit reminder opt-out wins.
   if(item.hideFromWeeklyReleases===true)return [];
-  if(!['Series','Anime'].includes(String(item.type))){
-    const raw=item.nextEpisodeDate||item.nextSeasonDate||item.filmReleaseDate;
-    return raw?[{kind:item.nextEpisodeDate?'episode':item.nextSeasonDate?'season':'film',raw,number:item.nextEpisodeNum||item.nextSeasonNum}]:[];
-  }
+  if(item.type==='Film')return item.filmReleaseDate?[{kind:'film',raw:item.filmReleaseDate}]:[];
+  if(!['Series','Anime'].includes(String(item.type)))return [];
   const active=Number(item.airingSeason||item.curSeason||0);
   const scheduled=Array.isArray(item.scheduledEpisodeReleases)?item.scheduledEpisodeReleases:[];
   const cached=Array.isArray(item.recurringWeeklySchedule?.episodes)?item.recurringWeeklySchedule.episodes:[];

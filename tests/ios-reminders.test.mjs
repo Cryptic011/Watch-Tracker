@@ -35,3 +35,11 @@ test('film alerts follow Planned/Saved status and all plans retain account ident
   assert.deepEqual(reminderPlan([{...film,status:'Watched'}],'A',{now}),[]);
   assert.ok(reminderPlan([film],'B',{now}).every(row=>row.accountId==='B'));
 });
+
+test('Films ignore stale series fields when choosing their release reminder',()=>{
+ const film={id:'film',title:'Film',type:'Film',status:'Planned',releaseSchedule:{},filmReleaseDate:'2026-10-28T12:00:00Z',nextEpisodeDate:'2026-10-29T12:00:00Z',nextSeasonDate:'2026-10-30T12:00:00Z',nextEpisodeNum:9};
+ const plan=reminderPlan([film],'A',{now});
+ assert.equal(plan.length,3);assert.equal(plan[2].at,Date.parse(film.filmReleaseDate));assert.doesNotMatch(plan[2].body,/S\d|E9/);
+ assert.deepEqual(reminderPlan([{...film,filmReleaseDate:''}],'A',{now}),[]);
+ assert.deepEqual(reminderPlan([{...film,type:'Other'}],'A',{now}),[]);
+});

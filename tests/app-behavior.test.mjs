@@ -549,3 +549,17 @@ test('Tracker details recover a conflicting IMDb link only with the saved show I
   assert.deepEqual(JSON.parse(JSON.stringify(await api.fetchOfficialTrackerArtwork({...selected,...change}))),{});
  }
 });
+
+test('Empty artwork identity responses are retryable with the same request key',async()=>{
+ const api=loadFunctions(['cachedMetadataRequest','officialEpisodeImageMap','officialSeasonImageMap','fetchOfficialTrackerArtwork'],`
+ const trackerArtworkCache=new Map(),METADATA_CACHE_TTL_MS=21600000;
+ let attempts=0;
+ async function fetchJSONWithTimeout(url){
+  if(url.endsWith('/episodes')||url.endsWith('/seasons'))return [];
+  attempts++;return attempts===1?{}:{id:12,externals:{imdb:'tt1234568'},summary:'A verified show summary.',status:'Running'};
+ }
+ `);
+ const item={title:'Example',tvmazeShowId:'12',imdbId:'tt1234568'};
+ assert.deepEqual(JSON.parse(JSON.stringify(await api.fetchOfficialTrackerArtwork(item))),{});
+ assert.equal((await api.fetchOfficialTrackerArtwork(item)).details.status,'Running');
+});
