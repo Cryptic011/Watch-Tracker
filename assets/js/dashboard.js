@@ -76,42 +76,37 @@ const DASHBOARD_DATE_FORMATTER=new Intl.DateTimeFormat(USER_LOCALE,{timeZone:"UT
 const DASHBOARD_TIME_FORMATTER=new Intl.DateTimeFormat(USER_LOCALE,{timeZone:"UTC",hour:"2-digit",minute:"2-digit"});
 const DASHBOARD_PRIOR_DATE_FORMATTER=new Intl.DateTimeFormat(USER_LOCALE,{timeZone:"UTC",weekday:"short",day:"numeric",month:"short"});
 let selectedCalendarRange='week',selectedScheduleView='';
+function homeSchedulesVisible(){
+  return Boolean(currentUser&&currentTab==='library'&&!(typeof libraryOnlyPage!=='undefined'&&libraryOnlyPage));
+}
 function openScheduleView(view){
   if(!['recurring','calendar'].includes(view))return;
-  saveNavigationPosition();selectedScheduleView=view;
-  window.WatchLogGallery?.setCategory?.('');
-  render();window.scrollTo({top:0,behavior:'instant'});recordAppNavigation();
-  document.querySelector('[data-schedule-back]')?.focus({preventScroll:true});
+  if(typeof libraryOnlyPage!=='undefined'&&libraryOnlyPage)goToTabHome('library');
+  selectedScheduleView='';render();
+  const panel=document.querySelector('[data-home-section="'+view+'"]');
+  if(panel){panel.open=true;panel.querySelector('summary')?.focus({preventScroll:true});}
 }
-function closeScheduleView(){
-  if(appNavigationBack())return;
-  const view=selectedScheduleView;goToTabHome('library');
-  document.querySelector('[data-schedule-open="'+view+'"]')?.focus({preventScroll:true});
-}
+function closeScheduleView(){goToTabHome('library');}
 function renderScheduleNavigation(){
-  if(typeof refreshRegionalReleaseSources==='function')refreshRegionalReleaseSources();
   let root=document.getElementById('library-schedule-navigation');
   if(!root){
     root=document.createElement('div');root.id='library-schedule-navigation';
+    root.className='home-schedules';
     document.getElementById('library-view').prepend(root);
-    root.addEventListener('click',event=>{
-      const open=event.target.closest('[data-schedule-open]');if(open){openScheduleView(open.dataset.scheduleOpen);return;}
-      if(event.target.closest('[data-schedule-back]'))closeScheduleView();
-    });
+    for(const [key,label] of [['calendar','Calendar'],['recurring','Recurring shows']]){
+      const panel=document.createElement('details');panel.className='home-schedule-panel';panel.dataset.homeSection=key;panel.open=true;
+      const summary=document.createElement('summary');summary.innerHTML='<h2>'+label+'</h2><span class="home-section-chevron" aria-hidden="true">⌄</span>';
+      panel.append(summary);root.append(panel);
+      panel.addEventListener('toggle',()=>{if(homeSchedulesVisible())renderDashboard();});
+    }
   }
-  const visible=Boolean(currentUser&&currentTab==='library'&&!categoryControlsVisible());
-  root.classList.toggle('hidden',!visible);
-  document.getElementById('media-list').classList.toggle('hidden',Boolean(selectedScheduleView));
-  if(!visible)return;
-  if(selectedScheduleView){
-    updateDashboardMarkup(root,`<div class="schedule-page-nav"><button type="button" class="schedule-back" data-schedule-back aria-label="Back to Library"><span aria-hidden="true">‹</span> Library</button><span>${selectedScheduleView==='recurring'?'WEEKLY SHOWS':'RELEASE CALENDAR'}</span></div>`);
-    return;
-  }
-  const now=new Date(),shows=new Set([...recurringWeeklyShows(mediaItems,now).map(row=>String(row.item.id)),...calendarEvents(mediaItems,now,14).unknown.filter(item=>item.streamingPending&&isEpisodeTrackable(item)).map(item=>String(item.id))]).size;
-  const range=calendarRange(selectedCalendarRange,now),releases=calendarEvents(mediaItems,range.start,range.days).events.length;
-  const recurringIcon='<svg viewBox="0 0 24 24"><path d="M20 7h-7l2.5-2.5M4 17h7l-2.5 2.5M19 7a8 8 0 0 0-13-1M5 17a8 8 0 0 0 13 1"/></svg>';
-  const calendarIcon='<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M7 3v4m10-4v4M3 11h18m-13 4h1m6 0h1m-8 3h1"/></svg>';
-  updateDashboardMarkup(root,`<div class="schedule-shortcuts" aria-label="Your schedules">${[['recurring','Recurring shows',shows,'shows',recurringIcon],['calendar','Your calendar',releases,'releases',calendarIcon]].map(([view,label,count,unit,icon])=>`<button type="button" class="schedule-shortcut" data-schedule-open="${view}" aria-label="${label}, ${count} ${unit}"><span class="schedule-shortcut-top"><span class="schedule-shortcut-icon" aria-hidden="true">${icon}</span><span class="schedule-shortcut-count">${count}</span></span><span class="schedule-shortcut-copy"><strong>${label}</strong><span>${view==='recurring'?'Next 14 days':'Browse releases'}<span aria-hidden="true"> ›</span></span></span></button>`).join('')}</div>`);
+  const account=String(currentUser?.id||'');
+  if(root._account!==account){root._account=account;for(const panel of root.querySelectorAll('[data-home-section]'))panel.open=true;}
+  const visible=homeSchedulesVisible();root.classList.toggle('hidden',!visible);
+  const calendar=document.getElementById('library-dashboard');
+  const calendarPanel=root.querySelector('[data-home-section="calendar"]');
+  if(calendar&&calendar.parentElement!==calendarPanel)calendarPanel.append(calendar);
+  if(typeof refreshRegionalReleaseSources==='function')refreshRegionalReleaseSources();
 }
 function calendarRange(range,now=new Date()){
   const today=new Date(now);today.setUTCHours(0,0,0,0);
@@ -256,13 +251,13 @@ function renderRecurringWeeklySchedule(){
   if(!root){
     const library=document.getElementById("library-view");if(!library)return;
     root=document.createElement("div");root.id="recurring-weekly-dashboard";
-    document.getElementById('library-schedule-navigation').after(root);
+    document.querySelector('[data-home-section="recurring"]').append(root);
     root.addEventListener("click",event=>{
       const button=event.target.closest("[data-recurring-open]");if(button)openMediaRow(button.dataset.recurringOpen,button);
     });
   }
-  const available=Boolean(currentUser&&currentTab==="library"&&!categoryControlsVisible()&&selectedScheduleView==='recurring');
-  root.classList.toggle("hidden",!available||selectedScheduleView!=="recurring");
+  const available=homeSchedulesVisible();
+  root.classList.toggle("hidden",!available);
   if(!available){if(!currentUser){root.replaceChildren();root._dashboardMarkup=null;}return;}
   const now=new Date(),rows=recurringWeeklyShows(mediaItems,now),pending=calendarEvents(mediaItems,now,14).unknown.filter(item=>item.streamingPending&&isEpisodeTrackable(item)),total=new Set([...rows.map(row=>String(row.item.id)),...pending.map(item=>String(item.id))]).size;
   const progressMarkers=new Map();
@@ -321,8 +316,8 @@ function renderDashboard(){
   renderRecurringWeeklySchedule();
   const root=document.getElementById('library-dashboard');if(!root)return;
   renderWatchStatistics();
-  const visible=Boolean(currentUser&&currentTab==='library'&&!categoryControlsVisible()&&!searchQuery.trim()&&selectedScheduleView==='calendar');
-  root.classList.toggle('hidden',!visible||selectedScheduleView!=='calendar');if(!visible){if(!currentUser){root.replaceChildren();root._dashboardMarkup=null;}return;}
+  const visible=homeSchedulesVisible();
+  root.classList.toggle('hidden',!visible);if(!visible){if(!currentUser){root.replaceChildren();root._dashboardMarkup=null;}return;}
   const progressMarkers=new Map();
   const {start,days:daysToShow,label:rangeLabel,priorStart,priorDays}=calendarRange(selectedCalendarRange,new Date());
   const {events,unknown:unresolved}=calendarEvents(mediaItems,start,daysToShow),pending=unresolved.filter(item=>item.streamingPending),unknown=unresolved.filter(item=>!item.streamingPending);

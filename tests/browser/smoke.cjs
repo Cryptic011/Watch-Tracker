@@ -133,7 +133,10 @@ const server=http.createServer((req,res)=>{
   assert.match(pendingSchedule.calendar,/Date and time unconfirmed/,'calendar distinguishes unconfirmed streaming from no release date');
   assert.equal(pendingSchedule.undated,0);assert.ok(pendingSchedule.emptyHeights.every(height=>height<65),'empty weekdays stay compact');
   assert.equal(await page.locator('.changelog-entry').count(),0,'startup does not construct the full hidden changelog');
+  assert.equal(await page.locator('[data-gallery-category]').count(),0,'Home has no duplicate Library boxes');
+  await page.locator('[data-tab="collection"]').click();
   assert.equal(await page.evaluate(()=>{const node=mediaList.querySelector('.gallery-category');render();return Boolean(node)&&node===mediaList.querySelector('.gallery-category');}),true,'unchanged Library render retains category and poster nodes');
+  await page.locator('[data-tab="library"]').click();
   // Exercise the actual weekly schedule DOM, not just its sorting helper.
   // Date order deliberately conflicts with local clock order (17:00 this
   // week vs 01:00 next week); an undated old show must not appear at all.
@@ -322,6 +325,7 @@ const server=http.createServer((req,res)=>{
   await page.locator('#close-title-search').click();
   await page.locator('[data-tab="library"]').click();
   phase='gallery';
+  await page.locator('[data-tab="collection"]').click();
   assert.equal(await page.getByRole('heading',{name:'Next to watch',exact:true}).count(),0);
   const categories=await page.locator('.gallery-category').evaluateAll(nodes=>nodes.map(n=>({y:n.getBoundingClientRect().y,height:n.getBoundingClientRect().height})));
   assert.ok(categories[1].y>=categories[0].y+categories[0].height);
@@ -335,7 +339,8 @@ const server=http.createServer((req,res)=>{
   assert.equal(await page.locator('.gallery-tile').count(),1,'user-created collection names filter the library');
   await page.locator('#library-collection-select').selectOption('');
   await page.evaluate(prior=>{mediaItems[0]=prior;render();},beforeCollectionTest);
-  assert.match(await page.locator('.gallery-section h3').first().textContent(),/^2020/);
+  assert.match(await page.locator('.gallery-section h3').first().textContent(),/^Films/);
+  assert.match(await page.locator('.gallery-tile small').first().textContent(),/2020/);
   assert.equal(await page.locator('[data-gallery-manage]').count(),1);
   assert.equal(await page.locator('.gallery-section [data-gallery-manage]').count(),0);
   assert.equal(await page.locator('[data-gallery-total-count]').textContent(),'1');
@@ -699,7 +704,7 @@ const server=http.createServer((req,res)=>{
   await page.locator('[data-tab="library"]').click();
   await page.waitForFunction(()=>document.querySelector('#settings-view').classList.contains('hidden')&&!document.querySelector('#library-view').classList.contains('hidden'));
   assert.equal(await page.locator('.top-nav .search-box').isVisible(),true,'Library search returns on Library');
-  assert.equal(await page.locator('.stats-row').isVisible(),true,'Tracking totals return on Library');
+  assert.equal(await page.locator('.stats-row').isVisible(),false,'Home omits Library totals');
   assert.equal(await page.locator('.top-nav h1').isVisible(),true,'App title returns on Library home');
   for(const selector of ['.profile-card','#sync-now','#logout-btn','#appearance-mode','#background-reminder-status','#enable-background-reminders']){
     assert.equal(await page.locator(selector).first().isVisible(),false,selector+' must not be visible in Library');
@@ -716,29 +721,38 @@ const server=http.createServer((req,res)=>{
   });
   const recurring=page.locator('#recurring-weekly-dashboard');
   const calendarView=page.locator('#library-dashboard');
-  assert.equal(await recurring.isVisible(),false,'Library home contains a shortcut instead of an expanded weekly schedule');
-  assert.equal(await calendarView.isVisible(),false,'the calendar has its own view');
-  const scheduleCards=page.locator('.schedule-shortcut');
-  assert.deepEqual(await scheduleCards.evaluateAll(nodes=>nodes.map(node=>node.dataset.scheduleOpen)),['recurring','calendar'],'Recurring is left and Your calendar is right');
+  assert.equal(await recurring.isVisible(),true,'Home shows recurring releases');
+  assert.equal(await calendarView.isVisible(),true,'Home shows the calendar above recurring releases');
+  assert.equal(await page.locator('[data-gallery-category]').count(),0,'Home contains no Library sections');
+  assert.equal(await page.locator('.schedule-shortcut').count(),0,'there are no separate schedule navigation cards');
+  const panels=page.locator('[data-home-section]');
+  assert.deepEqual(await panels.evaluateAll(nodes=>nodes.map(node=>node.dataset.homeSection)),['calendar','recurring']);
   for(const width of [320,390,768]){
    await page.setViewportSize({width,height:844});
-   const boxes=await scheduleCards.evaluateAll(nodes=>nodes.map(node=>{const b=node.getBoundingClientRect();return{x:b.x,y:b.y,right:b.right};}));
-   assert.equal(boxes[0].y,boxes[1].y,'the two cards share one row');assert.ok(boxes[0].right<boxes[1].x,'calendar remains on the right');
+   const boxes=await panels.evaluateAll(nodes=>nodes.map(node=>{const b=node.getBoundingClientRect();return{top:b.top,bottom:b.bottom};}));
+   assert.ok(boxes[1].top>=boxes[0].bottom,'schedules stack vertically on every screen size');
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
   }
   await page.setViewportSize({width:390,height:844});
+  const recurringSummary=page.locator('[data-home-section="recurring"]>summary');
+  await recurringSummary.focus();await page.keyboard.press('Enter');
+  assert.equal(await recurring.isVisible(),false,'keyboard collapses recurring shows independently');
+  assert.equal(await calendarView.isVisible(),true);
+  await page.evaluate(()=>render());
+  assert.equal(await recurring.isVisible(),false,'rendering retains the collapsed section');
+  await page.locator('[data-tab="collection"]').click();
+  await page.locator('[data-tab="library"]').click();
+  assert.equal(await recurring.isVisible(),false,'returning Home retains the collapsed section');
+  await recurringSummary.click();assert.equal(await recurring.isVisible(),true);
+  const calendarSummary=page.locator('[data-home-section="calendar"]>summary');
+  await calendarSummary.click();assert.equal(await calendarView.isVisible(),false);assert.equal(await recurring.isVisible(),true);
+  await calendarSummary.click();
+  await page.locator('[data-tab="collection"]').click();
+  assert.equal(await recurring.isVisible(),false);assert.equal(await calendarView.isVisible(),false);
+  assert.equal(await page.locator('[data-gallery-category]').count(),2,'Series and Films exist only in Library');
+  await page.goBack();await page.waitForFunction(()=>!libraryOnlyPage&&currentTab==='library');
+  assert.equal(await recurring.isVisible(),true);assert.equal(await calendarView.isVisible(),true);
   if(process.env.BROWSER_SCREENSHOT_DIR)await page.screenshot({path:path.join(process.env.BROWSER_SCREENSHOT_DIR,engine.name()+'-schedule-home.png'),fullPage:true});
-  await page.locator('[data-schedule-open="recurring"]').focus();await page.keyboard.press('Enter');
-  assert.equal(await recurring.isVisible(),true,'Recurring opens its dedicated layout with the keyboard');
-  assert.equal(await page.locator('#media-list').isVisible(),false,'the schedule replaces the Movies and Series area');
-  assert.equal(await page.locator('.stats-row').isVisible(),false,'the dedicated view omits Library totals');
-  assert.equal(await page.locator('.top-nav .search-box').isVisible(),false,'the dedicated view omits Library filters');
-  assert.equal(await calendarView.isVisible(),false);
-  assert.match(new URL(page.url()).hash,/^#\/library\/recurring$/);
-  await page.goBack();await page.waitForFunction(()=>location.hash==='#/library');
-  assert.equal(await page.locator('.schedule-shortcut').count(),2,'browser Back returns to the compact cards');
-  await page.goForward();await page.waitForFunction(()=>location.hash==='#/library/recurring');
-  assert.equal(await recurring.isVisible(),true,'browser Forward restores the recurring layout');
   assert.equal(await recurring.locator('[data-recurring-open="show"]').isVisible(),true);
   assert.deepEqual(await recurring.locator('[data-recurring-day]').evaluateAll(nodes=>nodes.map(node=>Number(node.dataset.recurringDay))),[1,2,3,4,5,6,0]);
   assert.equal(await recurring.locator('[data-recurring-open="show"]').count(),1);
@@ -783,21 +797,21 @@ const server=http.createServer((req,res)=>{
    await WatchLogRegionalReleases.refresh([item],{country:releaseViewingCountry()},async()=>({ok:true,json:async()=>item.scheduledEpisodeReleases.map(ep=>({season:ep.season,number:ep.number,airdate:ep.raw.slice(0,10),airtime:'20:00',airstamp:ep.raw,_embedded:{show:{id:Number(item.tvmazeShowId),webChannel:{name:item.platform,country:{code:releaseViewingCountry()}}}}}))}),Date.now()+18*3600000);render();
   },{progress:savedMarkerProgress,schedule:savedGraceSchedule});
   const scheduleText=await recurring.textContent();
-  await page.locator('[data-schedule-back]').click();
+  await page.locator('[data-tab="library"]').click();
   await page.waitForFunction(()=>location.hash==='#/library');
-  assert.equal(await recurring.isVisible(),false);
-  await page.waitForFunction(()=>document.activeElement?.matches('[data-schedule-open="recurring"]'));
-  await page.locator('[data-schedule-open="calendar"]').click();
+  assert.equal(await recurring.isVisible(),true);
+  await page.locator('[data-tab="library"]').click();
   assert.equal(await calendarView.isVisible(),true);
-  assert.equal(await recurring.isVisible(),false,'calendar and recurring layouts are separate');
+  assert.equal(await recurring.isVisible(),true,'calendar filters leave recurring shows visible');
   assert.equal(await page.locator('[data-calendar-range="today"]').isVisible(),true);
   await page.locator('[data-calendar-range="today"]').click();
-  assert.match(new URL(page.url()).hash,/^#\/library\/calendar\?range=today$/);
+  assert.match(new URL(page.url()).hash,/^#\/library\?range=today$/);
   assert.equal(await recurring.textContent(),scheduleText,'calendar range cannot change the recurring schedule');
   if(process.env.BROWSER_SCREENSHOT_DIR)await page.screenshot({path:path.join(process.env.BROWSER_SCREENSHOT_DIR,engine.name()+'-calendar.png'),fullPage:true});
-  await page.locator('[data-schedule-back]').click();
+  await page.locator('[data-tab="library"]').click();
   await page.waitForFunction(()=>location.hash==='#/library');
-  assert.equal(await page.locator('#media-list').isVisible(),true,'one Back returns home even after changing calendar range');
+  assert.equal(await page.locator('#media-list').isVisible(),false,'Home has no title browsing area');
+  await page.locator('[data-tab="collection"]').click();
   await page.locator('[data-gallery-category="Series"]').click();
   assert.equal(await page.locator('.top-nav h1').isVisible(),false,'Series shows its category heading without the app title');
   await page.locator('[data-filter="Watched"]').click();
@@ -812,8 +826,8 @@ const server=http.createServer((req,res)=>{
   await page.waitForFunction(()=>currentTab==='library'&&searchQuery==='');
   await page.locator('[data-filter="All"]').click();await page.locator('#sort-mode').selectOption('current');
   await page.locator('[data-gallery-back]').click();
-  assert.equal(await recurring.isVisible(),false,'returning from Series shows the compact schedule cards');
-  await page.locator('[data-schedule-open="recurring"]').click();
+  assert.equal(await recurring.isVisible(),false,'Library stays separate from Home schedules');
+  await page.locator('[data-tab="library"]').click();
   assert.equal(await recurring.locator('[data-recurring-open="show"]').isVisible(),true);
   await page.evaluate(()=>{const item=mediaItems.find(row=>row.id==='show');item.platform+=' test';render();item.platform=item.platform.slice(0,-5);render();});
   assert.equal(await recurring.locator('[data-recurring-open="show"]').isVisible(),true,'metadata updates retain the dedicated view');
@@ -831,9 +845,9 @@ const server=http.createServer((req,res)=>{
   await page.waitForFunction(()=>document.querySelector('[data-gallery-details]').textContent.includes('official series description'));
   await page.locator('[data-gallery-close]').click();
   await page.waitForFunction(()=>document.activeElement?.matches('#recurring-weekly-dashboard [data-recurring-open="show"]'));
-  await page.waitForFunction(()=>location.hash==='#/library/recurring');
-  await page.locator('[data-schedule-back]').click();await page.waitForFunction(()=>location.hash==='#/library');
-  await page.locator('[data-schedule-open="calendar"]').click();
+  await page.waitForFunction(()=>location.hash==='#/library');
+  await page.locator('[data-tab="library"]').click();await page.waitForFunction(()=>location.hash==='#/library');
+  await page.locator('[data-tab="library"]').click();
   await page.locator('[data-calendar-range="upcoming"]').click();
   assert.equal(await page.locator('#library-dashboard [data-dashboard-open="show"] .release-progress-dot').first().getAttribute('data-behind-level'),'red','release calendar uses the same marker rules');
   await page.locator('#library-dashboard [data-dashboard-open="show"]').first().click();
@@ -847,14 +861,14 @@ const server=http.createServer((req,res)=>{
   assert.equal(await page.locator('[data-gallery-watch-next]').count(),0,'unreleased episodes are never offered by Watch next');
   assert.equal(await page.locator('.gallery-caught-up').textContent(),'All released episodes watched');
   await page.locator('[data-gallery-close]').click();
-  await page.waitForFunction(()=>location.hash.startsWith('#/library/calendar'));
+  await page.waitForFunction(()=>location.hash.startsWith('#/library'));
   assert.equal(await page.locator('[data-calendar-range="upcoming"]').getAttribute('aria-pressed'),'true','closing episode details restores the calendar range');
   assert.equal(await page.locator('#library-dashboard [data-dashboard-open="show"] .release-progress-dot').first().getAttribute('data-behind-level'),'green','watching released episodes makes the release-calendar marker green');
-  await page.locator('[data-schedule-back]').click();
-  await page.locator('[data-schedule-open="recurring"]').click();
+  await page.locator('[data-tab="library"]').click();
+  await page.locator('[data-tab="library"]').click();
   assert.equal(await recurringMarker().getAttribute('data-behind-level'),'green','opening the recurring page shows the saved progress immediately');
-  await page.locator('[data-schedule-back]').click();
-  await page.locator('[data-schedule-open="calendar"]').click();
+  await page.locator('[data-tab="library"]').click();
+  await page.locator('[data-tab="library"]').click();
   await page.locator('[data-calendar-range="upcoming"]').click();
   phase='duplicate prevention';
   await page.locator('#add-btn').click();await page.locator('#discovery-query').fill('Browser Test Series');
@@ -878,13 +892,13 @@ const server=http.createServer((req,res)=>{
   await page.waitForFunction(()=>document.querySelector('#auth-screen').classList.contains('hidden'),{timeout:10000});
   await page.waitForFunction(id=>mediaItems.find(item=>item.id===id)?.platform==='Saved before refresh',refreshItemId,{timeout:10000});
   assert.equal(items.find(item=>item.id===refreshItemId)?.platform,'Saved before refresh');
-  assert.equal(await page.locator('#recurring-weekly-dashboard [data-recurring-open="show"]').count(),0,'hidden schedule rows are not built during startup');
-  await page.locator('[data-schedule-open="recurring"]').click();
+  assert.equal(await page.locator('[data-gallery-category]').count(),0,'Home restores without duplicate Library content');
+  await page.locator('[data-tab="library"]').click();
   await page.waitForFunction(()=>document.querySelectorAll('#recurring-weekly-dashboard [data-recurring-open="show"]').length===1);
   assert.equal(await page.locator('#recurring-weekly-dashboard [data-recurring-open="show"]').count(),1,'streaming membership survives reload');
-  await page.locator('[data-schedule-back]').click();
-  assert.equal(await page.locator('.schedule-shortcut').count(),2,'reload restores the compact schedule cards on Library home');
-  assert.equal(await recurring.isVisible(),false);assert.equal(await calendarView.isVisible(),false);
+  await page.locator('[data-tab="library"]').click();
+  assert.equal(await page.locator('[data-home-section]').count(),2,'reload restores both collapsible schedules');
+  assert.equal(await recurring.isVisible(),true);assert.equal(await calendarView.isVisible(),true);
   assert.ok(loads>before);
   // A failed cloud save must leave the current page and edit intact.
   phase='failed save';
@@ -919,7 +933,7 @@ const server=http.createServer((req,res)=>{
   await page.locator('[data-tab="collection"]').click();
   assert.match(new URL(page.url()).hash,/^#\/collection/);
   assert.equal(await page.locator('[data-gallery-category]').count(),2);
-  assert.equal(await page.locator('.schedule-shortcut').first().isVisible(),false);
+  assert.equal(await page.locator('[data-home-section]').first().isVisible(),false);
   assert.equal(await page.locator('#sort-mode').isVisible(),true);
   await page.locator('[data-gallery-category="Series"]').click();
   await page.locator('#sort-mode').selectOption('title');
@@ -927,7 +941,8 @@ const server=http.createServer((req,res)=>{
   assert.match(new URL(page.url()).hash,/collection\/series/);
   assert.equal(await page.locator('#continue-watching').isVisible(),false);
   await page.locator('[data-tab="library"]').click();
-  assert.equal(await page.locator('.schedule-shortcut').first().isVisible(),true);
+  assert.equal(await page.locator('[data-home-section]').first().isVisible(),true);
+  assert.equal(await page.locator('[data-gallery-category]').count(),0);
   assert.ok(saves>=4);assert.deepEqual(errors,[]);
   console.log(`${engine.name()}: visual search, filters, descriptions, duplicate badges, add/edit, episode mark/undo, unreleased guard and refresh persistence passed`);
  }finally{await browser.close();}
