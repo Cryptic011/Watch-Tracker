@@ -112,7 +112,7 @@ test('Search errors expose a retry and clearing input removes results',async()=>
 });
 test('Search is immediately after Library and artwork/update connections are allowed by CSP',()=>{
   const html=fs.readFileSync(new URL('../index.html',import.meta.url),'utf8');
-  assert.deepEqual([...html.matchAll(/class="tab-btn[^"]*" data-tab="([^"]+)"/g)].map(m=>m[1]),['library','settings']);
+  assert.deepEqual([...html.matchAll(/class="tab-btn[^"]*" data-tab="([^"]+)"/g)].map(m=>m[1]),['library','collection','settings']);
   assert.match(html,/connect-src[^;]*wss:\/\/okkwteywtgfsnlrjdyhv\.supabase\.co/);
   assert.match(html,/img-src[^;]*https:\/\/\*\.mzstatic\.com/);
   assert.doesNotMatch(html.match(/connect-src[^;]*/)[0],/(?:wikipedia|wikidata|wikimedia)/i);
@@ -140,8 +140,8 @@ test('Catalogue gateway includes TVMaze show summaries alongside film descriptio
 test('Retired History and Watchlist tabs are removed and cannot be activated',()=>{
   const html=fs.readFileSync(new URL('../index.html',import.meta.url),'utf8');
   const library=fs.readFileSync(new URL('../assets/js/library.js',import.meta.url),'utf8');
-  assert.deepEqual([...html.matchAll(/class="tab-btn[^"]*" data-tab="([^"]+)"/g)].map(m=>m[1]),['library','settings']);
-  assert.match(library,/const ALLOWED_BOTTOM_TABS=new Set\(\["library","search","settings"\]\)/);
+  assert.deepEqual([...html.matchAll(/class="tab-btn[^"]*" data-tab="([^"]+)"/g)].map(m=>m[1]),['library','collection','settings']);
+  assert.match(library,/const ALLOWED_BOTTOM_TABS=new Set\(\["library","collection","search","settings"\]\)/);
   assert.match(library,/if\(!ALLOWED_BOTTOM_TABS\.has\(tab\)\)tab="library"/);
   assert.match(library,/label==="history"\|\|label==="watchlist"/);
 });

@@ -32,8 +32,8 @@ function renderLibraryFeatures(){
   $('library-features').classList.toggle('hidden',!visible);
   root.classList.add('hidden');
   if(!visible){if(currentTab==='library'&&!category)libraryScope='';return;}
-  const categoryItems=mediaItems.filter(item=>category==='Film'?item.type==='Film':item.type!=='Film');
-  const options=[['',category==='Film'?'All movies':'All series'],['favourites','Favourites'],['archived','Archived'],...collectionNames(categoryItems).map(name=>['list:'+name,name])];
+  const categoryItems=mediaItems.filter(item=>!category|| (category==='Film'?item.type==='Film':item.type!=='Film'));
+  const options=[['',category==='Film'?'All movies':category==='Series'?'All series':'All titles'],['favourites','Favourites'],['archived','Archived'],...collectionNames(categoryItems).map(name=>['list:'+name,name])];
   if(!options.some(([value])=>value===libraryScope))libraryScope='';
   const select=$('library-collection-select'),markup=options.map(([value,label])=>`<option value="${esc(value)}">${esc(label)}</option>`).join('');
   if(select._options!==markup){select.innerHTML=markup;select._options=markup;}select.value=libraryScope;

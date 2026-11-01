@@ -57,3 +57,14 @@ test('Each primary control returns to its own home with nested state cleared',()
   assert.equal(page.filter,'All');assert.equal(page.scroll,0);
  }
 });
+
+test('Dedicated Library routes preserve category, filters and sort separately from Home',()=>{
+ const c=router();
+ for(const category of ['', 'Film','Series']){
+  const page={tab:'collection',category,filter:'Watching',sort:'title'};
+  const hash=c.appPageHash(page),parsed=c.parseAppHash(hash);
+  assert.match(hash,/^#\/collection/);
+  for(const [key,value]of Object.entries(page))assert.equal(parsed[key],value);
+ }
+ assert.equal(c.parseAppHash('#/library').tab,'library');
+});
