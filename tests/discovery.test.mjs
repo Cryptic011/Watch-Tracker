@@ -92,11 +92,36 @@ test('Provider text is escaped and only allowed HTTPS artwork is rendered',()=>{
   assert.equal(c.discoveryImage('https://static.tvmaze.com.evil.test/poster.jpg'),'');
   assert.equal(c.discoveryImage('https://is1-ssl.mzstatic.com/poster.jpg'),'https://is1-ssl.mzstatic.com/poster.jpg');
 });
-test('Adding opens the editor; saved titles close the search preview and open their title page instead',()=>{
-  const {c,calls,$}=harness();c.addDiscoveryTitle({title:'Reacher',format:'Series'});assert.deepEqual(calls,['new','Reacher']);
-  calls.length=0;$('discovery-detail').open=true;c.findTrackedDuplicate=()=>({id:'existing'});c.addDiscoveryTitle({title:'Reacher',format:'Series'});assert.deepEqual(calls,['details:existing']);
-  assert.equal($('discovery-detail').open,false);
-  assert.match(c.discoveryCard({title:'Reacher',format:'Series'},0),/Already added/);
+function quickHarness(){
+ const h=harness(),c=h.c;c.persistenceGeneration=1;c.uuid=()=>String(c.mediaItems.length+1);
+ c.nowISO=()=>new Date().toISOString();c.localISODate=()=>new Date().toISOString().slice(0,10);
+ c.render=()=>{};c.persistLibrary=async()=>true;c.scheduleMetadataRefresh=async()=>true;c.showAppToast=()=>{};
+ return h;
+}
+test('Add saves a Planned show immediately without opening the editor; duplicates open the saved title',async()=>{
+ const {c,calls,$}=quickHarness();let writes=0;c.persistLibrary=async()=>{writes++;return true;};
+ const item={title:'Reacher',format:'Series',tvmazeId:'12',imdbId:'tt1234568',year:'2022'};
+ assert.equal(await c.addDiscoveryTitle(item),true);assert.deepEqual(calls,[]);assert.equal(writes,1);
+ const saved=c.mediaItems[0];assert.equal(saved.status,'Planned');assert.equal(saved.curEp,0);assert.equal(saved.tvmazeShowId,'12');assert.ok(saved.createdAt);
+ assert.equal(Object.keys(saved.watchedEpisodes).length,0);
+ $('discovery-detail').open=true;c.findTrackedDuplicate=()=>saved;
+ assert.equal(await c.addDiscoveryTitle(item),false);assert.deepEqual(calls,['details:'+saved.id]);assert.equal(writes,1);
+ assert.equal($('discovery-detail').open,false);
+});
+test('Fast double taps cannot add duplicate records while the first local save is pending',async()=>{
+ const {c}=quickHarness();let finish,writes=0;
+ c.findTrackedDuplicate=item=>c.mediaItems.find(row=>row.title===item.title);
+ c.persistLibrary=()=>{writes++;return new Promise(resolve=>finish=resolve);};
+ const item={title:'A show',format:'Series'};
+ const pending=c.addDiscoveryTitle(item);assert.equal(c.mediaItems.length,1);
+ assert.equal(await c.addDiscoveryTitle(item),false);assert.equal(writes,1);finish(true);assert.equal(await pending,true);
+});
+test('A pending quick add never refreshes metadata or shows success in a different account',async()=>{
+ const {c}=quickHarness();let finish,updates=0,notices=0;
+ c.persistLibrary=()=>new Promise(resolve=>finish=resolve);c.scheduleMetadataRefresh=()=>updates++;c.showAppToast=()=>notices++;
+ const pending=c.addDiscoveryTitle({title:'A film',format:'Film',imdbId:'tt1234567'});
+ c.persistenceGeneration++;c.currentUser={id:'other'};c.mediaItems=[];finish(true);await pending;
+ assert.equal(updates,0);assert.equal(notices,0);assert.equal(c.mediaItems.length,0);
 });
 test('Leaving search cancels pending results and changing account clears the previous query',async()=>{
   const {c,$}=harness();let resolve;
@@ -237,4 +262,12 @@ test('Leaving search and opening saved results dismiss the keyboard without clea
  c.document.activeElement=input;c.mediaItems=[{id:'ncis',title:'NCIS',type:'Series'}];
  $('discovery-library-results').listeners.click({target:{closest:()=>({dataset:{libraryOpen:'ncis'}})}});
  assert.equal(blurred,2);assert.deepEqual(calls,['details:ncis']);
+});
+
+test('Quick Add cannot create an unverified film shadow of an existing series',async()=>{
+ const {c}=quickHarness();c.mediaItems=[{id:'show',title:'A show',type:'Series'}];
+ c.normalizeTitle=value=>String(value||'').toLowerCase();c.isWeakFilmRecord=item=>item.type==='Film'&&!item.imdbId&&!item.releaseYear&&!item.filmReleaseDate;
+ let saves=0;c.persistLibrary=()=>{saves++;};
+ assert.equal(await c.addDiscoveryTitle({title:'A show',format:'Film'}),false);
+ assert.equal(saves,0);assert.equal(c.mediaItems.length,1);
 });

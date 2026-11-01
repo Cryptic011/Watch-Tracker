@@ -118,3 +118,13 @@ test('A long season is applied as one progress update with bounded work',()=>{
  assert.equal(unmarked.watchedEpisodes[1],undefined);assert.equal(unmarked.watchedEpisodes[2].length,3);
  assert.equal(unmarked.watchedSeasons,1);assert.equal(unmarked.curSeason,2);assert.equal(unmarked.curEp,3);
 });
+
+test('Recent additions sort by original creation time across statuses, without using edit timestamps',()=>{
+ const c=functions(['sortMediaRows','recentAdditionTime','itemMatchesCurrentView'],{activeSort:'title',activeFilter:'Recent',currentTab:'library',categoryControlsVisible:()=>true,librarySearchScore:()=>1,titleCollator:new Intl.Collator('en')});
+ const items=[{id:'older',title:'A',status:'Watched',createdAt:'2020-01-01',updatedAt:'2099-01-01'},
+  {id:'new',title:'Z',status:'Watching',createdAt:'2026-11-01'},
+  {id:'unknown',title:'B',status:'Planned',updatedAt:'2099-01-02'}];
+ assert.deepEqual(Array.from(c.sortMediaRows(items).rows,item=>item.id),['new','older','unknown']);
+ for(const item of items)assert.equal(c.itemMatchesCurrentView(item,'',[],Date.now()),true);
+ assert.equal(items[0].id,'older','sorting does not mutate saved records');
+});

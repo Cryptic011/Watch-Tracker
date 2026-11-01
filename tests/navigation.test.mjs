@@ -79,3 +79,10 @@ test('Old category bookmarks resolve to the single Library page, never Home cont
  const home=c.parseAppHash(c.appPageHash({tab:'library',calendarRange:'upcoming'}));
  assert.equal(home.calendarRange,'upcoming');assert.equal(home.tab,'library');
 });
+
+test('Recent additions filter restores in Library URLs',()=>{
+ const c=router();for(const category of ['', 'Series','Film']){
+  const page=c.parseAppHash(c.appPageHash({tab:'collection',category,filter:'Recent'}));
+  assert.equal(page.filter,'Recent');assert.equal(page.tab,'collection');assert.equal(page.category,category);
+ }
+});

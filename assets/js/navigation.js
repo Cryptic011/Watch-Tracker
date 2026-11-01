@@ -17,7 +17,7 @@ function appPageHash(page){
 }
 function parseAppHash(hash){
   const [path,query='']=String(hash||'#/library').replace(/^#\/?/,'').split('?'),parts=path.split('/'),params=new URLSearchParams(query);
-  const page={tab:'library',category:'',schedule:'',calendarRange:['today','upcoming'].includes(params.get('range'))?params.get('range'):'week',settings:'',title:'',scope:params.get('collection')||'',query:params.get('q')||'',filter:['All','Planned','Watching','Watched'].includes(params.get('filter'))?params.get('filter'):'All',sort:['current','recent','release','title','platform','watched','shows'].includes(params.get('sort'))?params.get('sort'):'current',scroll:0,dialogScroll:0};
+  const page={tab:'library',category:'',schedule:'',calendarRange:['today','upcoming'].includes(params.get('range'))?params.get('range'):'week',settings:'',title:'',scope:params.get('collection')||'',query:params.get('q')||'',filter:['All','Recent','Planned','Watching','Watched'].includes(params.get('filter'))?params.get('filter'):'All',sort:['current','recent','release','title','platform','watched','shows'].includes(params.get('sort'))?params.get('sort'):'current',scroll:0,dialogScroll:0};
   if(parts[0]==='settings'){page.tab='settings';page.settings=['general','reminders','account','maintenance'].includes(parts[1])?parts[1]:'';}
   else if(parts[0]==='collection'){page.tab='collection';if(['movies','series'].includes(parts[1]))page.category=parts[1]==='movies'?'Film':'Series';}
   else if(parts[0]==='search'){page.tab='search';page.searchText=params.get('q')||'';page.query='';page.searchFormat=['Film','Series'].includes(params.get('format'))?params.get('format'):'All';}

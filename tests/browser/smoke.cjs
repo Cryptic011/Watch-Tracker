@@ -292,9 +292,11 @@ const server=http.createServer((req,res)=>{
   await page.locator('#discovery-results .discovery-title').first().click();await page.locator('#discovery-detail').waitFor({state:'visible'});
   await page.locator('[data-discovery-detail-source] a[href="https://www.imdb.com/title/tt1234567/"]').waitFor();
   assert.ok((await page.locator('.discovery-full-description').textContent()).length>100);
-  await page.locator('#discovery-detail-add').click();await page.locator('#modal').waitFor({state:'visible'});
-  assert.equal(await page.locator('#title').inputValue(),'Browser Test Film');assert.equal(await page.locator('#type').inputValue(),'Film');
-  await page.locator('#save-btn').click();await page.waitForFunction(()=>!localSaveInFlight&&!cloudSaveInFlight&&mediaItems.length===1);
+  await page.locator('#discovery-detail-add').click();
+  await page.waitForFunction(()=>!localSaveInFlight&&!cloudSaveInFlight&&mediaItems.length===1);
+  assert.equal(await page.locator('#modal').isVisible(),false,'catalogue Add saves directly without a form');
+  assert.equal(items[0].status,'Planned');
+  assert.ok(items[0].createdAt,'quick adds preserve their original addition date');
   assert.equal(items[0].title,'Browser Test Film');
   await page.locator('#discovery-library-results [data-library-result]').waitFor();
   assert.equal(await page.locator('#discovery-results [data-discovery-add]').count(),0,'saved global results move into the Library section');
@@ -900,6 +902,27 @@ const server=http.createServer((req,res)=>{
   assert.equal(await page.locator('[data-home-section]').count(),2,'reload restores both collapsible schedules');
   assert.equal(await recurring.isVisible(),true);assert.equal(await calendarView.isVisible(),true);
   assert.ok(loads>before);
+  phase='quick add and Recent';
+  const quickAdded=await page.evaluate(async()=>{
+    await addDiscoveryTitle({title:'New Planned Series',format:'Series',tvmazeId:'9988',imdbId:'tt9999888',year:'2026'});
+    await addDiscoveryTitle({title:'New Planned Series',format:'Series',tvmazeId:'9988',imdbId:'tt9999888',year:'2026'});
+    const item=mediaItems.find(row=>row.tvmazeShowId==='9988');
+    return {id:item.id,status:item.status,createdAt:item.createdAt,count:mediaItems.filter(row=>row.tvmazeShowId==='9988').length};
+  });
+  if(await page.locator('.gallery-detail[open]').count()){await page.locator('[data-gallery-close]').click();await page.waitForFunction(()=>!window.location.hash.startsWith('#/title/'));}
+  assert.equal(quickAdded.status,'Planned');assert.equal(quickAdded.count,1);
+  await page.locator('[data-tab="collection"]').click();await page.locator('[data-filter="Recent"]').click();
+  assert.equal(await page.locator('.gallery-tile').first().getAttribute('data-gallery-item'),quickAdded.id);
+  assert.equal(await page.locator('#sort-mode').isDisabled(),true,'Recent always orders by addition date');
+  await page.locator('[data-gallery-item="'+quickAdded.id+'"]').click();
+  await page.locator('[data-gallery-menu]').click();await page.locator('[data-gallery-edit-menu]').click();
+  await page.locator('#status').selectOption('Watching');await page.locator('#save-btn').click();
+  await page.waitForFunction(id=>mediaItems.find(row=>row.id===id)?.status==='Watching'&&!localSaveInFlight&&!cloudSaveInFlight,quickAdded.id);
+  assert.equal(await page.evaluate(id=>mediaItems.find(row=>row.id===id).createdAt,quickAdded.id),quickAdded.createdAt);
+  assert.equal(await page.locator('.gallery-tile').first().getAttribute('data-gallery-item'),quickAdded.id,'adjusting status keeps the title in Recent');
+  assert.match(new URL(page.url()).hash,/filter=Recent/);
+  await page.locator('[data-filter="All"]').click();assert.equal(await page.locator('#sort-mode').isEnabled(),true);
+  await page.locator('[data-tab="library"]').click();
   // A failed cloud save must leave the current page and edit intact.
   phase='failed save';
   // Reload starts background metadata persistence. Finish that successful
