@@ -252,7 +252,7 @@ html,body{overscroll-behavior-y:none}
 html.search-keyboard-open .bottom-tabs{visibility:hidden;pointer-events:none}
 
 /* Home retains schedules and progress; Library is a dedicated title browser. */
-.bottom-tabs{width:min(330px,calc(100% - 144px))}
+.bottom-tabs{width:min(252px,calc(100% - 152px))}
 .bottom-tabs::before{width:calc((100% - 12px)/3)}
 .bottom-tabs[data-active-tab="collection"]::before{transform:translateX(100%)}
 .bottom-tabs[data-active-tab="settings"]::before{transform:translateX(200%)}
