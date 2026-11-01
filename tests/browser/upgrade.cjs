@@ -87,7 +87,7 @@ function patch(items,changes){
    assert.equal(await page.locator('#library-collection-select option[value="list:Film nights"]').count(),1);
    assert.equal(await page.locator('#continue-watching').isVisible(),false,'Movies do not show series progress');
    await page.locator('[data-gallery-back]').click();
-   await page.waitForFunction(()=>location.hash==='#/collection');
+   await page.waitForFunction(()=>location.hash.split('?')[0]==='#/collection');
    await page.locator('[data-gallery-category="Series"]').click();
    assert.equal(await page.locator('#continue-watching').isVisible(),false,'Library is only title browsing');
    assert.equal(await page.locator('#library-collection-select option[value="list:Film nights"]').count(),0,'custom lists are scoped to the category');
@@ -109,7 +109,7 @@ function patch(items,changes){
    await page.locator('#title-lists-dialog').waitFor({state:'hidden'});
    const directUrl=page.url();await page.locator('[data-gallery-close]').click();
    await page.waitForFunction(()=>location.hash.startsWith('#/collection/series'));
-   await page.goBack();await page.waitForFunction(()=>location.hash==='#/collection');
+   await page.goBack();await page.waitForFunction(()=>location.hash.split('?')[0]==='#/collection');
    await page.goForward();await page.waitForFunction(()=>location.hash.startsWith('#/collection/series'));
    await page.goto(directUrl);await page.locator('.gallery-detail[open]').waitFor();
    assert.equal(await page.locator('.gallery-episode-row').count(),0,'deep links retain lazy season loading');
@@ -121,7 +121,7 @@ function patch(items,changes){
    await page.locator('[data-filter="All"]').click();
    await page.locator('#library-collection-select').selectOption('favourites');
    assert.equal(await page.locator('[data-gallery-total-count]').textContent(),'1');
-   await page.locator('[data-gallery-back]').click();await page.waitForFunction(()=>location.hash==='#/collection');
+   await page.locator('[data-gallery-back]').click();await page.waitForFunction(()=>location.hash.split('?')[0]==='#/collection');
    assert.equal(await page.locator('#library-collections').isVisible(),true);
    await page.locator('#library-collection-select').selectOption('');
    assert.equal(await page.locator('#continue-watching').isVisible(),false);

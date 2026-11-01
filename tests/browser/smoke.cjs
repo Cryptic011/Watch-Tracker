@@ -740,6 +740,9 @@ const server=http.createServer((req,res)=>{
   assert.equal(await calendarView.isVisible(),true);
   await page.evaluate(()=>render());
   assert.equal(await recurring.isVisible(),false,'rendering retains the collapsed section');
+  await page.locator('[data-tab="collection"]').click();
+  await page.locator('[data-tab="library"]').click();
+  assert.equal(await recurring.isVisible(),false,'returning Home retains the collapsed section');
   await recurringSummary.click();assert.equal(await recurring.isVisible(),true);
   const calendarSummary=page.locator('[data-home-section="calendar"]>summary');
   await calendarSummary.click();assert.equal(await calendarView.isVisible(),false);assert.equal(await recurring.isVisible(),true);
