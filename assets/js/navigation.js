@@ -3,10 +3,10 @@ let navigationApplying=false,navigationReady=false,navigationAccount='',navigati
 function currentAppPage(){
   const dialog=document.querySelector('.gallery-detail[open]');
   const panel=[...document.querySelectorAll('#settings-view [data-settings-panel]')].find(node=>!node.classList.contains('hidden'));
-  return {schedule:typeof selectedScheduleView==='string'?selectedScheduleView:'',calendarRange:typeof selectedCalendarRange==='string'?selectedCalendarRange:'week',searchText:typeof discoveryInput!=='undefined'?discoveryInput.value.trim():'',searchFormat:typeof discoveryFilter!=='undefined'?discoveryFilter:'All',tab:currentTab,category:window.WatchLogGallery?.getCategory?.()||'',scope:typeof libraryScope==='string'?libraryScope:'',settings:panel?.dataset.settingsPanel||'',title:dialog?.dataset.item||'',query:searchQuery,filter:activeFilter,sort:activeSort,scroll:window.scrollY||0,dialogScroll:dialog?.scrollTop||0};
+  return {schedule:typeof selectedScheduleView==='string'?selectedScheduleView:'',calendarRange:typeof selectedCalendarRange==='string'?selectedCalendarRange:'week',searchText:typeof discoveryInput!=='undefined'?discoveryInput.value.trim():'',searchFormat:typeof discoveryFilter!=='undefined'?discoveryFilter:'All',tab:typeof libraryOnlyPage!=="undefined"&&libraryOnlyPage&&currentTab==="library"?"collection":currentTab,category:window.WatchLogGallery?.getCategory?.()||'',scope:typeof libraryScope==='string'?libraryScope:'',settings:panel?.dataset.settingsPanel||'',title:dialog?.dataset.item||'',query:searchQuery,filter:activeFilter,sort:activeSort,scroll:window.scrollY||0,dialogScroll:dialog?.scrollTop||0};
 }
 function appPageHash(page){
-  let path=page.title?'title/'+encodeURIComponent(page.title):page.tab==='settings'?'settings'+(page.settings?'/'+page.settings:''):page.tab==='search'?'search':'library'+(page.schedule?'/'+page.schedule:page.category?'/'+(page.category==='Film'?'movies':'series'):'');
+  let path=page.title?'title/'+encodeURIComponent(page.title):page.tab==='settings'?'settings'+(page.settings?'/'+page.settings:''):page.tab==='search'?'search':page.tab==='collection'?'collection'+(page.category?'/'+(page.category==='Film'?'movies':'series'):''):'library'+(page.schedule?'/'+page.schedule:page.category?'/'+(page.category==='Film'?'movies':'series'):'');
   const query=new URLSearchParams();
   if(page.scope)query.set('collection',page.scope);
   if(page.schedule==='calendar'&&page.calendarRange&&page.calendarRange!=='week')query.set('range',page.calendarRange);
@@ -19,6 +19,7 @@ function parseAppHash(hash){
   const [path,query='']=String(hash||'#/library').replace(/^#\/?/,'').split('?'),parts=path.split('/'),params=new URLSearchParams(query);
   const page={tab:'library',category:'',schedule:'',calendarRange:['today','upcoming'].includes(params.get('range'))?params.get('range'):'week',settings:'',title:'',scope:params.get('collection')||'',query:params.get('q')||'',filter:['All','Planned','Watching','Watched'].includes(params.get('filter'))?params.get('filter'):'All',sort:['current','recent','release','title','platform','watched','shows'].includes(params.get('sort'))?params.get('sort'):'current',scroll:0,dialogScroll:0};
   if(parts[0]==='settings'){page.tab='settings';page.settings=['general','reminders','account','maintenance'].includes(parts[1])?parts[1]:'';}
+  else if(parts[0]==='collection'){page.tab='collection';if(['movies','series'].includes(parts[1]))page.category=parts[1]==='movies'?'Film':'Series';}
   else if(parts[0]==='search'){page.tab='search';page.searchText=params.get('q')||'';page.query='';page.searchFormat=['Film','Series'].includes(params.get('format'))?params.get('format'):'All';}
   else if(parts[0]==='title'){try{page.title=decodeURIComponent(parts.slice(1).join('/'));}catch(_){}}
   else if(['recurring','calendar'].includes(parts[1]))page.schedule=parts[1];
@@ -66,7 +67,7 @@ function applyAppPage(page){
   }finally{navigationApplying=false;}
 }
 function goToTabHome(tab){
-  if(!['library','search','settings'].includes(tab))tab='library';
+  if(!['library','collection','search','settings'].includes(tab))tab='library';
   saveNavigationPosition();
   if(tab==='search'&&typeof resetTitleSearch==='function')resetTitleSearch();
   applyAppPage({tab,category:'',schedule:'',calendarRange:'week',settings:'',title:'',scope:'',query:'',filter:'All',sort:'current',searchText:'',searchFormat:'All',scroll:0,dialogScroll:0});

@@ -396,11 +396,11 @@ window.WatchLogGallery=(()=>{
       const target=event.target.closest('[data-gallery-item]');if(target)open(target.dataset.galleryItem,target);
     });}
     let markup;
-    if(!category){markup=`<div class="gallery-home">${[['Film','Movies','▤'],['Series','Series','▣']].map(([type,label,icon])=>{
+    if(!category){markup=`${api.plainLibrary?'<h2 class="gallery-library-title">Library</h2>':''}<div class="gallery-home">${(api.plainLibrary?[['Series','Series','▣'],['Film','Films','▤']]:[['Film','Movies','▤'],['Series','Series','▣']]).map(([type,label,icon])=>{
       const items=rows.filter(item=>type==='Film'?isFilm(item):!isFilm(item));return `<button type="button" class="gallery-category" data-gallery-category="${type}"><span class="gallery-category-icon" aria-hidden="true">${icon}</span><span><strong>${label}</strong><small>${items.length} title${items.length===1?'':'s'}</small></span><span class="gallery-fan" aria-hidden="true">${items.slice(0,3).map(item=>art(item)).join('')}</span></button>`;
     }).join('')}</div><p class="gallery-caption">${rows.length} titles in this view</p>`;}
     else{const items=rows.filter(item=>category==='Film'?isFilm(item):!isFilm(item)),tracked=api.items().filter(item=>(category==='Film'?isFilm(item):!isFilm(item))&&(!api.includes||api.includes(item))),parts=sections(items,api.upcoming);
-      const content=api.filter==='Watched'?releaseGroups(items).map(group=>section(group.year,group.rows)).join(''):section('Upcoming',parts.future,true)+section('Released',parts.released)+section('Date unknown',parts.remaining);
+      const content=api.plainLibrary?section(category==='Film'?'Films':'Series',items):api.filter==='Watched'?releaseGroups(items).map(group=>section(group.year,group.rows)).join(''):section('Upcoming',parts.future,true)+section('Released',parts.released)+section('Date unknown',parts.remaining);
       markup=`<div class="gallery-nav"><button type="button" class="gallery-back" data-gallery-back aria-label="Back to Library">‹</button><h2>${category==='Film'?'Movies':'Series'}</h2><span class="gallery-heading-actions"><span class="gallery-count" data-gallery-total-count aria-label="${tracked.length} tracked ${category==='Film'?'films':'series'}">${tracked.length}</span>${manageButton(tracked,category==='Film'?'Movies':'Series')}</span></div>${content}${items.length?'':'<p class="gallery-empty">No titles match your search or filter.</p>'}`;}
     if(host._galleryMarkup!==markup){
       // Keep live collection/progress controls, listeners and disclosure state.

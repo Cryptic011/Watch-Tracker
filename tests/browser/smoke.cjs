@@ -916,6 +916,18 @@ const server=http.createServer((req,res)=>{
   assert.equal(recoveredDetails.state,'ready');
   assert.equal(recoveredDetails.status,'Running');
   assert.match(recoveredDetails.description,/major city and port/);
+  await page.locator('[data-tab="collection"]').click();
+  assert.match(new URL(page.url()).hash,/^#\/collection/);
+  assert.equal(await page.locator('[data-gallery-category]').count(),2);
+  assert.equal(await page.locator('.schedule-shortcut').first().isVisible(),false);
+  assert.equal(await page.locator('#sort-mode').isVisible(),true);
+  await page.locator('[data-gallery-category="Series"]').click();
+  await page.locator('#sort-mode').selectOption('title');
+  await page.locator('[data-filter="Watching"]').click();
+  assert.match(new URL(page.url()).hash,/collection\/series/);
+  assert.equal(await page.locator('#continue-watching').isVisible(),false);
+  await page.locator('[data-tab="library"]').click();
+  assert.equal(await page.locator('.schedule-shortcut').first().isVisible(),true);
   assert.ok(saves>=4);assert.deepEqual(errors,[]);
   console.log(`${engine.name()}: visual search, filters, descriptions, duplicate badges, add/edit, episode mark/undo, unreleased guard and refresh persistence passed`);
  }finally{await browser.close();}
