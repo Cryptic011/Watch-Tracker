@@ -70,11 +70,13 @@ const mark=(page,episode)=>page.evaluate(ep=>toggleEpisodeWatched('show',1,ep),e
   for(const page of [a,b]){await page.goto(base);await page.locator('#auth-email').fill(account.email);await page.locator('#auth-pin').fill('1234');await page.locator('#auth-submit').click();await page.waitForFunction(()=>document.querySelector('#auth-screen').classList.contains('hidden'));await page.waitForFunction(()=>navigator.serviceWorker.controller);}
   const tokenA=await a.evaluate(()=>cloudSessionToken);
   await b.evaluate(()=>openMediaRow('show'));await b.locator('.gallery-season>summary').click();
+  await a.locator('[data-tab="collection"]').click();
   await a.locator('[data-gallery-category="Series"]').click();
-  await a.locator('#continue-watching>details>summary').click();
-  await a.locator('[data-continue-mark="show"]').click();await settled(a);await progress(b,[2]);
+  await a.locator('[data-gallery-item="show"]').click();
+  await a.locator('[data-gallery-watch-next]').click();await settled(a);await progress(b,[2]);
   assert.equal(await b.locator('[data-gallery-toggle-episode="1:2"]').getAttribute('aria-pressed'),'true','an open tracker receives the other device tick');
   assert.equal(await b.locator('.gallery-season').getAttribute('open'),'');
+  await a.locator('[data-gallery-close]').click();
   console.log('cross-device: foreground polling updates an open tracker without Sync Now');
 
   await b.evaluate(()=>document.querySelector('.gallery-detail').close());await b.waitForFunction(()=>!document.querySelector('.gallery-detail[open]'));

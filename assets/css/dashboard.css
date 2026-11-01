@@ -128,3 +128,18 @@
 .release-pending h3{font-size:.9rem;line-height:1.4}.release-pending h3>span{color:var(--muted);font-size:.75rem}
 .release-pending>p{margin:7px 0 12px;color:var(--muted);font-size:.76rem;line-height:1.5}
 .release-pending .release-tba-item>span:nth-child(2){grid-column:1;line-height:1.4}
+
+/* Home has two independently collapsible schedules, always in one column. */
+.home-schedules{display:flex;flex-direction:column;gap:18px;margin:0 0 24px;min-width:0}
+.home-schedule-panel{min-width:0;border:1px solid var(--border);border-radius:24px;background:var(--card);overflow:hidden}
+.home-schedule-panel>summary{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:64px;padding:18px;cursor:pointer;list-style:none;color:var(--text)}
+.home-schedule-panel>summary::-webkit-details-marker{display:none}
+.home-schedule-panel>summary h2{margin:0;font-size:1.12rem}
+.home-schedule-panel>summary:focus-visible{outline:2px solid var(--blue2);outline-offset:-4px;border-radius:24px}
+.home-section-chevron{font-size:1.3rem;color:var(--muted)}
+.home-schedule-panel[open]>summary{border-bottom:1px solid var(--border)}
+.home-schedule-panel[open] .home-section-chevron{transform:rotate(180deg)}
+.home-schedule-panel .dashboard-section{margin:0;border:0;border-radius:0!important}
+.home-schedule-panel .weekly-releases-heading h2{display:none}
+.home-schedule-panel .weekly-releases-heading{padding-top:12px}
+.home-schedule-panel .weekly-eyebrow{display:none}

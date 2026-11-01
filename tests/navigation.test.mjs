@@ -14,7 +14,7 @@ test('Reminder routes beat saved navigation and never open a colliding title in 
  }
 });
 test('App URLs round-trip titles, collections, Library filters and sort order',()=>{
- const c=router(),page={tab:'library',category:'Series',scope:'list:My shows & films',query:'NCIS',filter:'Watching',sort:'title'};
+ const c=router(),page={tab:'collection',category:'Series',scope:'list:My shows & films',query:'NCIS',filter:'Watching',sort:'title'};
  const hash=c.appPageHash(page),parsed=c.parseAppHash(hash);
  for(const [key,value] of Object.entries(page))assert.equal(parsed[key],value);
  const title=c.parseAppHash(c.appPageHash({...page,title:'a/b c'}));assert.equal(title.title,'a/b c');
@@ -67,4 +67,15 @@ test('Dedicated Library routes preserve category, filters and sort separately fr
   for(const [key,value]of Object.entries(page))assert.equal(parsed[key],value);
  }
  assert.equal(c.parseAppHash('#/library').tab,'library');
+});
+
+test('Old category bookmarks resolve to the single Library page, never Home content',()=>{
+ const c=router();
+ for(const [path,category] of [['movies','Film'],['series','Series']]){
+  const page=c.parseAppHash('#/library/'+path+'?sort=title');
+  assert.equal(page.tab,'collection');assert.equal(page.category,category);
+  assert.match(c.appPageHash(page),/^#\/collection\//);
+ }
+ const home=c.parseAppHash(c.appPageHash({tab:'library',calendarRange:'upcoming'}));
+ assert.equal(home.calendarRange,'upcoming');assert.equal(home.tab,'library');
 });

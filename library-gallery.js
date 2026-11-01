@@ -388,6 +388,16 @@ window.WatchLogGallery=(()=>{
   }
   function mount(element,rows,callbacks){
     host=element;api=callbacks;rows=api.includes?rows.filter(api.includes):rows;observer?.disconnect();host.classList.add('gallery-active');
+    if(api.dashboardOnly){
+      category='';
+      if(api.features){
+        const progress=document.getElementById('continue-watching');
+        if(progress&&host.contains(progress))api.features.append(progress);
+        if(host.contains(api.features))host.before(api.features);
+      }
+      if(host.childNodes.length)host.replaceChildren();
+      host._galleryMarkup=null;return;
+    }
     if(!host._galleryEvents){host._galleryEvents=true;host.addEventListener('click',event=>{
       const manage=event.target.closest('[data-gallery-manage]');
       if(manage){api.manage?.(JSON.parse(manage.dataset.galleryManageIds||'[]'),manage.dataset.galleryManage);return;}

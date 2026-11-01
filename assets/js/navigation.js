@@ -9,7 +9,7 @@ function appPageHash(page){
   let path=page.title?'title/'+encodeURIComponent(page.title):page.tab==='settings'?'settings'+(page.settings?'/'+page.settings:''):page.tab==='search'?'search':page.tab==='collection'?'collection'+(page.category?'/'+(page.category==='Film'?'movies':'series'):''):'library'+(page.schedule?'/'+page.schedule:page.category?'/'+(page.category==='Film'?'movies':'series'):'');
   const query=new URLSearchParams();
   if(page.scope)query.set('collection',page.scope);
-  if(page.schedule==='calendar'&&page.calendarRange&&page.calendarRange!=='week')query.set('range',page.calendarRange);
+  if((page.schedule==='calendar'||page.tab==='library'&&!page.schedule)&&page.calendarRange&&page.calendarRange!=='week')query.set('range',page.calendarRange);
   if(page.tab==='search'){if(page.searchText)query.set('q',page.searchText);if(page.searchFormat&&page.searchFormat!=='All')query.set('format',page.searchFormat);}else if(page.query)query.set('q',page.query);
   if(page.filter&&page.filter!=='All')query.set('filter',page.filter);
   if(page.sort&&page.sort!=='current')query.set('sort',page.sort);
@@ -24,6 +24,7 @@ function parseAppHash(hash){
   else if(parts[0]==='title'){try{page.title=decodeURIComponent(parts.slice(1).join('/'));}catch(_){}}
   else if(['recurring','calendar'].includes(parts[1]))page.schedule=parts[1];
   else if(parts[1]==='movies'||parts[1]==='series')page.category=parts[1]==='movies'?'Film':'Series';
+  if(page.tab==='library'&&page.category)page.tab='collection';
   return page;
 }
 function saveNavigationPosition(){
@@ -46,10 +47,11 @@ function applyAppPage(page){
   if(!currentUser)return;
   navigationApplying=true;const revision=++navigationRestore,previousSchedule=typeof selectedScheduleView==='string'?selectedScheduleView:'';
   try{
+    if(page.tab==='library'&&page.category)page={...page,tab:'collection'};
     document.querySelector('.gallery-detail[open]')?.close();
     libraryScope=page.scope||'';activeFilter=page.filter||'All';activeSort=page.sort||'current';searchQuery=page.query||'';searchInput.value=searchQuery;sortMode.value=activeSort;
     pillBtns.forEach(button=>button.classList.toggle('active',button.dataset.filter===activeFilter));
-    selectedScheduleView=['recurring','calendar'].includes(page.schedule)?page.schedule:'';
+    selectedScheduleView='';
     selectedCalendarRange=['today','upcoming'].includes(page.calendarRange)?page.calendarRange:'week';
     window.WatchLogGallery?.setCategory?.(page.category||'');
     if(page.tab==='search'){const text=page.searchText||'';if(discoveryQuery!==text){pauseTitleSearch();discoveryRows=[];discoveryQuery=text;}discoveryInput.value=text;discoveryFilter=page.searchFormat||'All';}
@@ -62,7 +64,7 @@ function applyAppPage(page){
       if(revision!==navigationRestore)return;
       window.scrollTo?.({top:Number(page.scroll)||0,behavior:'auto'});
       const dialog=document.querySelector('.gallery-detail[open]');if(dialog)dialog.scrollTop=Number(page.dialogScroll)||0;
-      if(previousSchedule&&!selectedScheduleView&&page.tab==='library'&&!page.category&&!page.title)document.querySelector('[data-schedule-open="'+previousSchedule+'"]')?.focus({preventScroll:true});
+      if(previousSchedule&&!selectedScheduleView&&page.tab==='library'&&!page.category&&!page.title)document.querySelector('[data-home-section="'+previousSchedule+'"]>summary')?.focus({preventScroll:true});
     });
   }finally{navigationApplying=false;}
 }
