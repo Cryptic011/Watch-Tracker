@@ -122,7 +122,7 @@ const server=http.createServer((req,res)=>{
       {id:'agenda-last',title:'Last included date',type:'Film',filmReleaseDate:day(13)},
       {id:'agenda-outside',title:'Outside fourteen days',type:'Film',filmReleaseDate:day(14)},
       {id:'agenda-old',title:'Last week',type:'Film',filmReleaseDate:new Date(monday.getTime()-86400000).toISOString()},
-      {id:'agenda-prior',title:'Earlier this week',type:'Film',filmReleaseDate:new Date(now.getTime()-1000).toISOString()}];
+      {id:'agenda-prior',title:'Released earlier today',type:'Film',filmReleaseDate:today.toISOString()}];
     mediaItems=mediaItems.map(item=>({...item,filmReleaseDate:item.filmReleaseDate.length===10?item.filmReleaseDate+'T18:00:00Z':item.filmReleaseDate,filmReleaseSource:'Official test listing',platform:'Test streaming'}));
     renderDashboard();
     const root=document.querySelector('#library-dashboard'),card=root.querySelector('.release-card').getBoundingClientRect(),poster=root.querySelector('.calendar-poster').getBoundingClientRect();
@@ -134,7 +134,7 @@ const server=http.createServer((req,res)=>{
       fits:root.scrollWidth<=root.clientWidth};
    }finally{mediaItems=saved;selectedCalendarRange=range;renderDashboard();}
   });
-  assert.deepEqual(agendaProof,{posterAligned:true,period:'Next 14 days · GMT',controls:0,days:2,posters:2,future:['agenda-near','agenda-last'],prior:['agenda-prior'],priorLast:true,fits:true},'calendar shows a compact fourteen-day poster agenda and only this week’s prior releases');
+  assert.deepEqual(agendaProof,{posterAligned:true,period:'Next 14 days · GMT',controls:0,days:3,posters:3,future:['agenda-prior','agenda-near','agenda-last'],prior:[],priorLast:true,fits:true},'calendar retains today’s elapsed releases alongside the next fourteen days and keeps Prior Releases separate');
   phase='calendar poster loading';
   const beforePosterCheck=await page.evaluate(()=>{
    const original=mediaItems;

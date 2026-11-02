@@ -115,11 +115,13 @@ function calendarRange(_range,now=new Date()){
 }
 function calendarWindowEvents(items,range='upcoming',now=new Date()){
   const window=calendarRange(range,now),result=calendarEvents(items,window.start,window.days);
+  // Keep the whole current calendar day in the main list. A release passing
+  // its time must not move to Prior Releases before the next GMT midnight.
   const midnight=window.start.getTime();
   const prior=calendarEvents(items,window.priorStart,Math.round((midnight-window.priorStart.getTime())/86400000)+1).events;
   const unconfirmedTimes=[...new Map([...prior,...result.events].filter(event=>event.dateOnly).map(event=>[event.item.id+'|'+event.label+'|'+event.raw,event])).values()];
-  return {...window,...result,events:result.events.filter(event=>!event.dateOnly&&event.date>=now),
-    priorEvents:prior.filter(event=>!event.dateOnly&&event.date<now),unconfirmedTimes};
+  return {...window,...result,events:result.events.filter(event=>!event.dateOnly&&event.date.getTime()>=midnight),
+    priorEvents:prior.filter(event=>!event.dateOnly&&event.date.getTime()<midnight),unconfirmedTimes};
 }
 function calendarEvents(items,now=new Date(),days=7){
   const start=new Date(now);start.setUTCHours(0,0,0,0);

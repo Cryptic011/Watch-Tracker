@@ -1,3 +1,7 @@
+## 2026-11-02 — Keep today's releases visible until midnight
+- Keep releases in their dated calendar section for the whole day, including after their release time.
+- Move them to Prior Releases at the next GMT midnight. Apply the same boundary to Calendar and Recurring shows.
+
 ## 2026-11-02 — Restore season covers and show episode titles
 - Keep each season's own poster where available; use the matching show's cover for missing or broken season artwork.
 - Show the episode number once, with its actual title underneath. Fetch titles alongside episode images, including for older saved shows.

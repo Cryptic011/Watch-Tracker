@@ -413,17 +413,17 @@ test('A single announced episode or season premiere appears without a historical
  assert.equal(c.recurringWeeklyShows([{...one,hideFromWeeklyReleases:true}],now).length,0);
 });
 
-test('Fourteen-day agenda separates elapsed releases and restricts prior releases to this week',()=>{
+test('Fourteen-day agenda keeps elapsed releases today and restricts prior releases to earlier days this week',()=>{
  const c=app(),now=new Date('2026-11-05T12:00:00Z');
- const dates=['2026-11-01T20:00:00Z','2026-11-02','2026-11-05T09:00:00Z','2026-11-05','2026-11-05T18:00:00Z','2026-11-18T23:59:00Z','2026-11-19T00:00:00Z'];
+ const dates=['2026-11-01T20:00:00Z','2026-11-02','2026-11-05T09:00:00Z','2026-11-05','2026-11-05T18:00:00Z','2026-11-18T23:59:00Z','2026-11-19T00:00:00Z','2026-11-04T18:00:00Z'];
  const rows=dates.map((date,index)=>({id:String(index),title:date,type:'Film',filmReleaseDate:date}));
  const result=c.calendarWindowEvents(rows,'upcoming',now);
  assert.equal(result.days,14);
- assert.deepEqual(Array.from(result.events,event=>event.item.id),['4','5']);
- assert.deepEqual(Array.from(result.priorEvents,event=>event.item.id),['2']);
+ assert.deepEqual(Array.from(result.events,event=>event.item.id),['2','4','5']);
+ assert.deepEqual(Array.from(result.priorEvents,event=>event.item.id),['7']);
  assert.deepEqual(Array.from(result.unconfirmedTimes,event=>event.item.id),['1','3']);
  assert.ok(result.events.every(event=>!event.dateOnly),'date-only entries never become confirmed calendar cards');
- for(const range of ['today','week','upcoming'])assert.deepEqual(Array.from(c.calendarWindowEvents(rows,range,now).priorEvents,event=>event.item.id),['2']);
+ for(const range of ['today','week','upcoming'])assert.deepEqual(Array.from(c.calendarWindowEvents(rows,range,now).priorEvents,event=>event.item.id),['7']);
 });
 test('Prior releases clear at Monday midnight, including month and year boundaries',()=>{
  const c=app(),now=new Date('2027-01-04T00:00:00Z');
@@ -450,4 +450,17 @@ test('The whole calendar renders both weeks using the same dated poster-card com
   assert.ok(!markup.includes('data-recurring-day'));
  }
  assert.equal(calendar.replaceAll('data-dashboard-open','data-recurring-open'),recurring,'both displays share the complete calendar presentation');
+});
+
+
+test('Monday releases remain through 23:59:59 then move to prior on Tuesday',()=>{
+ const c=app(),rows=[{id:'morning',title:'Monday show',type:'Series',airingSeason:1,latestEpisodeNum:2,latestEpisodeDate:'2026-11-02T08:00:00Z'}];
+ for(const time of ['2026-11-02T07:59:59Z','2026-11-02T08:00:00Z','2026-11-02T15:44:00Z','2026-11-02T23:59:59.999Z']){
+  const result=c.calendarWindowEvents(rows,'upcoming',new Date(time));
+  assert.deepEqual(Array.from(result.events,event=>event.item.id),['morning'],time);
+  assert.equal(result.priorEvents.length,0,time);
+ }
+ const next=c.calendarWindowEvents(rows,'upcoming',new Date('2026-11-03T00:00:00Z'));
+ assert.equal(next.events.length,0);assert.deepEqual(Array.from(next.priorEvents,event=>event.item.id),['morning']);
+ assert.equal(c.recurringScheduleDelay([],new Date('2026-11-02T23:59:59Z')),1000,'the active calendar refreshes at midnight');
 });
