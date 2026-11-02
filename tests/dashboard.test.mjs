@@ -209,27 +209,27 @@ test('Official weekly patterns and stored schedules persist through refreshes an
  assert.match(fs.readFileSync(new URL('../assets/js/sync.js',import.meta.url),'utf8'),/recurringWeeklySchedule:scheduleVerified\?\(result.recurringWeeklySchedule\|\|null\)/);
 });
 
-test('Calendar retains the week filter and covers exactly fourteen upcoming dates',()=>{
+test('Calendar always covers fourteen dates, including legacy range requests',()=>{
  const c=app(),now=new Date(2026,9,22,18),week=c.calendarRange('week',now),upcoming=c.calendarRange('upcoming',now),today=c.calendarRange('today',now);
  assert.equal(c.localISODate(week.start),'2026-10-22');
- assert.equal(week.days,4);
+ assert.equal(week.days,14);
  assert.equal(c.localISODate(week.priorStart),'2026-10-19');
  assert.equal(week.priorDays,3);
  assert.equal(c.localISODate(upcoming.start),'2026-10-22');
  assert.equal(upcoming.days,14);
  assert.equal(upcoming.label,'Next 14 days');
  assert.equal(c.localISODate(today.start),'2026-10-22');
- assert.equal(today.days,1);
+ assert.equal(today.days,14);
  const items=['2026-10-18','2026-10-19','2026-10-21','2026-10-22','2026-10-25','2026-10-26','2026-10-29','2026-10-30'].map((date,index)=>({id:String(index),title:date,type:'Film',filmReleaseDate:date}));
- assert.equal(JSON.stringify(c.calendarEvents(items,week.start,week.days).events.map(event=>event.item.title)),JSON.stringify(['2026-10-22','2026-10-25']));
+ assert.equal(JSON.stringify(c.calendarEvents(items,week.start,week.days).events.map(event=>event.item.title)),JSON.stringify(['2026-10-22','2026-10-25','2026-10-26','2026-10-29','2026-10-30']));
  assert.equal(JSON.stringify(c.calendarEvents(items,week.priorStart,week.priorDays).events.map(event=>event.item.title)),JSON.stringify(['2026-10-19','2026-10-21']));
  assert.equal(JSON.stringify(c.calendarEvents(items,upcoming.start,upcoming.days).events.map(event=>event.item.title)),JSON.stringify(['2026-10-22','2026-10-25','2026-10-26','2026-10-29','2026-10-30']));
 });
-test('Calendar shows only the selected window while retaining TBA and excluded sections',()=>{
+test('Calendar is one clean list with Prior Releases and no range controls or extra panels',()=>{
  const dashboard=fs.readFileSync(new URL('../assets/js/dashboard.js',import.meta.url),'utf8');
  assert.doesNotMatch(dashboard,/upcomingBeyondWeek|upcomingMarkup|next 30 days/i);
- assert.match(dashboard,/data-dashboard-section="unknown"/);
- assert.match(dashboard,/data-dashboard-section="excluded"/);
+ assert.doesNotMatch(dashboard,/data-dashboard-section="unknown"/);
+ assert.doesNotMatch(dashboard,/data-dashboard-section="excluded"/);
  assert.match(dashboard,/data-dashboard-section="prior"/);
  assert.match(dashboard,/Prior Releases/);
 });
@@ -363,8 +363,8 @@ test('Changelog shows the actual workflow run number and explains the Weekly Rel
   const dashboard=fs.readFileSync(new URL('../assets/js/dashboard.js',import.meta.url),'utf8');
   assert.match(index,/Exclude this show from Weekly Releases/);
   assert.match(css,/\.weekly-release-preference-copy\{display:flex/);
-  assert.match(dashboard,/data-calendar-range/);
-  assert.match(dashboard,/data-calendar-include/);
+  assert.doesNotMatch(dashboard,/data-calendar-range/);
+  assert.match(dashboard,/hideFromWeeklyReleases===true/);
 });
 
 

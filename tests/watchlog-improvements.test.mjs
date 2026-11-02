@@ -47,7 +47,7 @@ test('Library controls include backup restore, alternate titles, and all request
 
 test('Calendar controls show GMT and reduced-motion is global',()=>{
   const dashboard=read('../assets/js/dashboard.js'),css=read('../assets/css/app.css');
-  for(const range of ['today','week','upcoming'])assert.ok(dashboard.includes(`['${range}'`));
+  assert.doesNotMatch(dashboard,/data-calendar-range/);assert.match(dashboard,/Next 14 days/);
   assert.match(dashboard,/GMT/);
   assert.doesNotMatch(dashboard,/resolvedOptions\(\)\.timeZone/);
   assert.match(css,/@media\(prefers-reduced-motion:reduce\)/);

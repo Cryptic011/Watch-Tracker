@@ -1,3 +1,9 @@
+## 2026-11-02 — Remove calendar filters and clean the whole display
+- Remove Today, This week and all calendar range tabs; always show one 14-day dated list.
+- Ignore legacy range links so old saved navigation cannot restore the old filtered calendar.
+- Remove duplicate headings, totals, footnotes and extra confirmation/exclusion panels from the calendar.
+- Keep poster cards, collapsible calendars and a compact current-week Prior Releases section at the bottom.
+
 ## 2026-11-02 — Replace the complete calendar display
 - Use one shared dated poster-card calendar across Calendar and Recurring shows.
 - Replace the repeating Monday–Sunday buckets with actual release dates across the next 14 days.

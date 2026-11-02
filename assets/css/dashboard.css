@@ -163,3 +163,25 @@
 .calendar-agenda .release-chevron{display:none}
 .calendar-agenda .prior-releases{margin-top:24px}
 @media(min-width:620px){.calendar-agenda .release-card{grid-template-columns:92px minmax(0,1fr);min-height:138px}.calendar-agenda .calendar-poster{width:92px;min-height:138px}}
+
+/* One clean calendar, without range tabs or nested dashboard panels. */
+.home-schedule-panel{border:0;border-radius:0;background:none;overflow:visible}
+.home-schedule-panel>summary{padding:16px 0;min-height:54px}
+.home-schedule-panel[open]>summary{border-bottom:1px solid var(--border)}
+.calendar-period{margin:0;padding:12px 0 2px;color:var(--muted);font-size:.78rem;font-weight:600}
+.calendar-agenda .release-week-list{padding:0}
+.calendar-agenda .release-day,.calendar-agenda .release-day.is-today{margin:18px 0 25px}
+.calendar-agenda .release-card{background:var(--inner);border-radius:14px;box-shadow:none}
+.calendar-agenda .prior-releases{margin:22px 0 0;padding:0}
+.calendar-agenda .prior-releases .release-tba-count{background:none;border-radius:0;min-width:0;color:var(--muted)}
+
+/* Reference treatment: black canvas, strong dates, flat neutral cards. */
+.calendar-agenda .release-card{background:#1e1e1e;gap:12px;grid-template-columns:74px minmax(0,1fr);min-height:111px}
+.calendar-agenda .calendar-poster{width:74px;min-height:111px}
+.calendar-agenda .release-day-heading{margin-bottom:18px}
+.calendar-agenda .release-day,.calendar-agenda .release-day.is-today{margin:24px 0 30px}
+.calendar-agenda .release-day-name{font-size:clamp(1.08rem,4.9vw,1.35rem);line-height:1.25;letter-spacing:-.025em}
+.calendar-agenda .release-card-copy{padding:14px 12px 14px 0;gap:5px}
+.calendar-agenda .release-card-copy strong{font-size:1.05rem}
+html[data-theme="light"] .calendar-agenda .release-card{background:#eef1f5}
+@media(min-width:620px){.calendar-agenda .release-card{grid-template-columns:92px minmax(0,1fr);min-height:138px}.calendar-agenda .calendar-poster{width:92px;min-height:138px}}

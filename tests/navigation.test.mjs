@@ -26,12 +26,12 @@ test('Search and Settings have their own restorable URLs',()=>{
  assert.equal(parsed.tab,'search');assert.equal(parsed.searchText,'The Batman');assert.equal(parsed.searchFormat,'Film');
  assert.equal(c.parseAppHash('#/settings/unknown').settings,'');assert.equal(c.parseAppHash('#/title/%E0%A4').title,'');
 });
-test('Schedule views and calendar ranges have restorable Library URLs',()=>{
+test('Schedule URLs always restore the full calendar and ignore legacy range parameters',()=>{
  const c=router();
  for(const schedule of ['recurring','calendar'])for(const calendarRange of ['week','today','upcoming']){
   const page={tab:'library',schedule,calendarRange},hash=c.appPageHash(page),parsed=c.parseAppHash(hash);
   assert.equal(parsed.tab,'library');assert.equal(parsed.schedule,schedule);assert.equal(parsed.category,'');
-  assert.equal(parsed.calendarRange,schedule==='calendar'?calendarRange:'upcoming');
+  assert.equal(parsed.calendarRange,'upcoming');
  }
  assert.equal(c.parseAppHash('#/library/calendar?range=unknown').calendarRange,'upcoming');
  assert.equal(c.parseAppHash('#/library/unknown').schedule,'');
@@ -86,3 +86,5 @@ test('Recent additions filter restores in Library URLs',()=>{
   assert.equal(page.filter,'Recent');assert.equal(page.tab,'collection');assert.equal(page.category,category);
  }
 });
+
+test('Legacy Today and This week links cannot restore removed calendar filters',()=>{const c=router();for(const range of ['today','week','upcoming']){assert.equal(c.parseAppHash('#/library?range='+range).calendarRange,'upcoming');assert.equal(c.appPageHash({tab:'library',calendarRange:range}),'#/library');}});

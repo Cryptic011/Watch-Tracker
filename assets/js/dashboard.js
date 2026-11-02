@@ -108,14 +108,10 @@ function renderScheduleNavigation(){
   if(calendar&&calendar.parentElement!==calendarPanel)calendarPanel.append(calendar);
   if(typeof refreshRegionalReleaseSources==='function')refreshRegionalReleaseSources();
 }
-function calendarRange(range,now=new Date()){
+function calendarRange(_range,now=new Date()){
   const today=new Date(now);today.setUTCHours(0,0,0,0);
   const weekStart=new Date(today);weekStart.setUTCDate(weekStart.getUTCDate()-(weekStart.getUTCDay()+6)%7);
-  const priorDays=(today.getUTCDay()+6)%7;
-  const throughSunday=7-priorDays;
-  if(range==='today')return{start:today,days:1,label:'Local calendar day',priorStart:weekStart,priorDays:0};
-  if(range==='upcoming')return{start:today,days:14,label:'Next 14 days',priorStart:weekStart,priorDays};
-  return{start:today,days:throughSunday,label:`Today through Sunday`,priorStart:weekStart,priorDays};
+  return{start:today,days:14,label:'Next 14 days',priorStart:weekStart,priorDays:(today.getUTCDay()+6)%7};
 }
 function calendarWindowEvents(items,range='upcoming',now=new Date()){
   const window=calendarRange(range,now),result=calendarEvents(items,window.start,window.days);
@@ -265,10 +261,10 @@ function renderRecurringWeeklySchedule(){
   root.classList.toggle("hidden",!available);
   if(!available){if(!currentUser){root.replaceChildren();root._dashboardMarkup=null;}return;}
   const now=new Date(),items=mediaItems.filter(isEpisodeTrackable),schedule=calendarWindowEvents(items,'upcoming',now);
-  const rows=recurringWeeklyShows(items,now),pending=schedule.unknown.filter(item=>item.streamingPending);
-  const total=new Set(schedule.events.map(event=>String(event.item.id))).size,progressMarkers=new Map();
+  const rows=recurringWeeklyShows(items,now);
+  const progressMarkers=new Map();
   const days=releaseAgendaDays(schedule,'data-recurring-open',progressMarkers);
-  updateDashboardMarkup(root,`<section class="dashboard-section weekly-releases recurring-weekly-releases calendar-agenda" aria-labelledby="recurring-weekly-title"><header class="weekly-releases-heading"><div class="recurring-summary-copy"><h2 id="recurring-weekly-title">Recurring shows</h2><p class="dashboard-note">Next 14 days · GMT</p></div><span class="weekly-total">${total}<small>shows</small></span></header><div class="release-week-list">${days}</div>${pendingStreamingMarkup(pending,'data-recurring-open')}${releaseTimeConfirmationMarkup(schedule.unconfirmedTimes,'data-recurring-open')}${releaseAgendaPrior(schedule.priorEvents,'data-recurring-open',progressMarkers)}<p class="weekly-footnote">All times are GMT. Prior Releases contains confirmed releases from this week only.</p></section>`);
+  updateDashboardMarkup(root,`<section class="dashboard-section weekly-releases recurring-weekly-releases calendar-agenda" aria-label="Recurring release calendar"><p class="calendar-period">Next 14 days · GMT</p><div class="release-week-list">${days}</div>${releaseAgendaPrior(schedule.priorEvents,'data-recurring-open',progressMarkers)}</section>`);
   window.WatchLogGallery?.observeScheduleArtwork?.(root,items);
 
   if(document.visibilityState==="visible"){
@@ -318,9 +314,7 @@ function releaseAgendaDays({events,start,days:daysToShow},openAttribute='data-da
     const date=new Date(start);date.setUTCDate(date.getUTCDate()+offset);
     const key=localISODate(date),rows=eventsByDay.get(key)||[];
     if(!rows.length)continue;
-    const isToday=localISODate(date)===localISODate(new Date());
     const dayLabel=new Intl.DateTimeFormat(USER_LOCALE,{timeZone:'UTC',weekday:'long',day:'numeric',month:'short',year:'numeric'}).format(date);
-    const dateLabel=DASHBOARD_DATE_FORMATTER.format(date);
     // Group episodes of the same title airing at the same time into one compact card.
     const grouped=[],groupsByKey=new Map();
     for(const event of rows){
@@ -330,19 +324,17 @@ function releaseAgendaDays({events,start,days:daysToShow},openAttribute='data-da
       if(!group){group={key:groupKey,item:event.item,time,dateOnly:event.dateOnly,events:[],labels:new Set()};groupsByKey.set(groupKey,group);grouped.push(group);}
       if(!group.labels.has(event.label)){group.labels.add(event.label);group.events.push(event);}
     }
-    days+=`<section data-release-day="${key}" class="release-day${rows.length?' has-releases':' is-empty'}${isToday?' is-today':''}" aria-label="${esc(dayLabel)}, ${esc(dateLabel)}">
-      <header class="release-day-heading"><div><span class="release-day-name">${esc(dayLabel)}${isToday?'<span class="today-marker">TODAY</span>':''}</span></div><span class="release-day-count">${rows.length} ${rows.length===1?'release':'releases'}</span></header>
+    days+=`<section data-release-day="${key}" class="release-day has-releases" aria-label="${esc(dayLabel)}">
+      <header class="release-day-heading"><div><span class="release-day-name">${esc(dayLabel)}</span></div></header>
       ${grouped.length?grouped.map(group=>{
         const labels=group.events.map(event=>event.label);
         const episodeLabel=labels.length>1&&labels.every(label=>/^S\d+ E\d+$/.test(label))
           ?labels[0].match(/^S(\d+) E/)[0].replace(' E','')+' E'+labels.map(label=>Number(label.match(/E(\d+)/)[1])).join(', ')
           :labels.join(' · ');
         const platform=(group.item.platform?esc(group.item.platform):'Platform not saved')+(group.item.releaseSchedule&&!group.item.releaseSchedule.estimated?' · '+esc(group.item.releaseSchedule.country)+' streaming':'');
-        const releaseState=group.events.some(event=>event.date.toDateString()===new Date().toDateString())?'Today':group.events.some(event=>event.date>new Date())?'Upcoming':'Released';
         return `<button type="button" class="release-card" ${openAttribute}="${esc(group.item.id)}" data-release-at="${esc(group.events[0].raw)}">
           <span class="calendar-poster"><span class="calendar-poster-fallback" aria-hidden="true">${esc(group.item.title.slice(0,1))}</span><img hidden alt="" data-art="${esc(`${group.item.type}:${group.item.imdbId||group.item.tvmazeShowId||group.item.id}`)}" decoding="async" loading="lazy"></span>
           <span class="release-card-copy"><strong class="release-show-title"><span>${esc(group.item.title)}</span>${scheduleProgressMarker(group.item,progressMarkers)}</strong><span class="release-episode">${esc(episodeLabel)}${group.events.length===1&&group.events[0].title?' · '+esc(group.events[0].title):''}</span><span class="release-time">${esc(group.time)}${group.item.platform?' on '+platform:''}</span></span>
-          <span class="release-chevron" aria-hidden="true">›</span>
         </button>`;
       }).join(''):'<p class="release-empty">Nothing listed for this day</p>'}
     </section>`;
@@ -352,11 +344,6 @@ function releaseAgendaDays({events,start,days:daysToShow},openAttribute='data-da
 function releaseAgendaPrior(priorEvents,openAttribute='data-dashboard-open',progressMarkers=new Map()){
   return `<details class="release-tba prior-releases" data-dashboard-section="prior"><summary><span>Prior Releases</span><span class="release-tba-count">${priorEvents.length}</span></summary><div class="release-tba-list">${priorEvents.map(event=>`<button type="button" class="release-tba-item" ${openAttribute}="${esc(event.item.id)}"><strong class="release-show-title"><span>${esc(event.item.title)}</span>${scheduleProgressMarker(event.item,progressMarkers)}</strong><span>${esc(event.label)} · ${esc(DASHBOARD_PRIOR_DATE_FORMATTER.format(event.date))}${event.dateOnly?' · Date only':' · '+esc(DASHBOARD_TIME_FORMATTER.format(event.date))}</span></button>`).join('')}${!priorEvents.length?'<p class="release-empty">No releases earlier this week</p>':''}</div></details>`;
 }
-function releaseTimeConfirmationMarkup(events,openAttribute='data-dashboard-open'){
-  if(!events.length)return '';
-  return `<details class="release-tba" data-dashboard-section="unconfirmed-times"><summary><span>Release times to be confirmed</span><span class="release-tba-count">${events.length}</span></summary><div class="release-tba-list">${events.map(event=>`<button type="button" class="release-tba-item" ${openAttribute}="${esc(event.item.id)}"><strong>${esc(event.item.title)}</strong><span>${esc(event.label)} · ${esc(DASHBOARD_PRIOR_DATE_FORMATTER.format(event.date))} · Time to be confirmed</span></button>`).join('')}</div></details>`;
-}
-
 function renderDashboard(){
   if(typeof renderLibraryFeatures==="function")renderLibraryFeatures();
   renderScheduleNavigation();
@@ -366,28 +353,11 @@ function renderDashboard(){
   const visible=homeSchedulesVisible();
   root.classList.toggle('hidden',!visible);if(!visible){if(!currentUser){root.replaceChildren();root._dashboardMarkup=null;}return;}
   const progressMarkers=new Map();
-  const {start,days:daysToShow,label:rangeLabel,events,priorEvents,unconfirmedTimes,unknown:unresolved}=calendarWindowEvents(mediaItems,selectedCalendarRange,new Date());
-  const pending=unresolved.filter(item=>item.streamingPending),unknown=unresolved.filter(item=>!item.streamingPending);
-  const days=releaseAgendaDays({events,start,days:daysToShow},'data-dashboard-open',progressMarkers);
-  const excluded=mediaItems.filter(item=>item.hideFromWeeklyReleases===true);
-  const priorMarkup=releaseAgendaPrior(priorEvents,'data-dashboard-open',progressMarkers);
-  const controls=`<div class="filter-pills calendar-range" role="group" aria-label="Filter release calendar">${[['today','Today'],['week','This week'],['upcoming','Next 14 days']].map(([key,label])=>`<button type="button" class="pill-btn${selectedCalendarRange===key?' active':''}" data-calendar-range="${key}" aria-pressed="${selectedCalendarRange===key}">${label}</button>`).join('')}</div>`;
-  updateDashboardMarkup(root,`<section class="dashboard-section weekly-releases calendar-agenda" aria-labelledby="weekly-releases-title">
-    <header class="weekly-releases-heading"><div class="recurring-summary-copy"><span class="weekly-eyebrow">RELEASE CALENDAR</span><h2 id="weekly-releases-title">Your calendar</h2><p class="dashboard-note">${rangeLabel} · GMT</p></div><span class="weekly-total">${events.length}<small>releases</small></span></header>
-    ${controls}
-    <div class="release-week-list">${days||'<p class="release-empty">No releases in this date range</p>'}</div>
-    ${pendingStreamingMarkup(pending,"data-dashboard-open")}
-    ${unknown.length?`<details class="release-tba" data-dashboard-section="unknown"><summary><span>Dates to be announced</span><span class="release-tba-count">${unknown.length}</span></summary><div class="release-tba-list">${unknown.map(item=>`<button type="button" class="release-tba-item" data-dashboard-open="${esc(item.id)}"><strong class="release-show-title"><span>${esc(item.title)}</span>${scheduleProgressMarker(item,progressMarkers)}</strong><span>${esc(item.announcement)} · Date TBA</span><span class="release-chevron" aria-hidden="true">›</span></button>`).join('')}</div></details>`:''}
-    ${excluded.length?`<details class="release-tba" data-dashboard-section="excluded"><summary><span>Excluded from Weekly Releases</span><span class="release-tba-count">${excluded.length}</span></summary><div class="release-tba-list">${excluded.map(item=>`<div class="dashboard-row excluded-release-row"><div><strong>${esc(item.title)}</strong><span class="release-state-badge" data-release-state="excluded">Excluded</span></div><button type="button" class="btn btn-secondary" data-calendar-include="${esc(item.id)}">Re-enable</button></div>`).join('')}</div></details>`:''}
-    ${releaseTimeConfirmationMarkup(unconfirmedTimes,'data-dashboard-open')}
-    ${priorMarkup}
-    <p class="weekly-footnote">All times are GMT. Only confirmed release timestamps appear in the dated list and Prior Releases.</p>
-  </section>`);
+  const schedule=calendarWindowEvents(mediaItems,'upcoming',new Date());
+  updateDashboardMarkup(root,`<section class="dashboard-section weekly-releases calendar-agenda" aria-label="Release calendar"><p class="calendar-period">Next 14 days · GMT</p><div class="release-week-list">${releaseAgendaDays(schedule,'data-dashboard-open',progressMarkers)}</div>${releaseAgendaPrior(schedule.priorEvents,'data-dashboard-open',progressMarkers)}</section>`);
   window.WatchLogGallery?.observeScheduleArtwork?.(root,mediaItems);
 }
 document.getElementById('library-dashboard').addEventListener('click',event=>{
-  const range=event.target.closest('[data-calendar-range]');if(range){saveNavigationPosition();selectedCalendarRange=range.dataset.calendarRange;renderDashboard();recordAppNavigation(true);return;}
-  const include=event.target.closest('[data-calendar-include]');if(include){const item=mediaItems.find(row=>String(row.id)===include.dataset.calendarInclude);if(item){item.hideFromWeeklyReleases=false;render();void persistLibrary(mediaItems,{background:true,precleaned:true});}return;}
   const watch=event.target.closest('[data-dashboard-watch]');
   if(watch){
     const item=mediaItems.find(row=>String(row.id)===watch.dataset.dashboardWatch),next=item&&nextWatchEpisode(item);
