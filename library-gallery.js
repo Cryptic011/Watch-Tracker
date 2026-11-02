@@ -407,7 +407,7 @@ window.WatchLogGallery=(()=>{
     });}
     let markup;
     if(!category&&api.filter==='Recent')markup='<div class="gallery-library-title"><h2>Recent additions</h2></div>'+section('Recently added',rows)+(rows.length?'':'<p class="gallery-empty">No titles added yet.</p>');
-    else if(!category){markup=`${api.plainLibrary?'<h2 class="gallery-library-title">Library</h2>':''}<div class="gallery-home">${(api.plainLibrary?[['Series','Series','▣'],['Film','Films','▤']]:[['Film','Movies','▤'],['Series','Series','▣']]).map(([type,label,icon])=>{
+    else if(!category){markup=`<div class="gallery-home">${(api.plainLibrary?[['Series','Series','▣'],['Film','Films','▤']]:[['Film','Movies','▤'],['Series','Series','▣']]).map(([type,label,icon])=>{
       const items=rows.filter(item=>type==='Film'?isFilm(item):!isFilm(item));return `<button type="button" class="gallery-category" data-gallery-category="${type}"><span class="gallery-category-icon" aria-hidden="true">${icon}</span><span><strong>${label}</strong><small>${items.length} title${items.length===1?'':'s'}</small></span><span class="gallery-fan" aria-hidden="true">${items.slice(0,3).map(item=>art(item)).join('')}</span></button>`;
     }).join('')}</div><p class="gallery-caption">${rows.length} titles in this view</p>`;}
     else{const items=rows.filter(item=>category==='Film'?isFilm(item):!isFilm(item)),tracked=api.items().filter(item=>(category==='Film'?isFilm(item):!isFilm(item))&&(!api.includes||api.includes(item))),parts=sections(items,api.upcoming);

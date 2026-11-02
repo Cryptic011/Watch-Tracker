@@ -956,6 +956,8 @@ const server=http.createServer((req,res)=>{
   await page.locator('[data-tab="collection"]').click();
   assert.match(new URL(page.url()).hash,/^#\/collection/);
   assert.equal(await page.locator('[data-gallery-category]').count(),2);
+  assert.equal(await page.getByRole('heading',{name:'Library',exact:true}).count(),1,'Library has one heading for controls and categories');
+  assert.equal(await page.locator('#list-toolbar').evaluate(node=>getComputedStyle(node).borderBottomWidth),'0px','filters flow into the category boxes without a dividing section');
   assert.equal(await page.locator('[data-home-section]').first().isVisible(),false);
   assert.equal(await page.locator('#sort-mode').isVisible(),true);
   await page.locator('[data-gallery-category="Series"]').click();
