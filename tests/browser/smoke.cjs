@@ -136,6 +136,8 @@ const server=http.createServer((req,res)=>{
   assert.equal(await page.locator('[data-gallery-category]').count(),0,'Home has no duplicate Library boxes');
   await page.locator('[data-tab="collection"]').click();
   assert.equal(await page.evaluate(()=>{const node=mediaList.querySelector('.gallery-grid');render();return Boolean(node)&&node===mediaList.querySelector('.gallery-grid');}),true,'unchanged Library render retains the unified title grid');
+  assert.equal(await page.locator('.gallery-empty').count(),1,'empty Library shows one message');
+  assert.equal(await page.locator('#empty-state').isVisible(),false,'no duplicate empty state below the grid');
   await page.locator('[data-tab="library"]').click();
   // Exercise the actual weekly schedule DOM, not just its sorting helper.
   // Date order deliberately conflicts with local clock order (17:00 this

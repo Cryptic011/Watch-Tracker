@@ -442,6 +442,7 @@
     mediaList.classList.toggle("hidden",!libraryOnlyPage);
     emptyState.classList.toggle("hidden",!libraryOnlyPage||rows.length>0);
     if(currentTab==="library"&&window.WatchLogGallery){
+      emptyState.classList.add("hidden");
       $("list-label").textContent="Library";
       window.WatchLogGallery.mount(mediaList,rows,{plainLibrary:libraryOnlyPage,dashboardOnly:!libraryOnlyPage,features:$("library-features"),filter:activeFilter,includes:typeof libraryScopeIncludes==="function"?libraryScopeIncludes:null,organise:typeof saveTitleOrganisation==="function"?saveTitleOrganisation:null,lists:typeof openTitleLists==="function"?openTitleLists:null,navigate:typeof recordAppNavigation==="function"?recordAppNavigation:null,manage:openBulkManage,upcoming:upcomingSortInfo,next:nextWatchEpisode,last:item=>isEpisodeTrackable(item)?lastLoggedEpisode(item):null,released:item=>releasedEpisodeMap(item),watched:item=>watchedEpisodeMap(item),toggleEpisode:toggleEpisodeWatched,toggleSeason:toggleSeasonWatched,refreshEpisodes:(item,force=false)=>{
         if(!currentUser||!navigator.onLine||!isEpisodeTrackable(item)||(!force&&!episodeMetadataNeedsRefresh(item)))return Promise.resolve(false);
