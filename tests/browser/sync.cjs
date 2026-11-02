@@ -71,7 +71,7 @@ const mark=(page,episode)=>page.evaluate(ep=>toggleEpisodeWatched('show',1,ep),e
   const tokenA=await a.evaluate(()=>cloudSessionToken);
   await b.evaluate(()=>openMediaRow('show'));await b.locator('.gallery-season>summary').click();
   await a.locator('[data-tab="collection"]').click();
-  await a.locator('[data-gallery-category="Series"]').click();
+  await a.locator('#library-type-select').selectOption('Series');
   await a.locator('[data-gallery-item="show"]').click();
   await a.locator('[data-gallery-watch-next]').click();await settled(a);await progress(b,[2]);
   assert.equal(await b.locator('[data-gallery-toggle-episode="1:2"]').getAttribute('aria-pressed'),'true','an open tracker receives the other device tick');

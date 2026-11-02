@@ -258,6 +258,5 @@ html.search-keyboard-open .bottom-tabs{visibility:hidden;pointer-events:none}
 .bottom-tabs[data-active-tab="settings"]::before{transform:translateX(200%)}
 .library-only-page .stats-row,.library-only-page #library-schedule-navigation,.library-only-page #recurring-weekly-dashboard,.library-only-page #library-dashboard,.library-only-page #library-features,.library-only-page #continue-watching{display:none!important}
 
-/* One Library heading and controls flow directly into the title categories. */
+/* One Library heading and filter panel lead straight into the combined grid. */
 .library-only-page .list-toolbar{border-bottom:0;margin-bottom:0;padding-bottom:8px}
-.library-only-page .gallery-home{padding-top:0}

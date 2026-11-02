@@ -135,7 +135,7 @@ const server=http.createServer((req,res)=>{
   assert.equal(await page.locator('.changelog-entry').count(),0,'startup does not construct the full hidden changelog');
   assert.equal(await page.locator('[data-gallery-category]').count(),0,'Home has no duplicate Library boxes');
   await page.locator('[data-tab="collection"]').click();
-  assert.equal(await page.evaluate(()=>{const node=mediaList.querySelector('.gallery-category');render();return Boolean(node)&&node===mediaList.querySelector('.gallery-category');}),true,'unchanged Library render retains category and poster nodes');
+  assert.equal(await page.evaluate(()=>{const node=mediaList.querySelector('.gallery-grid');render();return Boolean(node)&&node===mediaList.querySelector('.gallery-grid');}),true,'unchanged Library render retains the unified title grid');
   await page.locator('[data-tab="library"]').click();
   // Exercise the actual weekly schedule DOM, not just its sorting helper.
   // Date order deliberately conflicts with local clock order (17:00 this
@@ -329,10 +329,10 @@ const server=http.createServer((req,res)=>{
   phase='gallery';
   await page.locator('[data-tab="collection"]').click();
   assert.equal(await page.getByRole('heading',{name:'Next to watch',exact:true}).count(),0);
-  const categories=await page.locator('.gallery-category').evaluateAll(nodes=>nodes.map(n=>({y:n.getBoundingClientRect().y,height:n.getBoundingClientRect().height})));
-  assert.ok(categories[1].y>=categories[0].y+categories[0].height);
+  assert.equal(await page.locator('[data-gallery-category]').count(),0,'no category boxes above titles');
+  assert.equal(await page.locator('.gallery-grid').count(),1);
   await page.evaluate(()=>{mediaItems[0].status='Watched';mediaItems[0].filmReleaseDate='2020-02-14';mediaItems[0].date='2026-09-21';render();});
-  await page.locator('[data-gallery-category="Film"]').click();await page.locator('[data-filter="Watched"]').click();
+  await page.locator('#library-type-select').selectOption('Film');await page.locator('[data-filter="Watched"]').click();
   assert.equal(await page.locator('.library-filter-panel #library-collection-select').isVisible(),true,'status and collection controls share one filter panel');
   const beforeCollectionTest=await page.evaluate(()=>{const prior=structuredClone(mediaItems[0]);mediaItems[0]={...prior,favorite:true,lists:['Weekend & films']};render();return prior;});
   await page.locator('#library-collection-select').selectOption('favourites');
@@ -341,7 +341,7 @@ const server=http.createServer((req,res)=>{
   assert.equal(await page.locator('.gallery-tile').count(),1,'user-created collection names filter the library');
   await page.locator('#library-collection-select').selectOption('');
   await page.evaluate(prior=>{mediaItems[0]=prior;render();},beforeCollectionTest);
-  assert.match(await page.locator('.gallery-section h3').first().textContent(),/^Films/);
+  assert.equal(await page.locator('.gallery-grid').count(),1,'one combined grid');
   assert.match(await page.locator('.gallery-tile small').first().textContent(),/2020/);
   assert.equal(await page.locator('[data-gallery-manage]').count(),1);
   assert.equal(await page.locator('.gallery-section [data-gallery-manage]').count(),0);
@@ -359,7 +359,7 @@ const server=http.createServer((req,res)=>{
   await page.waitForFunction(()=>document.querySelector('[data-gallery-details]').textContent.includes('coastal town'));
   assert.equal(await page.locator('[data-gallery-details] a').count(),0,'the compact facts panel omits source rows');
   await page.locator('[data-gallery-close]').click();
-  await page.locator('[data-filter="All"]').click();await page.locator('[data-gallery-back]').click();
+  await page.locator('[data-filter="All"]').click();await page.locator('#library-type-select').selectOption('');
   await page.evaluate(()=>openEdit(mediaItems[0].id));await page.locator('#platform').fill('Cinema');await page.locator('#film-release-time').fill('08:30');await page.locator('#save-btn').click();
   await page.waitForFunction(()=>mediaItems[0]?.platform==='Cinema'&&!cloudSaveInFlight&&!localSaveInFlight&&!queuedCloudSnapshot&&!queuedLocalSnapshot,null,{timeout:10000});assert.equal(items[0].platform,'Cinema');
   assert.equal(items[0].filmReleaseDate,'2020-02-14T08:30:00.000Z','the real film form saves the confirmed GMT instant');
@@ -402,7 +402,7 @@ const server=http.createServer((req,res)=>{
    item.releasedEpisodes={1:Array.from({length:18},(_,index)=>index+1),2:[1,2,3]};item.airedEpisodeCounts={1:18,2:3};item.episodeCounts={1:18,2:4};
    item.episodeTitles={1:{1:'A Longer Episode Title That Wraps Without Squeezing the Artwork'}};render();
   });
-  await page.locator('[data-gallery-category="Series"]').click();
+  await page.locator('#library-type-select').selectOption('Series');
   phase='category management';
   assert.equal(await page.locator('[data-gallery-manage]').count(),1);
   assert.equal(await page.locator('.gallery-section [data-gallery-manage]').count(),0);
@@ -569,7 +569,7 @@ const server=http.createServer((req,res)=>{
   assert.equal(await page.locator('[data-gallery-notes-preview]').isVisible(),false);
   assert.equal(items.find(row=>row.id==='show').notes,'');
   await page.locator('[data-gallery-close]').click();
-  await page.locator('[data-gallery-back]').click();
+  await page.locator('#library-type-select').selectOption('');
   // Delete/Undo restores just the removed title, preserving other progress.
   await page.evaluate(()=>openEdit(mediaItems[0].id));await page.locator('#delete-btn').click();
   await page.getByRole('button',{name:'Undo',exact:true}).click();
@@ -751,7 +751,7 @@ const server=http.createServer((req,res)=>{
   await calendarSummary.click();
   await page.locator('[data-tab="collection"]').click();
   assert.equal(await recurring.isVisible(),false);assert.equal(await calendarView.isVisible(),false);
-  assert.equal(await page.locator('[data-gallery-category]').count(),2,'Series and Films exist only in Library');
+  assert.equal(await page.locator('[data-gallery-category]').count(),0,'Library has no separate Series/Films boxes');
   await page.goBack();await page.waitForFunction(()=>!libraryOnlyPage&&currentTab==='library');
   assert.equal(await recurring.isVisible(),true);assert.equal(await calendarView.isVisible(),true);
   if(process.env.BROWSER_SCREENSHOT_DIR)await page.screenshot({path:path.join(process.env.BROWSER_SCREENSHOT_DIR,engine.name()+'-schedule-home.png'),fullPage:true});
@@ -814,7 +814,7 @@ const server=http.createServer((req,res)=>{
   await page.waitForFunction(()=>location.hash==='#/library');
   assert.equal(await page.locator('#media-list').isVisible(),false,'Home has no title browsing area');
   await page.locator('[data-tab="collection"]').click();
-  await page.locator('[data-gallery-category="Series"]').click();
+  await page.locator('#library-type-select').selectOption('Series');
   assert.equal(await page.locator('.top-nav h1').isVisible(),false,'Series shows its category heading without the app title');
   await page.locator('[data-filter="Watched"]').click();
   await page.locator('#sort-mode').selectOption('platform');
@@ -827,7 +827,7 @@ const server=http.createServer((req,res)=>{
   await page.locator('#close-title-search').click();
   await page.waitForFunction(()=>currentTab==='library'&&searchQuery==='');
   await page.locator('[data-filter="All"]').click();await page.locator('#sort-mode').selectOption('current');
-  await page.locator('[data-gallery-back]').click();
+  await page.locator('#library-type-select').selectOption('');
   assert.equal(await recurring.isVisible(),false,'Library stays separate from Home schedules');
   await page.locator('[data-tab="library"]').click();
   assert.equal(await recurring.locator('[data-recurring-open="show"]').isVisible(),true);
@@ -955,12 +955,12 @@ const server=http.createServer((req,res)=>{
   assert.match(recoveredDetails.description,/major city and port/);
   await page.locator('[data-tab="collection"]').click();
   assert.match(new URL(page.url()).hash,/^#\/collection/);
-  assert.equal(await page.locator('[data-gallery-category]').count(),2);
-  assert.equal(await page.getByRole('heading',{name:'Library',exact:true}).count(),1,'Library has one heading for controls and categories');
-  assert.equal(await page.locator('#list-toolbar').evaluate(node=>getComputedStyle(node).borderBottomWidth),'0px','filters flow into the category boxes without a dividing section');
+  assert.equal(await page.locator('[data-gallery-category]').count(),0);
+  assert.equal(await page.getByRole('heading',{name:'Library',exact:true}).count(),1,'Library has one heading above its combined titles');
+  assert.equal(await page.locator('#list-toolbar').evaluate(node=>getComputedStyle(node).borderBottomWidth),'0px','filters flow directly into the combined title grid');
   assert.equal(await page.locator('[data-home-section]').first().isVisible(),false);
   assert.equal(await page.locator('#sort-mode').isVisible(),true);
-  await page.locator('[data-gallery-category="Series"]').click();
+  await page.locator('#library-type-select').selectOption('Series');
   await page.locator('#sort-mode').selectOption('title');
   await page.locator('[data-filter="Watching"]').click();
   assert.match(new URL(page.url()).hash,/collection\/series/);
