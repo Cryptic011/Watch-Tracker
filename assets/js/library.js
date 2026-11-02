@@ -245,8 +245,16 @@
   episodeTrackerSeason.onchange=()=>{activeEpisodeTrackerSeason=Number(episodeTrackerSeason.value||0);updateEpisodeTracker();};
   episodeTrackerGrid.addEventListener("click",event=>{const button=event.target.closest("button[data-season][data-episode]");if(!button||!activeEpisodeTrackerId)return;toggleEpisodeWatched(activeEpisodeTrackerId,Number(button.dataset.season),Number(button.dataset.episode));});
   episodeTrackerEdit.onclick=()=>{const id=activeEpisodeTrackerId;closeEpisodeTrackerSheet();if(id)openEdit(id);};
+  function recentAdditionTime(item){
+    const time=Date.parse(item?.createdAt||'');
+    return Number.isFinite(time)?time:0;
+  }
   function sortMediaRows(rows){
     const list=[...rows],groups=new Map(),now=Date.now();
+    if(typeof activeFilter!=='undefined'&&activeFilter==='Recent'){
+      list.sort((a,b)=>recentAdditionTime(b)-recentAdditionTime(a)||titleCollator.compare(a.title||'',b.title||''));
+      return{rows:list,groups};
+    }
     // Keys live for this sort only: progress edits and release rollovers must
     // always be reflected on the next render, including in-place edits.
     const currentInfo=new Map(),releaseInfo=new Map();
@@ -385,7 +393,7 @@
     if(currentTab==="watchlist"){
       if(upcomingSortInfo(item,now).rank===0)return false;
     }else if(currentTab==="history"&&item.status!=="Watched")return false;
-    if(categoryControlsVisible()&&activeFilter!=="All"&&!(activeFilter==="Planned"&&(item.status==="Planned"||item.status==="Saved"))&&item.status!==activeFilter)return false;
+    if(categoryControlsVisible()&&!["All","Recent"].includes(activeFilter)&&!(activeFilter==="Planned"&&(item.status==="Planned"||item.status==="Saved"))&&item.status!==activeFilter)return false;
     const score=librarySearchScore(item,query,queryTokens);
     if(scoreById)scoreById.set(String(item.id),score);
     return score>0;
@@ -395,7 +403,7 @@
     renderedLibrarySearch=query;
     for(const item of mediaItems)if(itemMatchesCurrentView(item,query,queryTokens,now,scoreById))rows.push(item);
     const result=sortMediaRows(rows);
-    if(query)result.rows.sort((a,b)=>(scoreById.get(String(b.id))||0)-(scoreById.get(String(a.id))||0));
+    if(query&&(typeof activeFilter==='undefined'||activeFilter!=='Recent'))result.rows.sort((a,b)=>(scoreById.get(String(b.id))||0)-(scoreById.get(String(a.id))||0));
     return result;
   }
   function reminderMarkup(item,isFilm){
@@ -426,6 +434,7 @@
     if(renderFrame){cancelAnimationFrame(renderFrame);renderFrame=0;}
     if(typeof refreshTitleSearchBadges==="function")refreshTitleSearchBadges();
     $("list-toolbar").classList.toggle("hidden",!currentUser||!categoryControlsVisible());
+    if(typeof sortMode!=="undefined")sortMode.disabled=typeof libraryOnlyPage!=="undefined"&&libraryOnlyPage&&activeFilter==="Recent";
     updateCounts();updateFloatingAddVisibility();renderDashboard();
     if(!currentUser){window.WatchLogGallery?.clearArtwork?.();const features=$("library-features"),progress=$("continue-watching");if(features&&progress&&mediaList.contains(progress))features.append(progress);if(mediaList.contains(features))mediaList.before(features);mediaList.replaceChildren();mediaList._galleryMarkup=null;emptyState.classList.add("hidden");return;}
     if(currentTab!=="library"){updateEpisodeTracker();return;}
@@ -433,7 +442,7 @@
     mediaList.classList.toggle("hidden",!libraryOnlyPage);
     emptyState.classList.toggle("hidden",!libraryOnlyPage||rows.length>0);
     if(currentTab==="library"&&window.WatchLogGallery){
-      $("list-label").textContent="Library";
+      $("list-label").textContent=activeFilter==="Recent"?"Newest additions first":"Library";
       window.WatchLogGallery.mount(mediaList,rows,{plainLibrary:libraryOnlyPage,dashboardOnly:!libraryOnlyPage,features:$("library-features"),filter:activeFilter,includes:typeof libraryScopeIncludes==="function"?libraryScopeIncludes:null,organise:typeof saveTitleOrganisation==="function"?saveTitleOrganisation:null,lists:typeof openTitleLists==="function"?openTitleLists:null,navigate:typeof recordAppNavigation==="function"?recordAppNavigation:null,manage:openBulkManage,upcoming:upcomingSortInfo,next:nextWatchEpisode,last:item=>isEpisodeTrackable(item)?lastLoggedEpisode(item):null,released:item=>releasedEpisodeMap(item),watched:item=>watchedEpisodeMap(item),toggleEpisode:toggleEpisodeWatched,toggleSeason:toggleSeasonWatched,refreshEpisodes:(item,force=false)=>{
         if(!currentUser||!navigator.onLine||!isEpisodeTrackable(item)||(!force&&!episodeMetadataNeedsRefresh(item)))return Promise.resolve(false);
         return scheduleMetadataRefresh(item).then(updated=>{if(updated){render();window.WatchLogGallery?.refreshCurrent?.();}return updated;});

@@ -440,7 +440,7 @@
         verifiedCompletedSeasons:type==="Film"?null:(Number.isFinite(Number(verified?.completedSeasons))?Number(verified.completedSeasons):Number(previous?.verifiedCompletedSeasons||0)),
         episodeHistory:type==="Film"?[]:episodeHistory,...(type==="Film"?{watchedEpisodes:{}}:(Object.prototype.hasOwnProperty.call(previous||{},"watchedEpisodes")?{watchedEpisodes:Object.keys(airedEpisodeCounts).length?normalizeWatchedEpisodeMap(previous.watchedEpisodes,airedEpisodeCounts):previous.watchedEpisodes}:{})),lastEpisodeWatchedAt:type==="Film"?"":(previous?.lastEpisodeWatchedAt||""),
         lastWatchedSeason:type==="Film"?null:(previous?.lastWatchedSeason??null),lastWatchedEpisode:type==="Film"?null:(previous?.lastWatchedEpisode??null),
-        platform,date:watchedDate,createdAt:previous?.createdAt||nowISO(),updatedAt:previous?.updatedAt||nowISO()
+        platform,date:watchedDate,createdAt:previous?.createdAt||(previous?"":nowISO()),updatedAt:previous?.updatedAt||nowISO()
       };
       if(type!=="Film"&&item.episodeScheduleVerified===true){
         const releases=releasedEpisodeMap(item),progressChanged=!previous||Number(previous.watchedSeasons||0)!==Number(item.watchedSeasons||0)||Number(previous.curSeason||0)!==Number(item.curSeason||0)||Number(previous.curEp||0)!==Number(item.curEp||0);

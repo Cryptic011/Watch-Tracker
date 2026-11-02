@@ -160,13 +160,38 @@
     renderTitleSearch();
   }
 
-  function addDiscoveryTitle(item){
-    if(!item||!currentUser)return;
+  async function addDiscoveryTitle(item){
+    if(!item||!currentUser)return false;
     dismissTitleSearchKeyboard();
     if(discoveryDialog.open)discoveryDialog.close();
     const duplicate=discoveryDuplicate(item);
-    if(duplicate){openMediaRow(duplicate.id);return;}
-    openAdd();void selectSuggestion(item);
+    if(duplicate){openMediaRow(duplicate.id);return false;}
+    const type=item.format||item.type,title=String(item.title||'').trim();
+    if(!title||!['Film','Series','Anime'].includes(type))return false;
+    const account=String(currentUser.id),generation=persistenceGeneration,stamp=nowISO();
+    const saved={id:uuid(),title,type,status:'Planned',createdAt:stamp,updatedAt:stamp,date:localISODate(),
+      imdbId:item.imdbId||(item.source==='imdb'?item.externalId:'')||'',
+      tvmazeShowId:type==='Film'?'':String(item.tvmazeId||item.tvmazeShowId||(item.source==='tvmaze'?item.externalId:'')||''),
+      releaseYear:String(item.year||item.releaseYear||''),platform:item.platform||'',posterUrl:discoveryImage(item.posterUrl),
+      filmReleaseDate:type==='Film'?(item.releaseDate||''):'',filmReleaseSource:type==='Film'&&item.releaseDate?(item.releaseSource||item.source||'Catalogue'):'',
+      watchedSeasons:type==='Film'?null:0,curSeason:type==='Film'?null:0,curEp:type==='Film'?null:0,
+      watchedEpisodes:{},episodeHistory:[],episodeCounts:{},airedEpisodeCounts:{},releasedEpisodes:{},episodeScheduleVerified:false};
+    if(typeof isWeakFilmRecord==='function'&&isWeakFilmRecord(saved)&&mediaItems.some(row=>row.type!=='Film'&&normalizeTitle(row.title)===normalizeTitle(title))){
+      showAppToast('Choose a verified film result with a year or release date for this title.','warn');return false;
+    }
+    // Insert before the first await: a second tap sees the existing identity.
+    mediaItems.unshift(saved);render();
+    try{
+      await persistLibrary(mediaItems,{background:true,precleaned:true});
+      if(generation!==persistenceGeneration||String(currentUser?.id)!==account)return true;
+      showAppToast('Added to Planned. Find it in Library → Recent.','success');
+      const current=mediaItems.find(row=>String(row.id)===String(saved.id));
+      if(current)void scheduleMetadataRefresh(current);
+      return true;
+    }catch(error){
+      if(generation===persistenceGeneration&&String(currentUser?.id)===account)showAppToast('Adding needs attention. Your title is still open; retry Sync.','warn');
+      return false;
+    }
   }
   function showDiscoveryDetail(item,trigger){
     if(!item)return;dismissTitleSearchKeyboard();discoveryDetailItem=item;discoveryReturnFocus=trigger;
