@@ -308,6 +308,94 @@
     });
   }
   enforceBottomNavigation();
+  const bottomTabs=document.querySelector(".bottom-tabs"),tabIndicator=document.querySelector(".tab-indicator"),tabGlass=document.querySelector(".tab-glass");
+  const navigationMotionPreference=window.matchMedia("(prefers-reduced-motion: reduce)");
+  const nativeTabMotion=typeof tabIndicator.animate==="function";
+  bottomTabs.classList.toggle("native-tab-motion",nativeTabMotion);
+  let tabSlideAnimation=null,tabGlassAnimation=null;
+  navigationMotionPreference.addEventListener("change",()=>{tabSlideAnimation?.cancel();tabGlassAnimation?.cancel();});
+
+  function updateTabSelection(tab,forceMotion=false){
+    const index=Array.from(tabBtns).findIndex(button=>button.dataset.tab===tab);
+    if(index<0)return false;
+    const previous=Array.from(tabBtns).findIndex(button=>button.classList.contains("active"));
+    // Capture the on-screen position before cancelling an interrupted slide.
+    const moving=index!==previous||forceMotion;
+    const from=moving&&nativeTabMotion?getComputedStyle(tabIndicator).transform:"";
+    const destination=`translateX(${index*100}%)`;
+    if(moving)tabSlideAnimation?.cancel();
+    tabIndicator.style.transform=destination;
+    tabBtns.forEach(button=>{
+      const selected=button.dataset.tab===tab;
+      button.classList.toggle("active",selected);
+      if(selected)button.setAttribute("aria-current","page");else button.removeAttribute("aria-current");
+    });
+    if(moving){
+      tabGlassAnimation?.cancel();
+      if(nativeTabMotion){
+        tabSlideAnimation=tabIndicator.animate([
+          {transform:from==="none"?"translateX(0)":from},
+          {transform:destination}
+        ],{duration:navigationMotionPreference.matches?160:650,easing:navigationMotionPreference.matches?"ease-out":"cubic-bezier(.32,0,.18,1)"});
+      }
+      if(!navigationMotionPreference.matches&&typeof tabGlass.animate==="function"){
+        tabGlassAnimation=tabGlass.animate([
+          {transform:"scale(1,1)",offset:0},
+          {transform:"scale(1.18,.9)",offset:.3},
+          {transform:"scale(.98,1.02)",offset:.7},
+          {transform:"scale(1,1)",offset:1}
+        ],{duration:650,easing:"cubic-bezier(.32,0,.18,1)"});
+      }
+    }
+    return true;
+  }
+
+  updateTabSelection("library");
+  let navigationDrag=null,suppressNavigationClick=false,navigationClickTimer=0;
+  bottomTabs.addEventListener("pointerdown",event=>{
+    if(navigationDrag||!event.isPrimary||event.button!==0||!event.target.closest(".tab-btn"))return;
+    const first=tabBtns[0].getBoundingClientRect();
+    navigationDrag={id:event.pointerId,x:event.clientX,y:event.clientY,step:first.width,
+      offset:tabIndicator.getBoundingClientRect().left-first.left,moved:false};
+  });
+  bottomTabs.addEventListener("pointermove",event=>{
+    const drag=navigationDrag;if(!drag||drag.id!==event.pointerId)return;
+    const dx=event.clientX-drag.x,dy=event.clientY-drag.y;
+    if(!drag.moved){
+      if(Math.abs(dy)>Math.abs(dx)&&Math.abs(dy)>8){navigationDrag=null;return;}
+      if(Math.abs(dx)<6)return;
+      drag.moved=true;tabSlideAnimation?.cancel();tabGlassAnimation?.cancel();
+      bottomTabs.classList.add("is-dragging");bottomTabs.setPointerCapture(event.pointerId);
+    }
+    event.preventDefault();
+    drag.position=Math.max(0,Math.min((tabBtns.length-1)*drag.step,drag.offset+dx));
+    tabIndicator.style.transform="translateX("+drag.position+"px)";
+    if(!navigationMotionPreference.matches)tabGlass.style.transform="scale(1.06,.96)";
+    const preview=Math.round(drag.position/drag.step);
+    tabBtns.forEach((button,index)=>button.classList.toggle("drag-preview",index===preview));
+  });
+  function finishNavigationDrag(event,cancelled=false){
+    const drag=navigationDrag;if(!drag||drag.id!==event.pointerId)return;
+    navigationDrag=null;
+    if(!drag.moved)return;
+    suppressNavigationClick=true;clearTimeout(navigationClickTimer);
+    navigationClickTimer=setTimeout(()=>{suppressNavigationClick=false;},250);
+    bottomTabs.classList.remove("is-dragging");tabGlass.style.transform="";
+    tabBtns.forEach(button=>button.classList.remove("drag-preview"));
+    const index=Math.round((drag.position??drag.offset)/drag.step);
+    const destination=cancelled?bottomTabs.dataset.activeTab:tabBtns[index].dataset.tab;
+    updateTabSelection(destination,true);
+    if(!cancelled)goToTabHome(destination);
+    if(bottomTabs.hasPointerCapture(event.pointerId))bottomTabs.releasePointerCapture(event.pointerId);
+  }
+  bottomTabs.addEventListener("pointerup",event=>finishNavigationDrag(event));
+  bottomTabs.addEventListener("pointercancel",event=>finishNavigationDrag(event,true));
+  bottomTabs.addEventListener("lostpointercapture",event=>finishNavigationDrag(event,true));
+  bottomTabs.addEventListener("click",event=>{
+    if(!suppressNavigationClick)return;
+    suppressNavigationClick=false;event.preventDefault();event.stopImmediatePropagation();
+  },true);
+
   let searchReturnTab="library";
   let primaryPageAnimation=null;
   function animatePrimaryPage(from,to){
@@ -327,14 +415,10 @@
     if(tab!=="search"){libraryOnlyPage=tab==="collection";if(libraryOnlyPage)tab="library";}
     document.body.classList.toggle("library-only-page",libraryOnlyPage);
     enforceBottomNavigation();
-    const currentTabBtns=document.querySelectorAll(".bottom-tabs .tab-btn");
     const previousTab=currentTab;
     if(tab==="search"&&currentTab!=="search")searchReturnTab=libraryOnlyPage?"collection":currentTab;
     const primaryTab=tab==="search"?searchReturnTab:libraryOnlyPage?"collection":tab;
-    currentTab=tab;currentTabBtns.forEach(b=>{
-      b.classList.toggle("active",b.dataset.tab===primaryTab);
-      b.setAttribute("aria-current",b.dataset.tab===primaryTab?"page":"false");
-    });
+    currentTab=tab;updateTabSelection(primaryTab);
     document.querySelector(".bottom-tabs")?.setAttribute("data-active-tab",primaryTab);
     const search=tab==="search",settings=(search?searchReturnTab:tab)==="settings";
     libraryView.classList.toggle("hidden",settings);settingsView.classList.toggle("hidden",!settings);

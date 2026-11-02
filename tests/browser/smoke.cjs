@@ -220,7 +220,7 @@ const server=http.createServer((req,res)=>{
   assert.ok(fullSearch.x<=1&&fullSearch.y<=1&&fullSearch.width>=389&&fullSearch.height>=843,'Search covers the whole page');
   assert.equal(await page.locator('#library-view').evaluate(node=>getComputedStyle(node).visibility),'hidden','Library artwork cannot show through Search');
   await page.waitForFunction(()=>{
-    const cursor=getComputedStyle(document.querySelector('.bottom-tabs'),'::before');
+    const cursor=getComputedStyle(document.querySelector('.tab-indicator'));
     return Math.abs(new DOMMatrixReadOnly(cursor.transform).m41)<1;
   });
   if(process.env.BROWSER_SCREENSHOT_DIR)await page.screenshot({path:path.join(process.env.BROWSER_SCREENSHOT_DIR,engine.name()+'-search.png')});
@@ -578,6 +578,27 @@ const server=http.createServer((req,res)=>{
   await page.waitForFunction(()=>!cloudSaveInFlight&&!localSaveInFlight&&mediaItems.length===2);
   assert.equal(items.length,2);
   // Exercise the Settings menu and each drill-in panel in a mobile browser.
+  phase='tinted sliding navigation';
+  await page.locator('.bottom-tabs [data-tab="library"]').click();
+  await page.waitForFunction(()=>Math.abs(document.querySelector('.tab-indicator').getBoundingClientRect().x-document.querySelector('.bottom-tabs [data-tab="library"]').getBoundingClientRect().x)<1);
+  await page.locator('.bottom-tabs [data-tab="collection"]').click();
+  await page.waitForFunction(()=>{
+   const x=document.querySelector('.tab-indicator').getBoundingClientRect().x;
+   const home=document.querySelector('.bottom-tabs [data-tab="library"]').getBoundingClientRect().x;
+   const target=document.querySelector('.bottom-tabs [data-tab="collection"]').getBoundingClientRect().x;
+   return x>home+1&&x<target-1;
+  });
+  await page.waitForFunction(()=>Math.abs(document.querySelector('.tab-indicator').getBoundingClientRect().x-document.querySelector('.bottom-tabs [data-tab="collection"]').getBoundingClientRect().x)<1);
+  const dragStart=await page.locator('.bottom-tabs [data-tab="collection"]').boundingBox();
+  const dragEnd=await page.locator('.bottom-tabs [data-tab="settings"]').boundingBox();
+  await page.mouse.move(dragStart.x+dragStart.width/2,dragStart.y+dragStart.height/2);
+  await page.mouse.down();
+  await page.mouse.move(dragEnd.x+dragEnd.width/2,dragEnd.y+dragEnd.height/2,{steps:8});
+  assert.equal(await page.locator('.bottom-tabs').getAttribute('data-active-tab'),'collection','drag previews without opening a page');
+  assert.equal(await page.locator('.bottom-tabs').evaluate(node=>node.classList.contains('is-dragging')),true,'horizontal dragging controls the pill');
+  await page.mouse.up();
+  await page.waitForFunction(()=>document.querySelector('.bottom-tabs').dataset.activeTab==='settings');
+  await assertSettingsOnly();
   phase='settings visibility';
   const assertSettingsOnly=async()=>{
    for(const selector of ['.top-nav h1','.top-nav .search-box','.stats-row','#library-view','#discovery-view','#add-btn']){
