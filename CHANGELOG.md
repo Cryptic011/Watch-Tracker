@@ -1,3 +1,9 @@
+## 2026-11-02 — Replace the complete calendar display
+- Use one shared dated poster-card calendar across Calendar and Recurring shows.
+- Replace the repeating Monday–Sunday buckets with actual release dates across the next 14 days.
+- Apply confirmed-time filtering, chronological ordering, collapsible sections and this-week-only Prior Releases everywhere.
+- Show separate cards for the same series on different dates and keep covers and episode details on each card.
+
 ## 2026-11-02 — Collapsible fourteen-day release calendar
 - Show the next 14 calendar days by default, grouped by date with cover artwork and episode/time details.
 - Preserve the independently collapsible Calendar and Recurring shows sections.

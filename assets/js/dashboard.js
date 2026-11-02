@@ -264,18 +264,13 @@ function renderRecurringWeeklySchedule(){
   const available=homeSchedulesVisible();
   root.classList.toggle("hidden",!available);
   if(!available){if(!currentUser){root.replaceChildren();root._dashboardMarkup=null;}return;}
-  const now=new Date(),rows=recurringWeeklyShows(mediaItems,now),pending=calendarEvents(mediaItems,now,14).unknown.filter(item=>item.streamingPending&&isEpisodeTrackable(item)),total=new Set([...rows.map(row=>String(row.item.id)),...pending.map(item=>String(item.id))]).size;
-  const progressMarkers=new Map();
-  const days=Array.from({length:7},(_,index)=>{
-    const day=(index+1)%7,label=DASHBOARD_WEEKDAY_FORMATTER.format(new Date(2026,0,5+index)),shows=rows.filter(row=>row.day===day);
-    return `<section class="release-day recurring-weekday" data-recurring-day="${day}" aria-label="${esc(label)}"><header class="release-day-heading"><span class="release-day-name">${esc(label)}</span><span class="release-day-count">${shows.length} ${shows.length===1?"show":"shows"}</span></header>${shows.length?shows.map(row=>{
-      const episode=row.episodes.length?row.episodes.map(ep=>`S${ep.season} E${ep.number}`).join(" · "):"Next episode TBA";
-      const date=row.date?DASHBOARD_DATE_FORMATTER.format(row.date):"Date TBA";
-      const time=row.date&&!/^\d{4}-\d{2}-\d{2}$/.test(row.episodes[0].raw)?DASHBOARD_TIME_FORMATTER.format(row.date):"Time TBA";
-      return `<button type="button" class="release-card recurring-release-card" data-recurring-open="${esc(row.item.id)}"><span class="release-time">${esc(time)}</span><span class="release-card-copy"><strong class="release-show-title"><span>${esc(row.item.title)}</span>${scheduleProgressMarker(row.item,progressMarkers)}</strong><span class="release-episode">${esc(episode)} · ${esc(date)}</span><span class="release-state-badge" data-release-state="${row.state}">${row.state==="released"?"Released · last 24 hours":row.state==="upcoming"?"Upcoming":"Awaiting next episode"}</span><span class="release-platform">${esc(row.item.platform||"Platform not saved")}${row.item.releaseSchedule&&!row.item.releaseSchedule.estimated?` · ${esc(row.item.releaseSchedule.country)} streaming`:""}</span></span><span class="release-chevron" aria-hidden="true">›</span></button>`;
-    }).join(""):'<p class="release-empty">No recurring shows</p>'}</section>`;
-  }).join("");
-  updateDashboardMarkup(root,`<section class="dashboard-section weekly-releases recurring-weekly-releases" aria-labelledby="recurring-weekly-title"><header class="weekly-releases-heading"><div class="recurring-summary-copy"><span class="weekly-eyebrow">MONDAY–SUNDAY</span><h2 id="recurring-weekly-title">Recurring shows</h2><p class="dashboard-note">Next 14 days · GMT</p></div><span class="weekly-total">${total}<small>shows</small></span></header><div class="release-week-list">${days}</div>${pendingStreamingMarkup(pending,"data-recurring-open")}<p class="weekly-footnote">Releases within the next 14 days appear here. Episodes remain for 24 hours after release. Unconfirmed streaming releases are listed separately above.</p></section>`);
+  const now=new Date(),items=mediaItems.filter(isEpisodeTrackable),schedule=calendarWindowEvents(items,'upcoming',now);
+  const rows=recurringWeeklyShows(items,now),pending=schedule.unknown.filter(item=>item.streamingPending);
+  const total=new Set(schedule.events.map(event=>String(event.item.id))).size,progressMarkers=new Map();
+  const days=releaseAgendaDays(schedule,'data-recurring-open',progressMarkers);
+  updateDashboardMarkup(root,`<section class="dashboard-section weekly-releases recurring-weekly-releases calendar-agenda" aria-labelledby="recurring-weekly-title"><header class="weekly-releases-heading"><div class="recurring-summary-copy"><h2 id="recurring-weekly-title">Recurring shows</h2><p class="dashboard-note">Next 14 days · GMT</p></div><span class="weekly-total">${total}<small>shows</small></span></header><div class="release-week-list">${days}</div>${pendingStreamingMarkup(pending,'data-recurring-open')}${releaseTimeConfirmationMarkup(schedule.unconfirmedTimes,'data-recurring-open')}${releaseAgendaPrior(schedule.priorEvents,'data-recurring-open',progressMarkers)}<p class="weekly-footnote">All times are GMT. Prior Releases contains confirmed releases from this week only.</p></section>`);
+  window.WatchLogGallery?.observeScheduleArtwork?.(root,items);
+
   if(document.visibilityState==="visible"){
     recurringWeeklyTimer=setTimeout(renderDashboard,recurringScheduleDelay(rows,now,mediaItems));
   }
@@ -315,17 +310,7 @@ function renderWatchStatistics(){
   if(statsTarget)updateDashboardMarkup(statsTarget,`<section class="dashboard-section watch-statistics" aria-labelledby="watch-statistics-title"><header class="watch-statistics-heading"><div><h2 id="watch-statistics-title">Your watch statistics</h2><p class="dashboard-note">Based on progress saved in your library</p></div></header><div class="watch-statistics-grid"><div class="watch-stat"><strong>${stats.libraryCount}</strong><span>Library items</span></div><div class="watch-stat"><strong>${stats.episodesWatched}</strong><span>Episodes logged</span></div><div class="watch-stat"><strong>${stats.filmsWatched}</strong><span>Films watched</span></div><div class="watch-stat"><strong>${stats.showsInProgress}</strong><span>Shows in progress</span></div><div class="watch-stat"><strong>${stats.showsCompleted}</strong><span>Shows completed</span></div></div></section>`);
 }
 
-function renderDashboard(){
-  if(typeof renderLibraryFeatures==="function")renderLibraryFeatures();
-  renderScheduleNavigation();
-  renderRecurringWeeklySchedule();
-  const root=document.getElementById('library-dashboard');if(!root)return;
-  renderWatchStatistics();
-  const visible=homeSchedulesVisible();
-  root.classList.toggle('hidden',!visible);if(!visible){if(!currentUser){root.replaceChildren();root._dashboardMarkup=null;}return;}
-  const progressMarkers=new Map();
-  const {start,days:daysToShow,label:rangeLabel,events,priorEvents,unconfirmedTimes,unknown:unresolved}=calendarWindowEvents(mediaItems,selectedCalendarRange,new Date());
-  const pending=unresolved.filter(item=>item.streamingPending),unknown=unresolved.filter(item=>!item.streamingPending);
+function releaseAgendaDays({events,start,days:daysToShow},openAttribute='data-dashboard-open',progressMarkers=new Map()){
   const eventsByDay=new Map();
   for(const event of events){const key=localISODate(event.date);if(!eventsByDay.has(key))eventsByDay.set(key,[]);eventsByDay.get(key).push(event);}
   let days='';
@@ -345,7 +330,7 @@ function renderDashboard(){
       if(!group){group={key:groupKey,item:event.item,time,dateOnly:event.dateOnly,events:[],labels:new Set()};groupsByKey.set(groupKey,group);grouped.push(group);}
       if(!group.labels.has(event.label)){group.labels.add(event.label);group.events.push(event);}
     }
-    days+=`<section class="release-day${rows.length?' has-releases':' is-empty'}${isToday?' is-today':''}" aria-label="${esc(dayLabel)}, ${esc(dateLabel)}">
+    days+=`<section data-release-day="${key}" class="release-day${rows.length?' has-releases':' is-empty'}${isToday?' is-today':''}" aria-label="${esc(dayLabel)}, ${esc(dateLabel)}">
       <header class="release-day-heading"><div><span class="release-day-name">${esc(dayLabel)}${isToday?'<span class="today-marker">TODAY</span>':''}</span></div><span class="release-day-count">${rows.length} ${rows.length===1?'release':'releases'}</span></header>
       ${grouped.length?grouped.map(group=>{
         const labels=group.events.map(event=>event.label);
@@ -354,7 +339,7 @@ function renderDashboard(){
           :labels.join(' · ');
         const platform=(group.item.platform?esc(group.item.platform):'Platform not saved')+(group.item.releaseSchedule&&!group.item.releaseSchedule.estimated?' · '+esc(group.item.releaseSchedule.country)+' streaming':'');
         const releaseState=group.events.some(event=>event.date.toDateString()===new Date().toDateString())?'Today':group.events.some(event=>event.date>new Date())?'Upcoming':'Released';
-        return `<button type="button" class="release-card" data-dashboard-open="${esc(group.item.id)}">
+        return `<button type="button" class="release-card" ${openAttribute}="${esc(group.item.id)}" data-release-at="${esc(group.events[0].raw)}">
           <span class="calendar-poster"><span class="calendar-poster-fallback" aria-hidden="true">${esc(group.item.title.slice(0,1))}</span><img hidden alt="" data-art="${esc(`${group.item.type}:${group.item.imdbId||group.item.tvmazeShowId||group.item.id}`)}" decoding="async" loading="lazy"></span>
           <span class="release-card-copy"><strong class="release-show-title"><span>${esc(group.item.title)}</span>${scheduleProgressMarker(group.item,progressMarkers)}</strong><span class="release-episode">${esc(episodeLabel)}${group.events.length===1&&group.events[0].title?' · '+esc(group.events[0].title):''}</span><span class="release-time">${esc(group.time)}${group.item.platform?' on '+platform:''}</span></span>
           <span class="release-chevron" aria-hidden="true">›</span>
@@ -362,8 +347,30 @@ function renderDashboard(){
       }).join(''):'<p class="release-empty">Nothing listed for this day</p>'}
     </section>`;
   }
+  return days||'<p class="release-empty">No releases in this date range</p>';
+}
+function releaseAgendaPrior(priorEvents,openAttribute='data-dashboard-open',progressMarkers=new Map()){
+  return `<details class="release-tba prior-releases" data-dashboard-section="prior"><summary><span>Prior Releases</span><span class="release-tba-count">${priorEvents.length}</span></summary><div class="release-tba-list">${priorEvents.map(event=>`<button type="button" class="release-tba-item" ${openAttribute}="${esc(event.item.id)}"><strong class="release-show-title"><span>${esc(event.item.title)}</span>${scheduleProgressMarker(event.item,progressMarkers)}</strong><span>${esc(event.label)} · ${esc(DASHBOARD_PRIOR_DATE_FORMATTER.format(event.date))}${event.dateOnly?' · Date only':' · '+esc(DASHBOARD_TIME_FORMATTER.format(event.date))}</span></button>`).join('')}${!priorEvents.length?'<p class="release-empty">No releases earlier this week</p>':''}</div></details>`;
+}
+function releaseTimeConfirmationMarkup(events,openAttribute='data-dashboard-open'){
+  if(!events.length)return '';
+  return `<details class="release-tba" data-dashboard-section="unconfirmed-times"><summary><span>Release times to be confirmed</span><span class="release-tba-count">${events.length}</span></summary><div class="release-tba-list">${events.map(event=>`<button type="button" class="release-tba-item" ${openAttribute}="${esc(event.item.id)}"><strong>${esc(event.item.title)}</strong><span>${esc(event.label)} · ${esc(DASHBOARD_PRIOR_DATE_FORMATTER.format(event.date))} · Time to be confirmed</span></button>`).join('')}</div></details>`;
+}
+
+function renderDashboard(){
+  if(typeof renderLibraryFeatures==="function")renderLibraryFeatures();
+  renderScheduleNavigation();
+  renderRecurringWeeklySchedule();
+  const root=document.getElementById('library-dashboard');if(!root)return;
+  renderWatchStatistics();
+  const visible=homeSchedulesVisible();
+  root.classList.toggle('hidden',!visible);if(!visible){if(!currentUser){root.replaceChildren();root._dashboardMarkup=null;}return;}
+  const progressMarkers=new Map();
+  const {start,days:daysToShow,label:rangeLabel,events,priorEvents,unconfirmedTimes,unknown:unresolved}=calendarWindowEvents(mediaItems,selectedCalendarRange,new Date());
+  const pending=unresolved.filter(item=>item.streamingPending),unknown=unresolved.filter(item=>!item.streamingPending);
+  const days=releaseAgendaDays({events,start,days:daysToShow},'data-dashboard-open',progressMarkers);
   const excluded=mediaItems.filter(item=>item.hideFromWeeklyReleases===true);
-  const priorMarkup=`<details class="release-tba prior-releases" data-dashboard-section="prior"><summary><span>Prior Releases</span><span class="release-tba-count">${priorEvents.length}</span></summary><div class="release-tba-list">${priorEvents.map(event=>`<button type="button" class="release-tba-item" data-dashboard-open="${esc(event.item.id)}"><strong class="release-show-title"><span>${esc(event.item.title)}</span>${scheduleProgressMarker(event.item,progressMarkers)}</strong><span>${esc(event.label)} · ${esc(DASHBOARD_PRIOR_DATE_FORMATTER.format(event.date))}${event.dateOnly?' · Date only':' · '+esc(DASHBOARD_TIME_FORMATTER.format(event.date))}</span></button>`).join('')}${!priorEvents.length?'<p class="release-empty">No releases earlier this week</p>':''}</div></details>`;
+  const priorMarkup=releaseAgendaPrior(priorEvents,'data-dashboard-open',progressMarkers);
   const controls=`<div class="filter-pills calendar-range" role="group" aria-label="Filter release calendar">${[['today','Today'],['week','This week'],['upcoming','Next 14 days']].map(([key,label])=>`<button type="button" class="pill-btn${selectedCalendarRange===key?' active':''}" data-calendar-range="${key}" aria-pressed="${selectedCalendarRange===key}">${label}</button>`).join('')}</div>`;
   updateDashboardMarkup(root,`<section class="dashboard-section weekly-releases calendar-agenda" aria-labelledby="weekly-releases-title">
     <header class="weekly-releases-heading"><div class="recurring-summary-copy"><span class="weekly-eyebrow">RELEASE CALENDAR</span><h2 id="weekly-releases-title">Your calendar</h2><p class="dashboard-note">${rangeLabel} · GMT</p></div><span class="weekly-total">${events.length}<small>releases</small></span></header>
@@ -372,7 +379,7 @@ function renderDashboard(){
     ${pendingStreamingMarkup(pending,"data-dashboard-open")}
     ${unknown.length?`<details class="release-tba" data-dashboard-section="unknown"><summary><span>Dates to be announced</span><span class="release-tba-count">${unknown.length}</span></summary><div class="release-tba-list">${unknown.map(item=>`<button type="button" class="release-tba-item" data-dashboard-open="${esc(item.id)}"><strong class="release-show-title"><span>${esc(item.title)}</span>${scheduleProgressMarker(item,progressMarkers)}</strong><span>${esc(item.announcement)} · Date TBA</span><span class="release-chevron" aria-hidden="true">›</span></button>`).join('')}</div></details>`:''}
     ${excluded.length?`<details class="release-tba" data-dashboard-section="excluded"><summary><span>Excluded from Weekly Releases</span><span class="release-tba-count">${excluded.length}</span></summary><div class="release-tba-list">${excluded.map(item=>`<div class="dashboard-row excluded-release-row"><div><strong>${esc(item.title)}</strong><span class="release-state-badge" data-release-state="excluded">Excluded</span></div><button type="button" class="btn btn-secondary" data-calendar-include="${esc(item.id)}">Re-enable</button></div>`).join('')}</div></details>`:''}
-    ${unconfirmedTimes.length?`<details class="release-tba" data-dashboard-section="unconfirmed-times"><summary><span>Release times to be confirmed</span><span class="release-tba-count">${unconfirmedTimes.length}</span></summary><div class="release-tba-list">${unconfirmedTimes.map(event=>`<button type="button" class="release-tba-item" data-dashboard-open="${esc(event.item.id)}"><strong>${esc(event.item.title)}</strong><span>${esc(event.label)} · ${esc(DASHBOARD_PRIOR_DATE_FORMATTER.format(event.date))} · Time to be confirmed</span></button>`).join('')}</div></details>`:''}
+    ${releaseTimeConfirmationMarkup(unconfirmedTimes,'data-dashboard-open')}
     ${priorMarkup}
     <p class="weekly-footnote">All times are GMT. Only confirmed release timestamps appear in the dated list and Prior Releases.</p>
   </section>`);

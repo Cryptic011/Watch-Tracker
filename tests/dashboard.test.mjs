@@ -436,3 +436,18 @@ test('Prior calendar entries include verified latest episodes and exclude hidden
  assert.equal(c.calendarWindowEvents([show],'upcoming',new Date('2026-11-05T12:00:00Z')).priorEvents[0].label,'S2 E3');
  assert.equal(c.calendarWindowEvents([{...show,hideFromWeeklyReleases:true}],'upcoming',new Date('2026-11-05T12:00:00Z')).priorEvents.length,0);
 });
+
+test('The whole calendar renders both weeks using the same dated poster-card component',()=>{
+ const c=app();c.USER_LOCALE='en-GB';c.DASHBOARD_TIME_FORMATTER=new Intl.DateTimeFormat('en-GB',{timeZone:'UTC',hour:'2-digit',minute:'2-digit'});c.DASHBOARD_DATE_FORMATTER=new Intl.DateTimeFormat('en-GB',{timeZone:'UTC',day:'numeric',month:'short'});c.DASHBOARD_PRIOR_DATE_FORMATTER=c.DASHBOARD_DATE_FORMATTER;c.esc=value=>String(value);c.scheduleProgressMarker=()=>'';
+ vm.runInContext(extractFunction(html,'releaseAgendaDays')+'\n'+extractFunction(html,'releaseAgendaPrior'),c);
+ const show={id:'ncis',title:'NCIS',type:'Series',platform:'CBS'},start=new Date('2026-11-02T00:00:00Z');
+ const events=['2026-11-03T20:00:00Z','2026-11-10T20:00:00Z'].map((raw,index)=>({item:show,label:'S24 E'+(index+1),raw,date:new Date(raw),dateOnly:false}));
+ const model={events,start,days:14},calendar=c.releaseAgendaDays(model,'data-dashboard-open'),recurring=c.releaseAgendaDays(model,'data-recurring-open');
+ for(const markup of [calendar,recurring]){
+  assert.equal((markup.match(/class="calendar-poster"/g)||[]).length,2);
+  assert.ok(markup.includes('Tuesday, 3 Nov 2026')&&markup.includes('Tuesday, 10 Nov 2026'));
+  assert.ok(markup.indexOf('2026-11-03')<markup.indexOf('2026-11-10'));
+  assert.ok(!markup.includes('data-recurring-day'));
+ }
+ assert.equal(calendar.replaceAll('data-dashboard-open','data-recurring-open'),recurring,'both displays share the complete calendar presentation');
+});

@@ -169,7 +169,7 @@ const server=http.createServer((req,res)=>{
   const weeklyScreen=await page.evaluate(async()=>{
    const original=mediaItems,previousSchedule=selectedScheduleView,now=new Date(),target=new Date(now);
    target.setHours(12,0,0,0);
-   target.setDate(target.getDate()+((4-target.getDay()+7)%7||7));
+   target.setDate(target.getDate()+1);
    const day=target.getDay();
    const stamp=(weeks,hour)=>{
     const date=new Date(target);date.setDate(date.getDate()+weeks*7);date.setHours(hour,0,0,0);return date.toISOString();
@@ -196,23 +196,26 @@ const server=http.createServer((req,res)=>{
     selectedScheduleView="recurring";mediaItems=[evening,overnight,untimed,expired,distant,cachedReturn,{...evening,id:'duplicate-clock',imdbId:'tt1234999'}];
     await WatchLogRegionalReleases.refresh(mediaItems,{country:releaseViewingCountry()},async()=>({ok:true,json:async()=>mediaItems.flatMap(item=>(item.scheduledEpisodeReleases?.length?item.scheduledEpisodeReleases:item.recurringWeeklySchedule?.episodes||[]).map(ep=>({season:ep.season,number:ep.number,airdate:String(ep.raw).slice(0,10),airtime:/^\d{4}-\d{2}-\d{2}$/.test(ep.raw)?'':'08:00',airstamp:ep.raw,_embedded:{show:{id:Number(item.tvmazeShowId),webChannel:{name:item.platform,country:{code:releaseViewingCountry()}}}}})))}));
     renderRecurringWeeklySchedule();
-    const area=document.querySelector('.recurring-weekday[data-recurring-day="'+day+'"]');
+    const area=document.querySelector('#recurring-weekly-dashboard .release-week-list');
     return {cards:[...area.querySelectorAll('[data-recurring-open]')].map(node=>({
      title:node.querySelector('.release-show-title span')?.textContent,
-     time:node.querySelector('.release-time')?.textContent
-    })),count:area.querySelector('.release-day-count')?.textContent,
+     time:node.querySelector('.release-time')?.textContent,date:node.dataset.releaseAt
+    })),posters:area.querySelectorAll('.calendar-poster img').length,legacyDays:document.querySelectorAll('#recurring-weekly-dashboard [data-recurring-day]').length,
     unannouncedPresent:document.querySelector('#recurring-weekly-dashboard')?.textContent.includes('Unannounced returning programme'),
     distantReturns:document.querySelectorAll('#recurring-weekly-dashboard [data-recurring-open="distant-return"],#recurring-weekly-dashboard [data-recurring-open="cached-return"]').length,
     total:document.querySelector('#recurring-weekly-dashboard .weekly-total')?.textContent,
     noHorizontalOverflow:document.documentElement.scrollWidth<=window.innerWidth};
    }finally{mediaItems=original;selectedScheduleView=previousSchedule;renderRecurringWeeklySchedule();}
   });
-  assert.deepEqual(weeklyScreen.cards.map(card=>card.title),['01:00 programme','17:00 programme','Time unknown programme'],'recurring cards are ordered by local time before the next calendar week');
-  assert.ok(weeklyScreen.cards.at(-1).time.includes('TBA'),'a confirmed date without a time sorts last');
+  assert.deepEqual(weeklyScreen.cards.map(card=>card.title),['17:00 programme','01:00 programme'],'recurring cards follow actual release dates across both weeks');
+  assert.ok(weeklyScreen.cards.every(card=>!card.time.includes('TBA')),'dated cards require confirmed times');
+  assert.ok(Date.parse(weeklyScreen.cards[0].date)<Date.parse(weeklyScreen.cards[1].date),'a later clock time this week comes before next week');
+  assert.equal(weeklyScreen.posters,2,'every recurring release has a cover');
+  assert.equal(weeklyScreen.legacyDays,0,'the old Monday–Sunday buckets are replaced');
   assert.equal(weeklyScreen.unannouncedPresent,false,'past release patterns cannot assign a weekday to an unannounced return');
   assert.equal(weeklyScreen.distantReturns,0,'confirmed and cached returns beyond two weeks do not appear in the weekly calendar');
-  assert.match(weeklyScreen.total,/^3shows$/,'distant returns do not inflate the total show count');
-  assert.match(weeklyScreen.count,/^3 shows$/,'duplicate entries do not inflate the schedule');
+  assert.match(weeklyScreen.total,/^2shows$/,'only confirmed upcoming shows count toward the calendar');
+  assert.equal(weeklyScreen.cards.length,2,'duplicate entries do not inflate the schedule');
   assert.equal(weeklyScreen.noHorizontalOverflow,true,'weekly schedule fits the mobile viewport');
   console.log(engine.name()+': recurring clock order, undated returns, duplicate cards and mobile width passed');
 
@@ -826,9 +829,12 @@ const server=http.createServer((req,res)=>{
   await page.goBack();await page.waitForFunction(()=>!libraryOnlyPage&&currentTab==='library');
   assert.equal(await recurring.isVisible(),true);assert.equal(await calendarView.isVisible(),true);
   if(process.env.BROWSER_SCREENSHOT_DIR)await page.screenshot({path:path.join(process.env.BROWSER_SCREENSHOT_DIR,engine.name()+'-schedule-home.png'),fullPage:true});
-  assert.equal(await recurring.locator('[data-recurring-open="show"]').isVisible(),true);
-  assert.deepEqual(await recurring.locator('[data-recurring-day]').evaluateAll(nodes=>nodes.map(node=>Number(node.dataset.recurringDay))),[1,2,3,4,5,6,0]);
-  assert.equal(await recurring.locator('[data-recurring-open="show"]').count(),1);
+  assert.equal(await recurring.locator('.release-week-list [data-recurring-open="show"]').first().isVisible(),true);
+  assert.equal(await recurring.locator('[data-recurring-day]').count(),0,'the whole calendar uses real dates rather than weekday buckets');
+  const recurringDates=await recurring.locator('[data-release-day]').evaluateAll(nodes=>nodes.map(node=>node.dataset.releaseDay));
+  assert.deepEqual(recurringDates,[...recurringDates].sort(),'the calendar date groups are chronological');
+  const releaseKeys=await recurring.locator('.release-week-list [data-recurring-open="show"]').evaluateAll(nodes=>nodes.map(node=>node.dataset.releaseAt));
+  assert.ok(releaseKeys.length>0);assert.equal(new Set(releaseKeys).size,releaseKeys.length,'each actual release occurs once');
   assert.match(await recurring.textContent(),/S2 E2/);
   const recurringMarker=()=>recurring.locator('[data-recurring-open="show"] .release-progress-dot').first();
   assert.equal(await recurringMarker().getAttribute('data-behind-level'),'red');
@@ -901,9 +907,9 @@ const server=http.createServer((req,res)=>{
   await page.locator('#library-type-select').selectOption('');
   assert.equal(await recurring.isVisible(),false,'Library stays separate from Home schedules');
   await page.locator('[data-tab="library"]').click();
-  assert.equal(await recurring.locator('[data-recurring-open="show"]').isVisible(),true);
+  assert.equal(await recurring.locator('.release-week-list [data-recurring-open="show"]').first().isVisible(),true);
   await page.evaluate(()=>{const item=mediaItems.find(row=>row.id==='show');item.platform+=' test';render();item.platform=item.platform.slice(0,-5);render();});
-  assert.equal(await recurring.locator('[data-recurring-open="show"]').isVisible(),true,'metadata updates retain the dedicated view');
+  assert.equal(await recurring.locator('.release-week-list [data-recurring-open="show"]').first().isVisible(),true,'metadata updates retain the dedicated view');
   for(const width of [320,390,768]){
    await page.setViewportSize({width,height:844});
    assert.equal(await recurring.evaluate(root=>root.scrollWidth<=root.clientWidth),true,'recurring schedule fits the viewport');
@@ -911,7 +917,7 @@ const server=http.createServer((req,res)=>{
   }
   await page.setViewportSize({width:390,height:844});
   if(process.env.BROWSER_SCREENSHOT_DIR)await recurring.screenshot({path:path.join(process.env.BROWSER_SCREENSHOT_DIR,engine.name()+'-recurring.png')});
-  await recurring.locator('[data-recurring-open="show"]').click();
+  await recurring.locator('.release-week-list [data-recurring-open="show"]').first().click();
   assert.equal(await page.getByRole('tab',{name:'Episodes',exact:true}).getAttribute('aria-selected'),'true','recurring shows open the new Episodes page');
   assert.equal(await page.locator('#episode-tracker-modal').isVisible(),false,'old tracker stays closed');
   await page.getByRole('tab',{name:'Details',exact:true}).click();
@@ -967,8 +973,8 @@ const server=http.createServer((req,res)=>{
   assert.equal(items.find(item=>item.id===refreshItemId)?.platform,'Saved before refresh');
   assert.equal(await page.locator('[data-gallery-category]').count(),0,'Home restores without duplicate Library content');
   await page.locator('[data-tab="library"]').click();
-  await page.waitForFunction(()=>document.querySelectorAll('#recurring-weekly-dashboard [data-recurring-open="show"]').length===1);
-  assert.equal(await page.locator('#recurring-weekly-dashboard [data-recurring-open="show"]').count(),1,'streaming membership survives reload');
+  await page.waitForFunction(()=>document.querySelectorAll('#recurring-weekly-dashboard .release-week-list [data-recurring-open="show"]').length>0);
+  assert.ok(await page.locator('#recurring-weekly-dashboard .release-week-list [data-recurring-open="show"]').count()>0,'confirmed releases survive reload');
   await page.locator('[data-tab="library"]').click();
   assert.equal(await page.locator('[data-home-section]').count(),2,'reload restores both collapsible schedules');
   assert.equal(await recurring.isVisible(),true);assert.equal(await calendarView.isVisible(),true);
