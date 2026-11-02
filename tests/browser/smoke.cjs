@@ -199,7 +199,13 @@ const server=http.createServer((req,res)=>{
   const fixedDock=await page.evaluate(async()=>{
     const spacer=document.createElement('div');spacer.style.height='2400px';document.querySelector('main').append(spacer);
     const bounds=()=>['.bottom-tabs','#add-btn'].map(selector=>{const box=document.querySelector(selector).getBoundingClientRect();return {x:box.x,y:box.y};});
-    const before=bounds();window.scrollTo(0,900);await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+    // A preceding route restoration also scrolls on the next animation frame.
+    // Wait for the requested position rather than sampling that race after two frames.
+    const before=bounds();
+    for(let frame=0;frame<20&&window.scrollY<=800;frame++){
+      window.scrollTo({top:900,behavior:'instant'});
+      await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+    }
     const after=bounds(),scroll=window.scrollY;spacer.remove();window.scrollTo(0,0);return {before,after,scroll};
   });
   assert.ok(fixedDock.scroll>800,'the Library actually scrolled during the fixed-control test');
