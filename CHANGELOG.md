@@ -2,7 +2,7 @@
 - Show the next 14 calendar days by default, grouped by date with cover artwork and episode/time details.
 - Preserve the independently collapsible Calendar and Recurring shows sections.
 - Move Prior Releases to the bottom and limit it to already-released titles from the current Monday-to-Sunday week, including timed releases earlier today.
-- Retain Today and This week filters, date-only Time TBA labels, exclusions and unconfirmed-streaming sections.
+- Retain Today and This week filters, exclusions and unconfirmed-streaming sections. Keep date-only releases in a separate confirmation section instead of the dated calendar or Prior Releases.
 
 ## 2026-11-02 — Allow touch dragging between navigation pages
 - Ignore the original button’s capture-loss event when touch capture transfers to the navigation bar.

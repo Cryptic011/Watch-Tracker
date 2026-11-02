@@ -121,8 +121,9 @@ function calendarWindowEvents(items,range='upcoming',now=new Date()){
   const window=calendarRange(range,now),result=calendarEvents(items,window.start,window.days);
   const midnight=window.start.getTime();
   const prior=calendarEvents(items,window.priorStart,Math.round((midnight-window.priorStart.getTime())/86400000)+1).events;
-  return {...window,...result,events:result.events.filter(event=>event.dateOnly||event.date>=now),
-    priorEvents:prior.filter(event=>event.dateOnly?event.date<window.start:event.date<now)};
+  const unconfirmedTimes=[...new Map([...prior,...result.events].filter(event=>event.dateOnly).map(event=>[event.item.id+'|'+event.label+'|'+event.raw,event])).values()];
+  return {...window,...result,events:result.events.filter(event=>!event.dateOnly&&event.date>=now),
+    priorEvents:prior.filter(event=>!event.dateOnly&&event.date<now),unconfirmedTimes};
 }
 function calendarEvents(items,now=new Date(),days=7){
   const start=new Date(now);start.setUTCHours(0,0,0,0);
@@ -323,7 +324,7 @@ function renderDashboard(){
   const visible=homeSchedulesVisible();
   root.classList.toggle('hidden',!visible);if(!visible){if(!currentUser){root.replaceChildren();root._dashboardMarkup=null;}return;}
   const progressMarkers=new Map();
-  const {start,days:daysToShow,label:rangeLabel,events,priorEvents,unknown:unresolved}=calendarWindowEvents(mediaItems,selectedCalendarRange,new Date());
+  const {start,days:daysToShow,label:rangeLabel,events,priorEvents,unconfirmedTimes,unknown:unresolved}=calendarWindowEvents(mediaItems,selectedCalendarRange,new Date());
   const pending=unresolved.filter(item=>item.streamingPending),unknown=unresolved.filter(item=>!item.streamingPending);
   const eventsByDay=new Map();
   for(const event of events){const key=localISODate(event.date);if(!eventsByDay.has(key))eventsByDay.set(key,[]);eventsByDay.get(key).push(event);}
@@ -371,8 +372,9 @@ function renderDashboard(){
     ${pendingStreamingMarkup(pending,"data-dashboard-open")}
     ${unknown.length?`<details class="release-tba" data-dashboard-section="unknown"><summary><span>Dates to be announced</span><span class="release-tba-count">${unknown.length}</span></summary><div class="release-tba-list">${unknown.map(item=>`<button type="button" class="release-tba-item" data-dashboard-open="${esc(item.id)}"><strong class="release-show-title"><span>${esc(item.title)}</span>${scheduleProgressMarker(item,progressMarkers)}</strong><span>${esc(item.announcement)} · Date TBA</span><span class="release-chevron" aria-hidden="true">›</span></button>`).join('')}</div></details>`:''}
     ${excluded.length?`<details class="release-tba" data-dashboard-section="excluded"><summary><span>Excluded from Weekly Releases</span><span class="release-tba-count">${excluded.length}</span></summary><div class="release-tba-list">${excluded.map(item=>`<div class="dashboard-row excluded-release-row"><div><strong>${esc(item.title)}</strong><span class="release-state-badge" data-release-state="excluded">Excluded</span></div><button type="button" class="btn btn-secondary" data-calendar-include="${esc(item.id)}">Re-enable</button></div>`).join('')}</div></details>`:''}
+    ${unconfirmedTimes.length?`<details class="release-tba" data-dashboard-section="unconfirmed-times"><summary><span>Release times to be confirmed</span><span class="release-tba-count">${unconfirmedTimes.length}</span></summary><div class="release-tba-list">${unconfirmedTimes.map(event=>`<button type="button" class="release-tba-item" data-dashboard-open="${esc(event.item.id)}"><strong>${esc(event.item.title)}</strong><span>${esc(event.label)} · ${esc(DASHBOARD_PRIOR_DATE_FORMATTER.format(event.date))} · Time to be confirmed</span></button>`).join('')}</div></details>`:''}
     ${priorMarkup}
-    <p class="weekly-footnote">All times are GMT. A date without a confirmed time shows Time TBA and does not trigger a timed release alert.</p>
+    <p class="weekly-footnote">All times are GMT. Only confirmed release timestamps appear in the dated list and Prior Releases.</p>
   </section>`);
   window.WatchLogGallery?.observeScheduleArtwork?.(root,mediaItems);
 }

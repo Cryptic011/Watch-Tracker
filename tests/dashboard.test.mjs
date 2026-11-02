@@ -419,10 +419,11 @@ test('Fourteen-day agenda separates elapsed releases and restricts prior release
  const rows=dates.map((date,index)=>({id:String(index),title:date,type:'Film',filmReleaseDate:date}));
  const result=c.calendarWindowEvents(rows,'upcoming',now);
  assert.equal(result.days,14);
- assert.deepEqual(Array.from(result.events,event=>event.item.id),['3','4','5']);
- assert.deepEqual(Array.from(result.priorEvents,event=>event.item.id),['1','2']);
- assert.equal(result.events[0].dateOnly,true,'today without a time remains on the agenda');
- for(const range of ['today','week','upcoming'])assert.deepEqual(Array.from(c.calendarWindowEvents(rows,range,now).priorEvents,event=>event.item.id),['1','2']);
+ assert.deepEqual(Array.from(result.events,event=>event.item.id),['4','5']);
+ assert.deepEqual(Array.from(result.priorEvents,event=>event.item.id),['2']);
+ assert.deepEqual(Array.from(result.unconfirmedTimes,event=>event.item.id),['1','3']);
+ assert.ok(result.events.every(event=>!event.dateOnly),'date-only entries never become confirmed calendar cards');
+ for(const range of ['today','week','upcoming'])assert.deepEqual(Array.from(c.calendarWindowEvents(rows,range,now).priorEvents,event=>event.item.id),['2']);
 });
 test('Prior releases clear at Monday midnight, including month and year boundaries',()=>{
  const c=app(),now=new Date('2027-01-04T00:00:00Z');
