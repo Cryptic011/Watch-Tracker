@@ -122,7 +122,7 @@ const server=http.createServer((req,res)=>{
       {id:'agenda-outside',title:'Outside fourteen days',type:'Film',filmReleaseDate:day(14)},
       {id:'agenda-old',title:'Last week',type:'Film',filmReleaseDate:new Date(monday.getTime()-86400000).toISOString()},
       {id:'agenda-prior',title:'Earlier this week',type:'Film',filmReleaseDate:new Date(now.getTime()-1000).toISOString()}];
-    mediaItems=mediaItems.map(item=>({...item,releaseSchedule:{key:'verified-test-streaming',country:'GB',platform:'Test streaming',estimated:false}}));
+    mediaItems=mediaItems.map(item=>({...item,filmReleaseDate:item.filmReleaseDate.length===10?item.filmReleaseDate+'T18:00:00Z':item.filmReleaseDate,filmReleaseSource:'Official test listing',platform:'Test streaming'}));
     renderDashboard();
     const root=document.querySelector('#library-dashboard');
     return {range:root.querySelector('[data-calendar-range="upcoming"]').textContent,
