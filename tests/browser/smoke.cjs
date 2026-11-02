@@ -604,7 +604,7 @@ const server=http.createServer((req,res)=>{
   assert.equal(await page.locator('.bottom-tabs').evaluate(node=>node.classList.contains('is-dragging')),true,'horizontal dragging controls the pill');
   await page.mouse.up();
   await page.waitForFunction(()=>document.querySelector('.bottom-tabs').dataset.activeTab==='settings');
-  await assertSettingsOnly();
+  assert.equal(await page.locator('#settings-view').isVisible(),true,'releasing the pill opens Settings');
   phase='settings visibility';
   const assertSettingsOnly=async()=>{
    for(const selector of ['.top-nav h1','.top-nav .search-box','.stats-row','#library-view','#discovery-view','#add-btn']){

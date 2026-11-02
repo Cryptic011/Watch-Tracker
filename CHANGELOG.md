@@ -1,7 +1,7 @@
 ## 2026-11-02 — Tinted sliding bottom navigation
 - Add an explicit sliding selected-page pill to Home, Library and Settings.
 - Follow horizontal dragging, snap on release, and continue interrupted tap animations from the visible position.
-- Use a darker tint with less shine, including a matching light theme and a shorter reduced-motion glide.
+- Use solid tinted colours without transparency, blur, glass highlights or elastic stretching; retain smooth sliding and a shorter reduced-motion glide.
 - Preserve Search, keyboard visibility, navigation history and the current Home/Library layout.
 
 ## 2026-10-29 — Fix the nine code-review findings

@@ -312,8 +312,8 @@
   const navigationMotionPreference=window.matchMedia("(prefers-reduced-motion: reduce)");
   const nativeTabMotion=typeof tabIndicator.animate==="function";
   bottomTabs.classList.toggle("native-tab-motion",nativeTabMotion);
-  let tabSlideAnimation=null,tabGlassAnimation=null;
-  navigationMotionPreference.addEventListener("change",()=>{tabSlideAnimation?.cancel();tabGlassAnimation?.cancel();});
+  let tabSlideAnimation=null;
+  navigationMotionPreference.addEventListener("change",()=>{tabSlideAnimation?.cancel();});
 
   function updateTabSelection(tab,forceMotion=false){
     const index=Array.from(tabBtns).findIndex(button=>button.dataset.tab===tab);
@@ -331,21 +331,14 @@
       if(selected)button.setAttribute("aria-current","page");else button.removeAttribute("aria-current");
     });
     if(moving){
-      tabGlassAnimation?.cancel();
+
       if(nativeTabMotion){
         tabSlideAnimation=tabIndicator.animate([
           {transform:from==="none"?"translateX(0)":from},
           {transform:destination}
         ],{duration:navigationMotionPreference.matches?160:650,easing:navigationMotionPreference.matches?"ease-out":"cubic-bezier(.32,0,.18,1)"});
       }
-      if(!navigationMotionPreference.matches&&typeof tabGlass.animate==="function"){
-        tabGlassAnimation=tabGlass.animate([
-          {transform:"scale(1,1)",offset:0},
-          {transform:"scale(1.18,.9)",offset:.3},
-          {transform:"scale(.98,1.02)",offset:.7},
-          {transform:"scale(1,1)",offset:1}
-        ],{duration:650,easing:"cubic-bezier(.32,0,.18,1)"});
-      }
+
     }
     return true;
   }
@@ -364,13 +357,12 @@
     if(!drag.moved){
       if(Math.abs(dy)>Math.abs(dx)&&Math.abs(dy)>8){navigationDrag=null;return;}
       if(Math.abs(dx)<6)return;
-      drag.moved=true;tabSlideAnimation?.cancel();tabGlassAnimation?.cancel();
+      drag.moved=true;tabSlideAnimation?.cancel();
       bottomTabs.classList.add("is-dragging");bottomTabs.setPointerCapture(event.pointerId);
     }
     event.preventDefault();
     drag.position=Math.max(0,Math.min((tabBtns.length-1)*drag.step,drag.offset+dx));
     tabIndicator.style.transform="translateX("+drag.position+"px)";
-    if(!navigationMotionPreference.matches)tabGlass.style.transform="scale(1.06,.96)";
     const preview=Math.round(drag.position/drag.step);
     tabBtns.forEach((button,index)=>button.classList.toggle("drag-preview",index===preview));
   });
