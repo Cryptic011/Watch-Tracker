@@ -1,3 +1,8 @@
+## 2026-11-02 — Restore calendar show posters
+- Load hidden poster images immediately once their card enters view, then reveal them after the image loads.
+- Keep watching both calendars as you scroll and when other app surfaces render, so later cards also receive their show artwork.
+- Verify decoded, visible posters from saved artwork and the matching show provider in Chromium and WebKit.
+
 ## 2026-11-02 — Remove calendar filters and clean the whole display
 - Remove Today, This week and all calendar range tabs; always show one 14-day dated list.
 - Ignore legacy range links so old saved navigation cannot restore the old filtered calendar.

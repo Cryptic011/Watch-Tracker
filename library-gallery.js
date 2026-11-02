@@ -15,7 +15,9 @@ window.WatchLogGallery=(()=>{
     img._galleryImageFailedAt=0;
     img.onload=()=>{img.hidden=false;img._galleryImageFailedAt=0;};
     img.onerror=()=>{img.hidden=true;img._galleryImageFailedAt=Date.now();};
-    img.decoding='async';img.src=url;
+    // The parent card is observed for visibility. A hidden lazy image never
+    // starts loading, so it cannot fire the load event that reveals it.
+    img.loading='eager';img.decoding='async';img.src=url;
   }
   async function fetchArt(item){
     const signal=AbortSignal.timeout(6500);
@@ -65,7 +67,12 @@ window.WatchLogGallery=(()=>{
     artTargets.get(id)?.forEach(img=>applyImage(img,url));
   }).finally(()=>{active--;pending.delete(id);pump();});}}
   function observe(root,items){
-    observer?.disconnect();artTargets.clear();
+    // Keep observing the other calendar and the Library when one surface
+    // renders or opens a title. Remove only nodes that have left the page.
+    for(const [id,targets] of artTargets){
+      for(const img of targets)if(img.isConnected===false){observer?.unobserve(img.parentElement);targets.delete(img);}
+      if(!targets.size)artTargets.delete(id);
+    }
     const byKey=new Map(items.map(item=>[key(item),item]));
     const enqueue=(img,item)=>{
       const id=key(item),cached=freshArt(id);
@@ -86,8 +93,9 @@ window.WatchLogGallery=(()=>{
       if(!artTargets.has(img.dataset.art))artTargets.set(img.dataset.art,new Set());
       artTargets.get(img.dataset.art).add(img);
       const cached=freshArt(img.dataset.art);
-      if(cached)applyImage(img,cached.url||savedArt(item));
-      else if(observer)observer.observe(img.parentElement);
+      applyImage(img,cached?.url||savedArt(item));
+      if(cached)continue;
+      if(observer)observer.observe(img.parentElement);
       else enqueue(img,item);
     }
   }
@@ -387,7 +395,7 @@ window.WatchLogGallery=(()=>{
     return false;
   }
   function mount(element,rows,callbacks){
-    host=element;api=callbacks;rows=api.includes?rows.filter(api.includes):rows;observer?.disconnect();host.classList.add('gallery-active');
+    host=element;api=callbacks;rows=api.includes?rows.filter(api.includes):rows;host.classList.add('gallery-active');
     if(api.dashboardOnly){
       category='';
       if(api.features){
@@ -428,16 +436,7 @@ window.WatchLogGallery=(()=>{
     observe(host,rows);
   }
   function observeScheduleArtwork(root,items){
-    const byKey=new Map(items.map(item=>[key(item),item]));
-    for(const img of root.querySelectorAll('img[data-art]')){
-      const item=byKey.get(img.dataset.art);if(!item)continue;
-      const id=key(item),cached=freshArt(id);
-      if(!artTargets.has(id))artTargets.set(id,new Set());
-      const targets=artTargets.get(id);for(const target of targets)if(target.isConnected===false)targets.delete(target);
-      targets.add(img);applyImage(img,cached?.url||savedArt(item));
-      if(img.parentElement?.getClientRects?.().length&&!cached&&!pending.has(id)){pending.add(id);queue.push(item);}
-    }
-    pump();
+    observe(root,items);
   }
   function clearArtwork(){observer?.disconnect();artTargets.clear();queue.length=0;pending.clear();cache.clear();}
   return {mount,open,sections,observeScheduleArtwork,releaseGroups,back,refreshCurrent,clearArtwork,getCategory:()=>category,setCategory:value=>{category=['Film','Series'].includes(value)?value:'';},hasCategory:()=>Boolean(category)};

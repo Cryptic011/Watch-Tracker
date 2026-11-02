@@ -31,6 +31,28 @@ test('Hidden images load when their visible poster cards enter the viewport',asy
   assert.equal(app.observed[0],app.box);
   assert.deepEqual(app.lookups,['tt1877830']);
   assert.equal(app.img.url,poster);assert.equal(app.img.hidden,false);
+  assert.equal(app.img.loading,'eager','visibility is managed on the parent, never by a hidden lazy image');
+});
+test('Both calendars keep watching offscreen covers through Home renders',async()=>{
+  let intersect,disconnects=0;
+  const watched=new Set(),requests=[],images=[12,13].map(id=>{
+    const img={hidden:true,isConnected:true,dataset:{art:`Series:${id}`},set src(url){assert.equal(this.loading,'eager');this.url=url;this.onload();}};
+    img.parentElement={getClientRects:()=>[{}],querySelector:()=>img};return img;
+  });
+  const items=[12,13].map(id=>({id:String(id),type:'Series',title:'Show '+id,tvmazeShowId:String(id)}));
+  const app={window:{},URL,AbortSignal,document:{visibilityState:'visible'},
+    IntersectionObserver:class{constructor(callback){intersect=callback;}observe(box){watched.add(box);}unobserve(box){watched.delete(box);}disconnect(){disconnects++;watched.clear();}},
+    fetch:async url=>{requests.push(url);const id=Number(url.split('/').at(-1));return {ok:true,json:async()=>({id,image:{original:`https://static.tvmaze.com/${id}.jpg`}})};}};
+  vm.runInNewContext(source,app);
+  const gallery=app.window.WatchLogGallery;
+  for(const img of images)gallery.observeScheduleArtwork({querySelectorAll:()=>[img]},items);
+  gallery.mount({classList:{add(){}},childNodes:[]},[],{dashboardOnly:true});
+  assert.equal(disconnects,0);assert.equal(watched.size,2);assert.equal(requests.length,0,'offscreen provider lookups wait until scrolling');
+  intersect([{isIntersecting:true,target:images[0].parentElement}]);await new Promise(setImmediate);
+  assert.equal(images[0].hidden,false);assert.equal(images[1].hidden,true);
+  intersect([{isIntersecting:true,target:images[1].parentElement}]);await new Promise(setImmediate);
+  assert.equal(images[1].hidden,false);assert.equal(images[1].url,'https://static.tvmaze.com/13.jpg');
+  assert.equal(requests.length,2);
 });
 test('Posters also load when IntersectionObserver is unavailable',async()=>{
   const app=gallery({observer:false,results:[{imdbId:'tt1877830',posterUrl:poster}]});

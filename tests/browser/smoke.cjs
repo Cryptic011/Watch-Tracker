@@ -37,6 +37,7 @@ const server=http.createServer((req,res)=>{
    if(url.hostname==='api.tvmaze.com'&&url.pathname==='/shows/91405')return route.fulfill({headers,json:{id:91405,name:'NCIS: New York',premiered:'2026-10-06',status:'Running',externals:{imdb:'tt41814911'},summary:'<p>A team investigates crimes affecting a major city and port.</p>'}});
    if(url.hostname==='api.tvmaze.com'&&/^\/shows\/91405\/(?:episodes|seasons)$/.test(url.pathname))return route.fulfill({headers,json:[]});
    if(url.hostname==='api.tvmaze.com'&&url.pathname==='/shows/12')return route.fulfill({headers,json:{id:12,name:'Test Series',premiered:'2020-01-01',externals:{imdb:'tt1234568'},image:{original:'https://static.tvmaze.com/series-poster.jpg'},summary:'<p>An official series description &amp; a second detail.</p>',genres:['Drama','Action'],status:'Running',rating:{average:8.4},runtime:42,language:'English'}});
+   if(url.hostname==='api.tvmaze.com'&&url.pathname==='/shows/13')return route.fulfill({headers,json:{id:13,name:'Later poster',image:{original:'https://static.tvmaze.com/later-poster.jpg'}}});
    if(url.hostname==='api.tvmaze.com'&&url.pathname==='/shows/12/episodes')return route.fulfill({headers,json:[
     {season:1,number:1,image:{original:'https://static.tvmaze.com/episode-one.jpg'}},
     {season:1,number:2,image:null},
@@ -134,6 +135,31 @@ const server=http.createServer((req,res)=>{
    }finally{mediaItems=saved;selectedCalendarRange=range;renderDashboard();}
   });
   assert.deepEqual(agendaProof,{posterAligned:true,period:'Next 14 days · GMT',controls:0,days:2,posters:2,future:['agenda-near','agenda-last'],prior:['agenda-prior'],priorLast:true,fits:true},'calendar shows a compact fourteen-day poster agenda and only this week’s prior releases');
+  phase='calendar poster loading';
+  const beforePosterCheck=await page.evaluate(()=>{
+   const original=mediaItems;
+   mediaItems=Array.from({length:8},(_,index)=>({id:'poster-proof-'+index,type:'Series',title:index===0?'Test Series':index===7?'Later poster':'Saved poster '+index,
+    ...(index===0?{tvmazeShowId:'12',imdbId:'tt1234568'}:index===7?{tvmazeShowId:'13'}:{posterUrl:'https://static.tvmaze.com/saved-poster-'+index+'.jpg'}),
+    platform:'Poster test network',scheduledEpisodeReleases:[{season:1,number:1,raw:new Date(Date.now()+(index+1)*86400000).toISOString()}]}));
+   WatchLogGallery.clearArtwork();render();return original;
+  });
+  try{
+   for(const root of ['#library-dashboard','#recurring-weekly-dashboard']){
+    for(const id of ['poster-proof-0','poster-proof-3','poster-proof-7']){
+     const poster=page.locator(`${root} .release-card[data-${root.includes('recurring')?'recurring':'dashboard'}-open="${id}"] .calendar-poster img`);
+     await poster.locator('..').scrollIntoViewIfNeeded();
+     await poster.evaluate(img=>new Promise((resolve,reject)=>{
+      const start=Date.now();const check=()=>{if(!img.hidden&&img.complete&&img.naturalWidth>0)return resolve();if(Date.now()-start>8000)return reject(Error('Calendar poster never became visible: '+img.dataset.art));setTimeout(check,25);};check();
+     }));
+     assert.equal(await poster.isVisible(),true,'calendar and recurring posters load, including cards reached by scrolling');
+    }
+   }
+   assert.equal(await page.locator('#library-dashboard [data-dashboard-open="poster-proof-0"] img').getAttribute('src'),'https://static.tvmaze.com/series-poster.jpg','provider identity supplies a show cover without a saved poster');
+   const panel=page.locator('[data-home-section="recurring"]');
+   await panel.locator('summary').first().click();await panel.locator('summary').first().click();
+   await page.locator('#recurring-weekly-dashboard [data-recurring-open="poster-proof-7"] .calendar-poster').scrollIntoViewIfNeeded();
+   assert.equal(await page.locator('#recurring-weekly-dashboard [data-recurring-open="poster-proof-7"] img').isVisible(),true,'posters survive collapsing and reopening their calendar');
+  }finally{await page.evaluate(original=>{mediaItems=original;render();window.scrollTo(0,0);},beforePosterCheck);}
   const pendingSchedule=await page.evaluate(()=>{
    const saved=mediaItems,view=selectedScheduleView,range=selectedCalendarRange;
    try{
