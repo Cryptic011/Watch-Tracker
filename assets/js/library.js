@@ -382,7 +382,12 @@
   }
   bottomTabs.addEventListener("pointerup",event=>finishNavigationDrag(event));
   bottomTabs.addEventListener("pointercancel",event=>finishNavigationDrag(event,true));
-  bottomTabs.addEventListener("lostpointercapture",event=>finishNavigationDrag(event,true));
+  bottomTabs.addEventListener("lostpointercapture",event=>{
+    // Touch starts with implicit capture on the button. Moving capture to the
+    // bar releases that button first; its bubbling event is not a cancellation.
+    if(event.target!==bottomTabs||bottomTabs.hasPointerCapture(event.pointerId))return;
+    finishNavigationDrag(event,true);
+  });
   bottomTabs.addEventListener("click",event=>{
     if(!suppressNavigationClick)return;
     suppressNavigationClick=false;event.preventDefault();event.stopImmediatePropagation();

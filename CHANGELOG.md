@@ -1,3 +1,8 @@
+## 2026-11-02 — Allow touch dragging between navigation pages
+- Ignore the original button’s capture-loss event when touch capture transfers to the navigation bar.
+- Keep the drag active until release so it can switch Home, Library and Settings in both directions.
+- Add real touch-input regression coverage alongside the existing mouse-drag checks.
+
 ## 2026-11-02 — Tinted sliding bottom navigation
 - Add an explicit sliding selected-page pill to Home, Library and Settings.
 - Follow horizontal dragging, snap on release, and continue interrupted tap animations from the visible position.

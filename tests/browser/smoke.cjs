@@ -605,6 +605,25 @@ const server=http.createServer((req,res)=>{
   await page.mouse.up();
   await page.waitForFunction(()=>document.querySelector('.bottom-tabs').dataset.activeTab==='settings');
   assert.equal(await page.locator('#settings-view').isVisible(),true,'releasing the pill opens Settings');
+  if(engine.name()==='chromium'){
+    phase='touch navigation capture transfer';
+    const touch=await context.newCDPSession(page);
+    for(const [from,to] of [['library','collection'],['collection','settings'],['settings','collection'],['collection','library']]){
+      await page.locator('.bottom-tabs [data-tab="'+from+'"]').click();
+      await page.waitForFunction(tab=>Math.abs(document.querySelector('.tab-indicator').getBoundingClientRect().x-document.querySelector('.bottom-tabs [data-tab="'+tab+'"]').getBoundingClientRect().x)<1,from);
+      const a=await page.locator('.bottom-tabs [data-tab="'+from+'"]').boundingBox(),b=await page.locator('.bottom-tabs [data-tab="'+to+'"]').boundingBox();
+      const x=a.x+a.width/2,y=a.y+a.height/2,end=b.x+b.width/2;
+      await touch.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x,y,id:1}]});
+      for(let step=1;step<=8;step++)await touch.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:x+(end-x)*step/8,y,id:1}]});
+      assert.equal(await page.locator('.bottom-tabs').evaluate(node=>node.classList.contains('is-dragging')),true,'implicit button capture must not cancel the touch drag');
+      assert.equal(await page.locator('.bottom-tabs').getAttribute('data-active-tab'),from,'touch previews until release');
+      await touch.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+      await page.waitForFunction(tab=>document.querySelector('.bottom-tabs').dataset.activeTab===tab,to);
+      assert.equal(await page.locator('.bottom-tabs [data-tab="'+to+'"]').getAttribute('aria-current'),'page','touch release selects '+to);
+    }
+    await touch.detach();
+    await page.locator('.bottom-tabs [data-tab="settings"]').click();
+  }
   phase='settings visibility';
   const assertSettingsOnly=async()=>{
    for(const selector of ['.top-nav h1','.top-nav .search-box','.stats-row','#library-view','#discovery-view','#add-btn']){
