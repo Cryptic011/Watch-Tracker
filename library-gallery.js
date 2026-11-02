@@ -138,40 +138,49 @@ window.WatchLogGallery=(()=>{
     return `<button type="button" class="gallery-manage-button" data-gallery-manage="${esc(label)}" data-gallery-manage-ids="${esc(JSON.stringify(items.map(item=>String(item.id))))}" aria-label="Manage ${esc(label.toLowerCase())} titles" title="Manage ${esc(label.toLowerCase())} titles"${items.length?'':' disabled'}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m16 3 5 5M4 20l4-1L21 6a2.8 2.8 0 0 0-4-4L4 15l-1 6Z"/></svg></button>`;
   }
   function section(title,items,carousel=false){return items.length?`<section class="gallery-section" data-gallery-section="${esc(title)}"><h3>${esc(title)}<span class="gallery-count">${items.length}</span></h3><div class="${carousel?'gallery-carousel'+(category==='Film'?' gallery-film-carousel':''):'gallery-grid'}">${items.map(item=>tile(item,carousel)).join('')}</div></section>`:'';}
-  function paintTrackerImage(container,url,label){
+  function paintTrackerImage(container,url,label,fallback=""){
     const placeholder=`<span class="gallery-artwork-placeholder" aria-label="No artwork available">${esc(label)}</span>`;
     if(container._trackerImage===url)return;
     container._trackerImage=url;
     container.innerHTML=url?`<img src="${esc(url)}" alt="" loading="lazy" decoding="async">`:placeholder;
     const image=container.querySelector('img');
-    if(image)image.onerror=()=>{container.innerHTML=placeholder;};
+    if(image)image.onerror=()=>{
+      if(fallback&&fallback!==url){container._trackerImage=null;paintTrackerImage(container,fallback,label);}
+      else container.innerHTML=placeholder;
+    };
+  }
+  function episodeTitle(value){
+    const title=String(value||'').trim();
+    return /^(?:episode|ep\.?)\s*\d+$/i.test(title)?'':title;
   }
   function paintTrackerArtwork(section,artwork){
-    if(artwork.episodeImages)for(const row of section.querySelectorAll('[data-gallery-episode]')){
+    for(const row of section.querySelectorAll('[data-gallery-episode]')){
       const [season,episode]=row.dataset.galleryEpisode.split(':').map(Number);
       paintTrackerImage(row.querySelector('.gallery-episode-art'),artwork.episodeImages?.[season]?.[episode]||'',`E${episode}`);
+      const subtitle=row.querySelector('.gallery-episode-title'),title=episodeTitle(artwork.episodeTitles?.[season]?.[episode]);
+      if(subtitle&&title){subtitle.textContent=title;subtitle.hidden=false;}
     }
-    if(artwork.seasonImages)for(const poster of section.querySelectorAll('[data-gallery-season-art]')){
-      paintTrackerImage(poster,artwork.seasonImages[poster.dataset.gallerySeasonArt]||'',`S${poster.dataset.gallerySeasonArt}`);
+    for(const poster of section.querySelectorAll('[data-gallery-season-art]')){
+      paintTrackerImage(poster,artwork.seasonImages?.[poster.dataset.gallerySeasonArt]||artwork.posterUrl||'',`S${poster.dataset.gallerySeasonArt}`,artwork.posterUrl||'');
     }
   }
   async function loadTrackerArtwork(item){
     const section=dialog.querySelector('.gallery-season-list'),callbacks=api;
     if(!section)return;
-    dialog._trackerArtwork={episodeImages:item.episodeImagesSource==='TVMaze'?item.episodeImages||{}:{},seasonImages:item.seasonImagesSource==='TVMaze'?item.seasonImages||{}:{}};
+    dialog._trackerArtwork={posterUrl:savedArt(item)||freshArt(key(item))?.url||'',episodeTitles:item.episodeTitles||{},episodeImages:item.episodeImagesSource==='TVMaze'?item.episodeImages||{}:{},seasonImages:item.seasonImagesSource==='TVMaze'?item.seasonImages||{}:{}};
     paintTrackerArtwork(section,dialog._trackerArtwork);
     if(!callbacks.trackerArtwork)return;
     try{
       const artwork=await callbacks.trackerArtwork(item);
-      if(section===dialog.querySelector('.gallery-season-list')&&dialog.dataset.item===String(item.id)){dialog._trackerArtwork=artwork;paintTrackerArtwork(section,artwork);}
+      if(section===dialog.querySelector('.gallery-season-list')&&dialog.dataset.item===String(item.id)){dialog._trackerArtwork={...dialog._trackerArtwork,...artwork};paintTrackerArtwork(section,dialog._trackerArtwork);}
     }catch(_){}
   }
   function episodeRow(item,season,episode,watched){
-    const complete=watched.has(episode),title=item.episodeTitles?.[season]?.[episode]||'Episode '+episode;
+    const complete=watched.has(episode),title=episodeTitle(item.episodeTitles?.[season]?.[episode]);
     const date=item.episodeReleaseDates?.[season]?.[episode]||'',dateText=date?api.date(new Date(/^\d{4}-\d{2}-\d{2}$/.test(date)?date+'T12:00:00Z':date)):'';
     return `<div class="gallery-episode-row" data-gallery-episode="${season}:${episode}">
       <span class="gallery-episode-art"><span class="gallery-artwork-placeholder">E${episode}</span></span>
-      <span class="gallery-episode-copy"><strong>${episode}. ${esc(title)}</strong>${dateText?`<small>${esc(dateText)}</small>`:''}</span>
+      <span class="gallery-episode-copy"><strong>Episode ${episode}</strong><small class="gallery-episode-title"${title?'':' hidden'}>${esc(title)}</small>${dateText?`<small>${esc(dateText)}</small>`:''}</span>
       <button type="button" class="gallery-episode-toggle" data-gallery-toggle-episode="${season}:${episode}" aria-pressed="${complete}" aria-label="Mark S${season} E${episode} ${complete?'unwatched':'watched'}"><span class="gallery-episode-check" aria-hidden="true">${complete?'✓':''}</span></button>
     </div>`;
   }

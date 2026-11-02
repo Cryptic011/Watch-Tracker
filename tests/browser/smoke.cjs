@@ -40,7 +40,7 @@ const server=http.createServer((req,res)=>{
    if(url.hostname==='api.tvmaze.com'&&url.pathname==='/shows/13')return route.fulfill({headers,json:{id:13,name:'Later poster',image:{original:'https://static.tvmaze.com/later-poster.jpg'}}});
    if(url.hostname==='api.tvmaze.com'&&url.pathname==='/shows/12/episodes')return route.fulfill({headers,json:[
     {season:1,number:1,image:{original:'https://static.tvmaze.com/episode-one.jpg'}},
-    {season:1,number:2,image:null},
+    {season:1,number:2,name:'Crossing Lines',image:null},
     {season:1,number:3,image:{original:'https://static.tvmaze.com/series-poster.jpg'}}
    ]});
    if(url.hostname==='api.tvmaze.com'&&url.pathname==='/shows/12/seasons')return route.fulfill({headers,json:[
@@ -524,7 +524,14 @@ const server=http.createServer((req,res)=>{
   assert.equal(await page.locator('[data-gallery-episode="1:1"] img').getAttribute('src'),'https://static.tvmaze.com/episode-one.jpg');
   await page.locator('[data-gallery-season-art="1"] img').waitFor({state:'visible'});
   assert.equal(await page.locator('[data-gallery-season-art="1"] img').getAttribute('src'),'https://static.tvmaze.com/season-one.jpg');
-  assert.equal(await page.locator('[data-gallery-season-art="2"] img').count(),0);
+  await page.locator('[data-gallery-season-art="1"] img').evaluate(image=>image.dispatchEvent(new Event('error')));
+  assert.equal(await page.locator('[data-gallery-season-art="1"] img').getAttribute('src'),'https://static.tvmaze.com/series-poster.jpg','broken season artwork falls back to the matching show cover');
+  await page.locator('[data-gallery-season-art="2"] img').waitFor({state:'attached'});
+  assert.equal(await page.locator('[data-gallery-season-art="2"] img').getAttribute('src'),'https://static.tvmaze.com/series-poster.jpg','missing season artwork uses this show cover');
+  assert.equal(await page.locator('[data-gallery-episode="1:2"] .gallery-episode-copy strong').textContent(),'Episode 2');
+  assert.equal(await page.locator('[data-gallery-episode="1:2"] .gallery-episode-title').textContent(),'Crossing Lines','episode titles load even when absent from the saved item');
+  assert.equal(await page.locator('[data-gallery-episode="1:2"] .gallery-episode-title').isVisible(),true);
+  assert.doesNotMatch(await page.locator('.gallery-season-episodes').allTextContents().then(rows=>rows.join(' ')),/\d+\. Episode \d+/);
   const firstSeason=page.locator('.gallery-season[data-season="1"]');
   await firstSeason.locator('summary').press('Enter');
   await page.locator('.gallery-season[data-season="1"]:not([open])').waitFor({state:'attached'});

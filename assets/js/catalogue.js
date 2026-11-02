@@ -179,12 +179,19 @@
         fetchJSONWithTimeout(`https://api.tvmaze.com/shows/${encodeURIComponent(show.id)}/episodes`,{credentials:"omit"}),
         fetchJSONWithTimeout(`https://api.tvmaze.com/shows/${encodeURIComponent(show.id)}/seasons`,{credentials:"omit"})
       ]);
-      const artwork={details:{
+      const artwork={posterUrl:show.image?.original||show.image?.medium||"",details:{
         description:String(show.summary||""),premiered:show.premiered||"",genres:Array.isArray(show.genres)?show.genres:[],
         status:show.status||"",rating:Number.isFinite(show.rating?.average)?show.rating.average:null,
         runtime:show.averageRuntime||show.runtime||null,language:show.language||"",source:"TVMaze",sourceUrl:`https://www.tvmaze.com/shows/${show.id}`,sources:[{name:"TVMaze",url:`https://www.tvmaze.com/shows/${show.id}`}],ratingSource:"TVMaze"
       }};
-      if(results[0].status==="fulfilled"&&Array.isArray(results[0].value))artwork.episodeImages=officialEpisodeImageMap(results[0].value,show.image);
+      if(results[0].status==="fulfilled"&&Array.isArray(results[0].value)){
+        artwork.episodeImages=officialEpisodeImageMap(results[0].value,show.image);
+        artwork.episodeTitles={};
+        for(const episode of results[0].value){
+          const season=Number(episode?.season),number=Number(episode?.number),name=typeof episode?.name==="string"?episode.name.trim():"";
+          if(Number.isInteger(season)&&season>0&&Number.isInteger(number)&&number>0&&name)(artwork.episodeTitles[season]||(artwork.episodeTitles[season]={}))[number]=name;
+        }
+      }
       if(results[1].status==="fulfilled"&&Array.isArray(results[1].value)){
         artwork.seasonImages=officialSeasonImageMap(results[1].value);
         artwork.details.seasons=results[1].value.filter(season=>Number(season.number)>0).length;

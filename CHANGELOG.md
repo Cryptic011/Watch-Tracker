@@ -1,3 +1,7 @@
+## 2026-11-02 — Restore season covers and show episode titles
+- Keep each season's own poster where available; use the matching show's cover for missing or broken season artwork.
+- Show the episode number once, with its actual title underneath. Fetch titles alongside episode images, including for older saved shows.
+
 ## 2026-11-02 — Restore calendar show posters
 - Load hidden poster images immediately once their card enters view, then reveal them after the image loads.
 - Keep watching both calendars as you scroll and when other app surfaces render, so later cards also receive their show artwork.
