@@ -11,7 +11,7 @@ const helper=suite.slice(suite.indexOf('function extractFunction'),suite.indexOf
 const {extractFunction}=new Function('html','assert','vm',helper+'\nreturn {extractFunction};')(html,assert,vm);
 function app(){
  const c=vm.createContext({Date,console});
- vm.runInContext(['toMillis','isEpisodeTrackable','normalizeReleasedEpisodeMap','positiveEpisodeMap','releasedEpisodeMap','normalizeWatchedEpisodeMap','legacyWatchedEpisodeMap','watchedEpisodeMap','nextWatchEpisode','calendarRange','calendarEvents','localISODate','weeklyReleasePattern','recurringWeeklyShows','scheduleEpisodeAirTimes','recurringScheduleDelay','scheduleBehindLevel','scheduleProgressMarker'].map(n=>extractFunction(html,n)).join('\n'),c);return c;
+ vm.runInContext(['toMillis','isEpisodeTrackable','normalizeReleasedEpisodeMap','positiveEpisodeMap','releasedEpisodeMap','normalizeWatchedEpisodeMap','legacyWatchedEpisodeMap','watchedEpisodeMap','nextWatchEpisode','calendarRange','calendarEvents','calendarWindowEvents','localISODate','weeklyReleasePattern','recurringWeeklyShows','scheduleEpisodeAirTimes','recurringScheduleDelay','scheduleBehindLevel','scheduleProgressMarker'].map(n=>extractFunction(html,n)).join('\n'),c);return c;
 }
 test('Unconfirmed streaming shows remain visible separately from genuinely unknown dates',()=>{
  const c=app();c.regionalScheduleEvent=(_item,event)=>({...event,streamingUnconfirmed:true});
@@ -209,21 +209,21 @@ test('Official weekly patterns and stored schedules persist through refreshes an
  assert.match(fs.readFileSync(new URL('../assets/js/sync.js',import.meta.url),'utf8'),/recurringWeeklySchedule:scheduleVerified\?\(result.recurringWeeklySchedule\|\|null\)/);
 });
 
-test('Calendar shows the selected week remainder and Upcoming from today through the 29th',()=>{
+test('Calendar retains the week filter and covers exactly fourteen upcoming dates',()=>{
  const c=app(),now=new Date(2026,9,22,18),week=c.calendarRange('week',now),upcoming=c.calendarRange('upcoming',now),today=c.calendarRange('today',now);
  assert.equal(c.localISODate(week.start),'2026-10-22');
  assert.equal(week.days,4);
  assert.equal(c.localISODate(week.priorStart),'2026-10-19');
  assert.equal(week.priorDays,3);
  assert.equal(c.localISODate(upcoming.start),'2026-10-22');
- assert.equal(upcoming.days,8);
- assert.equal(upcoming.label,'22–29 Oct');
+ assert.equal(upcoming.days,14);
+ assert.equal(upcoming.label,'Next 14 days');
  assert.equal(c.localISODate(today.start),'2026-10-22');
  assert.equal(today.days,1);
  const items=['2026-10-18','2026-10-19','2026-10-21','2026-10-22','2026-10-25','2026-10-26','2026-10-29','2026-10-30'].map((date,index)=>({id:String(index),title:date,type:'Film',filmReleaseDate:date}));
  assert.equal(JSON.stringify(c.calendarEvents(items,week.start,week.days).events.map(event=>event.item.title)),JSON.stringify(['2026-10-22','2026-10-25']));
  assert.equal(JSON.stringify(c.calendarEvents(items,week.priorStart,week.priorDays).events.map(event=>event.item.title)),JSON.stringify(['2026-10-19','2026-10-21']));
- assert.equal(JSON.stringify(c.calendarEvents(items,upcoming.start,upcoming.days).events.map(event=>event.item.title)),JSON.stringify(['2026-10-22','2026-10-25','2026-10-26','2026-10-29']));
+ assert.equal(JSON.stringify(c.calendarEvents(items,upcoming.start,upcoming.days).events.map(event=>event.item.title)),JSON.stringify(['2026-10-22','2026-10-25','2026-10-26','2026-10-29','2026-10-30']));
 });
 test('Calendar shows only the selected window while retaining TBA and excluded sections',()=>{
  const dashboard=fs.readFileSync(new URL('../assets/js/dashboard.js',import.meta.url),'utf8');
@@ -411,4 +411,27 @@ test('A single announced episode or season premiere appears without a historical
  assert.equal(rows.length,2);assert.ok(rows.some(row=>row.item.id==='single'&&row.episodes[0].number===4));
  assert.ok(rows.some(row=>row.item.id==='premiere'&&row.episodes[0].number===1));
  assert.equal(c.recurringWeeklyShows([{...one,hideFromWeeklyReleases:true}],now).length,0);
+});
+
+test('Fourteen-day agenda separates elapsed releases and restricts prior releases to this week',()=>{
+ const c=app(),now=new Date('2026-11-05T12:00:00Z');
+ const dates=['2026-11-01T20:00:00Z','2026-11-02','2026-11-05T09:00:00Z','2026-11-05','2026-11-05T18:00:00Z','2026-11-18T23:59:00Z','2026-11-19T00:00:00Z'];
+ const rows=dates.map((date,index)=>({id:String(index),title:date,type:'Film',filmReleaseDate:date}));
+ const result=c.calendarWindowEvents(rows,'upcoming',now);
+ assert.equal(result.days,14);
+ assert.deepEqual(Array.from(result.events,event=>event.item.id),['3','4','5']);
+ assert.deepEqual(Array.from(result.priorEvents,event=>event.item.id),['1','2']);
+ assert.equal(result.events[0].dateOnly,true,'today without a time remains on the agenda');
+ for(const range of ['today','week','upcoming'])assert.deepEqual(Array.from(c.calendarWindowEvents(rows,range,now).priorEvents,event=>event.item.id),['1','2']);
+});
+test('Prior releases clear at Monday midnight, including month and year boundaries',()=>{
+ const c=app(),now=new Date('2027-01-04T00:00:00Z');
+ const rows=[{id:'old',title:'Last week',type:'Film',filmReleaseDate:'2027-01-03T23:59:59Z'},{id:'new',title:'This week',type:'Film',filmReleaseDate:'2027-01-04T00:00:00Z'}];
+ const result=c.calendarWindowEvents(rows,'upcoming',now);
+ assert.equal(result.priorEvents.length,0);assert.deepEqual(Array.from(result.events,event=>event.item.id),['new']);
+});
+test('Prior calendar entries include verified latest episodes and exclude hidden shows',()=>{
+ const c=app(),show={id:'show',title:'Series',type:'Series',airingSeason:2,latestEpisodeNum:3,latestEpisodeDate:'2026-11-03T20:00:00Z'};
+ assert.equal(c.calendarWindowEvents([show],'upcoming',new Date('2026-11-05T12:00:00Z')).priorEvents[0].label,'S2 E3');
+ assert.equal(c.calendarWindowEvents([{...show,hideFromWeeklyReleases:true}],'upcoming',new Date('2026-11-05T12:00:00Z')).priorEvents.length,0);
 });

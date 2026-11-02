@@ -427,6 +427,18 @@ window.WatchLogGallery=(()=>{
     }
     observe(host,rows);
   }
+  function observeScheduleArtwork(root,items){
+    const byKey=new Map(items.map(item=>[key(item),item]));
+    for(const img of root.querySelectorAll('img[data-art]')){
+      const item=byKey.get(img.dataset.art);if(!item)continue;
+      const id=key(item),cached=freshArt(id);
+      if(!artTargets.has(id))artTargets.set(id,new Set());
+      const targets=artTargets.get(id);for(const target of targets)if(target.isConnected===false)targets.delete(target);
+      targets.add(img);applyImage(img,cached?.url||savedArt(item));
+      if(img.parentElement?.getClientRects?.().length&&!cached&&!pending.has(id)){pending.add(id);queue.push(item);}
+    }
+    pump();
+  }
   function clearArtwork(){observer?.disconnect();artTargets.clear();queue.length=0;pending.clear();cache.clear();}
-  return {mount,open,sections,releaseGroups,back,refreshCurrent,clearArtwork,getCategory:()=>category,setCategory:value=>{category=['Film','Series'].includes(value)?value:'';},hasCategory:()=>Boolean(category)};
+  return {mount,open,sections,observeScheduleArtwork,releaseGroups,back,refreshCurrent,clearArtwork,getCategory:()=>category,setCategory:value=>{category=['Film','Series'].includes(value)?value:'';},hasCategory:()=>Boolean(category)};
 })();

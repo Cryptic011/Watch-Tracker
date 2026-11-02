@@ -1,3 +1,9 @@
+## 2026-11-02 — Collapsible fourteen-day release calendar
+- Show the next 14 calendar days by default, grouped by date with cover artwork and episode/time details.
+- Preserve the independently collapsible Calendar and Recurring shows sections.
+- Move Prior Releases to the bottom and limit it to already-released titles from the current Monday-to-Sunday week, including timed releases earlier today.
+- Retain Today and This week filters, date-only Time TBA labels, exclusions and unconfirmed-streaming sections.
+
 ## 2026-11-02 — Allow touch dragging between navigation pages
 - Ignore the original button’s capture-loss event when touch capture transfers to the navigation bar.
 - Keep the drag active until release so it can switch Home, Library and Settings in both directions.

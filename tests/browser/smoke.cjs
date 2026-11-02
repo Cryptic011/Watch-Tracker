@@ -111,6 +111,28 @@ const server=http.createServer((req,res)=>{
   if(process.env.BROWSER_SCREENSHOT_DIR)await page.screenshot({path:path.join(process.env.BROWSER_SCREENSHOT_DIR,engine.name()+'-gmt-settings.png')});
   await page.locator('.bottom-tabs [data-tab="library"]').click();
   assert.equal(changelogRequests,0,'startup does not request workflow history');
+  const agendaProof=await page.evaluate(()=>{
+   const saved=mediaItems,range=selectedCalendarRange,now=new Date(),today=new Date(now);today.setUTCHours(0,0,0,0);
+   const day=offset=>new Date(today.getTime()+offset*86400000).toISOString().slice(0,10);
+   const monday=new Date(today);monday.setUTCDate(monday.getUTCDate()-(monday.getUTCDay()+6)%7);
+   try{
+    selectedCalendarRange='upcoming';
+    mediaItems=[{id:'agenda-near',title:'Poster release',type:'Film',filmReleaseDate:day(2),posterUrl:'https://static.tvmaze.com/uploads/images/medium_portrait/1/1.jpg'},
+      {id:'agenda-last',title:'Last included date',type:'Film',filmReleaseDate:day(13)},
+      {id:'agenda-outside',title:'Outside fourteen days',type:'Film',filmReleaseDate:day(14)},
+      {id:'agenda-old',title:'Last week',type:'Film',filmReleaseDate:new Date(monday.getTime()-86400000).toISOString()},
+      {id:'agenda-prior',title:'Earlier this week',type:'Film',filmReleaseDate:new Date(now.getTime()-1000).toISOString()}];
+    renderDashboard();
+    const root=document.querySelector('#library-dashboard');
+    return {range:root.querySelector('[data-calendar-range="upcoming"]').textContent,
+      days:root.querySelectorAll('.release-day').length,posters:root.querySelectorAll('.calendar-poster img').length,
+      future:[...root.querySelectorAll('.release-week-list [data-dashboard-open]')].map(node=>node.dataset.dashboardOpen),
+      prior:[...root.querySelectorAll('.prior-releases [data-dashboard-open]')].map(node=>node.dataset.dashboardOpen),
+      priorLast:root.querySelector('.prior-releases').nextElementSibling?.classList.contains('weekly-footnote'),
+      fits:root.scrollWidth<=root.clientWidth};
+   }finally{mediaItems=saved;selectedCalendarRange=range;renderDashboard();}
+  });
+  assert.deepEqual(agendaProof,{range:'Next 14 days',days:2,posters:2,future:['agenda-near','agenda-last'],prior:['agenda-prior'],priorLast:true,fits:true},'calendar shows a compact fourteen-day poster agenda and only this week’s prior releases');
   const pendingSchedule=await page.evaluate(()=>{
    const saved=mediaItems,view=selectedScheduleView,range=selectedCalendarRange;
    try{

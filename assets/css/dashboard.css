@@ -143,3 +143,23 @@
 .home-schedule-panel .weekly-releases-heading h2{display:none}
 .home-schedule-panel .weekly-releases-heading{padding-top:12px}
 .home-schedule-panel .weekly-eyebrow{display:none}
+
+/* Calendar agenda: full-width poster cards grouped under release dates. */
+.calendar-agenda{background:var(--bg)}
+.calendar-agenda .release-week-list{display:block;padding:0 14px}
+.calendar-agenda .release-day,.calendar-agenda .release-day.is-today{margin:20px 0 26px;padding:0;border:0;border-radius:0;background:none}
+.calendar-agenda .release-day-heading{margin-bottom:14px}
+.calendar-agenda .release-day-name{font-size:clamp(1rem,4.7vw,1.3rem);font-weight:850;letter-spacing:-.025em}
+.calendar-agenda .release-day-count,.calendar-agenda .today-marker{display:none}
+.calendar-agenda .release-card{display:grid;grid-template-columns:78px minmax(0,1fr);gap:14px;min-height:117px;padding:0;margin:10px 0;border:0;border-radius:16px;background:var(--inner);overflow:hidden}
+.calendar-poster{position:relative;display:block;align-self:stretch;min-height:117px;width:78px;background:var(--card);overflow:hidden}
+.calendar-poster-fallback{position:absolute;inset:0;display:grid;place-items:center;color:var(--muted);font-size:1.8rem;font-weight:800}
+.calendar-poster img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.calendar-poster img[hidden]{display:none}
+.calendar-agenda .release-card-copy{padding:14px 12px 14px 0;gap:5px}
+.calendar-agenda .release-card-copy strong{font-size:1.03rem;line-height:1.3}
+.calendar-agenda .release-episode{font-size:.8rem;color:var(--muted)}
+.calendar-agenda .release-time{display:block;align-self:auto;min-height:0;padding:0;background:none;border-radius:0;text-align:left;font-size:.8rem;font-weight:600;line-height:1.4;color:var(--muted)}
+.calendar-agenda .release-chevron{display:none}
+.calendar-agenda .prior-releases{margin-top:24px}
+@media(min-width:620px){.calendar-agenda .release-card{grid-template-columns:92px minmax(0,1fr);min-height:138px}.calendar-agenda .calendar-poster{width:92px;min-height:138px}}

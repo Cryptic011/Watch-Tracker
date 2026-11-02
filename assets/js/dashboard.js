@@ -75,7 +75,7 @@ const DASHBOARD_WEEKDAY_FORMATTER=new Intl.DateTimeFormat(USER_LOCALE,{timeZone:
 const DASHBOARD_DATE_FORMATTER=new Intl.DateTimeFormat(USER_LOCALE,{timeZone:"UTC",day:"numeric",month:"short"});
 const DASHBOARD_TIME_FORMATTER=new Intl.DateTimeFormat(USER_LOCALE,{timeZone:"UTC",hour:"2-digit",minute:"2-digit"});
 const DASHBOARD_PRIOR_DATE_FORMATTER=new Intl.DateTimeFormat(USER_LOCALE,{timeZone:"UTC",weekday:"short",day:"numeric",month:"short"});
-let selectedCalendarRange='week',selectedScheduleView='';
+let selectedCalendarRange='upcoming',selectedScheduleView='';
 function homeSchedulesVisible(){
   return Boolean(currentUser&&currentTab==='library'&&!(typeof libraryOnlyPage!=='undefined'&&libraryOnlyPage));
 }
@@ -114,11 +114,15 @@ function calendarRange(range,now=new Date()){
   const priorDays=(today.getUTCDay()+6)%7;
   const throughSunday=7-priorDays;
   if(range==='today')return{start:today,days:1,label:'Local calendar day',priorStart:weekStart,priorDays:0};
-  if(range==='upcoming'){
-    const end=new Date(today);end.setUTCDate(end.getUTCDate()+7);
-    return{start:today,days:8,label:`${today.getUTCDate()}–${end.getUTCDate()} ${end.toLocaleDateString('en-GB',{month:'short',timeZone:'UTC'})}`,priorStart:weekStart,priorDays:0};
-  }
+  if(range==='upcoming')return{start:today,days:14,label:'Next 14 days',priorStart:weekStart,priorDays};
   return{start:today,days:throughSunday,label:`Today through Sunday`,priorStart:weekStart,priorDays};
+}
+function calendarWindowEvents(items,range='upcoming',now=new Date()){
+  const window=calendarRange(range,now),result=calendarEvents(items,window.start,window.days);
+  const midnight=window.start.getTime();
+  const prior=calendarEvents(items,window.priorStart,Math.round((midnight-window.priorStart.getTime())/86400000)+1).events;
+  return {...window,...result,events:result.events.filter(event=>event.dateOnly||event.date>=now),
+    priorEvents:prior.filter(event=>event.dateOnly?event.date<window.start:event.date<now)};
 }
 function calendarEvents(items,now=new Date(),days=7){
   const start=new Date(now);start.setUTCHours(0,0,0,0);
@@ -130,7 +134,7 @@ function calendarEvents(items,now=new Date(),days=7){
     let candidates=[];
     if(item.type==='Film')candidates=[{raw:item.filmReleaseDate,label:'Film release'}];
     else if(isEpisodeTrackable(item)){
-      candidates=(Array.isArray(item.scheduledEpisodeReleases)?item.scheduledEpisodeReleases:[]).map(ep=>({raw:ep.raw,label:`S${ep.season} E${ep.number}`,season:Number(ep.season),episode:Number(ep.number)}));
+      candidates=[...(Array.isArray(item.scheduledEpisodeReleases)?item.scheduledEpisodeReleases:[]),...(Array.isArray(item.recurringWeeklySchedule?.episodes)?item.recurringWeeklySchedule.episodes:[]),{season:item.airingSeason,number:item.latestEpisodeNum,raw:item.latestEpisodeDate}].filter(ep=>ep.season&&ep.number).map(ep=>({raw:ep.raw,label:`S${ep.season} E${ep.number}`,title:ep.title||ep.name||'',season:Number(ep.season),episode:Number(ep.number)}));
       if(item.nextEpisodeNum){
         const scheduled=(Array.isArray(item.scheduledEpisodeReleases)?item.scheduledEpisodeReleases:[]).find(ep=>Number(ep.number)===Number(item.nextEpisodeNum)&&String(ep.raw||"")===String(item.nextEpisodeDate||""));
         const activeSeason=Number(item.airingSeason||item.curSeason||0);
@@ -319,17 +323,17 @@ function renderDashboard(){
   const visible=homeSchedulesVisible();
   root.classList.toggle('hidden',!visible);if(!visible){if(!currentUser){root.replaceChildren();root._dashboardMarkup=null;}return;}
   const progressMarkers=new Map();
-  const {start,days:daysToShow,label:rangeLabel,priorStart,priorDays}=calendarRange(selectedCalendarRange,new Date());
-  const {events,unknown:unresolved}=calendarEvents(mediaItems,start,daysToShow),pending=unresolved.filter(item=>item.streamingPending),unknown=unresolved.filter(item=>!item.streamingPending);
-  const priorEvents=selectedCalendarRange==='week'&&priorDays?calendarEvents(mediaItems,priorStart,priorDays).events:[];
+  const {start,days:daysToShow,label:rangeLabel,events,priorEvents,unknown:unresolved}=calendarWindowEvents(mediaItems,selectedCalendarRange,new Date());
+  const pending=unresolved.filter(item=>item.streamingPending),unknown=unresolved.filter(item=>!item.streamingPending);
   const eventsByDay=new Map();
   for(const event of events){const key=localISODate(event.date);if(!eventsByDay.has(key))eventsByDay.set(key,[]);eventsByDay.get(key).push(event);}
   let days='';
   for(let offset=0;offset<daysToShow;offset++){
     const date=new Date(start);date.setUTCDate(date.getUTCDate()+offset);
     const key=localISODate(date),rows=eventsByDay.get(key)||[];
+    if(!rows.length)continue;
     const isToday=localISODate(date)===localISODate(new Date());
-    const dayLabel=selectedCalendarRange==='today'?'Today':DASHBOARD_WEEKDAY_FORMATTER.format(date);
+    const dayLabel=new Intl.DateTimeFormat(USER_LOCALE,{timeZone:'UTC',weekday:'long',day:'numeric',month:'short',year:'numeric'}).format(date);
     const dateLabel=DASHBOARD_DATE_FORMATTER.format(date);
     // Group episodes of the same title airing at the same time into one compact card.
     const grouped=[],groupsByKey=new Map();
@@ -341,7 +345,7 @@ function renderDashboard(){
       if(!group.labels.has(event.label)){group.labels.add(event.label);group.events.push(event);}
     }
     days+=`<section class="release-day${rows.length?' has-releases':' is-empty'}${isToday?' is-today':''}" aria-label="${esc(dayLabel)}, ${esc(dateLabel)}">
-      <header class="release-day-heading"><div><span class="release-day-name">${esc(dayLabel)}${isToday?'<span class="today-marker">TODAY</span>':''}</span><span class="release-day-date">${esc(dateLabel)}</span></div><span class="release-day-count">${rows.length} ${rows.length===1?'release':'releases'}</span></header>
+      <header class="release-day-heading"><div><span class="release-day-name">${esc(dayLabel)}${isToday?'<span class="today-marker">TODAY</span>':''}</span></div><span class="release-day-count">${rows.length} ${rows.length===1?'release':'releases'}</span></header>
       ${grouped.length?grouped.map(group=>{
         const labels=group.events.map(event=>event.label);
         const episodeLabel=labels.length>1&&labels.every(label=>/^S\d+ E\d+$/.test(label))
@@ -350,26 +354,27 @@ function renderDashboard(){
         const platform=(group.item.platform?esc(group.item.platform):'Platform not saved')+(group.item.releaseSchedule&&!group.item.releaseSchedule.estimated?' · '+esc(group.item.releaseSchedule.country)+' streaming':'');
         const releaseState=group.events.some(event=>event.date.toDateString()===new Date().toDateString())?'Today':group.events.some(event=>event.date>new Date())?'Upcoming':'Released';
         return `<button type="button" class="release-card" data-dashboard-open="${esc(group.item.id)}">
-          <span class="release-time">${esc(group.time)}</span>
-          <span class="release-card-copy"><strong class="release-show-title"><span>${esc(group.item.title)}</span>${scheduleProgressMarker(group.item,progressMarkers)}</strong><span class="release-episode">${esc(episodeLabel)} · ${group.dateOnly?'Date only':'Scheduled'}</span><span class="release-state-badge" data-release-state="${releaseState.toLowerCase()}">${releaseState}</span><span class="release-platform"><span class="release-platform-dot" aria-hidden="true"></span>${platform}</span></span>
+          <span class="calendar-poster"><span class="calendar-poster-fallback" aria-hidden="true">${esc(group.item.title.slice(0,1))}</span><img hidden alt="" data-art="${esc(`${group.item.type}:${group.item.imdbId||group.item.tvmazeShowId||group.item.id}`)}" decoding="async" loading="lazy"></span>
+          <span class="release-card-copy"><strong class="release-show-title"><span>${esc(group.item.title)}</span>${scheduleProgressMarker(group.item,progressMarkers)}</strong><span class="release-episode">${esc(episodeLabel)}${group.events.length===1&&group.events[0].title?' · '+esc(group.events[0].title):''}</span><span class="release-time">${esc(group.time)}${group.item.platform?' on '+platform:''}</span></span>
           <span class="release-chevron" aria-hidden="true">›</span>
         </button>`;
       }).join(''):'<p class="release-empty">Nothing listed for this day</p>'}
     </section>`;
   }
   const excluded=mediaItems.filter(item=>item.hideFromWeeklyReleases===true);
-  const priorMarkup=priorEvents.length?`<details class="release-tba prior-releases" data-dashboard-section="prior"><summary><span>Prior Releases</span><span class="release-tba-count">${priorEvents.length}</span></summary><div class="release-tba-list">${priorEvents.map(event=>`<button type="button" class="release-tba-item" data-dashboard-open="${esc(event.item.id)}"><strong class="release-show-title"><span>${esc(event.item.title)}</span>${scheduleProgressMarker(event.item,progressMarkers)}</strong><span>${esc(event.label)} · ${esc(DASHBOARD_PRIOR_DATE_FORMATTER.format(event.date))}${event.dateOnly?' · Date only':' · '+esc(DASHBOARD_TIME_FORMATTER.format(event.date))}</span></button>`).join('')}</div></details>`:'';
-  const controls=`<div class="filter-pills calendar-range" role="group" aria-label="Filter release calendar">${[['today','Today'],['week','This week'],['upcoming','Upcoming']].map(([key,label])=>`<button type="button" class="pill-btn${selectedCalendarRange===key?' active':''}" data-calendar-range="${key}" aria-pressed="${selectedCalendarRange===key}">${label}</button>`).join('')}</div>`;
-  updateDashboardMarkup(root,`<section class="dashboard-section weekly-releases" aria-labelledby="weekly-releases-title">
+  const priorMarkup=`<details class="release-tba prior-releases" data-dashboard-section="prior"><summary><span>Prior Releases</span><span class="release-tba-count">${priorEvents.length}</span></summary><div class="release-tba-list">${priorEvents.map(event=>`<button type="button" class="release-tba-item" data-dashboard-open="${esc(event.item.id)}"><strong class="release-show-title"><span>${esc(event.item.title)}</span>${scheduleProgressMarker(event.item,progressMarkers)}</strong><span>${esc(event.label)} · ${esc(DASHBOARD_PRIOR_DATE_FORMATTER.format(event.date))}${event.dateOnly?' · Date only':' · '+esc(DASHBOARD_TIME_FORMATTER.format(event.date))}</span></button>`).join('')}${!priorEvents.length?'<p class="release-empty">No releases earlier this week</p>':''}</div></details>`;
+  const controls=`<div class="filter-pills calendar-range" role="group" aria-label="Filter release calendar">${[['today','Today'],['week','This week'],['upcoming','Next 14 days']].map(([key,label])=>`<button type="button" class="pill-btn${selectedCalendarRange===key?' active':''}" data-calendar-range="${key}" aria-pressed="${selectedCalendarRange===key}">${label}</button>`).join('')}</div>`;
+  updateDashboardMarkup(root,`<section class="dashboard-section weekly-releases calendar-agenda" aria-labelledby="weekly-releases-title">
     <header class="weekly-releases-heading"><div class="recurring-summary-copy"><span class="weekly-eyebrow">RELEASE CALENDAR</span><h2 id="weekly-releases-title">Your calendar</h2><p class="dashboard-note">${rangeLabel} · GMT</p></div><span class="weekly-total">${events.length}<small>releases</small></span></header>
     ${controls}
-    <div class="release-week-list">${days}</div>
-    ${priorMarkup}
+    <div class="release-week-list">${days||'<p class="release-empty">No releases in this date range</p>'}</div>
     ${pendingStreamingMarkup(pending,"data-dashboard-open")}
     ${unknown.length?`<details class="release-tba" data-dashboard-section="unknown"><summary><span>Dates to be announced</span><span class="release-tba-count">${unknown.length}</span></summary><div class="release-tba-list">${unknown.map(item=>`<button type="button" class="release-tba-item" data-dashboard-open="${esc(item.id)}"><strong class="release-show-title"><span>${esc(item.title)}</span>${scheduleProgressMarker(item,progressMarkers)}</strong><span>${esc(item.announcement)} · Date TBA</span><span class="release-chevron" aria-hidden="true">›</span></button>`).join('')}</div></details>`:''}
     ${excluded.length?`<details class="release-tba" data-dashboard-section="excluded"><summary><span>Excluded from Weekly Releases</span><span class="release-tba-count">${excluded.length}</span></summary><div class="release-tba-list">${excluded.map(item=>`<div class="dashboard-row excluded-release-row"><div><strong>${esc(item.title)}</strong><span class="release-state-badge" data-release-state="excluded">Excluded</span></div><button type="button" class="btn btn-secondary" data-calendar-include="${esc(item.id)}">Re-enable</button></div>`).join('')}</div></details>`:''}
+    ${priorMarkup}
     <p class="weekly-footnote">All times are GMT. A date without a confirmed time shows Time TBA and does not trigger a timed release alert.</p>
   </section>`);
+  window.WatchLogGallery?.observeScheduleArtwork?.(root,mediaItems);
 }
 document.getElementById('library-dashboard').addEventListener('click',event=>{
   const range=event.target.closest('[data-calendar-range]');if(range){saveNavigationPosition();selectedCalendarRange=range.dataset.calendarRange;renderDashboard();recordAppNavigation(true);return;}
