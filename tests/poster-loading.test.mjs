@@ -12,7 +12,7 @@ function gallery({observer=true,results=[],item={id:'film',type:'Film',title:'Th
   const context={window:{},URL,AbortSignal,Date:class extends Date{static now(){return clock;}},document:{querySelectorAll:()=>[img]},fetch:fetchImpl};
   if(observer)context.IntersectionObserver=class{constructor(callback){this.callback=callback;}disconnect(){}unobserve(){}observe(target){observed.push(target);if(target!==img)queueMicrotask(()=>this.callback([{isIntersecting:true,target}]));}};
   vm.runInNewContext(source,context);
-  const mount=()=>context.window.WatchLogGallery.mount(host,[item],{artwork:async item=>{lookups.push(item.imdbId);return typeof results==='function'?results(item):results;}});
+  const mount=()=>context.window.WatchLogGallery.mount(host,[item],{items:()=>[item],last:()=>null,artwork:async item=>{lookups.push(item.imdbId);return typeof results==='function'?results(item):results;}});
   mount();
   return {img,box,observed,lookups,mount,advance:ms=>{clock+=ms;}};
 }

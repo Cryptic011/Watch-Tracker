@@ -1,11 +1,11 @@
 /* Library organisation, Continue Watching, offline readiness and recovery. */
 let libraryScope='',featureAccount='',continueExpanded=false;
-// A single filter panel combines status with Favourites or a named collection.
+// Keep type, status, favourites and collection filters together.
 const libraryFilterPills=document.querySelector('#list-toolbar .filter-pills');
 const libraryCollectionControl=$('library-collections');
 if(libraryFilterPills&&libraryCollectionControl){
   const panel=document.createElement('section');panel.className='library-filter-panel';panel.setAttribute('aria-label','Filter titles');
-  libraryFilterPills.before(panel);panel.append(libraryFilterPills,libraryCollectionControl);
+  libraryFilterPills.before(panel);panel.append(libraryFilterPills,$('library-type-control'),libraryCollectionControl);
   libraryCollectionControl.querySelector('label').textContent='Favourites & collections';
 }
 function collectionNames(items=mediaItems){return [...new Set(items.flatMap(item=>Array.isArray(item.lists)?item.lists:[]))].filter(name=>typeof name==='string'&&name.trim()).sort((a,b)=>titleCollator.compare(a,b));}
@@ -28,6 +28,7 @@ function renderLibraryFeatures(){
   if(featureAccount!==account){featureAccount=account;libraryScope='';continueExpanded=false;}
   const toolbar=$('library-collections'),root=$('continue-watching');if(!toolbar||!root)return;
   const category=window.WatchLogGallery?.getCategory?.()||'';
+  $('library-type-select').value=category;
   const visible=Boolean(currentUser&&categoryControlsVisible());toolbar.classList.toggle('hidden',!visible);
   $('library-features').classList.toggle('hidden',!visible);
   root.classList.add('hidden');
@@ -45,6 +46,7 @@ function renderLibraryFeatures(){
   root.classList.toggle('hidden',category!=='Series'||Boolean(searchQuery.trim())||!['All','Watching'].includes(activeFilter)||!rows.length);
   updateDashboardMarkup(root,rows.length?`<details class="dashboard-section continue-watching-section" data-dashboard-section="continue" aria-labelledby="continue-watching-title"><summary><h2 id="continue-watching-title">Continue Watching</h2><span class="continue-chevron" aria-hidden="true">⌄</span></summary><div class="continue-list">${shown.map(({item,next})=>`<article class="continue-row"><button type="button" class="continue-open" data-continue-open="${esc(item.id)}"><strong>${esc(item.title)}</strong><span>Next · S${next.season} E${next.episode}</span></button><button type="button" class="episode-quick-button" data-continue-mark="${esc(item.id)}" data-season="${next.season}" data-episode="${next.episode}"${episodeLogBusy.has(String(item.id))?' disabled':''}>${episodeLogBusy.has(String(item.id))?'Saving…':'Mark watched'}</button></article>`).join('')}</div>${rows.length>8?`<button type="button" class="btn btn-secondary" data-continue-more>${continueExpanded?'Show fewer':'Show all '+rows.length+' shows'}</button>`:''}</details>`:'');
 }
+$('library-type-select').onchange=event=>{saveNavigationPosition();window.WatchLogGallery?.setCategory?.(event.target.value);render();recordAppNavigation();};
 $('library-collection-select').onchange=event=>{saveNavigationPosition();libraryScope=event.target.value;render();recordAppNavigation();};
 $('continue-watching').addEventListener('click',event=>{
   const open=event.target.closest('[data-continue-open]');if(open){openMediaRow(open.dataset.continueOpen,open);return;}

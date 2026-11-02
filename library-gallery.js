@@ -121,7 +121,7 @@ window.WatchLogGallery=(()=>{
     return {future,released,remaining};
   }
   function tile(item,upcoming=false){
-    const event=api.upcoming(item);
+    const event=upcoming?api.upcoming(item):null;
     let subtitle=releaseTime(item)?api.date(new Date(releaseTime(item))):item.releaseYear||'Date unknown';
     if(upcoming){const season=event.season||item.nextSeasonNum||item.airingSeason||item.curSeason||'?';const label=event.kind==='episode'?`S${season} E${event.number||'?'}`:event.kind==='season'?`Season ${event.number||'?'}`:'Film release';subtitle=`${label} · ${event.rank===2?(event.dateOnly?api.date(new Date(event.time)):api.dateTime(new Date(event.time))):'Date TBA'}`;}
     return `<button type="button" class="gallery-tile" data-gallery-item="${esc(item.id)}" aria-label="Open ${esc(item.title)}">${art(item)}${stateBadge(item)}<strong>${esc(item.title)}</strong><small>${esc(subtitle)}</small></button>`;
@@ -401,18 +401,12 @@ window.WatchLogGallery=(()=>{
     if(!host._galleryEvents){host._galleryEvents=true;host.addEventListener('click',event=>{
       const manage=event.target.closest('[data-gallery-manage]');
       if(manage){api.manage?.(JSON.parse(manage.dataset.galleryManageIds||'[]'),manage.dataset.galleryManage);return;}
-      const cat=event.target.closest('[data-gallery-category]');if(cat){if(typeof saveNavigationPosition==='function')saveNavigationPosition();category=cat.dataset.galleryCategory;api.render();api.navigate?.();host.querySelector('.gallery-back')?.focus();return;}
-      if(event.target.closest('[data-gallery-back]')){if(typeof saveNavigationPosition==='function')saveNavigationPosition();category='';api.render();api.navigate?.();host.querySelector('.gallery-category')?.focus();return;}
       const target=event.target.closest('[data-gallery-item]');if(target)open(target.dataset.galleryItem,target);
     });}
-    let markup;
-    if(!category&&api.filter==='Recent')markup='<div class="gallery-library-title"><h2>Recent additions</h2></div>'+section('Recently added',rows)+(rows.length?'':'<p class="gallery-empty">No titles added yet.</p>');
-    else if(!category){markup=`${api.plainLibrary?'<h2 class="gallery-library-title">Library</h2>':''}<div class="gallery-home">${(api.plainLibrary?[['Series','Series','▣'],['Film','Films','▤']]:[['Film','Movies','▤'],['Series','Series','▣']]).map(([type,label,icon])=>{
-      const items=rows.filter(item=>type==='Film'?isFilm(item):!isFilm(item));return `<button type="button" class="gallery-category" data-gallery-category="${type}"><span class="gallery-category-icon" aria-hidden="true">${icon}</span><span><strong>${label}</strong><small>${items.length} title${items.length===1?'':'s'}</small></span><span class="gallery-fan" aria-hidden="true">${items.slice(0,3).map(item=>art(item)).join('')}</span></button>`;
-    }).join('')}</div><p class="gallery-caption">${rows.length} titles in this view</p>`;}
-    else{const items=rows.filter(item=>category==='Film'?isFilm(item):!isFilm(item)),tracked=api.items().filter(item=>(category==='Film'?isFilm(item):!isFilm(item))&&(!api.includes||api.includes(item))),parts=sections(items,api.upcoming);
-      const content=api.plainLibrary?section(category==='Film'?'Films':'Series',items):api.filter==='Watched'?releaseGroups(items).map(group=>section(group.year,group.rows)).join(''):section('Upcoming',parts.future,true)+section('Released',parts.released)+section('Date unknown',parts.remaining);
-      markup=`<div class="gallery-nav"><button type="button" class="gallery-back" data-gallery-back aria-label="Back to Library">‹</button><h2>${category==='Film'?'Movies':'Series'}</h2><span class="gallery-heading-actions"><span class="gallery-count" data-gallery-total-count aria-label="${tracked.length} tracked ${category==='Film'?'films':'series'}">${tracked.length}</span>${manageButton(tracked,category==='Film'?'Movies':'Series')}</span></div>${content}${items.length?'':'<p class="gallery-empty">No titles match your search or filter.</p>'}`;}
+    const items=rows.filter(item=>!category||(category==='Film'?isFilm(item):!isFilm(item)));
+    const tracked=api.items().filter(item=>(!category||(category==='Film'?isFilm(item):!isFilm(item)))&&(!api.includes||api.includes(item)));
+    const label=category==='Film'?'Movies':category==='Series'?'Series':'Library';
+    const markup=`<div class="gallery-library-summary"><span class="gallery-caption">${api.filter==='Recent'?'Newest additions first':items.length+' title'+(items.length===1?'':'s')}</span><span class="gallery-heading-actions"><span class="gallery-count" data-gallery-total-count aria-label="${tracked.length} tracked titles">${tracked.length}</span>${manageButton(tracked,label)}</span></div><div class="gallery-grid">${items.map(item=>tile(item)).join('')}</div>${items.length?'':'<p class="gallery-empty">No titles match your search or filter.</p>'}`;
     if(host._galleryMarkup!==markup){
       // Keep live collection/progress controls, listeners and disclosure state.
       if(api.features&&host.contains(api.features)){

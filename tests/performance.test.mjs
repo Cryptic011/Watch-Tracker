@@ -93,7 +93,7 @@ test('An unchanged Library keeps its existing poster DOM',()=>{
  vm.runInContext(fs.readFileSync(new URL('../library-gallery.js',import.meta.url),'utf8'),c);
  let writes=0;
  const host={classList:{add(){}},addEventListener(){},querySelectorAll:()=>[],set innerHTML(value){writes++;this.markup=value;}};
- const rows=[{id:'film',type:'Film',title:'Film'}],api={};
+ const rows=[{id:'film',type:'Film',title:'Film'}],api={items:()=>rows,last:()=>null};
  c.window.WatchLogGallery.mount(host,rows,api);
  c.window.WatchLogGallery.mount(host,structuredClone(rows),api);
  assert.equal(writes,1,'saving identical content must preserve focus and loaded posters');
