@@ -108,9 +108,13 @@ const server=http.createServer((req,res)=>{
   assert.equal(await page.locator('[data-filter="Recent"]').getAttribute('class').then(value=>value.includes('active')),true);
   assert.equal(await page.locator('[data-home-section="recurring"]').isVisible(),true);
   assert.equal(await page.locator('#library-shows').isVisible(),false,'Library landing has no Shows dashboard');
+  assert.equal(await page.locator('#list-toolbar .library-page-links').isVisible(),true);
+  assert.ok((await page.locator('#library-entry').boundingBox()).height<=48,'Shows and Films fit on one compact toolbar row');
+  assert.equal(await page.locator('#library-entry img').count(),0);
   await category('Film').click();
   assert.match(new URL(page.url()).hash,/^#\/collection\/movies/);
   assert.equal(await page.getByRole('heading',{name:'Films',exact:true}).isVisible(),true);
+  assert.equal(await page.locator('#library-entry').isVisible(),false);
   assert.equal(await page.locator('#library-shows').isVisible(),false,'Films has its own page');
   assert.equal(await page.locator('[data-home-section="recurring"]').isVisible(),false);
   await page.locator('[data-library-back]').click();
@@ -238,7 +242,7 @@ const server=http.createServer((req,res)=>{
   assert.equal(pendingSchedule.calendar,undefined,'the calendar contains only confirmed release cards');
   assert.equal(pendingSchedule.undated,0);assert.ok(pendingSchedule.emptyHeights.every(height=>height<65),'empty weekdays stay compact');
   assert.equal(await page.locator('.changelog-entry').count(),0,'startup does not construct the full hidden changelog');
-  assert.equal(await page.locator('[data-gallery-category]').count(),0,'Home has no duplicate Library boxes');
+  assert.equal(await page.locator('#library-entry').isVisible(),false,'Calendar hides Library navigation');
   await page.locator('[data-tab="collection"]').click();
   assert.equal(await page.evaluate(()=>{const node=mediaList.querySelector('.gallery-grid');render();return Boolean(node)&&node===mediaList.querySelector('.gallery-grid');}),true,'unchanged Library render retains the unified title grid');
   assert.equal(await page.locator('#media-list>.gallery-empty').count(),1,'empty Library shows one message');

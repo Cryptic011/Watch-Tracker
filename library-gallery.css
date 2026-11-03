@@ -1,16 +1,4 @@
 .titles-group.gallery-active{background:transparent;border:0;overflow:visible;border-radius:0}
-.gallery-home{display:grid;grid-template-columns:1fr;gap:16px;padding:8px 0 12px}
-.gallery-category{position:relative;isolation:isolate;overflow:hidden;display:flex;flex-direction:column;justify-content:space-between;min-width:0;min-height:190px;padding:22px;gap:48px;border:0;border-radius:28px;background:var(--inner);color:var(--text);text-align:left;cursor:pointer}
-.gallery-category strong{font-size:1.65rem;font-weight:800;letter-spacing:-.5px}
-.gallery-category small{display:block;margin-top:5px;color:var(--muted);font-size:.8rem}
-.gallery-category>span:not(.gallery-fan){position:relative;z-index:1;max-width:48%}
-.gallery-category-icon{display:grid;place-items:center;width:48px;height:48px;border-radius:14px;color:#ff5666;background:#ff40551c;font-size:1.5rem}
-.gallery-category[data-gallery-category="Series"] .gallery-category-icon{color:#d948ed;background:#d948ed1c}
-.gallery-fan{position:absolute;right:0;bottom:-12px;display:flex;align-items:flex-end;width:47%;height:94%;z-index:-1;pointer-events:none}
-.gallery-fan .gallery-art{width:60%;height:88%;flex-shrink:0;margin-left:-28%;border-radius:12px;box-shadow:0 0 18px #0005}
-.gallery-fan .gallery-art:first-child{margin-left:0}
-.gallery-fan .gallery-art:nth-child(2){height:79%}
-.gallery-fan .gallery-art:nth-child(3){height:83%}
 .gallery-art{position:relative;display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-end;aspect-ratio:2/3;border-radius:13px;overflow:hidden;padding:14px;background:radial-gradient(circle at 65% 15%,#6f9bdd66,transparent 38%),linear-gradient(145deg,#2e4d74 0%,#18263e 55%,#0a101c 100%);color:#eff6ff;border:1px solid #ffffff22;isolation:isolate;box-shadow:inset 0 1px 0 #ffffff12}
 .gallery-art::after{content:"";position:absolute;inset:auto 0 0;height:48%;background:linear-gradient(transparent,#07101ee8);z-index:0;pointer-events:none}
 .gallery-art>span{position:absolute;inset:18% 0 auto;font-size:clamp(2.5rem,11vw,4.6rem);font-weight:900;letter-spacing:-.08em;text-align:center;color:#e6f1ff;opacity:.96;z-index:0}
@@ -145,11 +133,11 @@ html:has(.gallery-detail[open]),body:has(>.gallery-detail[open]){overflow:hidden
 .gallery-action-menu .danger{color:var(--red)}
 .gallery-action-menu.hidden{display:none!important}
 .gallery-notes{display:block;width:100%;min-height:150px;padding:12px;border:1px solid var(--border);border-radius:12px;background:var(--inner);color:var(--text);font:inherit;line-height:1.5;resize:vertical}
-.gallery-tile:focus-visible,.gallery-category:focus-visible,.gallery-back:focus-visible,.gallery-menu-button:focus-visible,.gallery-season>summary:focus-visible,.gallery-season-state:focus-visible,.gallery-episode-toggle:focus-visible{outline:2px solid var(--blue2);outline-offset:3px}
+.gallery-tile:focus-visible,.gallery-back:focus-visible,.gallery-menu-button:focus-visible,.gallery-season>summary:focus-visible,.gallery-season-state:focus-visible,.gallery-episode-toggle:focus-visible{outline:2px solid var(--blue2);outline-offset:3px}
 
-@media(min-width:700px){.gallery-home{grid-template-columns:1fr 1fr}.gallery-category{min-height:230px}.gallery-grid{grid-template-columns:repeat(5,minmax(0,1fr));gap:28px 16px}}
+@media(min-width:700px){.gallery-grid{grid-template-columns:repeat(5,minmax(0,1fr));gap:28px 16px}}
 @media(max-width:360px){.gallery-season-list{padding-inline:12px}.gallery-season>summary{padding:12px;gap:10px}.gallery-season-episodes{padding:0 12px 8px}.gallery-episode-row{grid-template-columns:76px minmax(0,1fr) 44px;gap:10px}.gallery-season-label strong{font-size:.95rem}}
-@media(max-width:350px){.gallery-category{min-height:175px}.gallery-tile strong{font-size:.75rem}.gallery-tile small{font-size:.68rem}}
+@media(max-width:350px){.gallery-tile strong{font-size:.75rem}.gallery-tile small{font-size:.68rem}}
 
 /* Preserve the paragraph breaks in full show summaries. */
 .gallery-info-panel [data-gallery-details]>p{white-space:pre-line}

@@ -1,3 +1,6 @@
+## 2026-11-03 — Simplify Library navigation
+- Open the dedicated Shows and Films pages from one compact row in the Library toolbar.
+
 ## 2026-11-03 — Restore Home and dedicate pages to Shows and Films
 - Restore Home with search and shortcuts to Library and Calendar.
 - Open dedicated Shows and Films pages from poster cards in Library. Keep Recent selected when entering Library or either page.
