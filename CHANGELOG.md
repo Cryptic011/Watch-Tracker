@@ -1,3 +1,9 @@
+## 2026-11-03 — Separate Shows, Calendar and Library
+- Give Calendar a dedicated navigation page and move collapsible Recurring shows into Library.
+- Build Shows around poster watchlists, a released-episode queue, episodes in the next seven days and upcoming seasons grouped by year.
+- Open Library with Recent selected by default; retain its filter controls and restore explicit filter choices through navigation.
+- Keep the shared search button and the tinted navigation animation across Shows, Calendar, Library and Settings.
+
 ## 2026-11-03 — Show one calendar card per episode, with its title
 - Prefer the current episode schedule over stale recurring entries and next-episode pointers when an airtime changes.
 - Show the episode name immediately after its season and episode number in both calendars, retaining names through browser and background refreshes.

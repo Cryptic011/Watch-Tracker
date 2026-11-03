@@ -39,3 +39,11 @@ test('Gallery calculates upcoming metadata once per title with a consistent cloc
  assert.equal(result.future[0].id,'499');assert.equal(result.future.at(-1).id,'0');
  assert.equal(rows[0].id,'0');
 });
+
+test('Shows sections separate the released queue, seven-day episodes and future season returns',()=>{
+ const now=Date.parse('2026-11-03T12:00:00Z'),show={id:'show',type:'Series',title:'Example',nextSeasonNum:3,nextSeasonDate:'2027-01-05'},film={id:'film',type:'Film',title:'Film'};
+ const callbacks={upcoming:()=>({rank:2,time:now+8*86400000,kind:'episode',season:2,number:6}),released:()=>({2:[1,2]}),watched:()=>({2:[1]}),next:()=>({season:2,episode:2}),showEvents:items=>({events:items.flatMap(item=>[2,8].map(days=>({item,season:2,episode:days,date:new Date(now+days*86400000)})))})};
+ const sections=context.window.WatchLogGallery.showSections([show,film],callbacks,now);
+ assert.equal(sections.watchlist.length,1);assert.equal(sections.queue[0].event.number,2);assert.equal(sections.upcoming.length,1);assert.equal(sections.upcoming[0].event.number,2);assert.equal(sections.seasons[0].event.number,3);
+ const caught=context.window.WatchLogGallery.showSections([show],{...callbacks,next:()=>null},now);assert.equal(caught.queue.length,0);
+});

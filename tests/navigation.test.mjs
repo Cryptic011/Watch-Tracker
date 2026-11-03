@@ -30,7 +30,7 @@ test('Schedule URLs always restore the full calendar and ignore legacy range par
  const c=router();
  for(const schedule of ['recurring','calendar'])for(const calendarRange of ['week','today','upcoming']){
   const page={tab:'library',schedule,calendarRange},hash=c.appPageHash(page),parsed=c.parseAppHash(hash);
-  assert.equal(parsed.tab,'library');assert.equal(parsed.schedule,schedule);assert.equal(parsed.category,'');
+  assert.equal(parsed.tab,schedule==='calendar'?'calendar':'collection');assert.equal(parsed.schedule,schedule);assert.equal(parsed.category,'');
   assert.equal(parsed.calendarRange,'upcoming');
  }
  assert.equal(c.parseAppHash('#/library/calendar?range=unknown').calendarRange,'upcoming');
@@ -88,3 +88,9 @@ test('Recent additions filter restores in Library URLs',()=>{
 });
 
 test('Legacy Today and This week links cannot restore removed calendar filters',()=>{const c=router();for(const range of ['today','week','upcoming']){assert.equal(c.parseAppHash('#/library?range='+range).calendarRange,'upcoming');assert.equal(c.appPageHash({tab:'library',calendarRange:range}),'#/library');}});
+
+test('Calendar has its own route and Library defaults to Recent while explicit All survives a reload',()=>{
+ const c=router();assert.equal(c.appPageHash({tab:'calendar'}),'#/calendar');assert.equal(c.parseAppHash('#/calendar').tab,'calendar');
+ assert.equal(c.parseAppHash('#/collection').filter,'Recent');
+ assert.equal(c.parseAppHash(c.appPageHash({tab:'collection',filter:'All'})).filter,'All');
+});
