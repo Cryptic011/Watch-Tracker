@@ -448,6 +448,7 @@ function reminderCopy(
   item: Record<string, unknown>,
   event: { kind: string; number: unknown; season?: unknown },
   leadHours: number,
+  eventTime?: number,
 ) {
   const title = String(item.title || "").replace(/\s+/g, " ").trim() || "Untitled";
   const timing = leadHours === 24 ? "in 1 day" : leadHours === 1 ? "in 1 hour" : `in ${leadHours} hours`;
@@ -456,7 +457,8 @@ function reminderCopy(
   const premiere = event.kind === "film" || (season === 1 && episode === 1);
   const label = premiere ? "New show" : "New episode";
   const numbers = !premiere && Number.isInteger(season) && season > 0 && Number.isInteger(episode) && episode > 0 ? ` (S${season} E${episode})` : "";
-  const message = leadHours === 0 ? `${label} out now` : `${label} out ${timing}`;
+  const airtime = Number.isFinite(eventTime) ? new Date(eventTime!).toISOString().slice(11,16) : '';
+  const message = leadHours === 0 ? `${label} out now` : airtime ? `${label} airs at ${airtime}` : `${label} out ${timing}`;
   const body = `${message}${numbers}`;
   return { title, body };
 }
@@ -494,7 +496,7 @@ async function sendPush(
     JSON.stringify(payload),
     {
       vapidDetails,
-      TTL: 86400,
+      TTL: typeof payload.expiresAt === "number" ? Math.max(0, Math.min(86400, Math.floor((payload.expiresAt - Date.now()) / 1000))) : 86400,
       urgency: "high",
       signal: AbortSignal.timeout(12000),
     },
@@ -600,10 +602,11 @@ async function processPlannedReminders(
         );
         if (!delivery) continue;
 
-        const copy = reminderCopy(item, event, leadHours);
+        const copy = reminderCopy(item, event, leadHours, eventTime);
         const payload = {
           title: copy.title,
           body: copy.body,
+          expiresAt: leadHours ? reminderTime + 15 * 60000 : eventTime + 86400000,
           tag: `watchlog-${await sha256(eventKey).then((v) => v.slice(0, 24))}`,
           data: { url: "./", itemId, accountId:subscription.account_id, eventKey, kind: "reminder" },
         };
@@ -630,8 +633,7 @@ async function processPlannedReminders(
 function reminderStageIsDue(eventTime: number, leadHours: number, now: number) {
   const hour = 3600000;
   const due = eventTime - leadHours * hour;
-  const expires = leadHours === 24 ? eventTime - 6 * hour
-    : leadHours === 6 ? eventTime : eventTime + 24 * hour;
+  const expires = leadHours === 0 ? eventTime + 24 * hour : due + 15 * 60000;
   return Number.isFinite(eventTime) && now >= due && now < expires;
 }
 

@@ -103,8 +103,8 @@ const server=http.createServer((req,res)=>{
    return {summer:formatLocalDateTime('2026-06-01T08:00:00Z'),clock:DASHBOARD_TIME_FORMATTER.format(result.date),date:result.date.toISOString(),card:upcomingSortInfo(item,Date.parse('2026-11-01T00:00:00Z')).time,zone:DEVICE_TIME_ZONE};
   });
   assert.equal(gmt.summer,'01/06/2026, 08:00','British Summer Time does not shift the GMT clock');
-  assert.equal(gmt.clock,'08:00');assert.equal(gmt.date,'2026-11-02T08:00:00.000Z');
-  assert.equal(gmt.card,Date.parse(gmt.date),'title cards and the calendar agree on Marshals at 08:00 GMT');
+  assert.equal(gmt.clock,'01:30');assert.equal(gmt.date,'2026-11-02T01:30:00.000Z');
+  assert.equal(gmt.card,Date.parse(gmt.date),'title cards and the calendar retain the supplied Marshals airtime');
   assert.equal(gmt.zone,'UTC');
   await page.locator('.bottom-tabs [data-tab="settings"]').click();
   await page.locator('[data-settings-open="general"]').click();

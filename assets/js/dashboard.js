@@ -333,7 +333,7 @@ function releaseAgendaDays({events,start,days:daysToShow},openAttribute='data-da
         const episodeLabel=labels.length>1&&labels.every(label=>/^S\d+ E\d+$/.test(label))
           ?labels[0].match(/^S(\d+) E/)[0].replace(' E','')+' E'+labels.map(label=>Number(label.match(/E(\d+)/)[1])).join(', ')
           :labels.join(' · ');
-        const platform=(group.item.platform?esc(group.item.platform):'Platform not saved')+(group.item.releaseSchedule&&!group.item.releaseSchedule.estimated?' · '+esc(group.item.releaseSchedule.country)+' streaming':'');
+        const platform=(group.item.platform?esc(group.item.platform):'Platform not saved');
         return `<button type="button" class="release-card" ${openAttribute}="${esc(group.item.id)}" data-release-at="${esc(group.events[0].raw)}">
           <span class="calendar-poster"><span class="calendar-poster-fallback" aria-hidden="true">${esc(group.item.title.slice(0,1))}</span><img hidden alt="" data-art="${esc(`${group.item.type}:${group.item.imdbId||group.item.tvmazeShowId||group.item.id}`)}" decoding="async"></span>
           <span class="release-card-copy"><strong class="release-show-title"><span>${esc(group.item.title)}</span>${scheduleProgressMarker(group.item,progressMarkers)}</strong><span class="release-episode">${esc(episodeLabel)}${group.events.length===1&&group.events[0].title?' · '+esc(group.events[0].title):''}</span><span class="release-time">${esc(group.time)}${group.item.platform?' on '+platform:''}</span></span>

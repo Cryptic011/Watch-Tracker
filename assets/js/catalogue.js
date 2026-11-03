@@ -12,12 +12,11 @@
     input.value=resolved.raw?toLocalInput(resolved.raw):"";
     input.dataset.releaseDisplay=input.value;
     input.dataset.releaseSource=raw||"";
-    input.dataset.releaseDelay=resolved.releaseSchedule?.key==='broadcast-plus-four-hours'?String(4*3600000):"0";
+    delete input.dataset.releaseDelay;
   }
   function storedReleaseInput(input,previous=""){
     if(input.dataset&&input.value===input.dataset.releaseDisplay)return input.dataset.releaseSource||"";
-    const raw=storedDateFromInput(input.value,previous),delay=Number(input.dataset?.releaseDelay)||0;
-    return raw&&delay?new Date(Date.parse(raw)-delay).toISOString():raw;
+    return storedDateFromInput(input.value,previous);
   }
   function catalogueReleaseItem(result){
     return {type:$("type").value||"Series",title:$("title").value,tvmazeShowId:result.resolvedShowId||$("tvmaze-id").value,

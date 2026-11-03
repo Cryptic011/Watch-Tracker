@@ -1,3 +1,8 @@
+## 2026-11-03 — Use source airtimes without added delays
+- Remove the four-hour availability delay, regional streaming substitutions and fixed Marshals clock override from calendar cards and reminders.
+- Show the actual scheduled airtime in advance notifications; expire advance alerts after 15 minutes instead of replaying them hours late.
+- Keep FBI and CIA's separate source timestamps and their 61-minute gap. Preserve existing watch history and sent-delivery records.
+
 ## 2026-11-02 — Keep today's releases visible until midnight
 - Keep releases in their dated calendar section for the whole day, including after their release time.
 - Move them to Prior Releases at the next GMT midnight. Apply the same boundary to Calendar and Recurring shows.

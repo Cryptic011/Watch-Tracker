@@ -88,14 +88,14 @@ function workerHarness(episodes,options={}){
     run:()=>context.processPlannedReminders([{account_id:"a",time_zone:"Europe/London"}],{})};
 }
 
-test('Closed-app backend refreshes episode and regional schedules before sending a reminder',async()=>{
+test('Closed-app backend refreshes source episode schedules without regional substitutions',async()=>{
   const worker=workerHarness([{season:1,number:6,airstamp:'2026-09-06T12:00:00Z'}],{regional:true});
-  worker.setTime('2026-09-06T16:00:00Z'); // Existing airtime + four-hour availability rule.
+  worker.setTime('2026-09-06T12:00:00Z'); // The episode source airtime.
   assert.equal(vm.runInContext('typeof document',worker.context),'undefined');
   assert.equal(vm.runInContext('typeof window',worker.context),'undefined');
   assert.equal((await worker.run()).sent,1);
   assert.equal(worker.getCalls(),1,'the server fetches fresh episode metadata itself');
-  assert.equal(worker.getRegionalCalls(),30,'browser visibility cancellation cannot stop the backend feed queue');
+  assert.equal(worker.getRegionalCalls(),0,'airtimes do not depend on regional feed substitutions');
   assert.equal(worker.deliveries[0].title,'Example');
   assert.equal(worker.deliveries[0].body,'New episode out now (S1 E6)');
   assert.ok(worker.getLibrary().items[0].serverScheduleUpdatedAt,'the server persists its own schedule refresh');
@@ -128,8 +128,8 @@ test('Background scans catch up only the current reminder stage',async()=>{
   const release='2026-09-06T12:00:00Z';
   for(const [clock,expected] of [
     ['2026-09-05T11:59:59Z',[]],
-    ['2026-09-05T12:00:00Z',['New episode out in 1 day']],
-    ['2026-09-06T06:00:00Z',['New episode out in 6 hours']],
+    ['2026-09-05T12:00:00Z',['New episode airs at 12:00']],
+    ['2026-09-06T06:00:00Z',['New episode airs at 12:00']],
     ['2026-09-06T12:00:00Z',['New episode out now']],
     ['2026-09-07T12:00:00Z',[]],
   ]){
@@ -160,16 +160,16 @@ test("UTC instants schedule identically across subscription time zones",()=>{
 test('Reminder notifications use the show title and numbered episode message',()=>{
  const c=vm.createContext({});vm.runInContext(extractFunction(backend,'reminderCopy'),c);
  for(const [item,event,lead,body] of [
-  [{title:'NCIS'},{kind:'episode',season:23,number:2},6,'New episode out in 6 hours (S23 E2)'],
-  [{title:'Doomsday'},{kind:'film'},24,'New show out in 1 day'],
-  [{title:'Reacher'},{kind:'season',number:4},6,'New episode out in 6 hours (S4 E1)'],
+  [{title:'NCIS'},{kind:'episode',season:23,number:2},6,'New episode airs at 12:00 (S23 E2)'],
+  [{title:'Doomsday'},{kind:'film'},24,'New show airs at 12:00'],
+  [{title:'Reacher'},{kind:'season',number:4},6,'New episode airs at 12:00 (S4 E1)'],
   [{title:'Ted Lasso'},{kind:'episode',season:3,number:2},0,'New episode out now (S3 E2)'],
   [{title:'Reacher'},{kind:'season',number:4},0,'New episode out now (S4 E1)'],
   [{title:'Doomsday'},{kind:'film'},0,'New show out now'],
   [{title:'CIA'},{kind:'episode',season:1,number:2},0,'New episode out now (S1 E2)'],
   [{title:'CIA'},{kind:'episode',season:1,number:1},0,'New show out now'],
   [{title:'Unknown season'},{kind:'episode',number:2},0,'New episode out now'],
- ]){const copy=c.reminderCopy(item,event,lead);assert.equal(copy.title,item.title);assert.equal(copy.body,body);}
+ ]){const copy=c.reminderCopy(item,event,lead,Date.parse('2026-11-03T12:00:00Z'));assert.equal(copy.title,item.title);assert.equal(copy.body,body);}
 });
 
 test('Saving an older edit form preserves episode ticks received from another device',async()=>{
