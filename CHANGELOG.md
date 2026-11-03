@@ -1,3 +1,6 @@
+## 2026-11-03 — Tidy the Shows toolbar
+- Remove the extra Settings button and align the status selector with the filter button.
+
 ## 2026-11-03 — Separate Shows, Calendar and Library
 - Give Calendar a dedicated navigation page and move collapsible Recurring shows into Library.
 - Build Shows around poster watchlists, a released-episode queue, episodes in the next seven days and upcoming seasons grouped by year.

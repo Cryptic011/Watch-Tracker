@@ -99,7 +99,8 @@ const server=http.createServer((req,res)=>{
   await page.waitForFunction(()=>document.querySelector('#auth-screen').classList.contains('hidden'));
   phase='Shows, Calendar and Library separation';
   assert.deepEqual(await page.locator('.bottom-tabs .tab-btn span').allTextContents(),['Shows','Calendar','Library','Settings']);
-  assert.equal(await page.locator('[data-shows-status]').inputValue(),'All');
+  assert.equal(await page.getByRole('combobox',{name:'Show status'}).inputValue(),'All');
+  assert.equal(await page.locator('.shows-controls').getByRole('button').count(),1,'Shows has only its filter button in the toolbar');
   for(const section of ['Watchlist','Episode Queue','Upcoming Episodes','Upcoming Seasons'])assert.equal(await page.locator('[data-shows-section="'+section+'"]').count(),1);
   assert.equal(await page.locator('#library-dashboard').isVisible(),false);
   await page.locator('[data-tab="collection"]').click();
