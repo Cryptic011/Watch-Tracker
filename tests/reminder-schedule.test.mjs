@@ -145,3 +145,12 @@ test('FBI and CIA advance reminders retain their 61-minute gap and expire instea
  assert.equal(sent[0].expiresAt-clock,15*60000);
  sent.length=0;clock=Date.parse('2026-11-02T23:00:00Z');await c.processPlannedReminders(subscriptions,{});assert.equal(sent.length,0,'missed advance reminders are never replayed hours late');
 });
+
+test('Schedule refresh retains names and fills titles missing from old saved schedules',()=>{
+ const c=vm.createContext({Date,Number,Array,Set,String,Object});
+ vm.runInContext('const EPISODE_SCHEDULE_REFRESH_MS=21600000;\n'+['episodeUtcValue','episodeReleaseTime','buildServerEpisodeSchedule','zonedLocalToUtc','scheduledEventTime','serverScheduleRefreshDue'].map(name=>stripTypeScriptTypes(extract(name))).join('\n'),c);
+ const now=Date.parse('2026-11-03T00:00:00Z'),item={type:'Series',title:'CIA',serverScheduleUpdatedAt:new Date(now).toISOString(),nextEpisodeDate:'2026-11-10T02:00:00Z',scheduledEpisodeReleases:[{season:2,number:6,raw:'2026-11-10T02:00:00Z'}]};
+ assert.equal(c.serverScheduleRefreshDue(item,now),true);
+ const updated=c.buildServerEpisodeSchedule(item,[{season:2,number:6,name:'Legacy',airstamp:'2026-11-10T02:00:00Z'}],now);
+ assert.equal(updated.scheduledEpisodeReleases[0].title,'Legacy');assert.equal(c.serverScheduleRefreshDue(updated,now),false);
+});

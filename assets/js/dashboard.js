@@ -133,18 +133,28 @@ function calendarEvents(items,now=new Date(),days=7){
     let candidates=[];
     if(item.type==='Film')candidates=[{raw:item.filmReleaseDate,label:'Film release'}];
     else if(isEpisodeTrackable(item)){
-      candidates=[...(Array.isArray(item.scheduledEpisodeReleases)?item.scheduledEpisodeReleases:[]),...(Array.isArray(item.recurringWeeklySchedule?.episodes)?item.recurringWeeklySchedule.episodes:[]),{season:item.airingSeason,number:item.latestEpisodeNum,raw:item.latestEpisodeDate}].filter(ep=>ep.season&&ep.number).map(ep=>({raw:ep.raw,label:`S${ep.season} E${ep.number}`,title:ep.title||ep.name||'',season:Number(ep.season),episode:Number(ep.number)}));
+      candidates=[...(Array.isArray(item.scheduledEpisodeReleases)?item.scheduledEpisodeReleases:[]),...(Array.isArray(item.recurringWeeklySchedule?.episodes)?item.recurringWeeklySchedule.episodes:[]),{season:item.airingSeason,number:item.latestEpisodeNum,raw:item.latestEpisodeDate,title:item.latestEpisodeTitle}].filter(ep=>ep.season&&ep.number).map(ep=>({raw:ep.raw,label:`S${ep.season} E${ep.number}`,title:ep.title||ep.name||item.episodeTitles?.[ep.season]?.[ep.number]||'',season:Number(ep.season),episode:Number(ep.number)}));
       if(item.nextEpisodeNum){
         const scheduled=(Array.isArray(item.scheduledEpisodeReleases)?item.scheduledEpisodeReleases:[]).find(ep=>Number(ep.number)===Number(item.nextEpisodeNum)&&String(ep.raw||"")===String(item.nextEpisodeDate||""));
         const activeSeason=Number(item.airingSeason||item.curSeason||0);
         const episodeSeason=Number(item.nextEpisodeNum)>1&&activeSeason?activeSeason:(item.nextSeasonNum||activeSeason||item.curSeason||0);
         const nextEpisodeSeason=Number(scheduled?.season||episodeSeason);
-        candidates.push({raw:item.nextEpisodeDate,label:`S${nextEpisodeSeason||'?'} E${item.nextEpisodeNum}`,season:nextEpisodeSeason,episode:Number(item.nextEpisodeNum)});
+        candidates.push({title:item.nextEpisodeTitle||item.episodeTitles?.[nextEpisodeSeason]?.[item.nextEpisodeNum]||'',raw:item.nextEpisodeDate,label:`S${nextEpisodeSeason||'?'} E${item.nextEpisodeNum}`,season:nextEpisodeSeason,episode:Number(item.nextEpisodeNum)});
       }
       const activeSeason=Number(item.airingSeason||item.curSeason||0);
       const activeSeasonContinues=activeSeason>0&&Number(item.nextSeasonNum)>activeSeason&&Number(item.nextEpisodeNum)>1&&(Boolean(item.nextEpisodeDate)||Boolean((releasedEpisodeMap(item)||{})[activeSeason]?.length));
       if(item.nextSeasonNum&&!activeSeasonContinues&&!candidates.some(e=>e.season===Number(item.nextSeasonNum)&&e.episode===1))candidates.push({raw:item.nextSeasonDate,label:`Season ${item.nextSeasonNum}`,kind:'season',season:Number(item.nextSeasonNum),number:Number(item.nextSeasonNum)});
     }
+    // The explicit provider schedule is first. A stale next pointer or
+    // recurring snapshot cannot create another release for the same episode.
+    const episodes=new Map();
+    for(const candidate of candidates){
+      const identity=candidate.episode?`${candidate.season}:${candidate.episode}`:candidate.kind==='season'?`${candidate.season}:1`:candidate.label;
+      const previous=episodes.get(identity);
+      if(!previous||(!Number.isFinite(Date.parse(previous.raw))&&Number.isFinite(Date.parse(candidate.raw))))episodes.set(identity,candidate);
+      else if(!previous.title&&candidate.title)previous.title=candidate.title;
+    }
+    candidates=[...episodes.values()];
     const undated=[];let streamingUnconfirmed=false;
     for(const originalCandidate of candidates){
       const candidate=typeof regionalScheduleEvent==='function'?regionalScheduleEvent(item,originalCandidate):originalCandidate;
@@ -334,9 +344,10 @@ function releaseAgendaDays({events,start,days:daysToShow},openAttribute='data-da
           ?labels[0].match(/^S(\d+) E/)[0].replace(' E','')+' E'+labels.map(label=>Number(label.match(/E(\d+)/)[1])).join(', ')
           :labels.join(' · ');
         const platform=(group.item.platform?esc(group.item.platform):'Platform not saved');
+        const episodeCopy=group.events.some(event=>event.title)?group.events.map(event=>event.label+(event.title?' · '+event.title:'')).join(' / '):episodeLabel;
         return `<button type="button" class="release-card" ${openAttribute}="${esc(group.item.id)}" data-release-at="${esc(group.events[0].raw)}">
           <span class="calendar-poster"><span class="calendar-poster-fallback" aria-hidden="true">${esc(group.item.title.slice(0,1))}</span><img hidden alt="" data-art="${esc(`${group.item.type}:${group.item.imdbId||group.item.tvmazeShowId||group.item.id}`)}" decoding="async"></span>
-          <span class="release-card-copy"><strong class="release-show-title"><span>${esc(group.item.title)}</span>${scheduleProgressMarker(group.item,progressMarkers)}</strong><span class="release-episode">${esc(episodeLabel)}${group.events.length===1&&group.events[0].title?' · '+esc(group.events[0].title):''}</span><span class="release-time">${esc(group.time)}${group.item.platform?' on '+platform:''}</span></span>
+          <span class="release-card-copy"><strong class="release-show-title"><span>${esc(group.item.title)}</span>${scheduleProgressMarker(group.item,progressMarkers)}</strong><span class="release-episode">${esc(episodeCopy)}</span><span class="release-time">${esc(group.time)}${group.item.platform?' on '+platform:''}</span></span>
         </button>`;
       }).join(''):'<p class="release-empty">Nothing listed for this day</p>'}
     </section>`;

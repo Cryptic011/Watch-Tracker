@@ -283,7 +283,7 @@ function buildServerEpisodeSchedule(item, episodesRaw, now = Date.now()) {
     scheduledEpisodeReleases: episodes.filter(episode => {
       const time = episodeReleaseTime(episode);
       return time > 0 && time >= now - 2 * 86400000 && time <= now + 14 * 86400000;
-    }).map(episode => ({ season: episode.season, number: episode.number, raw: episodeUtcValue(episode) })),
+    }).map(episode => ({ season: episode.season, number: episode.number, raw: episodeUtcValue(episode), ...(episode.name ? { title: String(episode.name) } : {}) })),
     serverScheduleUpdatedAt: new Date(now).toISOString(),
     episodeScheduleVerified: true,
     airingSeason: latestSeason || null,
@@ -302,7 +302,8 @@ function buildServerEpisodeSchedule(item, episodesRaw, now = Date.now()) {
 function serverScheduleRefreshDue(item: Record<string, unknown>, now = Date.now()) {
   if (!["Series", "Anime"].includes(String(item?.type || "")) || !String(item?.title||"").trim()) return false;
   const next = scheduledEventTime(item.nextEpisodeDate, "UTC"), refreshed = new Date(String(item.serverScheduleUpdatedAt || "")).getTime();
-  return !Array.isArray(item.scheduledEpisodeReleases) || !Number.isFinite(refreshed) || now - refreshed >= EPISODE_SCHEDULE_REFRESH_MS || (Number.isFinite(next) && next <= now);
+  const missingTitles = Array.isArray(item.scheduledEpisodeReleases) && item.scheduledEpisodeReleases.some(episode => !String(episode?.title || episode?.name || "").trim());
+  return missingTitles || !Array.isArray(item.scheduledEpisodeReleases) || !Number.isFinite(refreshed) || now - refreshed >= EPISODE_SCHEDULE_REFRESH_MS || (Number.isFinite(next) && next <= now);
 }
 
 async function readLibraries(accountIds: string[]) {

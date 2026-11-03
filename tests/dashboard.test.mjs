@@ -464,3 +464,17 @@ test('Monday releases remain through 23:59:59 then move to prior on Tuesday',()=
  assert.equal(next.events.length,0);assert.deepEqual(Array.from(next.priorEvents,event=>event.item.id),['morning']);
  assert.equal(c.recurringScheduleDelay([],new Date('2026-11-02T23:59:59Z')),1000,'the active calendar refreshes at midnight');
 });
+
+
+test('A corrected schedule produces one card per episode and keeps its title',()=>{
+ const c=app(),show={id:'cia',title:'CIA',type:'Series',airingSeason:2,nextEpisodeNum:6,nextEpisodeDate:'2026-11-10T02:01:00Z',nextEpisodeTitle:'Legacy',scheduledEpisodeReleases:[{season:2,number:6,raw:'2026-11-10T02:00:00Z',title:'Legacy'},{season:2,number:7,raw:'2026-11-10T03:00:00Z',title:'Inside Men'}],recurringWeeklySchedule:{episodes:[{season:2,number:6,raw:'2026-11-10T02:01:00Z'}]}};
+ const result=c.calendarEvents([show],new Date('2026-11-10T00:00:00Z'),1);
+ assert.equal(result.events.length,2,'distinct episodes are retained');
+ assert.equal(result.events[0].raw,'2026-11-10T02:00:00Z');assert.equal(result.events[0].title,'Legacy');
+ const markupContext=app();markupContext.USER_LOCALE='en-GB';markupContext.DASHBOARD_TIME_FORMATTER=new Intl.DateTimeFormat('en-GB',{timeZone:'UTC',hour:'2-digit',minute:'2-digit'});markupContext.esc=String;markupContext.scheduleProgressMarker=()=>'';
+ vm.runInContext(extractFunction(html,'releaseAgendaDays'),markupContext);
+ const markup=markupContext.releaseAgendaDays({...result,days:1});assert.match(markup,/S2 E6 · Legacy/);
+ assert.equal((markup.match(/data-dashboard-open="cia"/g)||[]).length,2);
+ const moved={...show,scheduledEpisodeReleases:[{season:2,number:6,raw:'2026-11-12T02:00:00Z',title:'Legacy'}]};
+ assert.equal(c.calendarEvents([moved],new Date('2026-11-10T00:00:00Z'),1).events.length,0,'an old snapshot cannot resurrect a rescheduled episode');
+});

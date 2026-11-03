@@ -1,3 +1,8 @@
+## 2026-11-03 — Show one calendar card per episode, with its title
+- Prefer the current episode schedule over stale recurring entries and next-episode pointers when an airtime changes.
+- Show the episode name immediately after its season and episode number in both calendars, retaining names through browser and background refreshes.
+- Refresh older schedules with missing episode names without changing watched history or adding delays to airtimes.
+
 ## 2026-11-03 — Use source airtimes without added delays
 - Remove the four-hour availability delay, regional streaming substitutions and fixed Marshals clock override from calendar cards and reminders.
 - Show the actual scheduled airtime in advance notifications; expire advance alerts after 15 minutes instead of replaying them hours late.

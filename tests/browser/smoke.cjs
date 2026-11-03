@@ -135,6 +135,17 @@ const server=http.createServer((req,res)=>{
    }finally{mediaItems=saved;selectedCalendarRange=range;renderDashboard();}
   });
   assert.deepEqual(agendaProof,{posterAligned:true,period:'Next 14 days · GMT',controls:0,days:3,posters:3,future:['agenda-prior','agenda-near','agenda-last'],prior:[],priorLast:true,fits:true},'calendar retains today’s elapsed releases alongside the next fourteen days and keeps Prior Releases separate');
+  phase='corrected episode calendar';
+  const correctedCalendar=await page.evaluate(()=>{
+   const saved=mediaItems;
+   try{
+    const day=new Date(Date.now()+2*86400000).toISOString().slice(0,10),raw=day+'T02:00:00Z',old=day+'T02:01:00Z';
+    mediaItems=[{id:'corrected-cia',title:'CIA',type:'Series',platform:'CBS',airingSeason:2,nextEpisodeNum:6,nextEpisodeDate:old,nextEpisodeTitle:'Legacy',scheduledEpisodeReleases:[{season:2,number:6,raw,title:'Legacy'}],recurringWeeklySchedule:{episodes:[{season:2,number:6,raw:old}]}}];
+    renderDashboard();
+    return ['#library-dashboard','#recurring-weekly-dashboard'].map(id=>({count:document.querySelector(id).querySelectorAll('.release-card').length,copy:document.querySelector(id).querySelector('.release-card-copy').textContent}));
+   }finally{mediaItems=saved;renderDashboard();}
+  });
+  for(const calendar of correctedCalendar){assert.equal(calendar.count,1,'a revised episode time replaces its stale recurring snapshot');assert.match(calendar.copy,/S2 E6 · Legacy/);assert.match(calendar.copy,/02:00/);assert.doesNotMatch(calendar.copy,/02:01/);}
   phase='calendar poster loading';
   const beforePosterCheck=await page.evaluate(()=>{
    const original=mediaItems;

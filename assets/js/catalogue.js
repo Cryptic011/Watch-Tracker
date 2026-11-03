@@ -63,7 +63,7 @@
       const season=Number(row?.season),number=Number(row?.number),raw=String(row?.raw||"");
       const date=new Date(/^\d{4}-\d{2}-\d{2}$/.test(raw)?raw+"T12:00:00Z":raw);
       if(!Number.isInteger(season)||season<1||!Number.isInteger(number)||number<1||!Number.isFinite(date.getTime()))continue;
-      unique.set(season+":"+number,{season,number,raw,date});
+      unique.set(season+":"+number,{season,number,raw,date,...(row.title?{title:row.title}:{})});
     }
     const rows=[...unique.values()].sort((left,right)=>left.date-right.date);
     if(!rows.length)return null;
@@ -78,7 +78,7 @@
       for(const row of current)counts.set(row.date.getUTCDay(),(counts.get(row.date.getUTCDay())||0)+1);
       days.push(...[...counts].sort((left,right)=>right[1]-left[1]).slice(0,officialDays.length).map(([day])=>day));
     }
-    return days.length?{days,episodes:rows.slice(-100).map(({season,number,raw})=>({season,number,raw}))}:null;
+    return days.length?{days,episodes:rows.slice(-100).map(({season,number,raw,title})=>({season,number,raw,...(title?{title}:{})}))}:null;
   }
 
   function analyzeTVSchedule(seasonsRaw,episodesRaw,show,now=Date.now()){
@@ -320,8 +320,8 @@
       highest:schedule.highest,latestAired:schedule.latestAired,currentEpisode:schedule.currentEpisode,
       latestEpisodeDate:episodeReleaseTimestamp(schedule.currentEpisodeRow),seriesReleaseDate:show?.premiered||"",
       completedSeasons:schedule.completedSeasons,upcoming,nextEpisode:schedule.nextEpisode,airing:schedule.airing,episodeImages:officialEpisodeImageMap(schedule.episodes,show?.image),episodeImagesSource:"TVMaze",seasonImages:officialSeasonImageMap(schedule.seasons),seasonImagesSource:"TVMaze",
-      scheduledEpisodeReleases:schedule.episodes.filter(ep=>episodeAirTime(ep)>Date.now()-86400000).map(ep=>({season:ep.season,number:ep.number,raw:episodeReleaseTimestamp(ep)})),
-      recurringWeeklySchedule:ended?null:weeklyReleasePattern(schedule.episodes.map(ep=>({season:ep.season,number:ep.number,raw:episodeReleaseTimestamp(ep)})),show?.schedule?.days),
+      scheduledEpisodeReleases:schedule.episodes.filter(ep=>episodeAirTime(ep)>Date.now()-86400000).map(ep=>({season:ep.season,number:ep.number,raw:episodeReleaseTimestamp(ep),...(ep.name?{title:ep.name}:{})})),
+      recurringWeeklySchedule:ended?null:weeklyReleasePattern(schedule.episodes.map(ep=>({season:ep.season,number:ep.number,raw:episodeReleaseTimestamp(ep),...(ep.name?{title:ep.name}:{})})),show?.schedule?.days),
       episodeCounts:schedule.episodeCounts,airedEpisodeCounts:schedule.airedEpisodeCounts,releasedEpisodes:schedule.releasedEpisodes,known:new Set(schedule.known),
       sources:tvAvailable?["TVMaze"]:[],tvAvailable,episodeScheduleAvailable,resolvedShowId,
       imdbId:String(imdbId||show?.externals?.imdb||""),imdbConfirmed:false,show,ended,provisional:true
@@ -382,8 +382,8 @@
     const resolvedImdbId=imdb?.imdbId||expectedImdbId||"";
     return {
       highest,latestAired,currentEpisode,latestEpisodeDate:episodeReleaseTimestamp(schedule.currentEpisodeRow),seriesReleaseDate:show?.premiered||"",completedSeasons:schedule.completedSeasons,upcoming,nextEpisode:schedule.nextEpisode,airing:schedule.airing,episodeImages:officialEpisodeImageMap(schedule.episodes,show?.image),episodeImagesSource:"TVMaze",seasonImages:officialSeasonImageMap(schedule.seasons),seasonImagesSource:"TVMaze",
-      scheduledEpisodeReleases:schedule.episodes.filter(ep=>episodeAirTime(ep)>Date.now()-86400000).map(ep=>({season:ep.season,number:ep.number,raw:episodeReleaseTimestamp(ep)})),
-      recurringWeeklySchedule:tvEnded?null:weeklyReleasePattern(schedule.episodes.map(ep=>({season:ep.season,number:ep.number,raw:episodeReleaseTimestamp(ep)})),show?.schedule?.days),
+      scheduledEpisodeReleases:schedule.episodes.filter(ep=>episodeAirTime(ep)>Date.now()-86400000).map(ep=>({season:ep.season,number:ep.number,raw:episodeReleaseTimestamp(ep),...(ep.name?{title:ep.name}:{})})),
+      recurringWeeklySchedule:tvEnded?null:weeklyReleasePattern(schedule.episodes.map(ep=>({season:ep.season,number:ep.number,raw:episodeReleaseTimestamp(ep),...(ep.name?{title:ep.name}:{})})),show?.schedule?.days),
       episodeCounts:schedule.episodeCounts,airedEpisodeCounts:schedule.airedEpisodeCounts,releasedEpisodes:schedule.releasedEpisodes,known,sources,tvAvailable,episodeScheduleAvailable,
       resolvedShowId,imdbId:resolvedImdbId,imdbConfirmed:imdb?.confirmed===true,show,ended:tvEnded,provisional:false
     };
