@@ -441,8 +441,24 @@ window.WatchLogGallery=(()=>{
     if(root._galleryMarkup!==markup||!root.firstChild){root.innerHTML=markup;root._galleryMarkup=markup;}
     observe(root,items);
   }
+  function categoryMarkup(items){
+    return `<div class="gallery-home">${[['Series','Shows','▣'],['Film','Films','▤']].map(([type,label,icon])=>{
+      const titles=items.filter(item=>(type==='Film'?isFilm(item):!isFilm(item))&&!item.archived);
+      return `<button type="button" class="gallery-category" data-gallery-category="${type}"><span class="gallery-category-icon" aria-hidden="true">${icon}</span><span><strong>${label}</strong><small>${titles.length} title${titles.length===1?'':'s'}</small></span><span class="gallery-fan" aria-hidden="true">${titles.slice(0,3).map(item=>art(item)).join('')}</span></button>`;
+    }).join('')}</div>`;
+  }
   function mount(element,rows,callbacks){
     host=element;api=callbacks;rows=api.includes?rows.filter(api.includes):rows;host.classList.add('gallery-active');
+    const entry=api.entryRoot;
+    if(entry){
+      const visible=!api.dashboardOnly&&!category;
+      entry.classList.toggle('hidden',!visible);
+      if(visible){
+        const items=api.items(),markup=categoryMarkup(items);
+        if(entry._galleryMarkup!==markup||!entry.firstChild){entry.innerHTML=markup;entry._galleryMarkup=markup;}
+        observe(entry,items);
+      }else if(entry.firstChild)entry.replaceChildren();
+    }
     const showsRoot=api.showsRoot;
     if(showsRoot){
       const showsVisible=!api.dashboardOnly&&category==='Series';

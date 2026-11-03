@@ -1,3 +1,8 @@
+## 2026-11-03 — Restore Home and dedicate pages to Shows and Films
+- Restore Home with search and shortcuts to Library and Calendar.
+- Open dedicated Shows and Films pages from poster cards in Library. Keep Recent selected when entering Library or either page.
+- Reduce the size of the Shows posters and tighten the spacing between sections.
+
 ## 2026-11-03 — Organise Shows and Films inside Library
 - Put the Shows watchlist, episode queue, upcoming episodes, upcoming seasons and recurring releases inside Library, alongside a separate Films view.
 - Open Library with Recent selected.

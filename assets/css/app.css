@@ -255,7 +255,7 @@ html.search-keyboard-open .bottom-tabs{visibility:hidden;pointer-events:none}
 /* One Library heading and filter panel lead straight into the combined grid. */
 .library-only-page .list-toolbar{border-bottom:0;margin-bottom:0;padding-bottom:8px}
 /* Tinted, draggable selected-page pill. Position stays shared with Search. */
-    .tab-indicator{position:absolute;left:6px;top:6px;bottom:6px;width:calc((100% - 12px) / 3);border-radius:999px;pointer-events:none;transform:translateX(0);transition:transform .65s cubic-bezier(.32,0,.18,1);will-change:transform;z-index:0}
+    .tab-indicator{position:absolute;left:6px;top:6px;bottom:6px;width:calc((100% - 12px) / 4);border-radius:999px;pointer-events:none;transform:translateX(0);transition:transform .65s cubic-bezier(.32,0,.18,1);will-change:transform;z-index:0}
     .bottom-tabs.native-tab-motion .tab-indicator{transition:none}
     .tab-glass{position:absolute;inset:0;border:1px solid rgba(255,255,255,.08);border-radius:inherit;background:#07090d;box-shadow:0 2px 5px rgba(0,0,0,.2)}
     .bottom-tabs.is-dragging .tab-indicator{transition:none}.bottom-tabs.is-dragging .tab-btn{cursor:grabbing}
@@ -275,7 +275,8 @@ html[data-theme="light"] .bottom-tabs.is-dragging .tab-btn.drag-preview{color:#1
 .calendar-only-page .stats-row,.calendar-only-page #library-features{display:none!important}
 .calendar-only-page .bottom-tabs{left:50%;width:min(320px,calc(100% - 40px))}
 .calendar-only-page [data-home-section="calendar"]>summary{display:none}
-#library-type-control{margin:0 0 16px}
+.home-links{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:8px 0 20px}
+#library-category-header{margin-bottom:12px}
 .library-only-page #library-schedule-navigation{display:block;margin-bottom:24px}
 .library-only-page [data-home-section="recurring"]{margin-bottom:24px}
 .shows-controls{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:8px 0 20px}
@@ -283,17 +284,17 @@ html[data-theme="light"] .bottom-tabs.is-dragging .tab-btn.drag-preview{color:#1
 .shows-controls select{border-radius:999px;background:var(--inner);color:var(--text);border:1px solid var(--border);padding:11px 34px 11px 18px;font:inherit;font-weight:750;max-width:190px}
 .shows-filter-options{padding:14px;background:var(--inner);border-radius:16px;margin-bottom:24px}
 .shows-filter-options label{display:flex;align-items:center;gap:10px;min-height:32px}
-.shows-section{margin:0 0 30px}
-.shows-section h3{font-size:.9rem;text-transform:uppercase;margin:0 0 16px;letter-spacing:.02em;display:flex;align-items:center;gap:8px}
+.shows-section{margin:0 0 22px}
+.shows-section h3{font-size:.9rem;text-transform:uppercase;margin:0 0 12px;letter-spacing:.02em;display:flex;align-items:center;gap:8px}
 .shows-section h3>span,.shows-empty strong>span{color:#25d6c7}
 .upcoming-seasons h3>span{color:#e8c56f}
 .shows-poster-row{display:flex;gap:12px;overflow-x:auto;overscroll-behavior-x:contain;scroll-snap-type:x proximity;padding-bottom:8px}
-.shows-poster-card{flex:0 0 clamp(128px,30vw,185px);min-width:0;scroll-snap-align:start;background:var(--card);border:1px solid var(--border);border-radius:14px;padding:0;overflow:hidden;color:var(--text);text-align:center}
+.shows-poster-card{flex:0 0 clamp(112px,27vw,160px);min-width:0;scroll-snap-align:start;background:var(--card);border:1px solid var(--border);border-radius:14px;padding:0;overflow:hidden;color:var(--text);text-align:center}
 .shows-poster-card .gallery-art{border-radius:0;box-shadow:none}
-.shows-poster-copy{display:grid;gap:4px;padding:10px 8px 12px;font-size:.78rem;font-weight:750;line-height:1.4}
+.shows-poster-copy{display:grid;gap:4px;padding:8px 7px 10px;font-size:.78rem;font-weight:750;line-height:1.4}
 .shows-poster-copy strong{font-size:.85rem;overflow-wrap:anywhere}
 .shows-poster-copy small{color:#e8c56f;text-transform:uppercase;font-size:.72rem}
-.shows-empty{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:27px 18px;text-align:center}
+.shows-empty{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:21px 16px;text-align:center}
 .shows-empty strong{display:block;font-size:1rem}.shows-empty p{margin:10px 0 0;color:var(--muted);font-size:.88rem;line-height:1.5}
 .shows-year{border-radius:999px;background:var(--inner);border:1px solid var(--border);font-size:.76rem;text-transform:uppercase;padding:6px 12px;max-width:150px;margin:0 0 12px}
 html[data-theme="light"] .shows-poster-copy small{color:#795717}
