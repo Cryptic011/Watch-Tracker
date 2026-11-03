@@ -133,7 +133,8 @@ const server=http.createServer((req,res)=>{
   assert.equal(await page.locator('.gallery-grid').count(),0,'Shows overview has no second poster grid');
   await page.locator('[data-saved-shows]').click();
   assert.match(new URL(page.url()).hash,/series\/saved/);
-  assert.equal(await page.locator('.gallery-grid').isVisible(),true);
+  assert.equal(await page.locator('.gallery-grid').count(),1);
+  assert.equal(await page.locator('.gallery-empty').isVisible(),true,'Saved shows displays its empty state');
   assert.equal(await page.locator('#library-shows').isVisible(),false);
   await page.getByRole('button',{name:'Back to Shows',exact:true}).click();
   assert.equal(await page.getByRole('combobox',{name:'Show status'}).inputValue(),'All');
