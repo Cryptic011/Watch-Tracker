@@ -277,6 +277,7 @@ html[data-theme="light"] .bottom-tabs.is-dragging .tab-btn.drag-preview{color:#1
 .calendar-only-page [data-home-section="calendar"]>summary{display:none}
 .home-links{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:8px 0 20px}
 #library-category-header{margin-bottom:12px}
+.shows-saved-link{justify-self:end;min-height:44px;padding:4px 0;border:0;background:none;color:var(--blue2);font-size:.8rem;font-weight:800;cursor:pointer}
 .library-page-links{display:flex;gap:16px;margin:0 0 4px}
 .library-page-links button{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 4px;border:0;background:none;color:var(--blue2);font-size:.9rem;font-weight:800;cursor:pointer}
 .library-page-links button span{font-size:1.2em}

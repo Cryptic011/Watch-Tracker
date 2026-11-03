@@ -31,6 +31,7 @@
   let activeFilter = "All";
   let currentTab = "library";
   let libraryOnlyPage=false;
+  let savedShows=false;
   let calendarOnlyPage=false;
   let globalSwipeX=0,globalSwipeY=0,globalSwipeAt=0,globalSwipeTarget=null,globalSwipeHandledAt=0;
   let swipeActive=false,swipeComplete=false,swipeVertical=false;

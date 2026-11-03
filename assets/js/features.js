@@ -28,7 +28,7 @@ function renderLibraryFeatures(){
   if(featureAccount!==account){featureAccount=account;libraryScope='';continueExpanded=false;}
   const toolbar=$('library-collections'),root=$('continue-watching');if(!toolbar||!root)return;
   const category=window.WatchLogGallery?.getCategory?.()||'';
-  const visible=Boolean(currentUser&&categoryControlsVisible());
+  const visible=Boolean(currentUser&&savedTitleControlsVisible());
   toolbar.classList.toggle('hidden',!visible);
   $('library-features').classList.toggle('hidden',!visible);
   root.classList.add('hidden');

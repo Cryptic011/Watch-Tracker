@@ -68,7 +68,7 @@ test('Statistics normalize released and watched progress once per show',()=>{
 test('Saves on Settings and Search do not sort or rebuild the hidden Library',()=>{
  let trackers=0;
  const c=functions(['render'],{renderFrame:0,currentUser:{id:'account'},currentTab:'settings',
-  $:()=>({classList:{toggle(){}}}),categoryControlsVisible:()=>false,updateCounts(){},updateFloatingAddVisibility(){},renderDashboard(){},
+  $:()=>({classList:{toggle(){}}}),savedTitleControlsVisible:()=>false,updateCounts(){},updateFloatingAddVisibility(){},renderDashboard(){},
   currentVisibleMediaRows(){throw Error('Hidden Library must not be sorted');},updateEpisodeTracker(){trackers++;}});
  c.render();c.currentTab='search';c.render();assert.equal(trackers,2);
 });

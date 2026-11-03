@@ -445,7 +445,7 @@ window.WatchLogGallery=(()=>{
     host=element;api=callbacks;rows=api.includes?rows.filter(api.includes):rows;host.classList.add('gallery-active');
     const showsRoot=api.showsRoot;
     if(showsRoot){
-      const showsVisible=!api.dashboardOnly&&category==='Series';
+      const showsVisible=api.showsOverview===true;
       showsRoot.classList.toggle('hidden',!showsVisible);
       if(!showsRoot._galleryShowEvents){
         showsRoot._galleryShowEvents=true;

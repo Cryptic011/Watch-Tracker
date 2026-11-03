@@ -1,3 +1,6 @@
+## 2026-11-03 — Separate the Shows overview from saved titles
+- Open the complete grid from Saved shows in the Shows header. Keep the watchlist, queue and upcoming releases on the Shows overview.
+
 ## 2026-11-03 — Keep saved grids on the Shows and Films pages
 - Use Library for navigation and recurring shows. Display saved posters and filters only on the dedicated Shows and Films pages.
 

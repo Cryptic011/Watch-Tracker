@@ -100,6 +100,7 @@ const server=http.createServer((req,res)=>{
   phase='Home, dedicated Shows and Films, and Calendar';
   const category=type=>page.locator('[data-gallery-category="'+type+'"]');
   const openCategory=async type=>{await page.locator('[data-tab="collection"]').click();await category(type).click();};
+  const openSavedShows=async()=>{await openCategory('Series');await page.locator('[data-saved-shows]').click();};
   assert.deepEqual(await page.locator('.bottom-tabs .tab-btn span').allTextContents(),['Home','Library','Calendar','Settings']);
   assert.equal(await page.getByRole('heading',{name:'Home',exact:true}).isVisible(),true);
   assert.equal(await page.locator('#home-view').isVisible(),true);
@@ -129,6 +130,12 @@ const server=http.createServer((req,res)=>{
   await openCategory('Series');
   assert.match(new URL(page.url()).hash,/^#\/collection\/series/);
   assert.equal(await page.getByRole('heading',{name:'Shows',exact:true}).isVisible(),true);
+  assert.equal(await page.locator('.gallery-grid').count(),0,'Shows overview has no second poster grid');
+  await page.locator('[data-saved-shows]').click();
+  assert.match(new URL(page.url()).hash,/series\/saved/);
+  assert.equal(await page.locator('.gallery-grid').isVisible(),true);
+  assert.equal(await page.locator('#library-shows').isVisible(),false);
+  await page.getByRole('button',{name:'Back to Shows',exact:true}).click();
   assert.equal(await page.getByRole('combobox',{name:'Show status'}).inputValue(),'All');
   assert.equal(await page.locator('.shows-controls').getByRole('button').count(),1,'Shows has only its filter button in the toolbar');
   for(const section of ['Watchlist','Episode Queue','Upcoming Episodes','Upcoming Seasons'])assert.equal(await page.locator('[data-shows-section="'+section+'"]').count(),1);
@@ -526,7 +533,7 @@ const server=http.createServer((req,res)=>{
    item.releasedEpisodes={1:Array.from({length:18},(_,index)=>index+1),2:[1,2,3]};item.airedEpisodeCounts={1:18,2:3};item.episodeCounts={1:18,2:4};
    item.episodeTitles={1:{1:'A Longer Episode Title That Wraps Without Squeezing the Artwork'}};render();
   });
-  await openCategory('Series');
+  await openSavedShows();
   phase='category management';
   assert.equal(await page.locator('[data-gallery-manage]').count(),1);
   assert.equal(await page.locator('.gallery-section [data-gallery-manage]').count(),0);
@@ -700,7 +707,7 @@ const server=http.createServer((req,res)=>{
   assert.equal(await page.locator('[data-gallery-notes-preview]').isVisible(),false);
   assert.equal(items.find(row=>row.id==='show').notes,'');
   await page.locator('[data-gallery-close]').click();
-  await page.locator('[data-library-back]').click();
+  await page.locator('[data-tab="collection"]').click();
   // Delete/Undo restores just the removed title, preserving other progress.
   await page.evaluate(()=>openEdit(mediaItems[0].id));await page.locator('#delete-btn').click();
   await page.getByRole('button',{name:'Undo',exact:true}).click();
@@ -968,6 +975,7 @@ const server=http.createServer((req,res)=>{
   await openCategory('Series');
   assert.equal(await page.locator('[data-shows-section="Episode Queue"]').count(),1);
   assert.equal(await page.locator('.top-nav h1').isVisible(),false,'Series shows its category heading without the app title');
+  await page.locator('[data-saved-shows]').click();
   await page.locator('[data-filter="Watched"]').click();
   await page.locator('#sort-mode').selectOption('platform');
   await page.locator('#search-input').click();
@@ -979,7 +987,7 @@ const server=http.createServer((req,res)=>{
   await page.locator('#close-title-search').click();
   await page.waitForFunction(()=>currentTab==='library'&&searchQuery==='');
   await page.locator('[data-filter="All"]').click();await page.locator('#sort-mode').selectOption('current');
-  await page.locator('[data-library-back]').click();
+  await page.locator('[data-tab="collection"]').click();
   assert.equal(await recurring.isVisible(),true,'Recurring shows belong to Library');
   await page.locator('[data-tab="collection"]').click();
   assert.equal(await recurring.locator('.release-week-list [data-recurring-open="show"]').first().isVisible(),true);
@@ -1061,7 +1069,7 @@ const server=http.createServer((req,res)=>{
   });
   if(await page.locator('.gallery-detail[open]').count()){await page.locator('[data-gallery-close]').click();await page.waitForFunction(()=>!window.location.hash.startsWith('#/title/'));}
   assert.equal(quickAdded.status,'Planned');assert.equal(quickAdded.count,1);
-  await openCategory('Series');
+  await openSavedShows();
   assert.equal(await page.locator('.gallery-tile').first().getAttribute('data-gallery-item'),quickAdded.id);
   assert.equal(await page.locator('#sort-mode').isDisabled(),true,'Recent always orders by addition date');
   await page.locator('[data-gallery-item="'+quickAdded.id+'"]').click();
@@ -1110,7 +1118,7 @@ const server=http.createServer((req,res)=>{
   assert.equal(await page.locator('#list-toolbar').evaluate(node=>getComputedStyle(node).borderBottomWidth),'0px','filters flow directly into the category grid');
   assert.equal(await page.locator('[data-home-section]').first().isVisible(),false);
   assert.equal(await page.locator('#sort-mode').isVisible(),false);
-  await openCategory('Series');
+  await openSavedShows();
   assert.equal(await page.locator('#sort-mode').isVisible(),true);
   assert.equal(await page.locator('#sort-mode').isDisabled(),true,'Recent keeps newest additions first');
   await page.locator('[data-filter="Watching"]').click();

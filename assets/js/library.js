@@ -290,6 +290,7 @@
     $("count-planned").textContent=planned;$("count-watching").textContent=watching;$("count-watched").textContent=watched;
   }
   function categoryControlsVisible(){return currentTab==="library"&&libraryOnlyPage&&Boolean(window.WatchLogGallery?.hasCategory?.());}
+  function savedTitleControlsVisible(){return categoryControlsVisible()&&(savedShows||window.WatchLogGallery.getCategory()!=="Series");}
   function updateFloatingAddVisibility(){
     renderLibraryMaintenance();
     if(currentTab!=="search"){
@@ -456,7 +457,17 @@
       $('library-category-title').focus({preventScroll:true});
       return;
     }
+    if(event.target.closest('[data-saved-shows]')){
+      goToTabHome('collection','Series',true);
+      $('library-category-title').focus({preventScroll:true});
+      return;
+    }
     if(event.target.closest('[data-library-back]')){
+      if(savedShows){
+        goToTabHome('collection','Series');
+        document.querySelector('[data-saved-shows]').focus({preventScroll:true});
+        return;
+      }
       const type=window.WatchLogGallery.getCategory();
       goToTabHome('collection');
       document.querySelector('[data-gallery-category="'+type+'"]')?.focus({preventScroll:true});
@@ -537,23 +548,26 @@
   function render(){
     if(renderFrame){cancelAnimationFrame(renderFrame);renderFrame=0;}
     if(typeof refreshTitleSearchBadges==="function")refreshTitleSearchBadges();
-    const libraryVisible=Boolean(currentUser&&categoryControlsVisible());
-    $("list-toolbar").classList.toggle("hidden",!libraryVisible);
+    const savedTitlesVisible=Boolean(currentUser&&savedTitleControlsVisible());
+    $("list-toolbar").classList.toggle("hidden",!savedTitlesVisible);
     if(typeof sortMode!=="undefined")sortMode.disabled=typeof libraryOnlyPage!=="undefined"&&libraryOnlyPage&&activeFilter==="Recent";
     updateCounts();updateFloatingAddVisibility();renderDashboard();
     if(!currentUser){$("library-shows")?.replaceChildren();window.WatchLogGallery?.clearArtwork?.();const features=$("library-features"),progress=$("continue-watching");if(features&&progress&&mediaList.contains(progress))features.append(progress);if(mediaList.contains(features))mediaList.before(features);mediaList.replaceChildren();mediaList._galleryMarkup=null;emptyState.classList.add("hidden");return;}
     if(currentTab!=="library"){updateEpisodeTracker();return;}
     const category=window.WatchLogGallery?.getCategory?.()||'';
     $("home-view").classList.toggle("hidden",libraryOnlyPage||calendarOnlyPage);
-    $("library-category-header").classList.toggle("hidden",!libraryVisible);
+    const overview=categoryControlsVisible()&&category==='Series'&&!savedShows;
+    $("library-category-header").classList.toggle("hidden",!categoryControlsVisible());
+    document.querySelector('[data-saved-shows]').classList.toggle('hidden',!overview);
+    document.querySelector('[data-library-back]').setAttribute('aria-label',savedShows?'Back to Shows':'Back to Library');
     $("library-entry").classList.toggle("hidden",!libraryOnlyPage||Boolean(category));
-    $("library-category-title").textContent=category==='Film'?'Films':'Shows';
-    const {rows,groups}=libraryVisible?currentVisibleMediaRows():{rows:[],groups:new Map()};
-    mediaList.classList.toggle("hidden",!libraryVisible);
-    emptyState.classList.toggle("hidden",!libraryVisible||rows.length>0);
+    $("library-category-title").textContent=category==='Film'?'Films':savedShows?'Saved shows':'Shows';
+    const {rows,groups}=savedTitlesVisible?currentVisibleMediaRows():{rows:[],groups:new Map()};
+    mediaList.classList.toggle("hidden",!savedTitlesVisible);
+    emptyState.classList.toggle("hidden",!savedTitlesVisible||rows.length>0);
     if(currentTab==="library"&&window.WatchLogGallery){
       emptyState.classList.add("hidden");
-      window.WatchLogGallery.mount(mediaList,rows,{dashboardOnly:!libraryVisible,showsRoot:$("library-shows"),showEvents:items=>calendarWindowEvents(items),features:$("library-features"),filter:activeFilter,includes:typeof libraryScopeIncludes==="function"?libraryScopeIncludes:null,organise:typeof saveTitleOrganisation==="function"?saveTitleOrganisation:null,lists:typeof openTitleLists==="function"?openTitleLists:null,navigate:typeof recordAppNavigation==="function"?recordAppNavigation:null,manage:openBulkManage,upcoming:upcomingSortInfo,next:nextWatchEpisode,last:item=>isEpisodeTrackable(item)?lastLoggedEpisode(item):null,released:item=>releasedEpisodeMap(item),watched:item=>watchedEpisodeMap(item),toggleEpisode:toggleEpisodeWatched,toggleSeason:toggleSeasonWatched,refreshEpisodes:(item,force=false)=>{
+      window.WatchLogGallery.mount(mediaList,rows,{dashboardOnly:!savedTitlesVisible,showsOverview:overview,showsRoot:$("library-shows"),showEvents:items=>calendarWindowEvents(items),features:$("library-features"),filter:activeFilter,includes:typeof libraryScopeIncludes==="function"?libraryScopeIncludes:null,organise:typeof saveTitleOrganisation==="function"?saveTitleOrganisation:null,lists:typeof openTitleLists==="function"?openTitleLists:null,navigate:typeof recordAppNavigation==="function"?recordAppNavigation:null,manage:openBulkManage,upcoming:upcomingSortInfo,next:nextWatchEpisode,last:item=>isEpisodeTrackable(item)?lastLoggedEpisode(item):null,released:item=>releasedEpisodeMap(item),watched:item=>watchedEpisodeMap(item),toggleEpisode:toggleEpisodeWatched,toggleSeason:toggleSeasonWatched,refreshEpisodes:(item,force=false)=>{
         if(!currentUser||!navigator.onLine||!isEpisodeTrackable(item)||(!force&&!episodeMetadataNeedsRefresh(item)))return Promise.resolve(false);
         return scheduleMetadataRefresh(item).then(updated=>{if(updated){render();window.WatchLogGallery?.refreshCurrent?.();}return updated;});
       },trackerArtwork:fetchOfficialTrackerArtwork,saveNotes:saveTitleNotes,titleDetails:fetchOfficialTitleDetails,sourceLinks:titleDetailsSourceLinks,remove:async(id)=>{const i=mediaItems.findIndex(row=>String(row.id)===String(id));if(i<0)return false;const old=mediaItems[i];confirmedLibraryDeletes.add(String(id));mediaItems.splice(i,1);try{await persistLibrary(mediaItems,{background:true,precleaned:true});render();return true;}catch(error){mediaItems.splice(i,0,old);return false;}},date:formatLocalDate,dateTime:formatLocalDateTime,reminder:reminderMarkup,edit:openEdit,track:openEpisodeTracker,render,back:()=>{if(currentTab!=="library")switchTab("library");},artwork:async item=>(await pinApi("catalog_search",{query:item.imdbId||item.title,country:"gb"})).results,items:()=>mediaItems});
