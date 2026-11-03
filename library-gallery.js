@@ -427,33 +427,44 @@ window.WatchLogGallery=(()=>{
   }
   function showPoster({item,event},now,queued=false){
     const label=event.kind==='season'?'Season '+String(event.number).padStart(2,'0'):'S'+String(event.season||'?').padStart(2,'0')+' · E'+String(event.number||'?').padStart(2,'0');
-    return `<button type="button" class="shows-poster-card" data-gallery-item="${esc(item.id)}" aria-label="Open ${esc(item.title)} ${esc(label)}">${art(item)}<span class="shows-poster-copy"><strong>${esc(item.title)}</strong><span>${esc(label)}</span><small>${queued?'Ready to watch':esc(showCountdown(event,now))}</small></span></button>`;
+    return `<button type="button" class="shows-poster-card" data-shows-item="${esc(item.id)}" aria-label="Open ${esc(item.title)} ${esc(label)}">${art(item)}<span class="shows-poster-copy"><strong>${esc(item.title)}</strong><span>${esc(label)}</span><small>${queued?'Ready to watch':esc(showCountdown(event,now))}</small></span></button>`;
   }
   function showsSection(label,rows,now,empty,queued=false){
     return `<section class="shows-section" data-shows-section="${esc(label)}"><h3><span aria-hidden="true">◈</span> ${esc(label)}</h3>${rows.length?`<div class="gallery-carousel shows-poster-row">${rows.map(row=>showPoster(row,now,queued)).join('')}</div>`:`<div class="shows-empty"><strong><span aria-hidden="true">✓</span> ${esc(empty[0])}</strong><p>${esc(empty[1])}</p></div>`}</section>`;
   }
-  function mountShows(rows){
-    const now=Date.now(),items=rows.filter(item=>!isFilm(item)&&(showsFilter==='All'||(item.status==='Saved'?'Planned':item.status||'Planned')===showsFilter)&&(!showsFavourites||item.favorite));
+  function mountShows(root,rows){
+    const now=Date.now(),items=rows.filter(item=>!isFilm(item)&&(showsFilter==='All'||(item.status==='Saved'?'Planned':item.status||'Planned')===showsFilter)&&(!showsFavourites||item.favorite)&&(!api.includes||api.includes(item)));
     const groups=showSections(items,api,now);
     const years=new Map();
     for(const row of groups.seasons){const year=Number.isFinite(row.event.time)?new Date(row.event.time).getUTCFullYear():null,current=new Date(now).getUTCFullYear(),label=year===null?'Date to be announced':year===current?'This year':year===current+1?'Next year':String(year);if(!years.has(label))years.set(label,[]);years.get(label).push(row);}
     const markup=`<header class="shows-controls"><select data-shows-status aria-label="Show status">${['All','Watching','Planned','Watched'].map(value=>`<option value="${value}"${showsFilter===value?' selected':''}>${value==='All'?'All Shows':value}</option>`).join('')}</select><button type="button" data-shows-filter aria-label="Filter shows" aria-expanded="${showsFiltersOpen}">☷</button></header>${showsFiltersOpen?`<div class="shows-filter-options"><label><input type="checkbox" data-shows-favourites${showsFavourites?' checked':''}> Favourites only</label></div>`:''}${showsSection('Watchlist',groups.watchlist,now,['No shows on your watchlist.','Your saved shows with upcoming releases will appear here.'])}${showsSection('Episode Queue',groups.queue,now,["You're all caught up!",'New episodes will show up here as they become available.'],true)}${showsSection('Upcoming Episodes',groups.upcoming,now,['No upcoming episodes.','Episodes airing in the next 7 days will show up here when available.'])}<section class="shows-section upcoming-seasons" data-shows-section="Upcoming Seasons"><h3><span aria-hidden="true">◈</span> Upcoming Seasons</h3>${years.size?[...years].map(([label,rows])=>`<h4 class="shows-year">${esc(label)}</h4><div class="gallery-carousel shows-poster-row">${rows.map(row=>showPoster(row,now)).join('')}</div>`).join(''):'<div class="shows-empty"><strong>No upcoming seasons.</strong><p>Announced seasons will appear here.</p></div>'}</section>`;
-    if(host._galleryMarkup!==markup){host.innerHTML=markup;host._galleryMarkup=markup;}
-    observe(host,items);
+    if(root._galleryMarkup!==markup||!root.firstChild){root.innerHTML=markup;root._galleryMarkup=markup;}
+    observe(root,items);
   }
   function mount(element,rows,callbacks){
     host=element;api=callbacks;rows=api.includes?rows.filter(api.includes):rows;host.classList.add('gallery-active');
-    if(host.addEventListener&&!host._galleryShowEvents){
-      host._galleryShowEvents=true;
-      host.addEventListener('click',event=>{
-        if(event.target.closest('[data-shows-filter]')){showsFiltersOpen=!showsFiltersOpen;api.render();return;}
-        if(api.showsPage){const target=event.target.closest('[data-gallery-item]');if(target)open(target.dataset.galleryItem,target);}
-      });
-      host.addEventListener('change',event=>{if(event.target.matches('[data-shows-status]'))showsFilter=event.target.value;else if(event.target.matches('[data-shows-favourites]'))showsFavourites=event.target.checked;else return;api.render();});
+    const showsRoot=api.showsRoot;
+    if(showsRoot){
+      const showsVisible=!api.dashboardOnly&&category==='Series';
+      showsRoot.classList.toggle('hidden',!showsVisible);
+      if(!showsRoot._galleryShowEvents){
+        showsRoot._galleryShowEvents=true;
+        showsRoot.addEventListener('click',event=>{
+          if(event.target.closest('[data-shows-filter]')){showsFiltersOpen=!showsFiltersOpen;api.render();return;}
+          const target=event.target.closest('[data-shows-item]');
+          if(target)open(target.dataset.showsItem,target);
+        });
+        showsRoot.addEventListener('change',event=>{
+          if(event.target.matches('[data-shows-status]'))showsFilter=event.target.value;
+          else if(event.target.matches('[data-shows-favourites]'))showsFavourites=event.target.checked;
+          else return;
+          api.render();
+        });
+      }
+      if(showsVisible)mountShows(showsRoot,api.items());
+      else if(showsRoot.firstChild)showsRoot.replaceChildren();
     }
-    if(api.showsPage){mountShows(rows.length?rows:api.items());return;}
     if(api.dashboardOnly){
-      category='';
       if(api.features){
         const progress=document.getElementById('continue-watching');
         if(progress&&host.contains(progress))api.features.append(progress);
@@ -463,7 +474,6 @@ window.WatchLogGallery=(()=>{
       host._galleryMarkup=null;return;
     }
     if(!host._galleryEvents){host._galleryEvents=true;host.addEventListener('click',event=>{
-      if(api.showsPage)return;
       const manage=event.target.closest('[data-gallery-manage]');
       if(manage){api.manage?.(JSON.parse(manage.dataset.galleryManageIds||'[]'),manage.dataset.galleryManage);return;}
       const target=event.target.closest('[data-gallery-item]');if(target)open(target.dataset.galleryItem,target);

@@ -92,7 +92,7 @@ function renderScheduleNavigation(){
   if(!root){
     root=document.createElement('div');root.id='library-schedule-navigation';
     root.className='home-schedules';
-    document.getElementById('library-view').prepend(root);
+    document.getElementById('library-shows').after(root);
     for(const [key,label] of [['calendar','Calendar'],['recurring','Recurring shows']]){
       const panel=document.createElement('details');panel.className='home-schedule-panel';panel.dataset.homeSection=key;panel.open=key==='calendar';
       const summary=document.createElement('summary');summary.innerHTML='<h2>'+label+'</h2><span class="home-section-chevron" aria-hidden="true">⌄</span>';
@@ -103,7 +103,7 @@ function renderScheduleNavigation(){
   const account=String(currentUser?.id||'');
   if(root._account!==account){root._account=account;for(const panel of root.querySelectorAll('[data-home-section]'))panel.open=panel.dataset.homeSection==='calendar';}
   const visible=homeSchedulesVisible();root.classList.toggle('hidden',!visible);
-  for(const panel of root.querySelectorAll('[data-home-section]'))panel.classList.toggle('hidden',panel.dataset.homeSection==='calendar'?!calendarOnlyPage:!libraryOnlyPage);
+  for(const panel of root.querySelectorAll('[data-home-section]'))panel.classList.toggle('hidden',panel.dataset.homeSection==='calendar'?!calendarOnlyPage:!libraryOnlyPage||window.WatchLogGallery?.getCategory?.()==='Film');
   const calendar=document.getElementById('library-dashboard');
   const calendarPanel=root.querySelector('[data-home-section="calendar"]');
   if(calendar&&calendar.parentElement!==calendarPanel)calendarPanel.append(calendar);
@@ -270,7 +270,7 @@ function renderRecurringWeeklySchedule(){
       const button=event.target.closest("[data-recurring-open]");if(button)openMediaRow(button.dataset.recurringOpen,button);
     });
   }
-  const available=Boolean(currentUser&&currentTab==='library'&&libraryOnlyPage);
+  const available=Boolean(currentUser&&currentTab==='library'&&libraryOnlyPage&&window.WatchLogGallery?.getCategory?.()!=='Film');
   root.classList.toggle("hidden",!available);
   if(!available){if(!currentUser){root.replaceChildren();root._dashboardMarkup=null;}return;}
   const now=new Date(),items=mediaItems.filter(isEpisodeTrackable),schedule=calendarWindowEvents(items,'upcoming',now);
@@ -281,7 +281,7 @@ function renderRecurringWeeklySchedule(){
   window.WatchLogGallery?.observeScheduleArtwork?.(root,items);
 
   if(document.visibilityState==="visible"){
-    recurringWeeklyTimer=setTimeout(renderDashboard,recurringScheduleDelay(rows,now,mediaItems));
+    recurringWeeklyTimer=setTimeout(render,recurringScheduleDelay(rows,now,mediaItems));
   }
 }
 document.addEventListener("visibilitychange",()=>{
@@ -365,7 +365,7 @@ function renderDashboard(){
   const root=document.getElementById('library-dashboard');if(!root)return;
   renderWatchStatistics();
   const visible=Boolean(currentUser&&currentTab==='library'&&calendarOnlyPage);
-  root.classList.toggle('hidden',!visible);if(!visible){if(currentUser&&currentTab==='library'&&!libraryOnlyPage&&!calendarOnlyPage&&document.visibilityState==='visible')recurringWeeklyTimer=setTimeout(render,recurringScheduleDelay([],new Date(),mediaItems));if(!currentUser){root.replaceChildren();root._dashboardMarkup=null;}return;}
+  root.classList.toggle('hidden',!visible);if(!visible){if(!currentUser){root.replaceChildren();root._dashboardMarkup=null;}return;}
   const progressMarkers=new Map();
   const schedule=calendarWindowEvents(mediaItems,'upcoming',new Date());
   updateDashboardMarkup(root,`<section class="dashboard-section weekly-releases calendar-agenda" aria-label="Release calendar"><p class="calendar-period">Next 14 days · GMT</p><div class="release-week-list">${releaseAgendaDays(schedule,'data-dashboard-open',progressMarkers)}</div>${releaseAgendaPrior(schedule.priorEvents,'data-dashboard-open',progressMarkers)}</section>`);

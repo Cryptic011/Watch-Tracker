@@ -10,7 +10,7 @@ test('Reminder routes beat saved navigation and never open a colliding title in 
   c.currentUser={id:'account'};c.window.location=new URL('https://app.test/?reminderAccount='+owner+'#/title/shared-id');
   c.history={state:{watchlog:true,owner:'account',page:{tab:'settings',title:'old'}},replaceState(){}};
   c.applyAppPage=page=>applied.push({...page});c.currentAppPage=()=>applied.at(-1);c.showAppToast=message=>messages.push(message);
-  c.initAppNavigation();assert.equal(applied[0].title,owner==='account'?'shared-id':'');assert.equal(applied[0].tab,'library');assert.equal(messages.length,owner==='account'?0:1);
+  c.initAppNavigation();assert.equal(applied[0].title,owner==='account'?'shared-id':'');assert.equal(applied[0].tab,'collection');assert.equal(messages.length,owner==='account'?0:1);
  }
 });
 test('App URLs round-trip titles, collections, Library filters and sort order',()=>{
@@ -48,13 +48,13 @@ test('Calendar range updates replace their history entry so Back still returns t
 test('Each primary control returns to its own home with nested state cleared',()=>{
  const c=router(),applied=[];let resets=0,records=0;
  c.saveNavigationPosition=()=>{};c.resetTitleSearch=()=>resets++;c.applyAppPage=page=>applied.push(page);c.recordAppNavigation=()=>records++;
- for(const tab of ['library','search','settings'])c.goToTabHome(tab);
- assert.equal(resets,1);assert.equal(records,3);
- for(const [index,tab] of ['library','search','settings'].entries()){
+ for(const tab of ['library','calendar','search','settings'])c.goToTabHome(tab);
+ assert.equal(resets,1);assert.equal(records,4);
+ for(const [index,tab] of ['collection','calendar','search','settings'].entries()){
   const page=applied[index];assert.equal(page.tab,tab);
-  for(const key of ['category','schedule','settings','title','scope','query','searchText'])assert.equal(page[key],'');
+  for(const key of ['schedule','settings','title','scope','query','searchText'])assert.equal(page[key],'');
   assert.equal(page.calendarRange,'upcoming');
-  assert.equal(page.filter,'All');assert.equal(page.scroll,0);
+  assert.equal(page.category,tab==='collection'?'Series':'');assert.equal(page.filter,tab==='collection'?'Recent':'All');assert.equal(page.scroll,0);
  }
 });
 
@@ -66,7 +66,8 @@ test('Dedicated Library routes preserve category, filters and sort separately fr
   assert.match(hash,/^#\/collection/);
   for(const [key,value]of Object.entries(page))assert.equal(parsed[key],value);
  }
- assert.equal(c.parseAppHash('#/library').tab,'library');
+ assert.equal(c.parseAppHash('#/library').tab,'collection');
+ assert.equal(c.parseAppHash('#/library').category,'Series');
 });
 
 test('Old category bookmarks resolve to the single Library page, never Home content',()=>{
@@ -77,7 +78,7 @@ test('Old category bookmarks resolve to the single Library page, never Home cont
   assert.match(c.appPageHash(page),/^#\/collection\//);
  }
  const home=c.parseAppHash(c.appPageHash({tab:'library',calendarRange:'upcoming'}));
- assert.equal(home.calendarRange,'upcoming');assert.equal(home.tab,'library');
+ assert.equal(home.calendarRange,'upcoming');assert.equal(home.tab,'collection');
 });
 
 test('Recent additions filter restores in Library URLs',()=>{

@@ -8,7 +8,8 @@ export function installNativeControls(Native){
   async function sync(){
     frame=0;
     const overlay=Boolean(document.querySelector('dialog[open]'))||['modal','episode-tracker-modal'].some(id=>!hidden(document.getElementById(id)));
-    const state={visible:Boolean(currentUser&&authScreen.classList.contains('hidden')&&!overlay&&!document.documentElement.classList.contains('search-keyboard-open')),tab:document.querySelector('.bottom-tabs')?.dataset.activeTab||'library',searchVisible:currentTab==='library'&&!hidden(document.getElementById('add-btn')),dark:document.documentElement.dataset.theme==='dark'};
+    const activeTab=document.querySelector('.bottom-tabs')?.dataset.activeTab;
+    const state={visible:Boolean(currentUser&&authScreen.classList.contains('hidden')&&!overlay&&!document.documentElement.classList.contains('search-keyboard-open')),tab:activeTab==='collection'?'library':activeTab||'library',searchVisible:currentTab==='library'&&!hidden(document.getElementById('add-btn')),dark:document.documentElement.dataset.theme==='dark'};
     const key=JSON.stringify(state);if(key===last)return;
     last=key;const request=++generation;
     try{
@@ -24,7 +25,7 @@ export function installNativeControls(Native){
   document.addEventListener('toggle',event=>{if(event.target.tagName==='DIALOG')schedule();},true);
   window.addEventListener('watchlog:native-control',event=>{
     if(event.detail==='search'||event.detail==='add')openSearch();
-    else if(['library','settings'].includes(event.detail))document.querySelector(`.bottom-tabs [data-tab="${event.detail}"]`)?.click();
+    else if(['library','settings'].includes(event.detail))document.querySelector(`.bottom-tabs [data-tab="${event.detail==='library'?'collection':event.detail}"]`)?.click();
   });
   schedule();
 }

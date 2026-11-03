@@ -97,8 +97,8 @@ const server=http.createServer((req,res)=>{
   await page.goto(base);
   await page.locator('#auth-email').fill(account.email);await page.locator('#auth-pin').fill('1234');await page.locator('#auth-submit').click();
   await page.waitForFunction(()=>document.querySelector('#auth-screen').classList.contains('hidden'));
-  phase='Shows, Calendar and Library separation';
-  assert.deepEqual(await page.locator('.bottom-tabs .tab-btn span').allTextContents(),['Shows','Calendar','Library','Settings']);
+  phase='Shows and Films within Library, separate Calendar';
+  assert.deepEqual(await page.locator('.bottom-tabs .tab-btn span').allTextContents(),['Library','Calendar','Settings']);
   assert.equal(await page.getByRole('combobox',{name:'Show status'}).inputValue(),'All');
   assert.equal(await page.locator('.shows-controls').getByRole('button').count(),1,'Shows has only its filter button in the toolbar');
   for(const section of ['Watchlist','Episode Queue','Upcoming Episodes','Upcoming Seasons'])assert.equal(await page.locator('[data-shows-section="'+section+'"]').count(),1);
@@ -110,16 +110,19 @@ const server=http.createServer((req,res)=>{
   await page.locator('[data-tab="calendar"]').click();
   assert.equal(await page.locator('#library-dashboard').isVisible(),true);
   assert.equal(await page.locator('[data-home-section="recurring"]').isVisible(),false);
-  await page.locator('#add-btn').click();await page.locator('#close-title-search').click();
-  assert.equal(await page.locator('.bottom-tabs').getAttribute('data-active-tab'),'calendar','Search returns to its originating Calendar page');
-  await page.locator('[data-tab="library"]').click();
+  for(const selector of ['#add-btn','.top-nav .search-box'])assert.equal(await page.locator(selector).isVisible(),false,'Calendar has no Search controls');
+  await page.locator('[data-tab="collection"]').click();
+  await page.locator('#library-type-select').selectOption('Film');
+  assert.equal(await page.locator('#library-shows').isVisible(),false,'Films has its own Library view');
+  assert.equal(await page.locator('[data-home-section="recurring"]').isVisible(),false);
+  await page.locator('#library-type-select').selectOption('Series');
   const showsBefore=await page.evaluate(()=>{
    const original=mediaItems,now=Date.now();
    mediaItems=[{id:'shows-layout',title:'Test Series',type:'Series',status:'Watching',tvmazeShowId:'12',imdbId:'tt1234568',releaseYear:'2020',episodeScheduleVerified:true,metadataUpdatedAt:new Date(now).toISOString(),releasedEpisodes:{1:[1]},watchedEpisodes:{},episodeCounts:{1:2},airingSeason:1,nextEpisodeNum:2,nextEpisodeDate:new Date(now+2*86400000).toISOString(),nextSeasonNum:2,nextSeasonDate:new Date(now+70*86400000).toISOString(),scheduledEpisodeReleases:[{season:1,number:2,raw:new Date(now+2*86400000).toISOString(),title:'Upcoming test'}]}];render();return original;
   });
   try{
-   for(const section of ['Watchlist','Episode Queue','Upcoming Episodes','Upcoming Seasons'])assert.equal(await page.locator('[data-shows-section="'+section+'"] [data-gallery-item="shows-layout"]').count(),1);
-   await page.locator('[data-shows-section="Episode Queue"] [data-gallery-item]').click();await page.locator('.gallery-detail[open]').waitFor();await page.locator('[data-gallery-close]').click();
+   for(const section of ['Watchlist','Episode Queue','Upcoming Episodes','Upcoming Seasons'])assert.equal(await page.locator('[data-shows-section="'+section+'"] [data-shows-item="shows-layout"]').count(),1);
+   await page.locator('[data-shows-section="Episode Queue"] [data-shows-item]').click();await page.locator('.gallery-detail[open]').waitFor();await page.locator('[data-gallery-close]').click();
    await page.locator('[data-shows-status]').selectOption('Planned');assert.equal(await page.locator('.shows-poster-card').count(),0);
    await page.locator('[data-shows-status]').selectOption('All');
    for(const width of [320,390,768]){await page.setViewportSize({width,height:844});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,'Shows fits '+width+'px');}
@@ -138,7 +141,7 @@ const server=http.createServer((req,res)=>{
   await page.locator('[data-settings-open="general"]').click();
   assert.equal(await page.locator('#release-viewing-region').count(),0,'General has no region or timezone selector');
   if(process.env.BROWSER_SCREENSHOT_DIR)await page.screenshot({path:path.join(process.env.BROWSER_SCREENSHOT_DIR,engine.name()+'-gmt-settings.png')});
-  await page.locator('.bottom-tabs [data-tab="library"]').click();
+  await page.locator('.bottom-tabs [data-tab="collection"]').click();
   assert.equal(changelogRequests,0,'startup does not request workflow history');
   await page.locator('[data-tab="calendar"]').click();
   const agendaProof=await page.evaluate(()=>{
@@ -155,7 +158,7 @@ const server=http.createServer((req,res)=>{
     mediaItems=mediaItems.map(item=>({...item,filmReleaseDate:item.filmReleaseDate.length===10?item.filmReleaseDate+'T18:00:00Z':item.filmReleaseDate,filmReleaseSource:'Official test listing',platform:'Test streaming'}));
     renderDashboard();
     const root=document.querySelector('#library-dashboard'),card=root.querySelector('.release-card').getBoundingClientRect(),poster=root.querySelector('.calendar-poster').getBoundingClientRect();
-    return {posterAligned:Math.abs(card.left-poster.left)<1&&Math.abs(card.top-poster.top)<1&&Math.abs(poster.height/poster.width-1.5)<.02,period:root.querySelector('.calendar-period').textContent,controls:root.querySelectorAll('[data-calendar-range],.calendar-range').length,
+    return {posterAligned:Math.abs(card.left-poster.left)<1&&Math.abs(card.top-poster.top)<1&&Math.abs(poster.height/poster.width-1.5)<.02,posterWidth:poster.width,period:root.querySelector('.calendar-period').textContent,controls:root.querySelectorAll('[data-calendar-range],.calendar-range').length,
       days:root.querySelectorAll('.release-day').length,posters:root.querySelectorAll('.calendar-poster img').length,
       future:[...root.querySelectorAll('.release-week-list [data-dashboard-open]')].map(node=>node.dataset.dashboardOpen),
       prior:[...root.querySelectorAll('.prior-releases [data-dashboard-open]')].map(node=>node.dataset.dashboardOpen),
@@ -163,7 +166,7 @@ const server=http.createServer((req,res)=>{
       fits:root.scrollWidth<=root.clientWidth};
    }finally{mediaItems=saved;selectedCalendarRange=range;renderDashboard();}
   });
-  assert.deepEqual(agendaProof,{posterAligned:true,period:'Next 14 days · GMT',controls:0,days:3,posters:3,future:['agenda-prior','agenda-near','agenda-last'],prior:[],priorLast:true,fits:true},'calendar retains today’s elapsed releases alongside the next fourteen days and keeps Prior Releases separate');
+  assert.deepEqual(agendaProof,{posterAligned:true,posterWidth:62,period:'Next 14 days · GMT',controls:0,days:3,posters:3,future:['agenda-prior','agenda-near','agenda-last'],prior:[],priorLast:true,fits:true},'calendar retains today’s elapsed releases alongside the next fourteen days and keeps Prior Releases separate');
   phase='corrected episode calendar';
   const correctedCalendar=await page.evaluate(()=>{
    const saved=mediaItems;
@@ -307,12 +310,13 @@ const server=http.createServer((req,res)=>{
   assert.deepEqual(fixedDock.after,fixedDock.before,'the island and Search button stay fixed while Library scrolls');
   await page.locator('#search-input').click();
   assert.equal(await page.locator('#discovery-view').isVisible(),true,'Library search opens the Search page');
-  assert.equal(await page.locator('.bottom-tabs [data-tab="search"]').count(),0,'Search keeps the same two navigation tabs');
+  assert.equal(await page.locator('.bottom-tabs [data-tab="search"]').count(),0,'Search keeps the same navigation tabs');
   assert.equal(await page.locator('.bottom-tabs').getAttribute('data-active-tab'),'collection');
   await page.locator('#discovery-query').fill('B');
   assert.equal(await page.locator('#discovery-query').inputValue(),'B');
   await page.locator('.bottom-tabs [data-tab="calendar"]').click();
   assert.equal(await page.locator('.bottom-tabs [data-tab="search"]').isVisible(),false,'leaving Search removes its temporary tab');
+  await page.locator('[data-tab="collection"]').click();
   const libraryScrollBeforeSearch=await page.evaluate(async()=>{window.scrollTo(0,160);await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));return window.scrollY;});
   await page.locator('#add-btn').click();
   assert.equal(await page.locator('.bottom-tabs [data-tab="search"]').count(),0,'Search never expands the navigation capsule');
@@ -424,11 +428,11 @@ const server=http.createServer((req,res)=>{
   await page.locator('[data-gallery-close]').click();
   await page.waitForFunction(()=>!window.location.hash.startsWith('#/title/'));
   if(await page.locator('#discovery-view').isVisible())await page.locator('#close-title-search').click();
-  await page.locator('[data-tab="library"]').click();await page.locator('#add-btn').click();assert.equal(await page.locator('#discovery-query').inputValue(),'','Search control returns to Search home');
+  await page.locator('[data-tab="collection"]').click();await page.locator('#add-btn').click();assert.equal(await page.locator('#discovery-query').inputValue(),'','Search control returns to Search home');
   await page.locator('#discovery-manual').click();await page.locator('#modal').waitFor({state:'visible'});await page.locator('#close-modal').click();
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),true);
   await page.locator('#close-title-search').click();
-  await page.locator('[data-tab="library"]').click();
+  await page.locator('[data-tab="collection"]').click();
   phase='gallery';
   await page.locator('[data-tab="collection"]').click();
   assert.equal(await page.getByRole('heading',{name:'Next to watch',exact:true}).count(),0);
@@ -687,14 +691,14 @@ const server=http.createServer((req,res)=>{
   assert.equal(items.length,2);
   // Exercise the Settings menu and each drill-in panel in a mobile browser.
   phase='tinted sliding navigation';
-  await page.locator('.bottom-tabs [data-tab="library"]').click();
-  await page.waitForFunction(()=>Math.abs(document.querySelector('.tab-indicator').getBoundingClientRect().x-document.querySelector('.bottom-tabs [data-tab="library"]').getBoundingClientRect().x)<1);
+  await page.locator('.bottom-tabs [data-tab="calendar"]').click();
+  await page.waitForFunction(()=>Math.abs(document.querySelector('.tab-indicator').getBoundingClientRect().x-document.querySelector('.bottom-tabs [data-tab="calendar"]').getBoundingClientRect().x)<1);
   await page.locator('.bottom-tabs [data-tab="collection"]').click();
   await page.waitForFunction(()=>{
    const x=document.querySelector('.tab-indicator').getBoundingClientRect().x;
-   const home=document.querySelector('.bottom-tabs [data-tab="library"]').getBoundingClientRect().x;
    const target=document.querySelector('.bottom-tabs [data-tab="collection"]').getBoundingClientRect().x;
-   return x>home+1&&x<target-1;
+   const calendar=document.querySelector('.bottom-tabs [data-tab="calendar"]').getBoundingClientRect().x;
+   return x>target+1&&x<calendar-1;
   });
   await page.waitForFunction(()=>Math.abs(document.querySelector('.tab-indicator').getBoundingClientRect().x-document.querySelector('.bottom-tabs [data-tab="collection"]').getBoundingClientRect().x)<1);
   const dragStart=await page.locator('.bottom-tabs [data-tab="collection"]').boundingBox();
@@ -710,7 +714,7 @@ const server=http.createServer((req,res)=>{
   if(engine.name()==='chromium'){
     phase='touch navigation capture transfer';
     const touch=await context.newCDPSession(page);
-    for(const [from,to] of [['library','collection'],['collection','settings'],['settings','collection'],['collection','library']]){
+    for(const [from,to] of [['calendar','collection'],['collection','settings'],['settings','collection'],['collection','calendar']]){
       await page.locator('.bottom-tabs [data-tab="'+from+'"]').click();
       await page.waitForFunction(tab=>Math.abs(document.querySelector('.tab-indicator').getBoundingClientRect().x-document.querySelector('.bottom-tabs [data-tab="'+tab+'"]').getBoundingClientRect().x)<1,from);
       const a=await page.locator('.bottom-tabs [data-tab="'+from+'"]').boundingBox(),b=await page.locator('.bottom-tabs [data-tab="'+to+'"]').boundingBox();
@@ -742,7 +746,7 @@ const server=http.createServer((req,res)=>{
   await page.emulateMedia({reducedMotion:'no-preference'});
   for(const width of [320,390,768]){
    await page.setViewportSize({width,height:844});
-   for(const tab of ['settings','library']){
+   for(const tab of ['settings','collection']){
     await page.locator('[data-tab="'+tab+'"]').click();
     const geometry=await page.evaluate(()=>{
      const bar=document.querySelector('.bottom-tabs').getBoundingClientRect(),search=document.querySelector('#add-btn').getBoundingClientRect();
@@ -752,7 +756,7 @@ const server=http.createServer((req,res)=>{
     assert.equal(geometry.overflow,false,'navigation motion creates no horizontal page overflow');
     assert.equal(await page.locator('.bottom-tabs').getAttribute('data-active-tab'),tab);
     assert.equal(await page.locator('[data-tab="'+tab+'"]').getAttribute('aria-current'),'page');
-    if(tab==='library')assert.ok(geometry.searchLeft-geometry.barRight>=7,'search stays clear of the centred capsule');
+    if(tab==='collection')assert.ok(geometry.searchLeft-geometry.barRight>=7,'search stays clear of the centred capsule');
     else await assertSettingsOnly();
    }
   }
@@ -846,18 +850,18 @@ const server=http.createServer((req,res)=>{
   assert.ok(loads>loadsBeforeTrackSync,'Track Sync performs a cloud library load');
   await page.waitForFunction(()=>!document.querySelector('#sync-now').disabled&&document.querySelector('#sync-status').textContent.includes('Synced.'),null,{timeout:10000});
   await assertSettingsOnly();
-  await page.locator('[data-tab="library"]').click();
+  await page.locator('[data-tab="collection"]').click();
   await page.locator('#add-btn').click();
   assert.equal(await page.locator('#discovery-view').isVisible(),true,'Search opens after leaving Settings');
   assert.equal(await page.evaluate(()=>document.body.style.position),'fixed','the Library remains anchored behind the modal search backdrop');
   await page.locator('#close-title-search').click();
   await page.locator('[data-tab="settings"]').click();
   await assertSettingsOnly();
-  await page.locator('[data-tab="library"]').click();
+  await page.locator('[data-tab="collection"]').click();
   await page.waitForFunction(()=>document.querySelector('#settings-view').classList.contains('hidden')&&!document.querySelector('#library-view').classList.contains('hidden'));
   assert.equal(await page.locator('.shows-controls').isVisible(),true,'Shows restores its own controls');
   assert.equal(await page.locator('.stats-row').isVisible(),false,'Home omits Library totals');
-  assert.equal(await page.locator('.top-nav h1').isVisible(),true,'App title returns on Library home');
+  assert.equal(await page.getByRole('combobox',{name:'Browse Library'}).inputValue(),'Series','Library home opens Shows');
   for(const selector of ['.profile-card','#sync-now','#logout-btn','#appearance-mode','#background-reminder-status','#enable-background-reminders']){
     assert.equal(await page.locator(selector).first().isVisible(),false,selector+' must not be visible in Library');
   }
@@ -874,7 +878,7 @@ const server=http.createServer((req,res)=>{
   const recurring=page.locator('#recurring-weekly-dashboard');
   const calendarView=page.locator('#library-dashboard');
   assert.equal(await page.locator('[data-shows-section="Watchlist"]').isVisible(),true);
-  assert.equal(await recurring.isVisible(),false,'Shows is separate from both schedules');
+  assert.equal(await page.locator('[data-home-section="recurring"]').isVisible(),true,'Recurring shows are part of Library');
   assert.equal(await calendarView.isVisible(),false);
   await page.locator('[data-tab="calendar"]').click();
   assert.equal(await calendarView.isVisible(),true);assert.equal(await recurring.isVisible(),false);
@@ -944,7 +948,7 @@ const server=http.createServer((req,res)=>{
   assert.equal(await calendarView.isVisible(),true);assert.equal(await recurring.isVisible(),false);
   assert.equal(await page.locator('[data-calendar-range],.calendar-range').count(),0);
   assert.equal(new URL(page.url()).hash,'#/calendar');
-  await page.locator('[data-tab="library"]').click();
+  await page.locator('[data-tab="collection"]').click();
   assert.equal(await page.locator('#media-list').isVisible(),true,'Shows owns its poster sections');
   assert.equal(await page.locator('[data-shows-section="Episode Queue"]').count(),1);
   await page.locator('[data-tab="collection"]').click();
@@ -956,7 +960,7 @@ const server=http.createServer((req,res)=>{
   await page.locator('#discovery-query').fill('No matching title at all');
   await page.waitForFunction(()=>discoveryQuery==='No matching title at all');
   assert.equal(await page.locator('#discovery-library').isVisible(),false,'searching from a category uses the full Search page');
-  assert.equal(await recurring.isVisible(),false,'schedule content stays off the Series browsing page');
+  assert.equal(await recurring.isVisible(),false,'The search sheet hides the Library behind it');
   assert.equal(await recurring.textContent(),scheduleText,'Library status, search and sorting cannot remove recurring shows');
   await page.locator('#close-title-search').click();
   await page.waitForFunction(()=>currentTab==='library'&&searchQuery==='');
@@ -999,19 +1003,16 @@ const server=http.createServer((req,res)=>{
   await page.waitForFunction(()=>!document.querySelector('.gallery-detail[open]'));
   assert.equal(await page.locator('[data-calendar-range]').count(),0,'closing details keeps the clean filter-free calendar');
   assert.equal(await page.locator('#library-dashboard [data-dashboard-open="show"] .release-progress-dot').first().getAttribute('data-behind-level'),'green','watching released episodes makes the release-calendar marker green');
-  await page.locator('[data-tab="library"]').click();
-  await page.locator('[data-tab="library"]').click();
   await page.locator('[data-tab="collection"]').click();
   assert.equal(await recurringMarker().getAttribute('data-behind-level'),'green','opening the recurring page shows the saved progress immediately');
-  await page.locator('[data-tab="library"]').click();
-  await page.locator('[data-tab="library"]').click();
+  await page.locator('[data-tab="collection"]').click();
   phase='duplicate prevention';
   await page.locator('#add-btn').click();await page.locator('#discovery-query').fill('Browser Test Series');
   await page.locator('[data-discovery-filter="Series"]').click();
   await page.locator('#discovery-library-results [data-library-result="show"]').waitFor();
   assert.equal(await page.locator('#discovery-results [data-discovery-add]').count(),0,'a shared TVMaze ID is saved even when the catalogue IMDb ID differs');
   await page.locator('#close-title-search').click();
-  await page.locator('[data-tab="library"]').click();
+  await page.locator('[data-tab="collection"]').click();
   const beforeDuplicate=await page.evaluate(()=>mediaItems.length),beforeDuplicateSaves=saves;
   await page.evaluate(()=>{openAdd();titleInput.value='Test Series';typeSelect.value='Series';$('tvmaze-id').value='12';$('imdb-id').value='tt7654321';$('release-year').value='2021';});
   await page.locator('#save-btn').click();await page.locator('#duplicate-warning').waitFor({state:'visible'});
@@ -1028,12 +1029,11 @@ const server=http.createServer((req,res)=>{
   await page.waitForFunction(id=>mediaItems.find(item=>item.id===id)?.platform==='Saved before refresh',refreshItemId,{timeout:10000});
   assert.equal(items.find(item=>item.id===refreshItemId)?.platform,'Saved before refresh');
   assert.equal(await page.locator('[data-gallery-category]').count(),0,'Home restores without duplicate Library content');
-  await page.locator('[data-tab="library"]').click();
   await page.locator('[data-tab="collection"]').click();
   await page.evaluate(()=>{document.querySelector('[data-home-section="recurring"]').open=true;});
   await page.waitForFunction(()=>document.querySelectorAll('#recurring-weekly-dashboard .release-week-list [data-recurring-open="show"]').length>0);
   assert.ok(await page.locator('#recurring-weekly-dashboard .release-week-list [data-recurring-open="show"]').count()>0,'confirmed releases survive reload');
-  await page.locator('[data-tab="library"]').click();
+  await page.locator('[data-tab="collection"]').click();
   assert.equal(await page.locator('[data-home-section]').count(),2,'reload restores both collapsible schedules');
   await page.locator('[data-tab="collection"]').click();
   assert.equal(await recurring.isVisible(),true);assert.equal(await calendarView.isVisible(),false);
@@ -1058,7 +1058,7 @@ const server=http.createServer((req,res)=>{
   assert.equal(await page.locator('.gallery-tile').first().getAttribute('data-gallery-item'),quickAdded.id,'adjusting status keeps the title in Recent');
   assert.match(new URL(page.url()).hash,/filter=Recent/);
   await page.locator('[data-filter="All"]').click();assert.equal(await page.locator('#sort-mode').isEnabled(),true);
-  await page.locator('[data-tab="library"]').click();
+  await page.locator('[data-tab="collection"]').click();
   // A failed cloud save must leave the current page and edit intact.
   phase='failed save';
   // Reload starts background metadata persistence. Finish that successful
@@ -1102,7 +1102,7 @@ const server=http.createServer((req,res)=>{
   await page.locator('#sort-mode').selectOption('title');
   assert.match(new URL(page.url()).hash,/collection\/series/);
   assert.equal(await page.locator('#continue-watching').isVisible(),false);
-  await page.locator('[data-tab="library"]').click();
+  await page.locator('[data-tab="collection"]').click();
   assert.equal(await page.locator('[data-home-section]').first().isVisible(),false);
   assert.equal(await page.locator('[data-shows-section="Watchlist"]').isVisible(),true);
   assert.equal(await page.locator('[data-gallery-category]').count(),0);

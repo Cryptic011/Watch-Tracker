@@ -1,11 +1,11 @@
 /* Library organisation, Continue Watching, offline readiness and recovery. */
 let libraryScope='',featureAccount='',continueExpanded=false;
-// Keep type, status, favourites and collection filters together.
+// Keep status, favourites and collection filters together.
 const libraryFilterPills=document.querySelector('#list-toolbar .filter-pills');
 const libraryCollectionControl=$('library-collections');
 if(libraryFilterPills&&libraryCollectionControl){
   const panel=document.createElement('section');panel.className='library-filter-panel';panel.setAttribute('aria-label','Filter titles');
-  libraryFilterPills.before(panel);panel.append(libraryFilterPills,$('library-type-control'),libraryCollectionControl);
+  libraryFilterPills.before(panel);panel.append(libraryFilterPills,libraryCollectionControl);
   libraryCollectionControl.querySelector('label').textContent='Favourites & collections';
 }
 function collectionNames(items=mediaItems){return [...new Set(items.flatMap(item=>Array.isArray(item.lists)?item.lists:[]))].filter(name=>typeof name==='string'&&name.trim()).sort((a,b)=>titleCollator.compare(a,b));}
@@ -28,8 +28,9 @@ function renderLibraryFeatures(){
   if(featureAccount!==account){featureAccount=account;libraryScope='';continueExpanded=false;}
   const toolbar=$('library-collections'),root=$('continue-watching');if(!toolbar||!root)return;
   const category=window.WatchLogGallery?.getCategory?.()||'';
-  $('library-type-select').value=category;
-  const visible=Boolean(currentUser&&categoryControlsVisible());toolbar.classList.toggle('hidden',!visible);
+  const visible=Boolean(currentUser&&categoryControlsVisible());
+  $('library-type-control').classList.toggle('hidden',!visible);$('library-type-select').value=category;
+  toolbar.classList.toggle('hidden',!visible);
   $('library-features').classList.toggle('hidden',!visible);
   root.classList.add('hidden');
   if(!visible){if(currentTab==='library'&&!category)libraryScope='';return;}

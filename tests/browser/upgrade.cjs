@@ -78,13 +78,13 @@ function patch(items,changes){
    await page.goto(base);await page.waitForFunction(()=>document.querySelector('#auth-screen').classList.contains('hidden'));
    await page.waitForFunction(()=>navigator.serviceWorker.controller,{timeout:20000});
    await page.waitForFunction(()=>document.querySelector('#offline-status').textContent.includes('Ready for offline'));
-   assert.equal(await page.locator('#library-collections').isVisible(),false,'Library home has no collection control');
+   assert.equal(await page.locator('#library-collections').isVisible(),true,'Library home has its collection control');
    assert.equal(await page.locator('#continue-watching').isVisible(),false,'Library home has no Continue Watching section');
    await page.locator('[data-tab="collection"]').click();
-   assert.equal(await page.locator('#library-type-select').inputValue(),'');
-   assert.equal(await page.locator('.gallery-grid').count(),1,'all title types share one grid');
-   assert.equal(await page.locator('[data-gallery-category]').count(),0,'no film or show category boxes');
-   assert.equal(await page.locator('[data-gallery-item="film"]').count(),1);
+   assert.equal(await page.locator('#library-type-select').inputValue(),'Series');
+   assert.equal(await page.locator('.gallery-grid').count(),1,'Shows has one saved-title grid');
+   assert.equal(await page.locator('[data-gallery-category]').count(),0,'no duplicate category boxes');
+   assert.equal(await page.locator('[data-gallery-item="film"]').count(),0);
    assert.equal(await page.locator('[data-gallery-item="show"]').count(),1);
    await page.locator('#library-type-select').selectOption('Film');
    assert.equal(await page.locator('[data-gallery-item="film"]').count(),1);

@@ -1,3 +1,8 @@
+## 2026-11-03 — Organise Shows and Films inside Library
+- Put the Shows watchlist, episode queue, upcoming episodes, upcoming seasons and recurring releases inside Library, alongside a separate Films view.
+- Open Library with Recent selected.
+- Remove Search controls from Calendar and reduce release card spacing and height.
+
 ## 2026-11-03 — Tidy the Shows toolbar
 - Remove the extra Settings button and align the status selector with the filter button.
 

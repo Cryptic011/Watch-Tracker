@@ -293,13 +293,13 @@
   function updateFloatingAddVisibility(){
     renderLibraryMaintenance();
     if(currentTab!=="search"){
-      if(currentTab==="library")document.querySelector(".top-nav h1").textContent=libraryOnlyPage?"Library":calendarOnlyPage?"Calendar":"Shows";
+      if(currentTab==="library")document.querySelector(".top-nav h1").textContent=calendarOnlyPage?"Calendar":"Library";
       document.querySelector(".top-nav h1").classList.toggle("hidden",currentTab!=="library"||categoryControlsVisible());
-      if(currentTab==='library')for(const selector of ['.top-nav .search-box','.stats-row'])document.querySelector(selector).classList.toggle('hidden',selector==='.stats-row'&&!libraryOnlyPage);
+      if(currentTab==='library')for(const selector of ['.top-nav .search-box','.stats-row'])document.querySelector(selector).classList.toggle('hidden',calendarOnlyPage);
     }
-    addBtn.classList.toggle("hidden",!(currentUser&&currentTab==="library"));
+    addBtn.classList.toggle("hidden",!(currentUser&&currentTab==="library"&&libraryOnlyPage));
   }
-  const ALLOWED_BOTTOM_TABS=new Set(["library","calendar","collection","search","settings"]);
+  const ALLOWED_BOTTOM_TABS=new Set(["collection","calendar","search","settings"]);
   function enforceBottomNavigation(){
     document.querySelectorAll(".bottom-tabs .tab-btn").forEach(button=>{
       const tab=String(button.dataset.tab||"").toLowerCase();
@@ -343,7 +343,7 @@
     return true;
   }
 
-  updateTabSelection("library");
+  updateTabSelection("collection");
   let navigationDrag=null,suppressNavigationClick=false,navigationClickTimer=0;
   bottomTabs.addEventListener("pointerdown",event=>{
     if(navigationDrag||!event.isPrimary||event.button!==0||!event.target.closest(".tab-btn"))return;
@@ -393,7 +393,7 @@
     suppressNavigationClick=false;event.preventDefault();event.stopImmediatePropagation();
   },true);
 
-  let searchReturnTab="library";
+  let searchReturnTab="collection";
   let primaryPageAnimation=null;
   function animatePrimaryPage(from,to){
     primaryPageAnimation?.cancel();primaryPageAnimation=null;
@@ -407,16 +407,15 @@
     ],{duration:260,easing:"cubic-bezier(.22,1,.36,1)"});
   }
   function switchTab(tab){
-    if(!ALLOWED_BOTTOM_TABS.has(tab))tab="library";
+    if(!ALLOWED_BOTTOM_TABS.has(tab))tab="collection";
     if(typeof saveNavigationPosition==="function")saveNavigationPosition();
     if(tab!=="search"){
       libraryOnlyPage=tab==="collection";calendarOnlyPage=tab==="calendar";
-      if(libraryOnlyPage&&!navigationApplying){activeFilter="Recent";pillBtns.forEach(button=>button.classList.toggle("active",button.dataset.filter===activeFilter));}
+      if(libraryOnlyPage&&currentTab!=="search"&&!navigationApplying){activeFilter="Recent";pillBtns.forEach(button=>button.classList.toggle("active",button.dataset.filter===activeFilter));}
       if(libraryOnlyPage||calendarOnlyPage)tab="library";
     }
     document.body.classList.toggle("library-only-page",libraryOnlyPage);
     document.body.classList.toggle("calendar-only-page",calendarOnlyPage);
-    document.body.classList.toggle("shows-page",!libraryOnlyPage&&!calendarOnlyPage);
     enforceBottomNavigation();
     const previousTab=currentTab;
     if(tab==="search"&&currentTab!=="search")searchReturnTab=libraryOnlyPage?"collection":calendarOnlyPage?"calendar":currentTab;
@@ -523,7 +522,7 @@
     $("list-toolbar").classList.toggle("hidden",!currentUser||!categoryControlsVisible());
     if(typeof sortMode!=="undefined")sortMode.disabled=typeof libraryOnlyPage!=="undefined"&&libraryOnlyPage&&activeFilter==="Recent";
     updateCounts();updateFloatingAddVisibility();renderDashboard();
-    if(!currentUser){window.WatchLogGallery?.clearArtwork?.();const features=$("library-features"),progress=$("continue-watching");if(features&&progress&&mediaList.contains(progress))features.append(progress);if(mediaList.contains(features))mediaList.before(features);mediaList.replaceChildren();mediaList._galleryMarkup=null;emptyState.classList.add("hidden");return;}
+    if(!currentUser){$("library-shows")?.replaceChildren();window.WatchLogGallery?.clearArtwork?.();const features=$("library-features"),progress=$("continue-watching");if(features&&progress&&mediaList.contains(progress))features.append(progress);if(mediaList.contains(features))mediaList.before(features);mediaList.replaceChildren();mediaList._galleryMarkup=null;emptyState.classList.add("hidden");return;}
     if(currentTab!=="library"){updateEpisodeTracker();return;}
     const {rows,groups}=libraryOnlyPage?currentVisibleMediaRows():{rows:[],groups:new Map()};
     mediaList.classList.toggle("hidden",calendarOnlyPage);
@@ -531,7 +530,7 @@
     if(currentTab==="library"&&window.WatchLogGallery){
       emptyState.classList.add("hidden");
       $("list-label").textContent="Library";
-      window.WatchLogGallery.mount(mediaList,rows,{plainLibrary:libraryOnlyPage,dashboardOnly:!libraryOnlyPage,showsPage:!libraryOnlyPage&&!calendarOnlyPage,showEvents:items=>calendarWindowEvents(items),features:$("library-features"),filter:activeFilter,includes:typeof libraryScopeIncludes==="function"?libraryScopeIncludes:null,organise:typeof saveTitleOrganisation==="function"?saveTitleOrganisation:null,lists:typeof openTitleLists==="function"?openTitleLists:null,navigate:typeof recordAppNavigation==="function"?recordAppNavigation:null,manage:openBulkManage,upcoming:upcomingSortInfo,next:nextWatchEpisode,last:item=>isEpisodeTrackable(item)?lastLoggedEpisode(item):null,released:item=>releasedEpisodeMap(item),watched:item=>watchedEpisodeMap(item),toggleEpisode:toggleEpisodeWatched,toggleSeason:toggleSeasonWatched,refreshEpisodes:(item,force=false)=>{
+      window.WatchLogGallery.mount(mediaList,rows,{dashboardOnly:!libraryOnlyPage,showsRoot:$("library-shows"),showEvents:items=>calendarWindowEvents(items),features:$("library-features"),filter:activeFilter,includes:typeof libraryScopeIncludes==="function"?libraryScopeIncludes:null,organise:typeof saveTitleOrganisation==="function"?saveTitleOrganisation:null,lists:typeof openTitleLists==="function"?openTitleLists:null,navigate:typeof recordAppNavigation==="function"?recordAppNavigation:null,manage:openBulkManage,upcoming:upcomingSortInfo,next:nextWatchEpisode,last:item=>isEpisodeTrackable(item)?lastLoggedEpisode(item):null,released:item=>releasedEpisodeMap(item),watched:item=>watchedEpisodeMap(item),toggleEpisode:toggleEpisodeWatched,toggleSeason:toggleSeasonWatched,refreshEpisodes:(item,force=false)=>{
         if(!currentUser||!navigator.onLine||!isEpisodeTrackable(item)||(!force&&!episodeMetadataNeedsRefresh(item)))return Promise.resolve(false);
         return scheduleMetadataRefresh(item).then(updated=>{if(updated){render();window.WatchLogGallery?.refreshCurrent?.();}return updated;});
       },trackerArtwork:fetchOfficialTrackerArtwork,saveNotes:saveTitleNotes,titleDetails:fetchOfficialTitleDetails,sourceLinks:titleDetailsSourceLinks,remove:async(id)=>{const i=mediaItems.findIndex(row=>String(row.id)===String(id));if(i<0)return false;const old=mediaItems[i];confirmedLibraryDeletes.add(String(id));mediaItems.splice(i,1);try{await persistLibrary(mediaItems,{background:true,precleaned:true});render();return true;}catch(error){mediaItems.splice(i,0,old);return false;}},date:formatLocalDate,dateTime:formatLocalDateTime,reminder:reminderMarkup,edit:openEdit,track:openEpisodeTracker,render,back:()=>{if(currentTab!=="library")switchTab("library");},artwork:async item=>(await pinApi("catalog_search",{query:item.imdbId||item.title,country:"gb"})).results,items:()=>mediaItems});

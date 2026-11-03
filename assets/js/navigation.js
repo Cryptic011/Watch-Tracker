@@ -24,7 +24,7 @@ function parseAppHash(hash){
   else if(parts[0]==='title'){try{page.title=decodeURIComponent(parts.slice(1).join('/'));}catch(_){}}
   else if(['recurring','calendar'].includes(parts[1])){page.schedule=parts[1];page.tab=parts[1]==='calendar'?'calendar':'collection';if(!params.has('filter'))page.filter='Recent';}
   else if(parts[1]==='movies'||parts[1]==='series')page.category=parts[1]==='movies'?'Film':'Series';
-  if(page.tab==='library'&&page.category)page.tab='collection';
+  if(page.tab==='library'){page.tab='collection';page.category||='Series';if(!params.has('filter'))page.filter='Recent';}
   return page;
 }
 function saveNavigationPosition(){
@@ -47,13 +47,13 @@ function applyAppPage(page){
   if(!currentUser)return;
   navigationApplying=true;const revision=++navigationRestore,previousSchedule=typeof selectedScheduleView==='string'?selectedScheduleView:'';
   try{
-    if(page.tab==='library'&&page.category)page={...page,tab:'collection'};
+    if(page.tab==='library')page={...page,tab:'collection',category:page.category||'Series',filter:'Recent'};
     document.querySelector('.gallery-detail[open]')?.close();
     libraryScope=page.scope||'';activeFilter=page.filter||'All';activeSort=page.sort||'current';searchQuery=page.query||'';searchInput.value=searchQuery;sortMode.value=activeSort;
     pillBtns.forEach(button=>button.classList.toggle('active',button.dataset.filter===activeFilter));
     selectedScheduleView='';
     selectedCalendarRange='upcoming';
-    window.WatchLogGallery?.setCategory?.(page.category||'');
+    if(page.tab==='collection')window.WatchLogGallery?.setCategory?.(page.category||'');
     if(page.tab==='search'){const text=page.searchText||'';if(discoveryQuery!==text){pauseTitleSearch();discoveryRows=[];discoveryQuery=text;}discoveryInput.value=text;discoveryFilter=page.searchFormat||'All';}
     switchTab(page.tab||'library');
     if(page.tab==='settings'){showSettingsMenu();if(page.settings)showSettingsCategory(page.settings);}
@@ -69,10 +69,10 @@ function applyAppPage(page){
   }finally{navigationApplying=false;}
 }
 function goToTabHome(tab){
-  if(!['library','calendar','collection','search','settings'].includes(tab))tab='library';
+  if(!['calendar','collection','search','settings'].includes(tab))tab='collection';
   saveNavigationPosition();
   if(tab==='search'&&typeof resetTitleSearch==='function')resetTitleSearch();
-  applyAppPage({tab,category:'',schedule:'',calendarRange:'upcoming',settings:'',title:'',scope:'',query:'',filter:tab==='collection'?'Recent':'All',sort:'current',searchText:'',searchFormat:'All',scroll:0,dialogScroll:0});
+  applyAppPage({tab,category:tab==='collection'?'Series':'',schedule:'',calendarRange:'upcoming',settings:'',title:'',scope:'',query:'',filter:tab==='collection'?'Recent':'All',sort:'current',searchText:'',searchFormat:'All',scroll:0,dialogScroll:0});
   recordAppNavigation();
 }
 function initAppNavigation(){
@@ -83,7 +83,7 @@ function initAppNavigation(){
   const notificationUrl=new URL(window.location.href),notificationOwner=notificationUrl.searchParams.get('reminderAccount');
   const page=notificationOwner?parseAppHash(window.location.hash):saved||parseAppHash(window.location.hash);
   if(notificationOwner){
-    if(notificationOwner!==account){page.title='';page.tab='library';showAppToast('This reminder belongs to another account. Sign in to that account to view it.','warn');}
+    if(notificationOwner!==account){page.title='';page.tab='collection';page.category='Series';page.filter='Recent';showAppToast('This reminder belongs to another account. Sign in to that account to view it.','warn');}
     notificationUrl.searchParams.delete('reminderAccount');history.replaceState(history.state,'',notificationUrl.href);
   }
   applyAppPage(page);

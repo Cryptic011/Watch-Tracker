@@ -28,9 +28,9 @@
   let isSignUp = false;
   let maintenanceOwnerAccess = false;
   let publicMaintenance = {enabled:false,message:"Watch Tracker is currently under maintenance. Please try again shortly."};
-  let activeFilter = "All";
+  let activeFilter = "Recent";
   let currentTab = "library";
-  let libraryOnlyPage=false;
+  let libraryOnlyPage=true;
   let calendarOnlyPage=false;
   let globalSwipeX=0,globalSwipeY=0,globalSwipeAt=0,globalSwipeTarget=null,globalSwipeHandledAt=0;
   let swipeActive=false,swipeComplete=false,swipeVertical=false;

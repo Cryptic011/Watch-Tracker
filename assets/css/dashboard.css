@@ -185,3 +185,11 @@
 .calendar-agenda .release-card-copy strong{font-size:1.05rem}
 html[data-theme="light"] .calendar-agenda .release-card{background:#eef1f5}
 @media(min-width:620px){.calendar-agenda .release-card{grid-template-columns:92px minmax(0,1fr);min-height:138px}.calendar-agenda .calendar-poster{width:92px;min-height:138px}}
+
+/* Keep Calendar compact while retaining the full poster and release details. */
+.calendar-only-page .calendar-period{padding-top:4px}
+.calendar-only-page .calendar-agenda .release-day,.calendar-only-page .calendar-agenda .release-day.is-today{margin:16px 0 20px}
+.calendar-only-page .calendar-agenda .release-day-heading{margin-bottom:10px}
+.calendar-only-page .calendar-agenda .release-card{grid-template-columns:62px minmax(0,1fr);min-height:93px;margin:8px 0}
+.calendar-only-page .calendar-agenda .calendar-poster{width:62px;min-height:93px}
+.calendar-only-page .calendar-agenda .release-card-copy{padding-block:9px;gap:3px}

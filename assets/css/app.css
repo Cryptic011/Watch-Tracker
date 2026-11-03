@@ -255,7 +255,7 @@ html.search-keyboard-open .bottom-tabs{visibility:hidden;pointer-events:none}
 /* One Library heading and filter panel lead straight into the combined grid. */
 .library-only-page .list-toolbar{border-bottom:0;margin-bottom:0;padding-bottom:8px}
 /* Tinted, draggable selected-page pill. Position stays shared with Search. */
-    .tab-indicator{position:absolute;left:6px;top:6px;bottom:6px;width:calc((100% - 12px) / 4);border-radius:999px;pointer-events:none;transform:translateX(0);transition:transform .65s cubic-bezier(.32,0,.18,1);will-change:transform;z-index:0}
+    .tab-indicator{position:absolute;left:6px;top:6px;bottom:6px;width:calc((100% - 12px) / 3);border-radius:999px;pointer-events:none;transform:translateX(0);transition:transform .65s cubic-bezier(.32,0,.18,1);will-change:transform;z-index:0}
     .bottom-tabs.native-tab-motion .tab-indicator{transition:none}
     .tab-glass{position:absolute;inset:0;border:1px solid rgba(255,255,255,.08);border-radius:inherit;background:#07090d;box-shadow:0 2px 5px rgba(0,0,0,.2)}
     .bottom-tabs.is-dragging .tab-indicator{transition:none}.bottom-tabs.is-dragging .tab-btn{cursor:grabbing}
@@ -270,10 +270,12 @@ html[data-theme="light"] .bottom-tabs.is-dragging .tab-btn{color:#596171}
 html[data-theme="light"] .bottom-tabs.is-dragging .tab-btn.drag-preview{color:#101318}
 @media(prefers-reduced-motion:reduce){.tab-indicator{transition-duration:.16s;transition-timing-function:ease-out}.bottom-tabs .tab-icon svg{transition:none;transform:none}}
 
-/* Distinct Shows, Calendar and Library surfaces. */
+/* Library and Calendar navigation. */
 .bottom-tabs{width:min(320px,calc(100% - 96px));left:calc(50% - 30px)}
-.shows-page .top-nav .search-box,.shows-page .stats-row,.shows-page #library-features,.calendar-only-page .stats-row,.calendar-only-page #library-features{display:none!important}
+.calendar-only-page .stats-row,.calendar-only-page #library-features{display:none!important}
+.calendar-only-page .bottom-tabs{left:50%;width:min(320px,calc(100% - 40px))}
 .calendar-only-page [data-home-section="calendar"]>summary{display:none}
+#library-type-control{margin:0 0 16px}
 .library-only-page #library-schedule-navigation{display:block;margin-bottom:24px}
 .library-only-page [data-home-section="recurring"]{margin-bottom:24px}
 .shows-controls{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:8px 0 20px}
