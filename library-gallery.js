@@ -421,6 +421,7 @@ window.WatchLogGallery=(()=>{
   }
   function showCountdown(event,now){
     if(!Number.isFinite(event.time))return 'Date TBA';
+    if(new Date(event.time).toISOString().slice(0,10)===new Date(now).toISOString().slice(0,10))return 'Today';
     const days=Math.max(0,Math.ceil((event.time-now)/86400000));
     return days===0?'Today':days===1?'1 day':days<28?days+' days':Math.max(1,Math.round(days/30))+' months';
   }
@@ -496,5 +497,5 @@ window.WatchLogGallery=(()=>{
     observe(root,items);
   }
   function clearArtwork(){observer?.disconnect();artTargets.clear();queue.length=0;pending.clear();cache.clear();}
-  return {mount,open,sections,showSections,observeScheduleArtwork,releaseGroups,back,refreshCurrent,clearArtwork,getCategory:()=>category,setCategory:value=>{category=['Film','Series'].includes(value)?value:'';},hasCategory:()=>Boolean(category)};
+  return {mount,open,sections,showSections,showCountdown,observeScheduleArtwork,releaseGroups,back,refreshCurrent,clearArtwork,getCategory:()=>category,setCategory:value=>{category=['Film','Series'].includes(value)?value:'';},hasCategory:()=>Boolean(category)};
 })();

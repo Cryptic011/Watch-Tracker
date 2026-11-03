@@ -47,3 +47,10 @@ test('Shows sections separate the released queue, seven-day episodes and future 
  assert.equal(sections.watchlist.length,1);assert.equal(sections.queue[0].event.number,2);assert.equal(sections.upcoming.length,1);assert.equal(sections.upcoming[0].event.number,2);assert.equal(sections.seasons[0].event.number,3);
  const caught=context.window.WatchLogGallery.showSections([show],{...callbacks,next:()=>null},now);assert.equal(caught.queue.length,0);
 });
+
+test('Shows countdown calls a release later on the current day Today',()=>{
+ const now=Date.parse('2026-11-03T01:30:00Z'),countdown=context.window.WatchLogGallery.showCountdown;
+ assert.equal(countdown({time:Date.parse('2026-11-03T02:00:00Z')},now),'Today');
+ assert.equal(countdown({time:Date.parse('2026-11-04T01:00:00Z')},now),'1 day');
+ assert.equal(countdown({time:Infinity},now),'Date TBA');
+});
