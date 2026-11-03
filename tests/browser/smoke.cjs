@@ -320,8 +320,8 @@ const server=http.createServer((req,res)=>{
   assert.ok(fullSearch.x<=1&&fullSearch.y<=1&&fullSearch.width>=389&&fullSearch.height>=843,'Search covers the whole page');
   assert.equal(await page.locator('#library-view').evaluate(node=>getComputedStyle(node).visibility),'hidden','Library artwork cannot show through Search');
   await page.waitForFunction(()=>{
-    const cursor=getComputedStyle(document.querySelector('.tab-indicator'));
-    return Math.abs(new DOMMatrixReadOnly(cursor.transform).m41)<1;
+    const cursor=document.querySelector('.tab-indicator').getBoundingClientRect(),active=document.querySelector('.bottom-tabs .tab-btn.active').getBoundingClientRect();
+    return Math.abs(cursor.left-active.left)<1;
   });
   if(process.env.BROWSER_SCREENSHOT_DIR)await page.screenshot({path:path.join(process.env.BROWSER_SCREENSHOT_DIR,engine.name()+'-search.png')});
   await page.locator('#close-title-search').click();
