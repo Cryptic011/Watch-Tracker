@@ -30,3 +30,9 @@ test('Device language does not turn France or Ireland into the UK and an explici
  const api=engine();assert.equal(api.country({timeZone:'Europe/Paris',locale:'en-GB'}),'FR');assert.equal(api.country({timeZone:'Europe/Dublin',locale:'en-GB'}),'IE');assert.equal(api.country({timeZone:'Europe/London',locale:'en-US'}),'GB');assert.equal(api.country({country:'US',timeZone:'Europe/London'}),'US');
 });
 test('Browser and deployed reminder worker share identical airtime rules',()=>assert.equal(source,fs.readFileSync(new URL('../supabase/functions/watchlog-reminders/regional-releases.js',import.meta.url),'utf8')));
+
+test('Film alerts still require a verified release source as well as a clock time',()=>{
+ const event={raw:'2026-11-03T01:00:00Z'},api=engine();
+ assert.equal(api.resolveEvent({type:'Film'},event).streamingUnconfirmed,true);
+ assert.equal(api.resolveEvent({type:'Film',filmReleaseSource:'Manual'},event).streamingUnconfirmed,false);
+});

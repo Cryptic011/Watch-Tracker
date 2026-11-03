@@ -19,7 +19,7 @@
   async function refresh(){}
   function resolveEvent(item,event){
     const raw=event.broadcastRaw||event.raw;
-    const timed=/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(String(raw||''))&&Number.isFinite(Date.parse(raw));
+    const timed=(item.type!=='Film'||Boolean(String(item.filmReleaseSource||'').trim()))&&/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(String(raw||''))&&Number.isFinite(Date.parse(raw));
     return {...event,raw,platform:item.broadcastPlatform||item.platform,streamingUnconfirmed:!timed,
       releaseSchedule:timed?{key:'provider-airtime',platform:item.broadcastPlatform||item.platform||''}:null};
   }
