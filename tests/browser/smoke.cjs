@@ -1096,12 +1096,14 @@ const server=http.createServer((req,res)=>{
   assert.equal(await page.locator('[data-home-section]').first().isVisible(),false);
   assert.equal(await page.locator('#sort-mode').isVisible(),true);
   await page.locator('#library-type-select').selectOption('Series');
-  await page.locator('#sort-mode').selectOption('title');
+  assert.equal(await page.locator('#sort-mode').isDisabled(),true,'Recent keeps newest additions first');
   await page.locator('[data-filter="Watching"]').click();
+  await page.locator('#sort-mode').selectOption('title');
   assert.match(new URL(page.url()).hash,/collection\/series/);
   assert.equal(await page.locator('#continue-watching').isVisible(),false);
   await page.locator('[data-tab="library"]').click();
-  assert.equal(await page.locator('[data-home-section]').first().isVisible(),true);
+  assert.equal(await page.locator('[data-home-section]').first().isVisible(),false);
+  assert.equal(await page.locator('[data-shows-section="Watchlist"]').isVisible(),true);
   assert.equal(await page.locator('[data-gallery-category]').count(),0);
   assert.ok(saves>=4);assert.deepEqual(errors,[]);
   console.log(`${engine.name()}: visual search, filters, descriptions, duplicate badges, add/edit, episode mark/undo, unreleased guard and refresh persistence passed`);
