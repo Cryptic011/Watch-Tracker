@@ -1,3 +1,6 @@
+## 2026-11-03 — Keep saved grids on the Shows and Films pages
+- Use Library for navigation and recurring shows. Display saved posters and filters only on the dedicated Shows and Films pages.
+
 ## 2026-11-03 — Simplify Library navigation
 - Open the dedicated Shows and Films pages from one compact row in the Library toolbar.
 

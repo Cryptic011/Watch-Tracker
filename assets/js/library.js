@@ -289,7 +289,7 @@
     for(const item of mediaItems){if(item.status==="Planned"||item.status==="Saved")planned++;else if(item.status==="Watching")watching++;else if(item.status==="Watched")watched++;}
     $("count-planned").textContent=planned;$("count-watching").textContent=watching;$("count-watched").textContent=watched;
   }
-  function categoryControlsVisible(){return currentTab==="library"&&Boolean(typeof libraryOnlyPage!=="undefined"?libraryOnlyPage:window.WatchLogGallery?.hasCategory?.());}
+  function categoryControlsVisible(){return currentTab==="library"&&libraryOnlyPage&&Boolean(window.WatchLogGallery?.hasCategory?.());}
   function updateFloatingAddVisibility(){
     renderLibraryMaintenance();
     if(currentTab!=="search"){
@@ -545,16 +545,15 @@
     if(currentTab!=="library"){updateEpisodeTracker();return;}
     const category=window.WatchLogGallery?.getCategory?.()||'';
     $("home-view").classList.toggle("hidden",libraryOnlyPage||calendarOnlyPage);
-    $("library-category-header").classList.toggle("hidden",!(libraryVisible&&category));
-    $("library-entry").classList.toggle("hidden",!libraryVisible||Boolean(category));
+    $("library-category-header").classList.toggle("hidden",!libraryVisible);
+    $("library-entry").classList.toggle("hidden",!libraryOnlyPage||Boolean(category));
     $("library-category-title").textContent=category==='Film'?'Films':'Shows';
-    const {rows,groups}=libraryOnlyPage?currentVisibleMediaRows():{rows:[],groups:new Map()};
-    mediaList.classList.toggle("hidden",!libraryOnlyPage);
-    emptyState.classList.toggle("hidden",!libraryOnlyPage||rows.length>0);
+    const {rows,groups}=libraryVisible?currentVisibleMediaRows():{rows:[],groups:new Map()};
+    mediaList.classList.toggle("hidden",!libraryVisible);
+    emptyState.classList.toggle("hidden",!libraryVisible||rows.length>0);
     if(currentTab==="library"&&window.WatchLogGallery){
       emptyState.classList.add("hidden");
-      $("list-label").textContent=category?"Saved titles":"Library";
-      window.WatchLogGallery.mount(mediaList,rows,{dashboardOnly:!libraryOnlyPage,showsRoot:$("library-shows"),showEvents:items=>calendarWindowEvents(items),features:$("library-features"),filter:activeFilter,includes:typeof libraryScopeIncludes==="function"?libraryScopeIncludes:null,organise:typeof saveTitleOrganisation==="function"?saveTitleOrganisation:null,lists:typeof openTitleLists==="function"?openTitleLists:null,navigate:typeof recordAppNavigation==="function"?recordAppNavigation:null,manage:openBulkManage,upcoming:upcomingSortInfo,next:nextWatchEpisode,last:item=>isEpisodeTrackable(item)?lastLoggedEpisode(item):null,released:item=>releasedEpisodeMap(item),watched:item=>watchedEpisodeMap(item),toggleEpisode:toggleEpisodeWatched,toggleSeason:toggleSeasonWatched,refreshEpisodes:(item,force=false)=>{
+      window.WatchLogGallery.mount(mediaList,rows,{dashboardOnly:!libraryVisible,showsRoot:$("library-shows"),showEvents:items=>calendarWindowEvents(items),features:$("library-features"),filter:activeFilter,includes:typeof libraryScopeIncludes==="function"?libraryScopeIncludes:null,organise:typeof saveTitleOrganisation==="function"?saveTitleOrganisation:null,lists:typeof openTitleLists==="function"?openTitleLists:null,navigate:typeof recordAppNavigation==="function"?recordAppNavigation:null,manage:openBulkManage,upcoming:upcomingSortInfo,next:nextWatchEpisode,last:item=>isEpisodeTrackable(item)?lastLoggedEpisode(item):null,released:item=>releasedEpisodeMap(item),watched:item=>watchedEpisodeMap(item),toggleEpisode:toggleEpisodeWatched,toggleSeason:toggleSeasonWatched,refreshEpisodes:(item,force=false)=>{
         if(!currentUser||!navigator.onLine||!isEpisodeTrackable(item)||(!force&&!episodeMetadataNeedsRefresh(item)))return Promise.resolve(false);
         return scheduleMetadataRefresh(item).then(updated=>{if(updated){render();window.WatchLogGallery?.refreshCurrent?.();}return updated;});
       },trackerArtwork:fetchOfficialTrackerArtwork,saveNotes:saveTitleNotes,titleDetails:fetchOfficialTitleDetails,sourceLinks:titleDetailsSourceLinks,remove:async(id)=>{const i=mediaItems.findIndex(row=>String(row.id)===String(id));if(i<0)return false;const old=mediaItems[i];confirmedLibraryDeletes.add(String(id));mediaItems.splice(i,1);try{await persistLibrary(mediaItems,{background:true,precleaned:true});render();return true;}catch(error){mediaItems.splice(i,0,old);return false;}},date:formatLocalDate,dateTime:formatLocalDateTime,reminder:reminderMarkup,edit:openEdit,track:openEpisodeTracker,render,back:()=>{if(currentTab!=="library")switchTab("library");},artwork:async item=>(await pinApi("catalog_search",{query:item.imdbId||item.title,country:"gb"})).results,items:()=>mediaItems});

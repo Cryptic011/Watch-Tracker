@@ -252,7 +252,7 @@ html.search-keyboard-open .bottom-tabs{visibility:hidden;pointer-events:none}
 .bottom-tabs{width:min(252px,calc(100% - 152px))}
 .library-only-page .stats-row,.library-only-page #library-dashboard,.library-only-page #library-features,.library-only-page #continue-watching{display:none!important}
 
-/* One Library heading and filter panel lead straight into the combined grid. */
+/* Filters lead directly into the saved titles on each Library page. */
 .library-only-page .list-toolbar{border-bottom:0;margin-bottom:0;padding-bottom:8px}
 /* Tinted, draggable selected-page pill. Position stays shared with Search. */
     .tab-indicator{position:absolute;left:6px;top:6px;bottom:6px;width:calc((100% - 12px) / 4);border-radius:999px;pointer-events:none;transform:translateX(0);transition:transform .65s cubic-bezier(.32,0,.18,1);will-change:transform;z-index:0}

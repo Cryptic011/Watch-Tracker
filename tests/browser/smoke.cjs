@@ -105,15 +105,17 @@ const server=http.createServer((req,res)=>{
   assert.equal(await page.locator('#home-view').isVisible(),true);
   assert.equal(await page.locator('#library-dashboard').isVisible(),false);
   await page.getByRole('button',{name:'Open Library',exact:true}).click();
-  assert.equal(await page.locator('[data-filter="Recent"]').getAttribute('class').then(value=>value.includes('active')),true);
+  assert.equal(await page.locator('.gallery-grid').count(),0,'Library has no duplicate title grid');
+  assert.equal(await page.locator('#list-toolbar').isVisible(),false,'Filters belong to the dedicated pages');
   assert.equal(await page.locator('[data-home-section="recurring"]').isVisible(),true);
   assert.equal(await page.locator('#library-shows').isVisible(),false,'Library landing has no Shows dashboard');
-  assert.equal(await page.locator('#list-toolbar .library-page-links').isVisible(),true);
+  assert.equal(await page.locator('.library-page-links').isVisible(),true);
   assert.ok((await page.locator('#library-entry').boundingBox()).height<=48,'Shows and Films fit on one compact toolbar row');
   assert.equal(await page.locator('#library-entry img').count(),0);
   await category('Film').click();
   assert.match(new URL(page.url()).hash,/^#\/collection\/movies/);
   assert.equal(await page.getByRole('heading',{name:'Films',exact:true}).isVisible(),true);
+  assert.equal(await page.locator('[data-filter="Recent"]').evaluate(node=>node.classList.contains('active')),true);
   assert.equal(await page.locator('#library-entry').isVisible(),false);
   assert.equal(await page.locator('#library-shows').isVisible(),false,'Films has its own page');
   assert.equal(await page.locator('[data-home-section="recurring"]').isVisible(),false);
@@ -243,9 +245,9 @@ const server=http.createServer((req,res)=>{
   assert.equal(pendingSchedule.undated,0);assert.ok(pendingSchedule.emptyHeights.every(height=>height<65),'empty weekdays stay compact');
   assert.equal(await page.locator('.changelog-entry').count(),0,'startup does not construct the full hidden changelog');
   assert.equal(await page.locator('#library-entry').isVisible(),false,'Calendar hides Library navigation');
-  await page.locator('[data-tab="collection"]').click();
-  assert.equal(await page.evaluate(()=>{const node=mediaList.querySelector('.gallery-grid');render();return Boolean(node)&&node===mediaList.querySelector('.gallery-grid');}),true,'unchanged Library render retains the unified title grid');
-  assert.equal(await page.locator('#media-list>.gallery-empty').count(),1,'empty Library shows one message');
+  await openCategory('Film');
+  assert.equal(await page.evaluate(()=>{const node=mediaList.querySelector('.gallery-grid');render();return Boolean(node)&&node===mediaList.querySelector('.gallery-grid');}),true,'unchanged Films render retains its title grid');
+  assert.equal(await page.locator('#media-list>.gallery-empty').count(),1,'empty Films shows one message');
   assert.equal(await page.locator('#empty-state').isVisible(),false,'no duplicate empty state below the grid');
   await page.locator('[data-tab="collection"]').click();
   // Exercise the actual weekly schedule DOM, not just its sorting helper.
@@ -452,7 +454,7 @@ const server=http.createServer((req,res)=>{
   await page.locator('[data-tab="collection"]').click();
   assert.equal(await page.getByRole('heading',{name:'Next to watch',exact:true}).count(),0);
   assert.equal(await page.locator('[data-gallery-category]').count(),2,'Library offers separate Shows and Films pages');
-  assert.equal(await page.locator('.gallery-grid').count(),1);
+  assert.equal(await page.locator('.gallery-grid').count(),0);
   await page.evaluate(()=>{mediaItems[0].status='Watched';mediaItems[0].filmReleaseDate='2020-02-14';mediaItems[0].date='2026-09-21';render();});
   await openCategory('Film');await page.locator('[data-filter="Watched"]').click();
   assert.equal(await page.locator('.library-filter-panel #library-collection-select').isVisible(),true,'status and collection controls share one filter panel');
@@ -463,7 +465,7 @@ const server=http.createServer((req,res)=>{
   assert.equal(await page.locator('.gallery-tile').count(),1,'user-created collection names filter the library');
   await page.locator('#library-collection-select').selectOption('');
   await page.evaluate(prior=>{mediaItems[0]=prior;render();},beforeCollectionTest);
-  assert.equal(await page.locator('.gallery-grid').count(),1,'one combined grid');
+  assert.equal(await page.locator('.gallery-grid').count(),1,'one Films grid');
   assert.match(await page.locator('.gallery-tile small').first().textContent(),/2020/);
   assert.equal(await page.locator('[data-gallery-manage]').count(),1);
   assert.equal(await page.locator('.gallery-section [data-gallery-manage]').count(),0);
@@ -899,7 +901,7 @@ const server=http.createServer((req,res)=>{
   assert.equal(await calendarView.isVisible(),true);assert.equal(await recurring.isVisible(),false);
   assert.equal(new URL(page.url()).hash,'#/calendar');
   await page.locator('[data-tab="collection"]').click();
-  assert.equal(await page.locator('[data-filter="Recent"]').getAttribute('class').then(value=>value.includes('active')),true,'Recent is the Library default');
+  assert.equal(await page.locator('#list-toolbar').isVisible(),false,'Library does not repeat the title filters');
   assert.equal(await calendarView.isVisible(),false);
   const recurringSummary=page.locator('[data-home-section="recurring"]>summary');
   await page.evaluate(()=>{document.querySelector('[data-home-section="recurring"]').open=true;});
@@ -1059,7 +1061,7 @@ const server=http.createServer((req,res)=>{
   });
   if(await page.locator('.gallery-detail[open]').count()){await page.locator('[data-gallery-close]').click();await page.waitForFunction(()=>!window.location.hash.startsWith('#/title/'));}
   assert.equal(quickAdded.status,'Planned');assert.equal(quickAdded.count,1);
-  await page.locator('[data-tab="collection"]').click();await page.locator('[data-filter="Recent"]').click();
+  await openCategory('Series');
   assert.equal(await page.locator('.gallery-tile').first().getAttribute('data-gallery-item'),quickAdded.id);
   assert.equal(await page.locator('#sort-mode').isDisabled(),true,'Recent always orders by addition date');
   await page.locator('[data-gallery-item="'+quickAdded.id+'"]').click();
@@ -1104,11 +1106,12 @@ const server=http.createServer((req,res)=>{
   await page.locator('[data-tab="collection"]').click();
   assert.match(new URL(page.url()).hash,/^#\/collection/);
   assert.equal(await page.locator('[data-gallery-category]').count(),2);
-  assert.equal(await page.getByRole('heading',{name:'Library',exact:true}).filter({visible:true}).count(),1,'Library has one heading above its combined titles');
-  assert.equal(await page.locator('#list-toolbar').evaluate(node=>getComputedStyle(node).borderBottomWidth),'0px','filters flow directly into the combined title grid');
+  assert.equal(await page.getByRole('heading',{name:'Library',exact:true}).filter({visible:true}).count(),1,'Library has one heading above its page links');
+  assert.equal(await page.locator('#list-toolbar').evaluate(node=>getComputedStyle(node).borderBottomWidth),'0px','filters flow directly into the category grid');
   assert.equal(await page.locator('[data-home-section]').first().isVisible(),false);
-  assert.equal(await page.locator('#sort-mode').isVisible(),true);
+  assert.equal(await page.locator('#sort-mode').isVisible(),false);
   await openCategory('Series');
+  assert.equal(await page.locator('#sort-mode').isVisible(),true);
   assert.equal(await page.locator('#sort-mode').isDisabled(),true,'Recent keeps newest additions first');
   await page.locator('[data-filter="Watching"]').click();
   await page.locator('#sort-mode').selectOption('title');
