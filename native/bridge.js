@@ -82,7 +82,7 @@ if(Capacitor.isNativePlatform()){
       if(!currentUser)throw new Error('Sign in to export your library.');
       const data={format:'watchlog-library-backup',version:1,exportedAt:new Date().toISOString(),items:cloneLibrarySnapshot(mediaItems)};
       await Native.shareBackup({text:JSON.stringify(data,null,2)});
-      document.getElementById('library-backup-status').textContent='Backup sharing opened.';
+      document.getElementById('library-backup-status').textContent='Export sharing opened.';
     }catch(error){document.getElementById('library-backup-status').textContent=error.message||'Could not share the backup.';}
   };
   window.addEventListener('watchlog:native-active',()=>{

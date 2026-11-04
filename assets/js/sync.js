@@ -854,21 +854,28 @@
     const backup={format:"watchlog-library-backup",version:1,exportedAt:new Date().toISOString(),items:cloneLibrarySnapshot(mediaItems)};
     const url=URL.createObjectURL(new Blob([JSON.stringify(backup,null,2)],{type:"application/json"}));
     const link=document.createElement("a");link.href=url;link.download=`watched-logger-backup-${new Date().toISOString().slice(0,10)}.json`;link.click();URL.revokeObjectURL(url);
-    const status=document.getElementById("library-backup-status");if(status)status.textContent=`Backup exported with ${backup.items.length} library item(s).`;
+    const status=document.getElementById("library-backup-status");if(status)status.textContent=`Exported library with ${backup.items.length} library item(s).`;
   });
   document.getElementById("import-library-backup")?.addEventListener("change",async event=>{
-    const input=event.currentTarget,status=document.getElementById("library-backup-status"),file=input.files?.[0];input.value="";if(!file)return;
+    const input=event.currentTarget,status=document.getElementById("library-backup-status"),files=[...input.files||[]],file=files[0];input.value="";if(!file)return;
     const beforeItems=cloneLibrarySnapshot(mediaItems);
     try{
-      if(file.size>10*1024*1024)throw new Error("Backup file is larger than 10 MB.");
-      const backup=JSON.parse(await file.text());
+      if(files.reduce((size,row)=>size+row.size,0)>20*1024*1024)throw new Error("Choose import files totalling under 20 MB.");
+      let backup=null;
+      if(files.length===1&&!/\.csv$/i.test(file.name)){
+        try{backup=JSON.parse(await file.text());}catch(_){}
+      }
+      if(backup?.format!=="watchlog-library-backup"){
+        if(window.WatchLogTrakt?.previewFiles){await window.WatchLogTrakt.previewFiles(files);return;}
+        throw new Error("The import reader is unavailable. Refresh the app and try again.");
+      }
       if(backup?.format!=="watchlog-library-backup"||backup.version!==1||!Array.isArray(backup.items)||backup.items.some(item=>!item||typeof item.title!=="string"||!item.title.trim()))throw new Error("This is not a supported Watch Tracker backup.");
       const before=mediaItems.length;
       mediaItems=cleanLibraryRecords(mergeLibraries(mediaItems,backup.items)).items;
       render();
       await persistLibrary(mediaItems,{background:true,precleaned:true});
-      if(status)status.textContent=`Restored backup and checked duplicates from ${backup.items.length} imported item(s); ${mediaItems.length} unique titles are saved on this device and queued to sync (previously ${before}).`;
-    }catch(error){mediaItems=beforeItems;render();if(status)status.textContent=error.message||"Could not restore this backup.";}
+      if(status)status.textContent=`Imported and checked duplicates from ${backup.items.length} imported item(s); ${mediaItems.length} unique titles are saved on this device and queued to sync (previously ${before}).`;
+    }catch(error){mediaItems=beforeItems;render();if(status)status.textContent=error.message||"Could not import this file.";}
   });
 
   changePinBtn.onclick=async()=>{

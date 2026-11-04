@@ -10,7 +10,7 @@ const repository=process.env.GITHUB_REPOSITORY||'Cryptic011/Watch-Tracker';
 const runNumber=Number(process.env.GITHUB_RUN_NUMBER)||null;
 const runAttempt=Number(process.env.GITHUB_RUN_ATTEMPT)||1;
 let workflowRuns=[];
-if(process.env.GITHUB_ACTIONS==='true'){
+if(process.env.GITHUB_ACTIONS==='true'&&commits[0]?.commit===process.env.GITHUB_SHA){
   try{
     for(let page=1;page<=10;page++){
       const headers={Accept:'application/vnd.github+json'};

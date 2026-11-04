@@ -62,15 +62,11 @@
   }
   root.WatchLogTrakt={parse};
   if(typeof document==='undefined')return;
-  const section=document.createElement('section');section.className='sync-box';
-  section.innerHTML='<h3>Import from Trakt</h3><p class="small-note">Choose your exported JSON or CSV files. Preview titles and watched history before importing.</p><label class="btn btn-secondary backup-import-label" for="trakt-files">Choose Trakt exports<input id="trakt-files" type="file" accept=".json,.csv,application/json,text/csv" multiple hidden></label><p id="trakt-import-status" role="status"></p>';
-  document.querySelector('.library-backup').after(section);
   const dialog=document.createElement('dialog');dialog.className='changelog-dialog feature-dialog';dialog.dataset.blockRefresh='';
   dialog.innerHTML='<header class="changelog-heading"><h2>Import Trakt history</h2><button class="close-btn" data-trakt-cancel aria-label="Cancel import">×</button></header><div class="changelog-body"><p data-trakt-summary></p><div data-trakt-preview></div><p data-trakt-status role="status"></p><button class="btn btn-primary btn-full" data-trakt-confirm>Import titles and watched history</button></div>';
   document.body.append(dialog);
   let pending=[],owner='';
-  $('trakt-files').addEventListener('change',async event=>{
-    const files=[...event.target.files];event.target.value='';
+  root.WatchLogTrakt.previewFiles=async files=>{
     try{
       if(files.reduce((total,file)=>total+file.size,0)>20*1024*1024)throw Error('Choose export files totalling under 20 MB.');
       pending=[];owner=String(currentUser?.id||'');
@@ -81,8 +77,8 @@
       dialog.querySelector('[data-trakt-preview]').textContent=pending.slice(0,12).map(item=>item.title+' · '+item.type).join(' • ');
       dialog.querySelector('[data-trakt-status]').textContent='';
       dialog.showModal();
-    }catch(error){$('trakt-import-status').textContent=error.message;}
-  });
+    }catch(error){$('library-backup-status').textContent=error.message;}
+  };
   dialog.querySelector('[data-trakt-cancel]').onclick=()=>dialog.close();
   dialog.querySelector('[data-trakt-confirm]').onclick=async event=>{
     const button=event.currentTarget;button.disabled=true;
@@ -99,7 +95,7 @@
       }
       mediaItems=deduplicateLibrary(merged).items;
       await persistLibrary(mediaItems,{background:true,precleaned:true});
-      render();dialog.close();$('trakt-import-status').textContent='Imported '+pending.length+' titles and merged watched history. Changes are saved on this device and queued to sync.';
+      render();dialog.close();$('library-backup-status').textContent='Imported '+pending.length+' titles and merged watched history. Changes are saved on this device and queued to sync.';
       pending=[];
     }catch(error){mediaItems=before;render();dialog.querySelector('[data-trakt-status]').textContent=error.message||'Import could not be saved. Retry when storage is available.';}
     finally{button.disabled=false;}

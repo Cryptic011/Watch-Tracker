@@ -5,7 +5,7 @@
 - Use the title alone in Details and add View all shows & films beneath upcoming seasons.
 - Match changelog entries to the repository's actual workflow runs and embed run metadata for offline access.
 - Add passkey sign-in and registration for Face ID, Touch ID and device password managers.
-- Import Trakt JSON and CSV exports with a preview and merged watch history.
+- Use one Import and Export area. Import Trakt JSON and CSV exports with a preview and merged watch history, and accept existing Watch Tracker exports.
 - Sync appearance and sort preferences, preserve concurrent collection edits, and retain verified episode metadata offline.
 - Add an option to protect offline storage and improve navigation transitions.
 
