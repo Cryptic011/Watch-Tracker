@@ -605,11 +605,13 @@ const server=http.createServer((req,res)=>{
   await page.locator('[data-episode-description="1:1"]').click();
   await page.getByRole('dialog',{name:/Episode 1/}).waitFor();
   await page.waitForFunction(()=>document.querySelector('.episode-description p').textContent.includes('difficult case'));
-  const descriptionViewport=page.viewportSize();
-  for(const viewport of [descriptionViewport,{width:320,height:360}]){
-    await page.setViewportSize(viewport);
-    await page.waitForFunction(()=>!document.querySelector('.episode-description').getAnimations().some(animation=>animation.playState==='running'));
-    const placement=await page.locator('.episode-description').evaluate(node=>{
+  const compactDescription=await context.newPage();
+  await compactDescription.setViewportSize({width:320,height:360});
+  await compactDescription.setContent(await page.evaluate(()=>`<!doctype html><html><head>${[...document.querySelectorAll('link[rel="stylesheet"]')].map(link=>link.outerHTML.replace(link.getAttribute('href'),link.href)).join('')}</head><body>${document.querySelector('.episode-description').outerHTML.replace(' open=""','')}</body></html>`));
+  await compactDescription.evaluate(()=>{const box=document.querySelector('dialog');box.querySelector('p').textContent=box.querySelector('p').textContent.repeat(12);box.showModal();});
+  for(const descriptionPage of [page,compactDescription]){
+    await descriptionPage.waitForFunction(()=>!document.querySelector('.episode-description').getAnimations().some(animation=>animation.playState==='running'));
+    const placement=await descriptionPage.locator('.episode-description').evaluate(node=>{
       const box=node.getBoundingClientRect(),heading=node.querySelector('h3').getBoundingClientRect(),close=node.querySelector('button').getBoundingClientRect(),copy=node.querySelector('p').getBoundingClientRect();
       return {inside:box.left>=15&&box.top>=15&&box.right<=innerWidth-15&&box.bottom<=innerHeight-15,centered:Math.abs((box.top+box.bottom)/2-innerHeight/2)<3&&Math.abs((box.left+box.right)/2-innerWidth/2)<3,textFits:heading.right<=close.left&&heading.top>=box.top&&copy.top>=heading.bottom&&copy.bottom<=box.bottom};
     });
@@ -617,11 +619,12 @@ const server=http.createServer((req,res)=>{
     assert.equal(placement.centered,true,'episode description is centred on the viewport');
     assert.equal(placement.textFits,true,'title, close control and description have separate space');
   }
+  assert.equal(await compactDescription.locator('.episode-description p').evaluate(node=>node.scrollHeight>node.clientHeight),true,'long descriptions scroll within the compact box');
+  await compactDescription.close();
   await page.locator('.episode-description header').click({position:{x:24,y:8}});
   assert.equal(await page.locator('.episode-description').isVisible(),true,'tapping inside padding keeps the description open');
   await page.mouse.click(4,4);
   assert.equal(await page.locator('.episode-description').isVisible(),false,'tapping outside closes the description');
-  await page.setViewportSize(descriptionViewport);
 
   assert.equal(await page.locator('[data-gallery-episode="1:2"] .gallery-episode-title').textContent(),'Crossing Lines','episode titles load even when absent from the saved item');
   assert.equal(await page.locator('[data-gallery-episode="1:2"] .gallery-episode-title').isVisible(),true);
