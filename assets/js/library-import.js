@@ -60,7 +60,55 @@
     if(!groups.size)throw Error('No supported shows or films were found.');
     return {items:[...groups.values()],skipped};
   }
-  root.WatchLogTrakt={parse};
+  async function readFiles(files){
+    const exports=[];
+    let expandedTotal=0;
+    for(const file of files){
+      if(!/\.zip$/i.test(file.name)){exports.push(file);continue;}
+      const buffer=await file.arrayBuffer(),view=new DataView(buffer);
+      let end=view.byteLength-22;
+      while(end>=Math.max(0,view.byteLength-65557)&&view.getUint32(end,true)!==0x06054b50)end--;
+      if(end<0||end<view.byteLength-65557)throw Error('This ZIP export could not be read.');
+      const entries=view.getUint16(end+10,true),directory=view.getUint32(end+16,true);
+      if(entries>10000)throw Error('This archive contains too many files.');
+      let offset=directory;
+      for(let index=0;index<entries;index++){
+        if(offset+46>view.byteLength||view.getUint32(offset,true)!==0x02014b50)throw Error('This ZIP export is incomplete.');
+        const flags=view.getUint16(offset+8,true),method=view.getUint16(offset+10,true),compressed=view.getUint32(offset+20,true),expanded=view.getUint32(offset+24,true),nameLength=view.getUint16(offset+28,true),extraLength=view.getUint16(offset+30,true),commentLength=view.getUint16(offset+32,true),local=view.getUint32(offset+42,true);
+        const name=new TextDecoder().decode(new Uint8Array(buffer,offset+46,nameLength));
+        offset+=46+nameLength+extraLength+commentLength;
+        if(!/\.(json|csv)$/i.test(name)||name.includes('__MACOSX'))continue;
+        if(flags&1)throw Error('Use a ZIP export without a password.');
+        if(expanded>20*1024*1024||expandedTotal+expanded>50*1024*1024)throw Error('The uncompressed export is too large.');
+        if(local+30>view.byteLength||view.getUint32(local,true)!==0x04034b50)throw Error('The ZIP export is incomplete.');
+        const start=local+30+view.getUint16(local+26,true)+view.getUint16(local+28,true);
+        if(start+compressed>view.byteLength)throw Error('The ZIP export is incomplete.');
+        const bytes=new Uint8Array(buffer,start,compressed);
+        let content;
+        if(method===0)content=bytes;
+        else if(method===8){
+          if(typeof DecompressionStream==='undefined')throw Error('Unzip this export and choose its JSON or CSV files.');
+          const reader=new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw')).getReader();
+          const chunks=[];let size=0;
+          while(true){
+            const next=await reader.read();if(next.done)break;
+            size+=next.value.length;
+            if(size>20*1024*1024||expandedTotal+size>50*1024*1024){await reader.cancel();throw Error('The uncompressed export is too large.');}
+            chunks.push(next.value);
+          }
+          content=new Uint8Array(size);let cursor=0;for(const chunk of chunks){content.set(chunk,cursor);cursor+=chunk.length;}
+        }else throw Error('Unzip this export and choose its JSON or CSV files.');
+        if(content.length!==expanded)throw Error('This ZIP export is incomplete.');
+        expandedTotal+=content.length;
+        const value=new TextDecoder().decode(content).replace(/^\uFEFF/,'');
+        exports.push({name,size:content.length,text:async()=>value});
+      }
+    }
+    if(!exports.length)throw Error('No JSON or CSV files were found in this export.');
+    return exports;
+  }
+  root.WatchLogTrakt={parse,readFiles};
+
   if(typeof document==='undefined')return;
   const dialog=document.createElement('dialog');dialog.className='changelog-dialog feature-dialog';dialog.dataset.blockRefresh='';dialog.setAttribute('aria-label','Import Trakt history');
   dialog.innerHTML='<header class="changelog-heading"><h2>Import Trakt history</h2><button class="close-btn" data-trakt-cancel aria-label="Cancel import">×</button></header><div class="changelog-body"><p data-trakt-summary></p><div data-trakt-preview></div><p data-trakt-status role="status"></p><button class="btn btn-primary btn-full" data-trakt-confirm>Import titles and watched history</button></div>';
@@ -70,7 +118,11 @@
     try{
       if(files.reduce((total,file)=>total+file.size,0)>20*1024*1024)throw Error('Choose export files totalling under 20 MB.');
       pending=[];owner=String(currentUser?.id||'');
-      for(const file of files)pending.push(...parse(await file.text(),file.name).items);
+      for(const file of await readFiles(files)){
+        try{pending.push(...parse(await file.text(),file.name).items);}
+        catch(error){if(!/No titles|No supported|not a Trakt export/.test(error.message))throw error;}
+      }
+      if(!pending.length)throw Error('No supported shows or films were found in these exports.');
       if(!pending.length)return;
       pending=deduplicateLibrary(pending).items;
       dialog.querySelector('[data-trakt-summary]').textContent=pending.length+' titles found. Existing watch progress is merged, and matching titles are kept together.';

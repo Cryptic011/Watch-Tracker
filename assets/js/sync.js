@@ -862,7 +862,7 @@
     try{
       if(files.reduce((size,row)=>size+row.size,0)>20*1024*1024)throw new Error("Choose import files totalling under 20 MB.");
       let backup=null;
-      if(files.length===1&&!/\.csv$/i.test(file.name)){
+      if(files.length===1&&!/\.(?:csv|zip)$/i.test(file.name)){
         try{backup=JSON.parse(await file.text());}catch(_){}
       }
       if(backup?.format!=="watchlog-library-backup"){

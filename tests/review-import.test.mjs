@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
-const context=vm.createContext({});
+import {deflateRawSync} from 'node:zlib';
+const context=vm.createContext({Blob,TextDecoder,DecompressionStream});
 vm.runInContext(fs.readFileSync(new URL('../assets/js/library-import.js',import.meta.url),'utf8'),context);
 const parse=(rows,name)=>JSON.parse(JSON.stringify(context.WatchLogTrakt.parse(typeof rows==='string'?rows:JSON.stringify(rows),name)));
 test('Trakt watched exports retain season, episode and watch date without duplicate history',()=>{
@@ -30,4 +31,15 @@ test('Nested exports and CSV episode numbers preserve show identity and progress
  assert.deepEqual(nested.items[0].watchedEpisodes,{'1':[1]});
  const csv=parse('type,show,episode,season,watched_at\nepisode,Example,2,3,2026-11-01T10:00:00Z','episodes.csv');
  assert.equal(csv.items[0].title,'Example');assert.deepEqual(csv.items[0].watchedEpisodes,{'3':[2]});
+});
+
+test('A standard compressed Trakt ZIP exposes its JSON export without extracting paths',async()=>{
+ const name=Buffer.from('history.json'),payload=Buffer.from(JSON.stringify([{type:'movie',movie:{title:'ZIP title',ids:{trakt:1}},watched_at:'2026-11-01T10:00:00Z'}])),compressed=deflateRawSync(payload);
+ const local=Buffer.alloc(30);local.writeUInt32LE(0x04034b50,0);local.writeUInt16LE(8,8);local.writeUInt32LE(compressed.length,18);local.writeUInt32LE(payload.length,22);local.writeUInt16LE(name.length,26);
+ const central=Buffer.alloc(46);central.writeUInt32LE(0x02014b50,0);central.writeUInt16LE(8,10);central.writeUInt32LE(compressed.length,20);central.writeUInt32LE(payload.length,24);central.writeUInt16LE(name.length,28);
+ const directory=local.length+name.length+compressed.length;
+ const end=Buffer.alloc(22);end.writeUInt32LE(0x06054b50,0);end.writeUInt16LE(1,10);end.writeUInt32LE(central.length+name.length,12);end.writeUInt32LE(directory,16);
+ const bytes=Buffer.concat([local,name,compressed,central,name,end]);
+ const files=await context.WatchLogTrakt.readFiles([{name:'trakt-export.zip',arrayBuffer:async()=>bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength)}]);
+ assert.equal(files.length,1);assert.equal(parse(await files[0].text(),'history.json').items[0].title,'ZIP title');
 });
