@@ -398,15 +398,17 @@
   },true);
 
   let searchReturnTab="library";
-  let primaryPageAnimation=null;
+  let primaryPageAnimation=null,lastAnimatedPage="";
   function animatePrimaryPage(from,to){
     primaryPageAnimation?.cancel();primaryPageAnimation=null;
-    if(from===to||!["library","settings"].includes(from)||!["library","settings"].includes(to))return;
+    if(from===to||document.visibilityState==="hidden"||document.querySelector("dialog[open]"))return;
+    const destination=to.split(":")[0];
+    if(!["library","collection","calendar","settings"].includes(destination))return;
     if(window.matchMedia?.("(prefers-reduced-motion: reduce)").matches)return;
-    const page=to==="settings"?settingsView:libraryView;
+    const page=destination==="settings"?settingsView:libraryView;
     if(typeof page.animate!=="function")return;
     primaryPageAnimation=page.animate([
-      {opacity:.45,transform:`translateX(${to==="settings"?14:-14}px)`},
+      {opacity:.45,transform:`translateX(${destination==="settings"?14:-14}px)`},
       {opacity:1,transform:"translateX(0)"}
     ],{duration:260,easing:"cubic-bezier(.22,1,.36,1)"});
   }
@@ -421,8 +423,7 @@
     document.body.classList.toggle("library-only-page",libraryOnlyPage);
     document.body.classList.toggle("calendar-only-page",calendarOnlyPage);
     enforceBottomNavigation();
-    const previousTab=currentTab;
-    const previousPage=bottomTabs.dataset.activeTab;
+    const previousPage=lastAnimatedPage||bottomTabs.dataset.activeTab;
     if(tab==="search"&&currentTab!=="search")searchReturnTab=libraryOnlyPage?"collection":calendarOnlyPage?"calendar":currentTab;
     const primaryTab=tab==="search"?searchReturnTab:libraryOnlyPage?"collection":calendarOnlyPage?"calendar":tab;
     currentTab=tab;updateTabSelection(primaryTab);
@@ -437,7 +438,10 @@
       document.querySelector(".stats-row").classList.add("hidden");
     }
     updateFloatingAddVisibility();
-    animatePrimaryPage(previousPage,primaryTab);
+    if(!search){
+      const pageKey=primaryTab+":"+(window.WatchLogGallery?.getCategory?.()||"")+":"+savedShows;
+      animatePrimaryPage(previousPage,pageKey);lastAnimatedPage=pageKey;
+    }
     if(search){activateTitleSearch();if(typeof recordAppNavigation==="function")recordAppNavigation();return;}
     pauseTitleSearch();
     if(settings){renderWatchStatistics();void refreshPrivateReminderHistory();}
