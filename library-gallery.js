@@ -276,13 +276,15 @@ window.WatchLogGallery=(()=>{
       episodeDescriptionDialog.setAttribute('aria-labelledby','episode-description-title');
       document.body.append(episodeDescriptionDialog);
       episodeDescriptionDialog.addEventListener('click',event=>{
-        if(event.target===episodeDescriptionDialog||event.target.closest('[data-episode-description-close]'))episodeDescriptionDialog.close();
+        const bounds=episodeDescriptionDialog.getBoundingClientRect();
+        const outside=event.target===episodeDescriptionDialog&&(event.clientX<bounds.left||event.clientX>bounds.right||event.clientY<bounds.top||event.clientY>bounds.bottom);
+        if(outside||event.target.closest('[data-episode-description-close]'))episodeDescriptionDialog.close();
       });
       episodeDescriptionDialog.addEventListener('close',()=>{episodeDescriptionSequence++;});
     }
     const target=episodeDescriptionDialog,sequence=++episodeDescriptionSequence;
     const title=episodeTitle(dialog._trackerArtwork?.episodeTitles?.[season]?.[episode]||item.episodeTitles?.[season]?.[episode]);
-    target.innerHTML=`<button type="button" class="close-btn" data-episode-description-close aria-label="Close episode description">×</button><h3 id="episode-description-title">Episode ${episode}${title?' · '+esc(title):''}</h3><p role="status">Loading episode description…</p>`;
+    target.innerHTML=`<header><h3 id="episode-description-title">Episode ${episode}${title?' · '+esc(title):''}</h3><button type="button" class="close-btn" data-episode-description-close aria-label="Close episode description">×</button></header><p role="status">Loading episode description…</p>`;
     target.showModal();
     target.addEventListener('close',()=>{if(trigger.isConnected)trigger.focus({preventScroll:true});},{once:true});
     let summary=dialog._trackerArtwork?.episodeDescriptions?.[season]?.[episode];

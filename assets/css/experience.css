@@ -20,11 +20,13 @@
 html[data-theme="light"] .library-type-dock{background:#dce0e8;border-color:#1419231a}
 html[data-theme="light"] .library-type-dock button.active{background:#b9c1ce}
 .view-full-library{display:block;width:100%;min-height:52px;margin:12px 0 24px;padding:14px;border:1px solid var(--border);border-radius:16px;background:var(--inner);color:var(--text);font:inherit;font-weight:750;text-align:center}
-.episode-description{width:min(440px,calc(100% - 32px));max-height:min(65dvh,520px);padding:22px;border:1px solid var(--border);border-radius:20px;background:var(--card);color:var(--text);box-shadow:0 20px 70px #0008}
+.episode-description{position:fixed;inset:max(16px,env(safe-area-inset-top,0px)) 16px max(16px,env(safe-area-inset-bottom,0px));margin:auto;width:min(440px,calc(100% - 32px));height:fit-content;max-height:min(65dvh,520px);padding:0;overflow:hidden;border:1px solid var(--border);border-radius:20px;background:var(--card);color:var(--text);box-shadow:0 20px 70px #0008;text-align:left;overflow-wrap:anywhere}
+.episode-description[open]{display:flex;flex-direction:column}
 .episode-description::backdrop{background:#0005}
-.episode-description h3{margin:0 40px 12px 0;font-size:1.1rem}
-.episode-description p{font-size:.95rem;line-height:1.55;white-space:pre-line}
-.episode-description .close-btn{position:absolute;top:8px;right:8px}
+.episode-description header{display:flex;align-items:flex-start;gap:12px;flex-shrink:0;padding:18px 18px 12px}
+.episode-description h3{flex:1;min-width:0;margin:0;padding-top:8px;font-size:1.1rem;line-height:1.35}
+.episode-description p{min-height:0;margin:0;padding:0 20px 20px;overflow-y:auto;overscroll-behavior:contain;font-size:.95rem;line-height:1.55;white-space:pre-line}
+.episode-description .close-btn{position:static;flex:0 0 40px;width:40px;height:40px}
 button.gallery-episode-copy{min-width:0;align-self:stretch;text-align:left;background:none;border:0;color:inherit;font:inherit;padding:8px 0;cursor:pointer}
 .shows-filter-options input[type="checkbox"]{flex:0 0 22px;width:22px;height:22px;padding:0;margin:0;accent-color:var(--blue2)}
 .shows-filter-options label{text-transform:none;letter-spacing:normal;justify-content:flex-start}

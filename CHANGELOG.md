@@ -1,3 +1,8 @@
+## 2026-11-04 — Episode description positioning
+- Centre the description box within the screen and keep it clear of device safe areas.
+- Separate the episode heading and close button from the scrollable description text.
+- Keep the box open when tapping its padding and close it when tapping outside.
+
 ## 2026-11-04 — Home, Library, descriptions and account continuity
 - Add library-based recommendations, recent episode activity, upcoming releases and recent additions to Home.
 - Place a matching Shows and Films dock above the main navigation within Library.
