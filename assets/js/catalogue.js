@@ -159,6 +159,10 @@
   function fetchOfficialTrackerArtwork(item){
     const key=JSON.stringify([item.tvmazeShowId||"",item.imdbId||"",item.title,item.releaseYear||""]);
     return cachedMetadataRequest(trackerArtworkCache,key,async()=>{
+      let savedTrackerArtwork=[];
+      try{const saved=JSON.parse(localStorage.getItem("watchlog_tracker_details_v1")||"[]");if(Array.isArray(saved))savedTrackerArtwork=saved;}catch(_){}
+      const offlineArtwork=savedTrackerArtwork.find(row=>row?.key===key);
+      if(typeof navigator!=="undefined"&&navigator.onLine===false&&offlineArtwork)return offlineArtwork.artwork;
       const showId=String(item.tvmazeShowId||"").trim(),imdbId=String(item.imdbId||"").trim();
       let show=null;
       if(/^\d+$/.test(showId))show=await fetchJSONWithTimeout(`https://api.tvmaze.com/shows/${encodeURIComponent(showId)}`,{credentials:"omit"});
@@ -185,10 +189,13 @@
       }};
       if(results[0].status==="fulfilled"&&Array.isArray(results[0].value)){
         artwork.episodeImages=officialEpisodeImageMap(results[0].value,show.image);
-        artwork.episodeTitles={};
+        artwork.episodeTitles={};artwork.episodeDescriptions={};
         for(const episode of results[0].value){
           const season=Number(episode?.season),number=Number(episode?.number),name=typeof episode?.name==="string"?episode.name.trim():"";
-          if(Number.isInteger(season)&&season>0&&Number.isInteger(number)&&number>0&&name)(artwork.episodeTitles[season]||(artwork.episodeTitles[season]={}))[number]=name;
+          if(Number.isInteger(season)&&season>0&&Number.isInteger(number)&&number>0){
+            if(name)(artwork.episodeTitles[season]||(artwork.episodeTitles[season]={}))[number]=name;
+            if(episode.summary)(artwork.episodeDescriptions[season]||(artwork.episodeDescriptions[season]={}))[number]=String(episode.summary);
+          }
         }
       }
       if(results[1].status==="fulfilled"&&Array.isArray(results[1].value)){
@@ -196,13 +203,21 @@
         artwork.details.seasons=results[1].value.filter(season=>Number(season.number)>0).length;
       }
       if(results.some(result=>result.status==="rejected"))trackerArtworkCache.delete(key);
+      else{
+        try{
+          const saved=savedTrackerArtwork.filter(row=>row?.key!==key);
+          localStorage.setItem("watchlog_tracker_details_v1",JSON.stringify([...saved,{key,artwork}].slice(-40)));
+        }catch(_){}
+      }
       return artwork;
     });
   }
 
   function completeTitleSynopsis(value){
     const description=String(value||'').replace(/<[^>]*>/g,' ').replace(/&hellip;|&#8230;|&#x2026;/gi,'…').trim();
-    return Boolean(description)&&!/(?:\.{3}|…)\s*$/.test(description)&&!/^(?:genre|release date|runtime|cast|rating|seasons?)\s*:/i.test(description);
+    return Boolean(description)&&!/(?:\.{3}|…)\s*$/.test(description)&&!/^(?:genre|release date|runtime|cast|rating|seasons?)\s*:/i.test(description)
+      &&!(/\b(?:premieres?|season\s+\d+|episode\s+\d+|(?:new|current|upcoming|latest|final)\s+(?:season|episode))\b/i.test(description))
+      &&!(/\b(?:watch|stream)\s+(?:full\s+)?episodes?\s+on\b/i.test(description));
   }
   const titleDetailsCache=new Map();
   const TITLE_DETAILS_STORAGE_KEY="watchlog_verified_title_details_v1";
@@ -221,13 +236,13 @@
   }
   async function fetchOfficialTitleDetails(item){
     const payload={title:item.title,type:item.type==="Anime"?"Series":item.type||item.format,imdbId:item.imdbId||(item.source==="imdb"?item.externalId:""),tvmazeShowId:item.tvmazeShowId||item.tvmazeId,year:item.releaseYear||item.year,source:item.source,externalId:item.externalId,platform:item.platform||"",officialUrl:item.officialUrl||item.officialSite||"",country:typeof releaseViewingCountry==="function"?releaseViewingCountry()||"GB":"GB"};
-    const key="watch-service-v3-programme:"+JSON.stringify(payload);
+    const key="watch-service-v4-programme:"+JSON.stringify(payload);
     const seriesFallback=async()=>{
       if(payload.type!=="Series"||typeof fetchOfficialTrackerArtwork!=="function")return null;
       try{
         const fallback=(await fetchOfficialTrackerArtwork(item))?.details;
         if(!completeTitleSynopsis(fallback?.description))return null;
-        return {...fallback,synopsisVersion:6,synopsisScope:"series",descriptionSource:"TVMaze",state:"ready"};
+        return {...fallback,synopsisVersion:7,synopsisScope:"series",descriptionSource:"TVMaze",state:"ready"};
       }catch(_){return null;}
     };
     return cachedMetadataRequest(titleDetailsCache,key,async()=>{
@@ -235,7 +250,7 @@
         const permitted=source=>["TVMaze","IMDb","Apple TV","CBS","Paramount+","NBC","ABC","FOX","FX","HBO","Max","Disney+","Disney","Hulu","Netflix","Prime Video","Peacock","STARZ","Showtime","AMC","AMC+","The CW","PBS","BBC","ITV","ITVX","Channel 4","Sky","NOW","Crunchyroll","A&E","Freeform","Adult Swim","USA Network","BET","Warner Bros.","Universal","Paramount Pictures","Sony Pictures","20th Century Studios","Marvel","Lionsgate","Focus Features","Discovery+","TNT","TBS","Paramount Global Content","Paramount Press Express","Netflix Media Center","TMDb","JustWatch","Harry Potter","Star Wars","Lucasfilm","MGM","Amazon MGM Studios","Searchlight Pictures","Rakuten TV","Sky Store"].includes(String(source||""));
         const scope=payload.type==="Series"?"series":"film";
         const rejectedSource=details=>["source","descriptionSource","ratingSource"].some(field=>details[field]&&!permitted(details[field]));
-        const current=details=>details.synopsisVersion===6&&details.synopsisScope===scope;
+        const current=details=>details.synopsisVersion===7&&details.synopsisScope===scope;
         const mismatched=details=>Boolean(payload.imdbId&&details.imdbId&&payload.imdbId!==details.imdbId)||
           Boolean(payload.type==='Film'&&payload.year&&details.year&&String(payload.year)!==String(details.year));
         let stored=readStoredTitleDetails().find(row=>row.key===key)?.details;

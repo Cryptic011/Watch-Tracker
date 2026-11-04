@@ -2,6 +2,8 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.112.4";
 import { getUKAvailability } from "./uk-availability.mjs";
 import { getTitleDetails } from "./title-details.mjs";
+import { passkeyAction } from "./passkeys.mjs";
+import { getRecommendations } from "./recommendations.mjs";
 import { introducedDuplicate, mayChangeTitleIdentity } from "./duplicate-titles.mjs";
 
 const cors = {
@@ -241,6 +243,10 @@ Deno.serve(async (req: Request) => {
   const action = String(body?.action || "");
 
   try {
+    if (action === "passkey_auth_options" || action === "passkey_auth_verify") {
+      const result=await passkeyAction(req,body,{db,createSession,readLibrary,readMaintenance,isMaintenanceAdmin});
+      return json(result.body,result.status);
+    }
     if (action === "app_status") {
       const maintenance = await readMaintenance();
       return json({ ok: true, maintenance: maintenance.enabled, message: maintenance.message, updatedAt: maintenance.updatedAt });
@@ -374,6 +380,27 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    if(action.startsWith("passkey_")){
+      const result=await passkeyAction(req,body,{db,session,derivePin,unb64,safeEqual});
+      return json(result.body,result.status);
+    }
+    if(action==="recommendations"){
+      return json({ok:true,results:await getRecommendations(body.seeds,fetchCatalogJSON)});
+    }
+    if(action==="preferences"){
+      if(body.patch){
+        const patch=body.patch;
+        if(typeof patch!=="object"||Array.isArray(patch)||Object.keys(patch).some(key=>!["appearance","sort"].includes(key))||
+          (patch.appearance&&!["system","light","dark"].includes(patch.appearance))||
+          (patch.sort&&!["current","recent","release","title","platform","watched","shows"].includes(patch.sort)))return json({error:"Invalid preferences"},400);
+        const {data,error}=await db.rpc("watchlog_patch_preferences",{p_account:session.accountId,p_patch:patch});
+        if(error)throw error;
+        return json({ok:true,preferences:data||{}});
+      }
+      const {data,error}=await db.from("watchlog_pin_accounts").select("preferences").eq("id",session.accountId).single();
+      if(error)throw error;
+      return json({ok:true,preferences:data.preferences||{}});
+    }
     if (action === "maintenance_admin_status" || action === "set_maintenance") {
       if (!maintenanceAdmin && !(await isMaintenanceAdmin(session.accountId))) {
         return json({ error: "This account cannot manage maintenance mode.", code: "forbidden" }, 403);

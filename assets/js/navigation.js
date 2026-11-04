@@ -6,7 +6,7 @@ function currentAppPage(){
   return {schedule:typeof selectedScheduleView==='string'?selectedScheduleView:'',calendarRange:typeof selectedCalendarRange==='string'?selectedCalendarRange:'upcoming',searchText:typeof discoveryInput!=='undefined'?discoveryInput.value.trim():'',searchFormat:typeof discoveryFilter!=='undefined'?discoveryFilter:'All',tab:typeof libraryOnlyPage!=="undefined"&&libraryOnlyPage&&currentTab==="library"?"collection":typeof calendarOnlyPage!=="undefined"&&calendarOnlyPage&&currentTab==="library"?"calendar":currentTab,category:libraryOnlyPage&&currentTab==='library'?(window.WatchLogGallery?.getCategory?.()||''):'',savedShows,scope:typeof libraryScope==='string'?libraryScope:'',settings:panel?.dataset.settingsPanel||'',title:dialog?.dataset.item||'',query:searchQuery,filter:activeFilter,sort:activeSort,scroll:window.scrollY||0,dialogScroll:dialog?.scrollTop||0};
 }
 function appPageHash(page){
-  let path=page.title?'title/'+encodeURIComponent(page.title):page.tab==='settings'?'settings'+(page.settings?'/'+page.settings:''):page.tab==='search'?'search':page.tab==='calendar'?'calendar':page.tab==='collection'?'collection'+(page.category?'/'+(page.category==='Film'?'movies':'series'):''):'library'+(page.schedule?'/'+page.schedule:page.category?'/'+(page.category==='Film'?'movies':'series'):'');
+  let path=page.title?'title/'+encodeURIComponent(page.title):page.tab==='settings'?'settings'+(page.settings?'/'+page.settings:''):page.tab==='search'?'search':page.tab==='calendar'?'calendar':page.tab==='collection'?'collection'+(page.category?'/'+(page.category==='All'?'all':page.category==='Film'?'movies':'series'):''):'library'+(page.schedule?'/'+page.schedule:page.category?'/'+(page.category==='All'?'all':page.category==='Film'?'movies':'series'):'');
   if(!page.title&&page.tab==='collection'&&page.category==='Series'&&page.savedShows)path+='/saved';
   const query=new URLSearchParams();
   if(page.scope)query.set('collection',page.scope);
@@ -20,11 +20,11 @@ function parseAppHash(hash){
   const page={tab:'library',category:'',schedule:'',calendarRange:'upcoming',settings:'',title:'',scope:params.get('collection')||'',query:params.get('q')||'',filter:['All','Recent','Planned','Watching','Watched'].includes(params.get('filter'))?params.get('filter'):'All',sort:['current','recent','release','title','platform','watched','shows'].includes(params.get('sort'))?params.get('sort'):'current',scroll:0,dialogScroll:0};
   if(parts[0]==='settings'){page.tab='settings';page.settings=['general','reminders','account','maintenance'].includes(parts[1])?parts[1]:'';}
   else if(parts[0]==='calendar'){page.tab='calendar';}
-  else if(parts[0]==='collection'){page.tab='collection';if(!params.has('filter'))page.filter='Recent';if(['movies','series'].includes(parts[1]))page.category=parts[1]==='movies'?'Film':'Series';}
+  else if(parts[0]==='collection'){page.tab='collection';if(!params.has('filter'))page.filter='Recent';if(['movies','series','all'].includes(parts[1]))page.category=parts[1]==='all'?'All':parts[1]==='movies'?'Film':'Series';}
   else if(parts[0]==='search'){page.tab='search';page.searchText=params.get('q')||'';page.query='';page.searchFormat=['Film','Series'].includes(params.get('format'))?params.get('format'):'All';}
   else if(parts[0]==='title'){try{page.title=decodeURIComponent(parts.slice(1).join('/'));}catch(_){}}
   else if(['recurring','calendar'].includes(parts[1])){page.schedule=parts[1];page.tab=parts[1]==='calendar'?'calendar':'collection';if(!params.has('filter'))page.filter='Recent';}
-  else if(parts[1]==='movies'||parts[1]==='series')page.category=parts[1]==='movies'?'Film':'Series';
+  else if(parts[1]==='movies'||parts[1]==='series')page.category=parts[1]==='all'?'All':parts[1]==='movies'?'Film':'Series';
   if(page.tab==='library'&&(page.category||page.title)){page.tab='collection';page.category||='Series';if(!params.has('filter'))page.filter='Recent';}
   if(page.tab==='collection'&&page.category==='Series'&&parts[2]==='saved')page.savedShows=true;
   return page;

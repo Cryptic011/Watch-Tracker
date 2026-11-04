@@ -1,3 +1,14 @@
+## 2026-11-04 — Home, Library, descriptions and account continuity
+- Add library-based recommendations, recent episode activity, upcoming releases and recent additions to Home.
+- Place a matching Shows and Films dock above the main navigation within Library.
+- Open episode descriptions in a dismissible box and keep whole-show descriptions free of premiere promotions.
+- Use the title alone in Details and add View all shows & films beneath upcoming seasons.
+- Match changelog entries to the repository's actual workflow runs and embed run metadata for offline access.
+- Add passkey sign-in and registration for Face ID, Touch ID and device password managers.
+- Import Trakt JSON and CSV exports with a preview and merged watch history.
+- Sync appearance and sort preferences, preserve concurrent collection edits, and retain verified episode metadata offline.
+- Add an option to protect offline storage and improve navigation transitions.
+
 ## 2026-11-03 — Separate the Shows overview from saved titles
 - Open the complete grid from Saved shows in the Shows header. Keep the watchlist, queue and upcoming releases on the Shows overview.
 

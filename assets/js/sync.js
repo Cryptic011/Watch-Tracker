@@ -153,7 +153,13 @@
       if(key==="id")continue;
       const before=baseItem?.[key],local=localItem?.[key],remote=remoteItem?.[key];
       if(sameSyncValue(local,before))continue;
-      if(key==="watchedEpisodes"&&!sameSyncValue(remote,before))merged[key]=mergeEpisodeSetChanges(before,local,remote);
+      if(key==="lists"&&!sameSyncValue(remote,before)){
+        const previous=new Set(Array.isArray(before)?before:[]),next=new Set(Array.isArray(local)?local:[]),values=new Set(Array.isArray(remote)?remote:[]);
+        for(const name of previous)if(!next.has(name))values.delete(name);
+        for(const name of next)if(!previous.has(name))values.add(name);
+        merged[key]=[...values];
+      }
+      else if(key==="watchedEpisodes"&&!sameSyncValue(remote,before))merged[key]=mergeEpisodeSetChanges(before,local,remote);
       else if(key==="episodeHistory"&&!sameSyncValue(remote,before))merged[key]=mergeEpisodeHistory(before,local,remote);
       else if(local===undefined)delete merged[key];
       else merged[key]=local;
@@ -485,12 +491,14 @@
         if(hasPending()||queuedCloudSnapshot||localSyncPending())await retryPendingCloudSave();
         if(!activePersistenceContext(context))return false;
         if(hasPending()||queuedCloudSnapshot||localSyncPending()){cloudSyncFailures++;return false;}
+        if(typeof syncAccountPreferences==="function")void syncAccountPreferences();
         const knownRevision=cloudRevision;
         const result=await pinApi("load",{knownRevision},context.token);
         if(!activePersistenceContext(context))return false;
         if(result.account?.id!==context.accountId)throw new Error("Cloud account did not match this session.");
         if(result.unchanged===true||(Number(result.revision)===cloudRevision&&sameSyncValue(result.items,cloudBaseItems)&&sameSyncValue(mediaItems,cloudBaseItems))){
           if(hasPending()||localSaveInFlight||cloudSaveInFlight||queuedCloudSnapshot||localSyncPending())return false;
+          if(result.account)applyAccount(result.account);
           const recovered=cloudSyncFailures>0;
           cloudSyncFailures=0;
           cloudSyncIdleRounds=recovered?0:cloudSyncIdleRounds+1;
@@ -708,6 +716,11 @@
   }
   async function enterAccount(items,{syncText="Synced. This library is available on your other devices.",syncState="ok"}={}){
     hideMessage();authScreen.classList.add("hidden");
+    if(typeof preferenceKeys==='function'){
+      const keys=preferenceKeys();
+      if(keys)applyAccountPreferences({...safeReadJSON(keys.saved,{}),...safeReadJSON(keys.pending,{})});
+      void syncAccountPreferences();
+    }
     const original=Array.isArray(items)?items:[],migration=migratePlannedStatuses(original),cleanup=cleanLibraryRecords(migration.rows),cleaned=cleanup.items;
     mediaItems=cleaned;render();setSync(syncText,syncState);
     if(typeof initAppNavigation==="function")initAppNavigation();
@@ -845,6 +858,7 @@
   });
   document.getElementById("import-library-backup")?.addEventListener("change",async event=>{
     const input=event.currentTarget,status=document.getElementById("library-backup-status"),file=input.files?.[0];input.value="";if(!file)return;
+    const beforeItems=cloneLibrarySnapshot(mediaItems);
     try{
       if(file.size>10*1024*1024)throw new Error("Backup file is larger than 10 MB.");
       const backup=JSON.parse(await file.text());
@@ -854,7 +868,7 @@
       render();
       await persistLibrary(mediaItems,{background:true,precleaned:true});
       if(status)status.textContent=`Restored backup and checked duplicates from ${backup.items.length} imported item(s); ${mediaItems.length} unique titles are saved on this device and queued to sync (previously ${before}).`;
-    }catch(error){if(status)status.textContent=error.message||"Could not restore this backup.";}
+    }catch(error){mediaItems=beforeItems;render();if(status)status.textContent=error.message||"Could not restore this backup.";}
   });
 
   changePinBtn.onclick=async()=>{

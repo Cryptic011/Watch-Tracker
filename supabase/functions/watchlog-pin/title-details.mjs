@@ -1,6 +1,6 @@
 /* Public metadata only. A provider must match the selected identity before use. */
 const cache=new Map(),inFlight=new Map(),TTL=6*60*60*1000;
-const SYNOPSIS_VERSION=6;
+const SYNOPSIS_VERSION=7;
 const clean=value=>String(value??'').replace(/<[^>]*>/g,' ').replace(/&(?:#(\d+)|#x([0-9a-f]+)|(amp|quot|apos|lt|gt|nbsp));/gi,(all,decimal,hex,name)=>{
   if(name)return {amp:'&',quot:'"',apos:"'",lt:'<',gt:'>',nbsp:' '}[name.toLowerCase()];
   const n=parseInt(decimal||hex,decimal?10:16);return n>0&&n<=0x10ffff?String.fromCodePoint(n):'';
@@ -109,6 +109,7 @@ function isWholeTitleSynopsis(value,minimumLength=35){
  // Do not pass plot or press text about a specific season or episode
  // through the overall Show/Film Details panel.
  if(isReleaseSpecificText(description))return false;
+ if(/\b(?:premieres?|premiering)\b|\b(?:airs?|airing)\s+(?:on\s+)?(?:mondays?|tuesdays?|wednesdays?|thursdays?|fridays?|saturdays?|sundays?)\b|\b\d{1,2}\s*\/\s*\d{1,2}\s*c\b/i.test(description))return false;
  if(/\bwatch (?:full )?episodes on\b|\b(?:sign up|subscribe) (?:now|today|for)\b/i.test(description))return false;
  // Cast announcements and returning-character promos can describe the current
  // run without saying "season" anywhere (including CBS's NCIS SEO copy).

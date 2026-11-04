@@ -255,7 +255,7 @@ test('A distributor fallback uses the full matching series synopsis, never its t
  assert.match(result.description,/NCIS \(Naval Criminal Investigative Service\) follows a team/);
  assert.match(result.description,/crimes with Navy or Marine Corps ties\.$/);
  assert.doesNotMatch(result.description,/returns as|Show More|Show Less|\.\.\./);
- assert.equal(result.synopsisScope,'series');assert.equal(result.synopsisVersion,6);
+ assert.equal(result.synopsisScope,'series');assert.equal(result.synopsisVersion,7);
  assert.equal(result.sources[0].url,site);
  assert.equal(parseFirstPartyDetails(page.replace('>NCIS</h2>','>NCIS: Sydney</h2>'),site,{title:'NCIS',type:'Series'}),null);
  assert.ok(urls.includes(site));

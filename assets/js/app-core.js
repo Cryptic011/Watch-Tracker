@@ -221,7 +221,7 @@
   const currentBuild=window.WATCHLOG_BUILD||{count:0,releaseNumber:null,sha:"",commits:[]};
   const version=document.createElement("div");version.className="changelog-version";
   $("changelog-body").appendChild(version);
-  version.textContent=`App commit ${Number.isInteger(currentBuild.releaseNumber)?currentBuild.releaseNumber:currentBuild.count} · ${currentBuild.sha.slice(0,7)}`;
+  version.textContent=`${Number.isInteger(currentBuild.runNumber)?"Run #"+currentBuild.runNumber:"App commit"} · ${currentBuild.sha.slice(0,7)}`;
   let APP_CHANGELOG_FULL=window.WATCHLOG_BUILD?.commits||APP_CHANGELOG.filter(entry=>entry.commit);
   const statusBySha=new Map();
   const statusLabels={success:"Verified",failure:"Failed",cancelled:"Cancelled",timed_out:"Timed out",action_required:"Action required",skipped:"Skipped",stale:"Stale",in_progress:"In progress",queued:"Queued"};
@@ -262,7 +262,7 @@
       try{
         const runs=[],seenStatuses=new Set(),commitsBySha=new Map((currentBuild.commits||[]).map(entry=>[entry.commit,entry]));
         for(let page=1;page<=10;page++){
-          const response=await fetch("https://api.github.com/repos/Cryptic011/Watched-Tracker/actions/runs?per_page=100&page="+page,{headers:{Accept:"application/vnd.github+json"}});
+          const response=await fetch("https://api.github.com/repos/Cryptic011/Watch-Tracker/actions/runs?per_page=100&page="+page,{headers:{Accept:"application/vnd.github+json"}});
           if(!response.ok)throw new Error("GitHub Actions request failed");
           const data=await response.json();
           for(const run of (data.workflow_runs||[])) {

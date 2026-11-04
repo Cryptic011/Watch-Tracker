@@ -6,8 +6,30 @@ const notes=JSON.parse(readFileSync('release-notes.json','utf8'));
 // Identity and chronology always come from Git, even for curated notes.
 const commits=rows.map((row,index)=>{const [commit,date,...subject]=row.split('\t');const title=subject.join('\t');const note=notes[commit];return {number:rows.length-index+7,commit,date,title,changes:Array.isArray(note?.changes)&&note.changes.length?note.changes:[title]};});
 const releaseNumber=commits.length+7;
+const repository=process.env.GITHUB_REPOSITORY||'Cryptic011/Watch-Tracker';
+const runNumber=Number(process.env.GITHUB_RUN_NUMBER)||null;
+const runAttempt=Number(process.env.GITHUB_RUN_ATTEMPT)||1;
+let workflowRuns=[];
+if(process.env.GITHUB_ACTIONS==='true'){
+  try{
+    for(let page=1;page<=10;page++){
+      const headers={Accept:'application/vnd.github+json'};
+      if(process.env.GH_TOKEN)headers.Authorization='Bearer '+process.env.GH_TOKEN;
+      const response=await fetch('https://api.github.com/repos/'+repository+'/actions/workflows/pages.yml/runs?per_page=100&page='+page,{headers,signal:AbortSignal.timeout(10000)});
+      if(!response.ok)break;
+      const rows=(await response.json()).workflow_runs||[];
+      workflowRuns.push(...rows.filter(run=>run.head_branch==='main'));
+      if(rows.length<100)break;
+    }
+  }catch(error){console.warn('Using embedded workflow run metadata for this build.');}
+}
+for(const entry of commits){
+  const runs=workflowRuns.filter(run=>run.head_sha===entry.commit).map(run=>({workflowRunNumber:run.run_number,workflowRunAttempt:run.run_attempt,workflowRunId:run.id,status:run.conclusion||run.status}));
+  if(entry===commits[0]&&runNumber&&!runs.length)runs.push({workflowRunNumber:runNumber,workflowRunAttempt:runAttempt,workflowRunId:Number(process.env.GITHUB_RUN_ID)||null,status:'in_progress'});
+  if(runs.length){entry.workflowRuns=runs;entry.workflowRunNumber=runs[0].workflowRunNumber;entry.status=runs[0].status;}
+}
 if(Number.isInteger(releaseNumber)&&commits[0])commits[0].number=releaseNumber;
-const script='window.WATCHLOG_BUILD='+JSON.stringify({count:commits.length,releaseNumber,sha:commits[0].commit,commits}).replaceAll('<','\\u003c')+';\n';
+const script='window.WATCHLOG_BUILD='+JSON.stringify({count:commits.length,releaseNumber,runNumber,runAttempt,repository,sha:commits[0].commit,commits}).replaceAll('<','\\u003c')+';\n';
 writeFileSync('build-info.js',script);
 // Embed metadata so the page and changelog cannot cache different revisions.
 const html=readFileSync('index.html','utf8');

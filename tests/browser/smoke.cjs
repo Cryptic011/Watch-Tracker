@@ -39,7 +39,7 @@ const server=http.createServer((req,res)=>{
    if(url.hostname==='api.tvmaze.com'&&url.pathname==='/shows/12')return route.fulfill({headers,json:{id:12,name:'Test Series',premiered:'2020-01-01',externals:{imdb:'tt1234568'},image:{original:'https://static.tvmaze.com/series-poster.jpg'},summary:'<p>An official series description &amp; a second detail.</p>',genres:['Drama','Action'],status:'Running',rating:{average:8.4},runtime:42,language:'English'}});
    if(url.hostname==='api.tvmaze.com'&&url.pathname==='/shows/13')return route.fulfill({headers,json:{id:13,name:'Later poster',image:{original:'https://static.tvmaze.com/later-poster.jpg'}}});
    if(url.hostname==='api.tvmaze.com'&&url.pathname==='/shows/12/episodes')return route.fulfill({headers,json:[
-    {season:1,number:1,image:{original:'https://static.tvmaze.com/episode-one.jpg'}},
+    {season:1,number:1,summary:'<p>The team investigates a difficult case.</p>',image:{original:'https://static.tvmaze.com/episode-one.jpg'}},
     {season:1,number:2,name:'Crossing Lines',image:null},
     {season:1,number:3,image:{original:'https://static.tvmaze.com/series-poster.jpg'}}
    ]});
@@ -70,7 +70,7 @@ const server=http.createServer((req,res)=>{
     if(body.action==='catalog_details'){
      if(body.tvmazeShowId==='91405')return route.fulfill({headers,json:{ok:true,details:{state:'unavailable',sources:[]}}});
     const series=body.type==='Series',id=series?'tt1234568':'tt1234567',url='https://www.imdb.com/title/'+id+'/';
-     data={ok:true,details:{state:'ready',synopsisVersion:6,synopsisScope:series?'series':'film',description:series?'An official series description & a second detail.':'A detective uncovers a mystery in a quiet coastal town. '.repeat(8),year:'2020',genres:['Drama','Action'],runtime:series?42:120,rating:8.4,ratingSource:series?'TVMaze':'IMDb',source:series?'TVMaze':'IMDb',sources:[{name:series?'TVMaze':'IMDb',url:series?'https://www.tvmaze.com/shows/12':url}],imdbUrl:url}};
+     data={ok:true,details:{state:'ready',synopsisVersion:7,synopsisScope:series?'series':'film',description:series?'An official series description & a second detail.':'A detective uncovers a mystery in a quiet coastal town. '.repeat(8),year:'2020',genres:['Drama','Action'],runtime:series?42:120,rating:8.4,ratingSource:series?'TVMaze':'IMDb',source:series?'TVMaze':'IMDb',sources:[{name:series?'TVMaze':'IMDb',url:series?'https://www.tvmaze.com/shows/12':url}],imdbUrl:url}};
     }
     if(body.action==='save'){
      if(failSave)return route.fulfill({status:503,headers,json:{error:'Offline'}});
@@ -105,25 +105,26 @@ const server=http.createServer((req,res)=>{
   assert.equal(await page.getByRole('heading',{name:'Home',exact:true}).isVisible(),true);
   assert.equal(await page.locator('#home-view').isVisible(),true);
   assert.equal(await page.locator('#library-dashboard').isVisible(),false);
-  await page.getByRole('button',{name:'Open Library',exact:true}).click();
+  await page.locator('[data-tab="collection"]').click();
   assert.equal(await page.locator('.gallery-grid').count(),0,'Library has no duplicate title grid');
   assert.equal(await page.locator('#list-toolbar').isVisible(),false,'Filters belong to the dedicated pages');
   assert.equal(await page.locator('[data-home-section="recurring"]').isVisible(),true);
   assert.equal(await page.locator('#library-shows').isVisible(),false,'Library landing has no Shows dashboard');
   assert.equal(await page.locator('.library-page-links').isVisible(),true);
-  assert.ok((await page.locator('#library-entry').boundingBox()).height<=48,'Shows and Films fit on one compact toolbar row');
+  const dock=await page.locator('#library-entry').boundingBox(),mainDock=await page.locator('.bottom-tabs').boundingBox();
+  assert.ok(dock.height<=60&&dock.y+dock.height<mainDock.y,'The Shows and Films dock sits above the main dock');
   assert.equal(await page.locator('#library-entry img').count(),0);
   await category('Film').click();
   assert.match(new URL(page.url()).hash,/^#\/collection\/movies/);
   assert.equal(await page.getByRole('heading',{name:'Films',exact:true}).isVisible(),true);
   assert.equal(await page.locator('[data-filter="Recent"]').evaluate(node=>node.classList.contains('active')),true);
-  assert.equal(await page.locator('#library-entry').isVisible(),false);
+  assert.equal(await page.locator('#library-entry').isVisible(),true,'The type dock stays available within Library');
   assert.equal(await page.locator('#library-shows').isVisible(),false,'Films has its own page');
   assert.equal(await page.locator('[data-home-section="recurring"]').isVisible(),false);
   await page.locator('[data-library-back]').click();
   assert.equal(await category('Film').evaluate(node=>document.activeElement===node),true);
   await page.locator('[data-tab="library"]').click();
-  await page.getByRole('button',{name:'Open Calendar',exact:true}).click();
+  await page.locator('[data-tab="calendar"]').click();
   assert.equal(await page.locator('#library-dashboard').isVisible(),true);
   assert.equal(await page.locator('[data-home-section="recurring"]').isVisible(),false);
   for(const selector of ['#add-btn','.top-nav .search-box'])assert.equal(await page.locator(selector).isVisible(),false,'Calendar has no Search controls');
@@ -601,6 +602,11 @@ const server=http.createServer((req,res)=>{
   await page.locator('[data-gallery-season-art="2"] img').waitFor({state:'attached'});
   assert.equal(await page.locator('[data-gallery-season-art="2"] img').getAttribute('src'),'https://static.tvmaze.com/series-poster.jpg','missing season artwork uses this show cover');
   assert.equal(await page.locator('[data-gallery-episode="1:2"] .gallery-episode-copy strong').textContent(),'Episode 2');
+  await page.locator('[data-episode-description="1:1"]').click();
+  await page.getByRole('dialog',{name:/Episode 1/}).waitFor();
+  await page.waitForFunction(()=>document.querySelector('.episode-description p').textContent.includes('difficult case'));
+  await page.getByRole('button',{name:'Close episode description',exact:true}).click();
+
   assert.equal(await page.locator('[data-gallery-episode="1:2"] .gallery-episode-title').textContent(),'Crossing Lines','episode titles load even when absent from the saved item');
   assert.equal(await page.locator('[data-gallery-episode="1:2"] .gallery-episode-title').isVisible(),true);
   assert.doesNotMatch(await page.locator('.gallery-season-episodes').allTextContents().then(rows=>rows.join(' ')),/\d+\. Episode \d+/);
@@ -625,7 +631,7 @@ const server=http.createServer((req,res)=>{
    const layout=await page.locator('[data-gallery-episode="1:1"]').evaluate(row=>{
     const bounds=node=>{const rect=node.getBoundingClientRect();return {width:rect.width,height:rect.height,right:rect.right};};
     const dialog=row.closest('dialog');
-    return {display:getComputedStyle(row).display,art:bounds(row.querySelector('.gallery-episode-art')),text:bounds(row.querySelector('.gallery-episode-copy')),button:bounds(row.querySelector('button')),overflow:dialog.scrollWidth>dialog.clientWidth};
+    return {display:getComputedStyle(row).display,art:bounds(row.querySelector('.gallery-episode-art')),text:bounds(row.querySelector('.gallery-episode-copy')),button:bounds(row.querySelector('.gallery-episode-toggle')),overflow:dialog.scrollWidth>dialog.clientWidth};
    });
    assert.equal(layout.display,'grid');assert.equal(layout.overflow,false);
    assert.ok(layout.button.width>=44&&layout.button.height>=44);

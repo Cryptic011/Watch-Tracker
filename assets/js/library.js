@@ -422,6 +422,7 @@
     document.body.classList.toggle("calendar-only-page",calendarOnlyPage);
     enforceBottomNavigation();
     const previousTab=currentTab;
+    const previousPage=bottomTabs.dataset.activeTab;
     if(tab==="search"&&currentTab!=="search")searchReturnTab=libraryOnlyPage?"collection":calendarOnlyPage?"calendar":currentTab;
     const primaryTab=tab==="search"?searchReturnTab:libraryOnlyPage?"collection":calendarOnlyPage?"calendar":tab;
     currentTab=tab;updateTabSelection(primaryTab);
@@ -436,7 +437,7 @@
       document.querySelector(".stats-row").classList.add("hidden");
     }
     updateFloatingAddVisibility();
-    animatePrimaryPage(previousTab,tab);
+    animatePrimaryPage(previousPage,primaryTab);
     if(search){activateTitleSearch();if(typeof recordAppNavigation==="function")recordAppNavigation();return;}
     pauseTitleSearch();
     if(settings){renderWatchStatistics();void refreshPrivateReminderHistory();}
@@ -457,6 +458,7 @@
       $('library-category-title').focus({preventScroll:true});
       return;
     }
+    if(event.target.closest('[data-full-library]')){goToTabHome('collection','All');return;}
     if(event.target.closest('[data-saved-shows]')){
       goToTabHome('collection','Series',true);
       $('library-category-title').focus({preventScroll:true});
@@ -560,8 +562,10 @@
     $("library-category-header").classList.toggle("hidden",!categoryControlsVisible());
     document.querySelector('[data-saved-shows]').classList.toggle('hidden',!overview);
     document.querySelector('[data-library-back]').setAttribute('aria-label',savedShows?'Back to Shows':'Back to Library');
-    $("library-entry").classList.toggle("hidden",!libraryOnlyPage||Boolean(category));
-    $("library-category-title").textContent=category==='Film'?'Films':savedShows?'Saved shows':'Shows';
+    $("library-entry").classList.toggle("hidden",!libraryOnlyPage);
+    for(const button of $("library-entry").querySelectorAll('[data-gallery-category]'))button.classList.toggle('active',button.dataset.galleryCategory===category);
+    $("library-category-title").textContent=category==='All'?'All titles':category==='Film'?'Films':savedShows?'Saved shows':'Shows';
+    if(typeof renderHomeDashboard==='function')renderHomeDashboard();
     const {rows,groups}=savedTitlesVisible?currentVisibleMediaRows():{rows:[],groups:new Map()};
     mediaList.classList.toggle("hidden",!savedTitlesVisible);
     emptyState.classList.toggle("hidden",!savedTitlesVisible||rows.length>0);
