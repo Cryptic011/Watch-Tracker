@@ -853,7 +853,7 @@
   document.getElementById("export-library-backup")?.addEventListener("click",()=>{
     const backup={format:"watchlog-library-backup",version:1,exportedAt:new Date().toISOString(),items:cloneLibrarySnapshot(mediaItems)};
     const url=URL.createObjectURL(new Blob([JSON.stringify(backup,null,2)],{type:"application/json"}));
-    const link=document.createElement("a");link.href=url;link.download=`watched-logger-backup-${new Date().toISOString().slice(0,10)}.json`;link.click();URL.revokeObjectURL(url);
+    const link=document.createElement("a");link.href=url;link.download=`watched-logger-backup-${new Date().toISOString().slice(0,10)}.json`;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
     const status=document.getElementById("library-backup-status");if(status)status.textContent=`Exported library with ${backup.items.length} library item(s).`;
   });
   document.getElementById("import-library-backup")?.addEventListener("change",async event=>{

@@ -2,6 +2,7 @@
 
 const NAVIGATION_CACHE="watchlog-navigation-v4";
 const ARTWORK_CACHE="watchlog-artwork-v1";
+const METADATA_CACHE="watchlog-public-metadata-v1";
 const ARTWORK_LIMIT=150;
 const SHELL_BUILD="__WATCHLOG_BUILD__";
 const SHELL_CACHE="watchlog-shell-"+SHELL_BUILD;
@@ -60,6 +61,23 @@ self.addEventListener("fetch",event=>{
     })());return;
   }
   const url=new URL(request.url);
+  // Public show metadata remains available when a provider or connection fails.
+  // Account endpoints and catalogue searches never enter this cache.
+  if(url.hostname==="api.tvmaze.com"&&/^\/shows\/\d+(?:\/(?:episodes|seasons))?$/.test(url.pathname)){
+    event.respondWith((async()=>{
+      const cache=await caches.open(METADATA_CACHE),cached=await cache.match(request);
+      if(self.navigator?.onLine===false&&cached)return cached;
+      try{
+        const response=await fetch(request);
+        if(response.ok)try{
+          await cache.put(request,response.clone());
+          const keys=await cache.keys();
+          await Promise.all(keys.slice(0,Math.max(0,keys.length-90)).map(key=>cache.delete(key)));
+        }catch(_){}
+        return response.ok||!cached?response:cached;
+      }catch(error){if(cached)return cached;throw error;}
+    })());return;
+  }
   // Cache only public artwork requested as images. Never cache account APIs.
   if(request.destination==="image"&&url.protocol==="https:"&&
     ["static.tvmaze.com","image.tmdb.org","m.media-amazon.com","is1-ssl.mzstatic.com","is2-ssl.mzstatic.com","is3-ssl.mzstatic.com","is4-ssl.mzstatic.com","is5-ssl.mzstatic.com"].includes(url.hostname)){

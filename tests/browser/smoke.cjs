@@ -1136,6 +1136,23 @@ const server=http.createServer((req,res)=>{
   assert.equal(await page.locator('[data-home-section]').first().isVisible(),false);
   assert.equal(await page.locator('[data-shows-section="Watchlist"]').isVisible(),false);
   assert.equal(await page.locator('[data-gallery-category]').count(),2);
+  phase='Trakt import and export';
+  await page.locator('[data-tab="settings"]').click();
+  await page.locator('[data-settings-open="account"]').click();
+  assert.equal(await page.getByRole('heading',{name:'Import & export',exact:true}).isVisible(),true);
+  const importFixture=await page.evaluate(()=>{
+    const show=mediaItems.find(item=>item.id==='show');
+    return {count:mediaItems.length,id:show.id,row:{type:'episode',show:{title:show.title,year:Number(show.releaseYear),ids:{imdb:show.imdbId}},episode:{season:1,number:1},watched_at:'2026-10-01T10:00:00Z'}};
+  });
+  await page.locator('#import-library-backup').setInputFiles({name:'history.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify([importFixture.row]))});
+  await page.getByRole('dialog',{name:'Import Trakt history'}).waitFor();
+  await page.locator('[data-trakt-confirm]').click();
+  await page.waitForFunction(()=>!cloudSaveInFlight&&!localSaveInFlight);
+  assert.equal(await page.evaluate(()=>mediaItems.length),importFixture.count,'Trakt matches an existing title without adding a duplicate');
+  assert.ok(await page.evaluate(id=>mediaItems.find(item=>item.id===id).watchedEpisodes[1].includes(1),importFixture.id));
+  const exported=page.waitForEvent('download');
+  await page.getByRole('button',{name:'Export',exact:true}).click();
+  assert.match((await exported).suggestedFilename(),/backup.*\.json$/);
   assert.ok(saves>=4);assert.deepEqual(errors,[]);
   console.log(`${engine.name()}: visual search, filters, descriptions, duplicate badges, add/edit, episode mark/undo, unreleased guard and refresh persistence passed`);
  }finally{await browser.close();}
