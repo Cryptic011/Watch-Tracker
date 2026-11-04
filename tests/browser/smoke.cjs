@@ -607,7 +607,8 @@ const server=http.createServer((req,res)=>{
   await page.waitForFunction(()=>document.querySelector('.episode-description p').textContent.includes('difficult case'));
   const compactDescription=await context.newPage();
   await compactDescription.setViewportSize({width:320,height:360});
-  await compactDescription.setContent(await page.evaluate(()=>`<!doctype html><html><head>${[...document.querySelectorAll('link[rel="stylesheet"]')].map(link=>link.outerHTML.replace(link.getAttribute('href'),link.href)).join('')}</head><body>${document.querySelector('.episode-description').outerHTML.replace(' open=""','')}</body></html>`));
+  await compactDescription.setContent(await page.evaluate(()=>`<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">${[...document.querySelectorAll('link[rel="stylesheet"]')].map(link=>link.outerHTML.replace(link.getAttribute('href'),link.href)).join('')}</head><body>${document.querySelector('.episode-description').outerHTML.replace(' open=""','')}</body></html>`));
+  assert.equal(await compactDescription.evaluate(()=>innerWidth),320,'compact description uses the mobile layout viewport');
   await compactDescription.evaluate(()=>{const box=document.querySelector('dialog');box.querySelector('p').textContent=box.querySelector('p').textContent.repeat(12);box.showModal();});
   for(const descriptionPage of [page,compactDescription]){
     await descriptionPage.waitForFunction(()=>!document.querySelector('.episode-description').getAnimations().some(animation=>animation.playState==='running'));
