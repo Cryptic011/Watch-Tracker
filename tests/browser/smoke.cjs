@@ -617,7 +617,7 @@ const server=http.createServer((req,res)=>{
     assert.equal(placement.centered,true,'episode description is centred on the viewport');
     assert.equal(placement.textFits,true,'title, close control and description have separate space');
   }
-  await page.locator('.episode-description header').click({position:{x:2,y:2}});
+  await page.locator('.episode-description header').click({position:{x:24,y:8}});
   assert.equal(await page.locator('.episode-description').isVisible(),true,'tapping inside padding keeps the description open');
   await page.mouse.click(4,4);
   assert.equal(await page.locator('.episode-description').isVisible(),false,'tapping outside closes the description');
