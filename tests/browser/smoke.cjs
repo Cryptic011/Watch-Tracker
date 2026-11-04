@@ -1140,6 +1140,7 @@ const server=http.createServer((req,res)=>{
   await page.locator('[data-tab="settings"]').click();
   await page.locator('[data-settings-open="account"]').click();
   assert.equal(await page.getByRole('heading',{name:'Import & export',exact:true}).isVisible(),true);
+  assert.equal(await page.getByRole('heading',{name:'Face ID & passkeys',exact:true}).isVisible(),true);
   const importFixture=await page.evaluate(()=>{
     const show=mediaItems.find(item=>item.id==='show');
     return {count:mediaItems.length,id:show.id,row:{type:'episode',show:{title:show.title,year:Number(show.releaseYear),ids:{imdb:show.imdbId}},episode:{season:1,number:1},watched_at:'2026-10-01T10:00:00Z'}};
