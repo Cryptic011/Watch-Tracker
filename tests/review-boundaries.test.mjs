@@ -131,6 +131,9 @@ test('Background scans catch up only the current reminder stage',async()=>{
     ['2026-09-05T12:00:00Z',['New episode airs tomorrow at 12:00 (06/09)']],
     ['2026-09-06T06:00:00Z',['New episode airs today at 12:00 (06/09)']],
     ['2026-09-06T12:00:00Z',['New episode is available']],
+    ['2026-09-06T12:14:59Z',['New episode is available']],
+    ['2026-09-06T12:15:00Z',[]],
+    ['2026-09-06T20:51:00Z',[]],
     ['2026-09-07T12:00:00Z',[]],
   ]){
     const worker=workerHarness([{season:1,number:6,airstamp:release}]);

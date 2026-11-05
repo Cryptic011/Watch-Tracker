@@ -837,11 +837,14 @@
 
   logoutBtn.onclick=async()=>{
     logoutBtn.disabled=true;
+    // Stop focus/online repair from reconnecting while sign-out pauses delivery.
+    backgroundReminderBusy=true;++backgroundReminderGeneration;
+    try{
     try{if(localSaveInFlight)await localSaveInFlight;if(cloudSaveInFlight)await cloudSaveInFlight;}catch(_){}
-    try{await removeBackgroundPush();}catch(_){}
+    try{await removeBackgroundPush({preserveActivation:true});}catch(_){}
     try{if(cloudSessionToken)await pinApi("logout");}catch(_){}
     localStorage.removeItem(PIN_SESSION_KEY);await clearUserState();authPin.value="";isSignUp=false;updateAuthMode();showAuth();
-    logoutBtn.disabled=false;
+    }finally{backgroundReminderBusy=false;logoutBtn.disabled=false;}
   };
 
   syncNowBtn.onclick=async()=>{

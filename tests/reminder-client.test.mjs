@@ -148,3 +148,40 @@ test('A temporary first-activation service failure preserves the device intent a
 });
 
 test('A fresh device with granted browser permission still needs its own initial activation',async()=>{const h=harness({missing:true});await h.check();assert.equal(h.stats().subscribes,0);assert.equal(h.enable.textContent,'Enable Background Reminders');await h.reconnect();h.loseSubscription();await h.check();assert.equal(h.stats().serial,2);assert.equal(h.stats().permissionRequests,0);});
+
+test('Sign-out pauses server delivery and preserves the same activated phone connection for sign-in',async()=>{
+ const h=harness();await h.check();const original=h.stats().subscription;
+ let finishLogout;const logoutGate=new Promise(resolve=>finishLogout=resolve);
+ Object.assign(h.context,{logoutBtn:{},localSaveInFlight:null,cloudSaveInFlight:null,authPin:{value:''},updateAuthMode(){},showAuth(){},pinApi:async action=>{assert.equal(action,'logout');await logoutGate;},clearUserState:async()=>{h.context.currentUser=null;h.context.cloudSessionToken='';}});
+ h.context.localStorage.removeItem=()=>{};h.context.PIN_SESSION_KEY='session';
+ const sync=fs.readFileSync(new URL('../assets/js/sync.js',import.meta.url),'utf8');
+ vm.runInContext(sync.slice(sync.indexOf('  logoutBtn.onclick='),sync.indexOf('  syncNowBtn.onclick=')),h.context);
+ const signingOut=h.context.logoutBtn.onclick();await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(await h.check(),false,'a foreground repair cannot re-enable delivery during sign-out');
+ assert.equal(h.stats().serverEnabled,false);
+ finishLogout();await signingOut;
+ assert.equal(h.stats().serverEnabled,false,'signed-out device receives no account reminders');
+ assert.equal(h.stats().subscription,original,'sign-out does not revoke the Apple subscription');
+ h.context.currentUser={id:'account'};h.context.cloudSessionToken='new-session';
+ assert.equal(h.context.backgroundReminderPreference(),'on');
+ await h.context.syncExistingBackgroundPush();
+ assert.equal(h.stats().serverEnabled,true);assert.equal(h.stats().subscription,original);
+ assert.equal(h.stats().subscribes,0);assert.equal(h.stats().permissionRequests,0);
+});
+
+test('Sign-out revokes locally if server pause fails, while saved activation can repair on sign-in',async()=>{
+ const h=harness();await h.check();const fetch=h.context.fetch;
+ h.context.fetch=async(url,request)=>{if(JSON.parse(request.body).action==='unsubscribe')throw Error('Offline');return fetch(url,request);};
+ await h.context.removeBackgroundPush({preserveActivation:true});
+ assert.equal(h.stats().subscription,null,'a failed server pause cannot leave the signed-out connection active');
+ assert.equal(h.context.backgroundReminderPreference(),'on');
+ h.context.fetch=fetch;await h.check();
+ assert.ok(h.stats().subscription);assert.equal(h.stats().permissionRequests,0);
+});
+
+test('Signing out cannot undo an explicit reminder opt-out',async()=>{
+ const h=harness();await h.check();await h.off();
+ await h.context.removeBackgroundPush({preserveActivation:true});await h.context.syncExistingBackgroundPush();
+ assert.equal(h.context.backgroundReminderPreference(),'off');assert.equal(h.stats().subscription,null);
+ assert.equal(h.stats().serverEnabled,false);assert.equal(h.stats().subscribes,0);
+});

@@ -132,6 +132,8 @@ The backend independently refreshes episode metadata and regional streaming list
 
 Foreground sync remains at ten seconds while a tracker is open, after interaction, or with pending edits. Unchanged idle libraries gradually back off to one minute and check again on return. Hidden schedule pages are not rebuilt. Poster cards use provider thumbnails where available, retain lazy visibility-based loading, and release observers for replaced grids. Release notifications use Web Push, including on supported iPhone Home Screen installations.
 
+Release and advance reminders have a 15-minute delivery/retry window. Push-service TTL uses the same expiry, and newly created device registrations do not replay reminders that became due before registration. Signing out pauses server delivery while retaining the phone subscription, its delivery receipts, and the account's saved activation for the next sign-in. Explicitly turning reminders off still revokes the device subscription and preserves the opt-out. Background repair pauses during sign-out so it cannot reconnect the departing account.
+
 ### Code-review reliability fixes (29 October 2026)
 
 Legacy device records are imported only when creating a PIN account. Signing into an existing account uses the current cloud library plus its pending account-scoped device edits, so old migration copies cannot resurrect deleted titles.

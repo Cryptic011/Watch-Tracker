@@ -82,7 +82,7 @@ test('Release processing sends at-release alerts for Planned seasons, films and 
  const c=vm.createContext({Date:Clock,Number,Array,Set,String,Object,Map,TextEncoder,crypto,Response,URL,AbortSignal,console,Deno:{env:{get:()=>''},serve(){}},createClient:()=>({})});
  vm.runInContext(fs.readFileSync(path.join(root,'assets/js/regional-releases.js'),'utf8'),c);
  vm.runInContext(stripTypeScriptTypes(source.replace(/^import[\s\S]*?from "npm:web-push-neo@0\.1\.2";\n/m,'')),c);
- const items=[{id:'season',title:'Season premiere',type:'Series',status:'Planned',nextSeasonNum:2,nextSeasonDate:new Date(now-4*3600000).toISOString()},{id:'film',title:'Film premiere',type:'Film',status:'Planned',filmReleaseDate:raw,filmReleaseSource:'Manual'},{id:'show',title:'Returning series',type:'Series',status:'Watched',airingSeason:2,nextEpisodeNum:3,nextEpisodeDate:new Date(now-4*3600000).toISOString(),scheduledEpisodeReleases:[]}];
+ const items=[{id:'season',title:'Season premiere',type:'Series',status:'Planned',nextSeasonNum:2,nextSeasonDate:new Date(now-4*60000).toISOString()},{id:'film',title:'Film premiere',type:'Film',status:'Planned',filmReleaseDate:raw,filmReleaseSource:'Manual'},{id:'show',title:'Returning series',type:'Series',status:'Watched',airingSeason:2,nextEpisodeNum:3,nextEpisodeDate:new Date(now-4*60000).toISOString(),scheduledEpisodeReleases:[]}];
  c.readLibraries=async()=>[{account_id:'account',items}];c.refreshServerEpisodeSchedules=async rows=>rows;
  c.claimDelivery=async()=>({id:'delivery',attempts:1});c.finishDelivery=async()=>{};c.sendPush=async(row,config,payload)=>sent.push(payload);
  const result=await c.processPlannedReminders([{account_id:'account',time_zone:'Europe/London'}],{});
@@ -153,4 +153,29 @@ test('Schedule refresh retains names and fills titles missing from old saved sch
  assert.equal(c.serverScheduleRefreshDue(item,now),true);
  const updated=c.buildServerEpisodeSchedule(item,[{season:2,number:6,name:'Legacy',airstamp:'2026-11-10T02:00:00Z'}],now);
  assert.equal(updated.scheduledEpisodeReleases[0].title,'Legacy');assert.equal(c.serverScheduleRefreshDue(updated,now),false);
+});
+
+test('Chicago Fire is not replayed hours after release when a phone registers in the morning',async()=>{
+ let clock=Date.parse('2026-11-05T10:51:02Z');const sent=[],claims=[];
+ class Clock extends Date {static now(){return clock;}}
+ const c=vm.createContext({Date:Clock,Number,Array,Set,String,Object,Map,TextEncoder,crypto,Response,URL,AbortSignal,console,Deno:{env:{get:()=>''},serve(){}},createClient:()=>({})});
+ vm.runInContext(fs.readFileSync(path.join(root,'assets/js/regional-releases.js'),'utf8'),c);
+ vm.runInContext(stripTypeScriptTypes(source.replace(/^import[\s\S]*?from "npm:web-push-neo@0\.1\.2";\n/m,'')),c);
+ const raw='2026-11-05T02:00:00.000Z',item={id:'chicago',title:'Chicago Fire',type:'Series',status:'Watching',scheduledEpisodeReleases:[{season:15,number:5,raw}]};
+ c.readLibraries=async()=>[{account_id:'account',items:[item]}];c.refreshServerEpisodeSchedules=async rows=>rows;
+ c.claimDelivery=async(...args)=>{claims.push(args);return {id:'delivery',attempts:1};};c.finishDelivery=async()=>{};c.sendPush=async(_row,_config,payload)=>sent.push(payload);
+ const registered={account_id:'account',created_at:'2026-11-05T10:50:32Z'};
+ assert.equal((await c.processPlannedReminders([registered],{})).sent,0);
+ assert.equal(claims.length,0,'an old release never enters the delivery queue');
+ clock=Date.parse('2026-11-05T02:00:03Z');
+ assert.equal((await c.processPlannedReminders([{...registered,created_at:'2026-11-05T02:00:02Z'}],{})).sent,0,'new registrations do not replay already-due alerts within the retry window either');
+ assert.equal((await c.processPlannedReminders([{...registered,created_at:'2026-11-05T01:59:00Z'}],{})).sent,1,'a phone registered before release still receives its due alert');
+ assert.equal(sent[0].body,'New episode is available · S15 E5');
+ assert.equal(sent[0].expiresAt,Date.parse(raw)+15*60000,'the push service cannot queue the release alert for 24 hours');
+ sent.length=0;clock=Date.parse('2026-11-05T02:15:00Z');
+ assert.equal((await c.processPlannedReminders([{account_id:'account'}],{})).sent,0,'all devices stop catching up at the expiry boundary');
+ sent.length=0;clock=Date.parse('2026-11-05T20:00:03Z');
+ item.scheduledEpisodeReleases=[{season:15,number:6,raw:'2026-11-06T02:00:00Z'}];
+ assert.equal((await c.processPlannedReminders([registered],{})).sent,1,'new registrations retain future recurring episode reminders');
+ assert.equal(sent[0].body,'New episode airs tomorrow at 02:00 (06/11) · S15 E6');
 });

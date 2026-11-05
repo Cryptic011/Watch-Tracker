@@ -44,3 +44,10 @@ test('Reminder status and delivery tests require a valid account session',async(
     assert.equal(result.status,401);assert.equal(result.data.code,'session_expired');
   }
 });
+
+test('Unsubscribe pauses the account-scoped registration without deleting its delivery identity',async()=>{
+ const service=endpoint(),paused=await service.request('unsubscribe');
+ assert.equal(paused.status,200);assert.equal(service.enabled(),false);
+ assert.equal((await service.request('status')).data.enabled,false);
+ const denied=await endpoint().request('unsubscribe','');assert.equal(denied.status,401);
+});

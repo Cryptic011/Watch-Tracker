@@ -193,17 +193,28 @@
   async function syncExistingBackgroundPush(){
     return refreshBackgroundReminderStatus({reconnect:true});
   }
-  async function removeBackgroundPush(){
+  async function removeBackgroundPush({preserveActivation=false}={}){
     const token=cloudSessionToken;
     ++backgroundReminderGeneration;
     if(backgroundReminderRefresh)await backgroundReminderRefresh.catch(()=>{});
     const subscription=await currentPushSubscription();
     if(subscription){
+      if(preserveActivation){
+        try{
+          if(!token)throw new Error("Sign in again.");
+          await reminderApi("unsubscribe",{endpoint:subscription.endpoint},token);
+        }catch(error){
+          // If the server cannot pause delivery, revoke locally for sign-out
+          // privacy. Keep the saved intent so the next sign-in can repair it.
+          if(!await subscription.unsubscribe())throw error;
+        }
+      }else{
       const results=await Promise.allSettled([token?reminderApi("unsubscribe",{endpoint:subscription.endpoint},token):Promise.reject(new Error("Sign in again.")),subscription.unsubscribe().then(value=>{if(!value)throw new Error("Could not disconnect notifications on this device.");})]);
       if(results.every(result=>result.status==="rejected"))throw new Error("Could not turn reminders off. Check your connection and try again.");
+      }
     }
     if(token!==cloudSessionToken)return;
-    backgroundReminderPreference("off");
+    if(!preserveActivation)backgroundReminderPreference("off");
     setBackgroundReminderStatus("Background reminders are off on this device.");
   }
   async function runBackgroundReminderAction(action){

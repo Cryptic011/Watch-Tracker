@@ -43,6 +43,7 @@ type PushRow = {
   time_zone: string;
   locale: string;
   enabled: boolean;
+  created_at?: string;
 };
 
 type PushConfig = {
@@ -591,8 +592,11 @@ async function processPlannedReminders(
       for (const leadHours of leadTimes) {
         if(/^\d{4}-\d{2}-\d{2}$/.test(event.raw))continue; // A date alone does not confirm an availability time.
         const reminderTime = eventTime - leadHours * 60 * 60 * 1000;
-        // Catch up only the current stage. Reconnecting a device must not
-        // deliver "in 1 day" and "in 6 hours" after the episode has released.
+        // A new phone connection starts with upcoming alerts, never a replay
+        // of reminders that became due before this subscription existed.
+        const registeredAt = Date.parse(subscription.created_at || "");
+        if (Number.isFinite(registeredAt) && reminderTime < registeredAt) continue;
+        // Allow a brief scheduler/network retry, not hours of release catch-up.
         if (!reminderStageIsDue(eventTime, leadHours, now)) {
           continue;
         }
@@ -616,7 +620,7 @@ async function processPlannedReminders(
         const payload = {
           title: copy.title,
           body: copy.body,
-          expiresAt: leadHours ? reminderTime + 15 * 60000 : eventTime + 86400000,
+          expiresAt: reminderTime + 15 * 60000,
           tag: `watchlog-${await sha256(eventKey).then((v) => v.slice(0, 24))}`,
           data: { url: "./", itemId, accountId:subscription.account_id, eventKey, kind: "reminder" },
         };
@@ -643,7 +647,7 @@ async function processPlannedReminders(
 function reminderStageIsDue(eventTime: number, leadHours: number, now: number) {
   const hour = 3600000;
   const due = eventTime - leadHours * hour;
-  const expires = leadHours === 0 ? eventTime + 24 * hour : due + 15 * 60000;
+  const expires = due + 15 * 60000;
   return Number.isFinite(eventTime) && now >= due && now < expires;
 }
 
@@ -679,7 +683,7 @@ async function processCron(req: Request) {
   const { data, error } = await db
     .from("watchlog_push_subscriptions")
     .select(
-      "id,account_id,endpoint,p256dh,auth,expiration_time,time_zone,locale,enabled",
+      "id,account_id,endpoint,p256dh,auth,expiration_time,time_zone,locale,enabled,created_at",
     )
     .eq("enabled", true);
   if (error) throw error;
@@ -851,7 +855,9 @@ Deno.serve(async (req: Request) => {
       if (endpoint) {
         const { error } = await db
           .from("watchlog_push_subscriptions")
-          .delete()
+          // Retain identity and delivery receipts when this device pauses.
+          // Signing back in must not create a new registration or lose deduplication.
+          .update({ enabled: false, updated_at: new Date().toISOString() })
           .eq("account_id", session.accountId)
           .eq("endpoint", endpoint);
         if (error) throw error;

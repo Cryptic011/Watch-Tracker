@@ -1,3 +1,10 @@
+## 2026-11-05 — Stop late release alerts and retain phone activation
+- Expire release alerts after 15 minutes instead of replaying them for 24 hours; use the same expiry in push-service delivery.
+- Start new notification registrations with upcoming reminders, without replaying alerts from before registration.
+- Preserve the phone connection and delivery history when signing out, pause server delivery, and reconnect on the next sign-in without another activation.
+- Prevent foreground repair from reconnecting during sign-out; keep explicit reminder opt-outs in place.
+- Add regressions for the Chicago Fire morning catch-up, recurring future alerts, sign-out/sign-in, and notification opt-outs.
+
 ## 2026-11-05 — Remove unused native iOS project
 - Remove the unused Xcode project, bundled website copies, native adapter, iOS setup guides and native-only tests.
 - Remove Capacitor and the iOS bundler dependencies, build commands and obsolete repair script.
