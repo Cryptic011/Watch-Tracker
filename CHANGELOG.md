@@ -1,3 +1,9 @@
+## 2026-11-05 — Remove unused native iOS project
+- Remove the unused Xcode project, bundled website copies, native adapter, iOS setup guides and native-only tests.
+- Remove Capacitor and the iOS bundler dependencies, build commands and obsolete repair script.
+- Preserve the website/PWA assets, Web Push, account sync, backend functions, migrations, and web regression checks.
+- Keep production reminder coverage independent of the removed native helper and correct the setup documentation.
+
 ## 2026-11-05 — Recent shows above Watchlist
 - Add a matching poster-card Recents row above Watchlist, showing the latest 15 shows by their added date.
 
@@ -897,3 +903,4 @@
 - Remove duplicate status delivery from the deployment workflow and fail visibly if the private notification secret is missing.
 
 - Correct Changelog run labels to use the overall All workflows history position, not the individual workflow's run_number. Display only `Run N (short-commit)` before the change title.
+
