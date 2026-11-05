@@ -385,7 +385,7 @@ Deno.serve(async (req: Request) => {
       return json(result.body,result.status);
     }
     if(action==="recommendations"){
-      return json({ok:true,results:await getRecommendations(body.seeds,fetchCatalogJSON)});
+      return json({ok:true,results:await getRecommendations(body.seeds,fetchCatalogJSON,{exclude:body.exclude,country:body.country})});
     }
     if(action==="preferences"){
       if(body.patch){

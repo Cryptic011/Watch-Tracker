@@ -166,7 +166,7 @@ test('Retired History and Watchlist tabs are removed and cannot be activated',()
   const html=fs.readFileSync(new URL('../index.html',import.meta.url),'utf8');
   const library=fs.readFileSync(new URL('../assets/js/library.js',import.meta.url),'utf8');
   assert.deepEqual([...html.matchAll(/class="tab-btn[^"]*" data-tab="([^"]+)"/g)].map(m=>m[1]),['library','collection','calendar','settings']);
-  assert.match(library,/const ALLOWED_BOTTOM_TABS=new Set\(\["library","collection","calendar","search","settings"\]\)/);
+  assert.match(library,/const ALLOWED_BOTTOM_TABS=new Set\(\["library","collection","calendar","recurring","search","settings"\]\)/);
   assert.match(library,/if\(!ALLOWED_BOTTOM_TABS\.has\(tab\)\)tab="library"/);
   assert.match(library,/label==="history"\|\|label==="watchlist"/);
 });

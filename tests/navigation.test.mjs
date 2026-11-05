@@ -30,7 +30,7 @@ test('Schedule URLs always restore the full calendar and ignore legacy range par
  const c=router();
  for(const schedule of ['recurring','calendar'])for(const calendarRange of ['week','today','upcoming']){
   const page={tab:'library',schedule,calendarRange},hash=c.appPageHash(page),parsed=c.parseAppHash(hash);
-  assert.equal(parsed.tab,schedule==='calendar'?'calendar':'collection');assert.equal(parsed.schedule,schedule);assert.equal(parsed.category,'');
+  assert.equal(parsed.tab,schedule);assert.equal(parsed.schedule,schedule);assert.equal(parsed.category,'');
   assert.equal(parsed.calendarRange,'upcoming');
  }
  assert.equal(c.parseAppHash('#/library/calendar?range=unknown').calendarRange,'upcoming');
@@ -95,3 +95,5 @@ test('Calendar has its own route and Library defaults to Recent while explicit A
  assert.equal(c.parseAppHash('#/collection').filter,'Recent');
  assert.equal(c.parseAppHash(c.appPageHash({tab:'collection',filter:'All'})).filter,'All');
 });
+
+test('Recurring shows have their own URL and preserve Calendar as their entry point',()=>{const c=router();assert.equal(c.appPageHash({tab:'recurring'}),'#/recurring');assert.equal(c.parseAppHash('#/recurring').tab,'recurring');assert.equal(c.parseAppHash('#/library/recurring').tab,'recurring');});

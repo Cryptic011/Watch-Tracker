@@ -196,14 +196,16 @@
   function showDiscoveryDetail(item,trigger){
     if(!item)return;dismissTitleSearchKeyboard();discoveryDetailItem=item;discoveryReturnFocus=trigger;
     $("discovery-detail-title").textContent=item.title;
-    $("discovery-detail-body").innerHTML=`<div class="discovery-detail-intro">${discoveryPoster(item)}<div><p class="discovery-meta">${esc([item.year,item.format,item.detail].filter(Boolean).join(" · "))}</p>${discoveryDuplicate(item)?'<p class="discovery-added">✓ Already added</p>':""}</div></div><p class="discovery-full-description">${esc(discoveryDescription(item)||"Checking verified sources…")}</p><p data-discovery-detail-source>${discoveryAttribution(item)}</p><button type="button" class="btn btn-primary btn-full" id="discovery-detail-add">${discoveryDuplicate(item)?"View in library":"Add to library"}</button>`;
+    $("discovery-detail-body").innerHTML=`<div class="discovery-detail-intro">${discoveryPoster(item)}<div><p class="discovery-meta">${esc([item.year,item.format,item.detail].filter(Boolean).join(" · "))}</p>${discoveryDuplicate(item)?'<p class="discovery-added">✓ Already added</p>':""}</div></div><div data-discovery-description>${window.WatchLogGallery.descriptionMarkup(discoveryDescription(item)||"Checking verified sources…")}</div><p data-discovery-detail-source>${discoveryAttribution(item)}</p><button type="button" class="btn btn-primary btn-full" id="discovery-detail-add">${discoveryDuplicate(item)?"View in library":"Add to library"}</button>`;
     wireDiscoveryImages($("discovery-detail-body"));
     $("discovery-detail-add").onclick=()=>addDiscoveryTitle(discoveryDetailItem);
     discoveryDialog.showModal();
+    $("discovery-detail-body").querySelector("[data-discovery-description] p").classList.add("discovery-full-description");
+    window.WatchLogGallery.wireDescriptions($("discovery-detail-body"));
     if(typeof fetchOfficialTitleDetails==="function")void fetchDiscoveryDescription(item).then(description=>{
       if(!discoveryDialog.open||discoveryDetailItem!==item)return;
       if(description)item.description=description;
-      const body=$("discovery-detail-body");body.querySelector('.discovery-full-description').textContent=discoveryDescription(item)||"A verified description is temporarily unavailable.";
+      const body=$("discovery-detail-body");body.querySelector('[data-discovery-description]').innerHTML=window.WatchLogGallery.descriptionMarkup(discoveryDescription(item)||"A verified description is temporarily unavailable.");body.querySelector("[data-discovery-description] p").classList.add("discovery-full-description");window.WatchLogGallery.wireDescriptions(body);
       body.querySelector('[data-discovery-detail-source]').innerHTML=discoveryAttribution(item);
     }).catch(()=>{});
   }

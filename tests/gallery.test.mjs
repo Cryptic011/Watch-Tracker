@@ -44,7 +44,7 @@ test('Shows sections separate the released queue, seven-day episodes and future 
  const now=Date.parse('2026-11-03T12:00:00Z'),show={id:'show',type:'Series',title:'Example',nextSeasonNum:3,nextSeasonDate:'2027-01-05'},film={id:'film',type:'Film',title:'Film'};
  const callbacks={upcoming:()=>({rank:2,time:now+8*86400000,kind:'episode',season:2,number:6}),released:()=>({2:[1,2]}),watched:()=>({2:[1]}),next:()=>({season:2,episode:2}),showEvents:items=>({events:items.flatMap(item=>[2,8].map(days=>({item,season:2,episode:days,date:new Date(now+days*86400000)})))})};
  const sections=context.window.WatchLogGallery.showSections([show,film],callbacks,now);
- assert.equal(sections.watchlist.length,1);assert.equal(sections.queue[0].event.number,2);assert.equal(sections.upcoming.length,1);assert.equal(sections.upcoming[0].event.number,2);assert.equal(sections.seasons[0].event.number,3);
+ assert.equal(sections.watchlist.length,1);assert.equal(sections.queue.length,0);assert.equal(sections.upcoming.length,1);assert.equal(sections.upcoming[0].event.number,2);assert.equal(sections.seasons[0].event.number,3);
  const caught=context.window.WatchLogGallery.showSections([show],{...callbacks,next:()=>null},now);assert.equal(caught.queue.length,0);
 });
 
@@ -54,3 +54,5 @@ test('Shows countdown calls a release later on the current day Today',()=>{
  assert.equal(countdown({time:Date.parse('2026-11-04T01:00:00Z')},now),'1 day');
  assert.equal(countdown({time:Infinity},now),'Date TBA');
 });
+
+test('Episode queue contains only unstarted shows, including legacy progress',()=>{const next=()=>({season:1,episode:1}),callbacks={upcoming:()=>({rank:0}),released:()=>({1:[1,2]}),watched:item=>item.watchedEpisodes||{},next};const rows=[{id:'new',type:'Series'},{id:'tick',type:'Series',watchedEpisodes:{1:[1]}},{id:'legacy',type:'Series',curSeason:1,curEp:2},{id:'seasons',type:'Series',watchedSeasons:1},{id:'later',type:'Series',curSeason:2}];assert.equal(context.window.WatchLogGallery.showSections(rows,callbacks).queue.map(row=>row.item.id).join(','),'new');});

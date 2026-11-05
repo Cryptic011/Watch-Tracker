@@ -294,7 +294,7 @@
   function updateFloatingAddVisibility(){
     renderLibraryMaintenance();
     if(currentTab!=="search"){
-      if(currentTab==="library")document.querySelector(".top-nav h1").textContent=calendarOnlyPage?"Calendar":libraryOnlyPage?"Library":"Home";
+      if(currentTab==="library")document.querySelector(".top-nav h1").textContent=calendarOnlyPage?(selectedScheduleView==='recurring'?'Recurring shows':'Calendar'):libraryOnlyPage?"Library":"Home";
       document.querySelector(".top-nav h1").classList.toggle("hidden",currentTab!=="library"||categoryControlsVisible());
       if(currentTab==='library'){
         document.querySelector('.top-nav .search-box').classList.toggle('hidden',calendarOnlyPage);
@@ -303,7 +303,7 @@
     }
     addBtn.classList.toggle("hidden",!(currentUser&&currentTab==="library"&&!calendarOnlyPage));
   }
-  const ALLOWED_BOTTOM_TABS=new Set(["library","collection","calendar","search","settings"]);
+  const ALLOWED_BOTTOM_TABS=new Set(["library","collection","calendar","recurring","search","settings"]);
   function enforceBottomNavigation(){
     document.querySelectorAll(".bottom-tabs .tab-btn").forEach(button=>{
       const tab=String(button.dataset.tab||"").toLowerCase();
@@ -317,7 +317,21 @@
   const nativeTabMotion=typeof tabIndicator.animate==="function";
   bottomTabs.classList.toggle("native-tab-motion",nativeTabMotion);
   let tabSlideAnimation=null;
-  navigationMotionPreference.addEventListener("change",()=>{tabSlideAnimation?.cancel();});
+  let libraryTypeAnimation=null;
+  function updateLibraryTypeSelection(category){
+    const dock=$('library-entry'),indicator=dock.querySelector('.library-type-indicator');
+    const index=category==='Series'?0:category==='Film'?1:-1;
+    indicator.hidden=index<0;
+    for(const button of dock.querySelectorAll('[data-gallery-category]')){
+      const selected=button.dataset.galleryCategory===category;button.classList.toggle('active',selected);
+      if(selected)button.setAttribute('aria-current','page');else button.removeAttribute('aria-current');
+    }
+    if(index<0||dock.dataset.selection===String(index))return;
+    const from=getComputedStyle(indicator).transform,prior=dock.dataset.selection;
+    libraryTypeAnimation?.cancel();indicator.style.transform=`translateX(${index*100}%)`;dock.dataset.selection=String(index);
+    if(prior!==undefined&&!navigationMotionPreference.matches&&typeof indicator.animate==='function')libraryTypeAnimation=indicator.animate([{transform:from==='none'?'translateX(0)':from},{transform:`translateX(${index*100}%)`}],{duration:650,easing:'cubic-bezier(.32,0,.18,1)'});
+  }
+  navigationMotionPreference.addEventListener("change",()=>{tabSlideAnimation?.cancel();libraryTypeAnimation?.cancel();});
 
   function updateTabSelection(tab,forceMotion=false){
     const index=Array.from(tabBtns).findIndex(button=>button.dataset.tab===tab);
@@ -405,10 +419,11 @@
     const destination=to.split(":")[0];
     if(!["library","collection","calendar","settings"].includes(destination))return;
     if(window.matchMedia?.("(prefers-reduced-motion: reduce)").matches)return;
-    const page=destination==="settings"?settingsView:libraryView;
+    const typeChange=String(from||'').startsWith('collection:')&&to.startsWith('collection:');
+    const page=typeChange?(window.WatchLogGallery?.getCategory?.()==='Series'&&!savedShows?$('library-shows'):mediaList):destination==="settings"?settingsView:libraryView;
     if(typeof page.animate!=="function")return;
     primaryPageAnimation=page.animate([
-      {opacity:.45,transform:`translateX(${destination==="settings"?14:-14}px)`},
+      {opacity:.65,transform:`translateX(${typeChange?(window.WatchLogGallery?.getCategory?.()==='Film'?18:-18):destination==="settings"?14:-14}px)`},
       {opacity:1,transform:"translateX(0)"}
     ],{duration:260,easing:"cubic-bezier(.22,1,.36,1)"});
   }
@@ -416,7 +431,8 @@
     if(!ALLOWED_BOTTOM_TABS.has(tab))tab="library";
     if(typeof saveNavigationPosition==="function")saveNavigationPosition();
     if(tab!=="search"){
-      libraryOnlyPage=tab==="collection";calendarOnlyPage=tab==="calendar";
+      selectedScheduleView=tab==='recurring'?'recurring':'';
+      libraryOnlyPage=tab==="collection";calendarOnlyPage=tab==="calendar"||tab==='recurring';
       if(libraryOnlyPage&&currentTab!=="search"&&!navigationApplying){activeFilter="Recent";pillBtns.forEach(button=>button.classList.toggle("active",button.dataset.filter===activeFilter));}
       if(libraryOnlyPage||calendarOnlyPage)tab="library";
     }
@@ -438,14 +454,12 @@
       document.querySelector(".stats-row").classList.add("hidden");
     }
     updateFloatingAddVisibility();
-    if(!search){
-      const pageKey=primaryTab+":"+(window.WatchLogGallery?.getCategory?.()||"")+":"+savedShows;
-      animatePrimaryPage(previousPage,pageKey);lastAnimatedPage=pageKey;
-    }
+    const pageKey=primaryTab+":"+(calendarOnlyPage?selectedScheduleView:window.WatchLogGallery?.getCategory?.()||"")+":"+savedShows;
     if(search){activateTitleSearch();if(typeof recordAppNavigation==="function")recordAppNavigation();return;}
     pauseTitleSearch();
     if(settings){renderWatchStatistics();void refreshPrivateReminderHistory();}
     if(!settings){$("list-label").textContent=tab==="watchlist"?"Upcoming Premieres":tab==="history"?"Watch History":"Titles";render();}
+    animatePrimaryPage(previousPage,pageKey);lastAnimatedPage=pageKey;
     if(typeof recordAppNavigation==="function")recordAppNavigation();
   }
   enforceBottomNavigation();
@@ -567,7 +581,7 @@
     document.querySelector('[data-saved-shows]').classList.toggle('hidden',!overview);
     document.querySelector('[data-library-back]').setAttribute('aria-label',savedShows?'Back to Shows':'Back to Library');
     $("library-entry").classList.toggle("hidden",!libraryOnlyPage);
-    for(const button of $("library-entry").querySelectorAll('[data-gallery-category]'))button.classList.toggle('active',button.dataset.galleryCategory===category);
+    updateLibraryTypeSelection(category);
     $("library-category-title").textContent=category==='All'?'All titles':category==='Film'?'Films':savedShows?'Saved shows':'Shows';
     if(typeof renderHomeDashboard==='function')renderHomeDashboard();
     const {rows,groups}=savedTitlesVisible?currentVisibleMediaRows():{rows:[],groups:new Map()};

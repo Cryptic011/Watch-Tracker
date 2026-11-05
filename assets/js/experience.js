@@ -1,10 +1,16 @@
 /* Home, saved-library navigation and device continuity. */
 let homeRecommendationRequest=null,homeRecommendationRetryAt=0;
 function homeIsVisible(){return Boolean(currentUser&&currentTab==='library'&&!libraryOnlyPage&&!calendarOnlyPage);}
+function homeArtworkItem(item){return {...item,type:item.type||item.format||'Series',id:item.id||item.externalId||item.tvmazeId||item.imdbId,tvmazeShowId:item.tvmazeShowId||item.tvmazeId||(item.source==='tvmaze'?item.externalId:'')};}
 function homePoster(item,attributes,subtitle=''){
-  const url=String(item.posterUrl||item.imageUrl||item.image?.original||item.image?.medium||'');
-  const safe=/^https:\/\/(?:static\.tvmaze\.com|m\.media-amazon\.com|image\.tmdb\.org|[a-z0-9-]+\.mzstatic\.com)\//i.test(url);
-  return `<button type="button" class="home-poster" ${attributes}><span class="home-poster-art">${safe?`<img src="${esc(url)}" alt="" loading="lazy" decoding="async">`:`<span>${esc(item.title)}</span>`}</span><strong>${esc(item.title)}</strong>${subtitle?`<small>${esc(subtitle)}</small>`:''}</button>`;
+  const artwork=homeArtworkItem(item),key=`${artwork.type}:${artwork.imdbId||artwork.tvmazeShowId||artwork.id}`;
+  return `<button type="button" class="home-poster" ${attributes}><span class="home-poster-art"><span>${esc(item.title)}</span><img hidden alt="" data-art="${esc(key)}" decoding="async"></span><strong>${esc(item.title)}</strong>${subtitle?`<small>${esc(subtitle)}</small>`:''}</button>`;
+}
+function homeRecommendationSeeds(items){
+  return items.map(item=>{
+    const watched=Object.values(item.watchedEpisodes||{}).some(episodes=>Array.isArray(episodes)&&episodes.length)||Number(item.curEp)>0||Number(item.watchedSeasons)>0;
+    return {item,weight:1+(item.favorite?3:0)+(watched||item.status==='Watched'?2:0)+(item.status==='Watching'?1:0)};
+  }).sort((a,b)=>b.weight-a.weight||recentAdditionTime(b.item)-recentAdditionTime(a.item)).slice(0,32).map(({item,weight})=>({title:item.title,type:item.type,tvmazeId:item.tvmazeShowId,imdbId:item.imdbId,genres:item.genres||item.verifiedDetails?.genres||[],description:item.description||item.verifiedDetails?.description||'',weight}));
 }
 function homeSection(title,content){return `<section class="home-section"><h2>${title}</h2>${content}</section>`;}
 function renderHomeDashboard(){
@@ -18,19 +24,21 @@ function renderHomeDashboard(){
   }).sort((a,b)=>b.activity-a.activity).slice(0,12);
   const upcoming=calendarWindowEvents(items).events.filter(event=>event.date.getTime()>Date.now()&&event.date.getTime()<=Date.now()+7*86400000).slice(0,12);
   const recent=[...items].sort((a,b)=>recentAdditionTime(b)-recentAdditionTime(a)).slice(0,12);
-  const cached=safeReadJSON('watchlog_recommendations_'+account,null);
+  const seeds=homeRecommendationSeeds(items),signature=JSON.stringify(seeds),cacheKey='watchlog_recommendations_v2_'+account;
+  const cached=safeReadJSON(cacheKey,null);
   const recommendations=(cached?.items||[]).filter(row=>!discoveryDuplicate(row)).slice(0,12);
   const carousel=cards=>`<div class="home-carousel">${cards}</div>`;
   const recommendationContent=recommendations.length?carousel(recommendations.map((item,index)=>homePoster(item,`data-home-recommend="${index}"`,item.reason||'Based on your library')).join('')):`<p class="home-empty">${navigator.onLine===false?'Connect to discover recommendations based on your library.':items.length?'Finding shows based on your library…':'Save a few shows to discover recommendations.'}</p>`;
   const markup=homeSection('Recommended for you',recommendationContent)+homeSection('Continue Watching',continued.length?carousel(continued.map(({item,next})=>`<article class="home-continue">${homePoster(item,`data-home-item="${esc(item.id)}"`,`Next · S${next.season} E${next.episode}`)}<button type="button" class="home-mark" data-home-mark="${esc(item.id)}" data-season="${next.season}" data-episode="${next.episode}"${episodeLogBusy.has(String(item.id))?' disabled':''}>Mark watched</button></article>`).join('')):'<p class="home-empty">Mark an episode watched to continue that show here.</p>')+homeSection('Coming Up',upcoming.length?carousel(upcoming.map(event=>homePoster(event.item,`data-home-item="${esc(event.item.id)}"`,`${event.label} · ${formatLocalDate(event.date)}`)).join('')):'<p class="home-empty">No saved releases in the next seven days.</p>')+homeSection('Recently Added',recent.length?carousel(recent.map(item=>homePoster(item,`data-home-item="${esc(item.id)}"`)).join('')):'<p class="home-empty">Your newest saved titles will appear here.</p>');
   if(root._homeMarkup!==markup){root.innerHTML=markup;root._homeMarkup=markup;}
   root._recommendations=recommendations;
-  if(items.length&&navigator.onLine!==false&&!homeRecommendationRequest&&Date.now()>homeRecommendationRetryAt&&(!cached||Date.now()-cached.savedAt>12*3600000)){
-    const seeds=items.filter(item=>item.type!=='Film').slice(0,16).map(item=>({title:item.title,tvmazeId:item.tvmazeShowId,imdbId:item.imdbId}));
+  root._artItems=[...items,...recommendations.map(homeArtworkItem)];
+  window.WatchLogGallery?.observeScheduleArtwork?.(root,root._artItems);
+  if(items.length&&navigator.onLine!==false&&!homeRecommendationRequest&&Date.now()>homeRecommendationRetryAt&&(!cached||cached.signature!==signature||Date.now()-cached.savedAt>((cached.items||[]).length?6*3600000:60000))){
     homeRecommendationRetryAt=Date.now()+60000;
-    homeRecommendationRequest=pinApi('recommendations',{seeds}).then(result=>{
+    homeRecommendationRequest=pinApi('recommendations',{seeds,country:typeof releaseViewingCountry==='function'?releaseViewingCountry():'GB',exclude:items.slice(0,1000).map(item=>({title:item.title,tvmazeId:item.tvmazeShowId,imdbId:item.imdbId}))}).then(result=>{
       if(String(currentUser?.id)!==account)return;
-      if(Array.isArray(result.results))safeWriteJSON('watchlog_recommendations_'+account,{items:result.results,savedAt:Date.now()});
+      if(Array.isArray(result.results))safeWriteJSON(cacheKey,{items:result.results,savedAt:Date.now(),signature});
     }).catch(()=>{}).finally(()=>{
       homeRecommendationRequest=null;
       if(String(currentUser?.id)===account&&homeIsVisible()){

@@ -3,18 +3,20 @@ window.WatchLogGallery=(()=>{
   let category='',api=null,host=null,observer=null,dialog=null,returnFocus=null,active=0;
   const cache=new Map(),pending=new Set(),queue=[],artTargets=new Map();
   const ARTWORK_CACHE_MS=6*60*60*1000;
+  const ARTWORK_STORAGE_KEY='watchlog_verified_posters_v2';
   const freshArt=id=>{const entry=cache.get(id);return entry&&Date.now()-entry.checkedAt<(entry.url?ARTWORK_CACHE_MS:5*60*1000)?entry:null;};
   const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const isFilm=item=>item.type==='Film';
   const key=item=>`${item.type}:${item.imdbId||item.tvmazeShowId||item.id}`;
   const safeImage=value=>{try{const u=new URL(value);return u.protocol==='https:'&&(/(^|\.)media-amazon\.com$|(^|\.)tvmaze\.com$/.test(u.hostname))?u.href:'';}catch{return '';}};
+  try{for(const [id,entry] of JSON.parse(localStorage.getItem(ARTWORK_STORAGE_KEY)||'[]').slice(-250))if(safeImage(entry?.url)&&Date.now()-entry.checkedAt<ARTWORK_CACHE_MS)cache.set(id,entry);}catch(_){}
   function savedArt(item){return safeImage(item?.posterUrl||item?.imageUrl||item?.poster||item?.image?.original||item?.image?.medium);}
   function applyImage(img,url){
     if(!url)return;
     if(img.getAttribute?.('src')===url&&(!img._galleryImageFailedAt||Date.now()-img._galleryImageFailedAt<60000))return;
     img._galleryImageFailedAt=0;
     img.onload=()=>{img.hidden=false;img._galleryImageFailedAt=0;};
-    img.onerror=()=>{img.hidden=true;img._galleryImageFailedAt=Date.now();};
+    img.onerror=()=>{img.hidden=true;img._galleryImageFailedAt=Date.now();const id=img.dataset?.art;if(id&&cache.get(id)?.url===url){cache.delete(id);try{localStorage.setItem(ARTWORK_STORAGE_KEY,JSON.stringify([...cache].filter(([,entry])=>entry.url).slice(-250)));}catch(_){}}};
     // The parent card is observed for visibility. A hidden lazy image never
     // starts loading, so it cannot fire the load event that reveals it.
     img.loading='eager';img.decoding='async';img.src=url;
@@ -64,6 +66,7 @@ window.WatchLogGallery=(()=>{
     if(!targets?.size||![...targets].some(img=>typeof img.parentElement?.getClientRects!=='function'||img.parentElement.getClientRects().length)){pending.delete(id);continue;}
     active++;fetchArt(item).catch(()=>'').then(url=>{
     cache.set(id,{url,checkedAt:Date.now()});if(cache.size>250)cache.delete(cache.keys().next().value);
+    if(url)try{localStorage.setItem(ARTWORK_STORAGE_KEY,JSON.stringify([...cache].filter(([,entry])=>entry.url).slice(-250)));}catch(_){}
     artTargets.get(id)?.forEach(img=>applyImage(img,url));
   }).finally(()=>{active--;pending.delete(id);pump();});}}
   function observe(root,items){
@@ -255,7 +258,8 @@ window.WatchLogGallery=(()=>{
         ['Release date',premiere?api.date(new Date(premiere.slice(0,10)+'T12:00:00Z')):details.year||item.releaseYear||''],
         ['Released seasons',isFilm(item)?'':releasedSeasons],['Status',details.status||dialog._trackerArtwork?.details?.status||'Unconfirmed']
       ].filter(([,value])=>value!=='');
-      target.innerHTML=`<h3>${esc(item.title)}</h3><p>${esc(description||'A verified description is temporarily unavailable.')}</p>${facts.length?`<dl>${facts.map(([label,value])=>`<div><dt>${esc(label)}</dt><dd>${esc(value)}</dd></div>`).join('')}</dl>`:''}${!description?'<button type="button" class="btn btn-secondary" data-gallery-retry-details>Retry</button>':''}`;
+      target.innerHTML=`<h3>${esc(item.title)}</h3>${descriptionMarkup(description||'A verified description is temporarily unavailable.')}${facts.length?`<dl>${facts.map(([label,value])=>`<div><dt>${esc(label)}</dt><dd>${esc(value)}</dd></div>`).join('')}</dl>`:''}${!description?'<button type="button" class="btn btn-secondary" data-gallery-retry-details>Retry</button>':''}`;
+      wireDescriptions(target);
       const retry=target.querySelector('[data-gallery-retry-details]');if(retry)retry.onclick=()=>loadTitleDetails(item);
     }catch(_){
       if(target!==dialog.querySelector('[data-gallery-details]'))return;
@@ -268,6 +272,23 @@ window.WatchLogGallery=(()=>{
     const decoder=document.createElement('textarea');
     decoder.innerHTML=String(value||'').replace(/<[^>]*>/g,' ');
     return decoder.value.replace(/\s+/g,' ').trim();
+  }
+  let descriptionId=0,descriptionObserver=null;
+  const descriptionNodes=new Set();
+  function descriptionMarkup(text){
+    const id='title-description-'+(++descriptionId);
+    return `<div class="description-text"><p id="${id}">${esc(text)}</p><button type="button" class="description-toggle" data-description-toggle aria-controls="${id}" aria-expanded="false" hidden>More</button></div>`;
+  }
+  function wireDescriptions(root){
+    for(const node of descriptionNodes)if(!node.isConnected){descriptionObserver?.unobserve(node);descriptionNodes.delete(node);}
+    const measure=node=>{const p=node?.querySelector('p'),button=node?.querySelector('[data-description-toggle]');if(!p||!button||!p.getClientRects().length)return;button.hidden=!node.classList.contains('expanded')&&p.scrollHeight<=p.clientHeight+1;};
+    if(!descriptionObserver&&typeof ResizeObserver!=='undefined')descriptionObserver=new ResizeObserver(entries=>{for(const entry of entries)measure(entry.target.parentElement);});
+    for(const node of root.querySelectorAll('.description-text')){
+      const p=node.querySelector('p'),button=node.querySelector('[data-description-toggle]');
+      button.onclick=()=>{const expanded=node.classList.toggle('expanded');button.textContent=expanded?'Less':'More';button.setAttribute('aria-expanded',String(expanded));measure(node);};
+      if(!descriptionNodes.has(p)){descriptionNodes.add(p);descriptionObserver?.observe(p);}
+      requestAnimationFrame(()=>measure(node));
+    }
   }
   async function showEpisodeDescription(item,season,episode,trigger){
     if(!episodeDescriptionDialog){
@@ -284,7 +305,7 @@ window.WatchLogGallery=(()=>{
     }
     const target=episodeDescriptionDialog,sequence=++episodeDescriptionSequence;
     const title=episodeTitle(dialog._trackerArtwork?.episodeTitles?.[season]?.[episode]||item.episodeTitles?.[season]?.[episode]);
-    target.innerHTML=`<header><h3 id="episode-description-title">Episode ${episode}${title?' · '+esc(title):''}</h3><button type="button" class="close-btn" data-episode-description-close aria-label="Close episode description">×</button></header><p role="status">Loading episode description…</p>`;
+    target.innerHTML=`<header><h3 id="episode-description-title">Episode ${episode}${title?' · '+esc(title):''}</h3><button type="button" class="close-btn" data-episode-description-close aria-label="Close episode description">×</button></header><div data-episode-description-copy><p role="status">Loading episode description…</p></div>`;
     target.showModal();
     target.addEventListener('close',()=>{if(trigger.isConnected)trigger.focus({preventScroll:true});},{once:true});
     let summary=dialog._trackerArtwork?.episodeDescriptions?.[season]?.[episode];
@@ -295,7 +316,8 @@ window.WatchLogGallery=(()=>{
       }catch(_){}
     }
     if(sequence!==episodeDescriptionSequence||!target.open)return;
-    target.querySelector('p').textContent=descriptionText(summary)||'An episode description is temporarily unavailable.';
+    target.querySelector('[data-episode-description-copy]').innerHTML=descriptionMarkup(descriptionText(summary)||'An episode description is temporarily unavailable.');
+    wireDescriptions(target);
   }
   function closeDetail(){
     const notes=dialog?.querySelector('[data-gallery-notes-field]'),editing=dialog?.querySelector('[data-gallery-notes-editor]:not(.hidden)');
@@ -446,7 +468,8 @@ window.WatchLogGallery=(()=>{
       const event=callbacks.upcoming(item,now);
       if(event.rank>0)watchlist.push({item,event});
       const releases=callbacks.released(item),watched=callbacks.watched(item),next=callbacks.next(item,releases,watched);
-      if(next)queue.push({item,event:{kind:'episode',season:next.season,number:next.episode}});
+      const started=Object.values(watched).some(episodes=>Array.isArray(episodes)&&episodes.length>0)||Number(item.curEp)>0||Number(item.watchedSeasons)>0||Number(item.curSeason)>1;
+      if(next&&!started)queue.push({item,event:{kind:'episode',season:next.season,number:next.episode}});
       const date=String(item.nextSeasonDate||''),time=date?Date.parse(/^\d{4}-\d{2}-\d{2}$/.test(date)?date+'T12:00:00Z':date):Infinity;
       const released=Math.max(0,...Object.keys(releases).filter(season=>(releases[season]||[]).length).map(Number));
       if(Number(item.nextSeasonNum)>released&&time>now)seasons.push({item,event:{kind:'season',number:Number(item.nextSeasonNum),time,rank:Number.isFinite(time)?2:1}});
@@ -473,7 +496,7 @@ window.WatchLogGallery=(()=>{
     const groups=showSections(items,api,now);
     const years=new Map();
     for(const row of groups.seasons){const year=Number.isFinite(row.event.time)?new Date(row.event.time).getUTCFullYear():null,current=new Date(now).getUTCFullYear(),label=year===null?'Date to be announced':year===current?'This year':year===current+1?'Next year':String(year);if(!years.has(label))years.set(label,[]);years.get(label).push(row);}
-    const markup=`<header class="shows-controls"><select data-shows-status aria-label="Show status">${['All','Watching','Planned','Watched'].map(value=>`<option value="${value}"${showsFilter===value?' selected':''}>${value==='All'?'All Shows':value}</option>`).join('')}</select><button type="button" data-shows-filter aria-label="Filter shows" aria-expanded="${showsFiltersOpen}">☷</button></header>${showsFiltersOpen?`<div class="shows-filter-options"><label><input type="checkbox" data-shows-favourites${showsFavourites?' checked':''}> Favourites only</label></div>`:''}${showsSection('Watchlist',groups.watchlist,now,['No shows on your watchlist.','Your saved shows with upcoming releases will appear here.'])}${showsSection('Episode Queue',groups.queue,now,["You're all caught up!",'New episodes will show up here as they become available.'],true)}${showsSection('Upcoming Episodes',groups.upcoming,now,['No upcoming episodes.','Episodes airing in the next 7 days will show up here when available.'])}<section class="shows-section upcoming-seasons" data-shows-section="Upcoming Seasons"><h3><span aria-hidden="true">◈</span> Upcoming Seasons</h3>${years.size?[...years].map(([label,rows])=>`<h4 class="shows-year">${esc(label)}</h4><div class="shows-poster-row">${rows.map(row=>showPoster(row,now)).join('')}</div>`).join(''):'<div class="shows-empty"><strong>No upcoming seasons.</strong><p>Announced seasons will appear here.</p></div>'}</section><button type="button" class="view-full-library" data-full-library>View all shows &amp; films</button>`;
+    const markup=`<header class="shows-controls"><select data-shows-status aria-label="Show status">${['All','Watching','Planned','Watched'].map(value=>`<option value="${value}"${showsFilter===value?' selected':''}>${value==='All'?'All Shows':value}</option>`).join('')}</select><button type="button" data-shows-filter aria-label="Filter shows" aria-expanded="${showsFiltersOpen}">☷</button></header>${showsFiltersOpen?`<div class="shows-filter-options"><label><input type="checkbox" data-shows-favourites${showsFavourites?' checked':''}> Favourites only</label></div>`:''}${showsSection('Watchlist',groups.watchlist,now,['No shows on your watchlist.','Your saved shows with upcoming releases will appear here.'])}${showsSection('Episode Queue',groups.queue,now,["You're all caught up!",'Unstarted shows with released episodes will appear here.'],true)}${showsSection('Upcoming Episodes',groups.upcoming,now,['No upcoming episodes.','Episodes airing in the next 7 days will show up here when available.'])}<section class="shows-section upcoming-seasons" data-shows-section="Upcoming Seasons"><h3><span aria-hidden="true">◈</span> Upcoming Seasons</h3>${years.size?[...years].map(([label,rows])=>`<h4 class="shows-year">${esc(label)}</h4><div class="shows-poster-row">${rows.map(row=>showPoster(row,now)).join('')}</div>`).join(''):'<div class="shows-empty"><strong>No upcoming seasons.</strong><p>Announced seasons will appear here.</p></div>'}</section><button type="button" class="view-full-library" data-full-library>View all shows &amp; films</button>`;
     if(root._galleryMarkup!==markup||!root.firstChild){root.innerHTML=markup;root._galleryMarkup=markup;}
     observe(root,items);
   }
@@ -542,5 +565,5 @@ window.WatchLogGallery=(()=>{
     observe(root,items);
   }
   function clearArtwork(){observer?.disconnect();artTargets.clear();queue.length=0;pending.clear();cache.clear();}
-  return {mount,open,sections,showSections,showCountdown,observeScheduleArtwork,releaseGroups,back,refreshCurrent,clearArtwork,getCategory:()=>category,setCategory:value=>{category=['Film','Series','All'].includes(value)?value:'';},hasCategory:()=>Boolean(category)};
+  return {mount,open,sections,showSections,showCountdown,descriptionMarkup,wireDescriptions,observeScheduleArtwork,releaseGroups,back,refreshCurrent,clearArtwork,getCategory:()=>category,setCategory:value=>{category=['Film','Series','All'].includes(value)?value:'';},hasCategory:()=>Boolean(category)};
 })();

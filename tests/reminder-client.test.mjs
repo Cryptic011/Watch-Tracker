@@ -41,18 +41,7 @@ function harness({permission='granted',missing=false}={}){
   };
 }
 
-test('A lost subscription replaces stale Turn Off controls with Reconnect',async()=>{
-  const h=harness();await h.check();assert.equal(h.disable.classList.contains('hidden'),false);
-  h.loseSubscription();assert.equal(await h.check(),false);
-  assert.equal(h.enable.textContent,'Reconnect Reminders');
-  assert.equal(h.enable.classList.contains('hidden'),false);
-  assert.equal(h.disable.classList.contains('hidden'),true);
-  assert.equal(h.testButton.disabled,true);
-  await h.reconnect();
-  assert.equal(h.label.textContent,'Reminders on');assert.equal(h.testButton.disabled,false);
-  assert.equal(h.stats().registered,0,'existing active worker survives update download failures');
-  assert.equal(h.stats().permissionRequests,0,'granted permission needs no new permission prompt');
-});
+test('A saved activation silently restores a lost subscription without another permission prompt',async()=>{const h=harness();await h.check();h.loseSubscription();assert.equal(await h.check(),true);assert.equal(h.label.textContent,'Reminders on');assert.equal(h.stats().serial,2);assert.equal(h.stats().permissionRequests,0);assert.equal(h.enable.classList.contains('hidden'),true);});
 
 test('A test repairs a disappeared subscription without depending on library saves',async()=>{
   const h=harness();await h.check();h.loseSubscription();await h.test();
@@ -141,3 +130,21 @@ test('Offline status preserves device subscription and makes no service requests
   assert.equal(h.enable.classList.contains('hidden'),true);
   h.context.navigator.onLine=true;await h.check();assert.equal(h.label.textContent,'Reminders on');
 });
+test('An IndexedDB activation restores a missing localStorage preference after reopening',async()=>{
+ const h=harness({missing:true});h.context.cacheGet=async()=>({userId:'account',value:'on'});h.context.cachePut=async()=>true;
+ assert.equal(await h.check(),true);assert.equal(h.stats().subscribes,1);assert.equal(h.stats().permissionRequests,0);
+});
+test('Safari can request one restoration tap without losing the saved activation',async()=>{
+ const h=harness();await h.check();h.loseSubscription();const subscribe=h.worker.pushManager.subscribe;
+ h.worker.pushManager.subscribe=async()=>{const error=Error('Gesture required');error.name='NotAllowedError';throw error;};
+ assert.equal(await h.check(),false);assert.match(h.status.textContent,/activation is saved/);assert.equal(h.enable.textContent,'Reconnect Reminders');assert.equal(h.stats().permissionRequests,0);
+ h.worker.pushManager.subscribe=subscribe;await h.reconnect();assert.equal(h.label.textContent,'Reminders on');
+});
+test('A temporary first-activation service failure preserves the device intent and recovers automatically',async()=>{
+ const h=harness({missing:true}),fetch=h.context.fetch;
+ h.context.fetch=async(url,request)=>{if(JSON.parse(request.body).action==='subscribe')throw Error('Offline');return fetch(url,request);};
+ await h.reconnect();assert.match(h.status.textContent,/activation is saved/i);
+ h.context.fetch=fetch;await h.check();assert.equal(h.label.textContent,'Reminders on');assert.equal(h.stats().permissionRequests,0);
+});
+
+test('A fresh device with granted browser permission still needs its own initial activation',async()=>{const h=harness({missing:true});await h.check();assert.equal(h.stats().subscribes,0);assert.equal(h.enable.textContent,'Enable Background Reminders');await h.reconnect();h.loseSubscription();await h.check();assert.equal(h.stats().serial,2);assert.equal(h.stats().permissionRequests,0);});

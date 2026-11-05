@@ -38,7 +38,7 @@
   function beginSwipe(x,y,target){
     globalSwipeX=x;globalSwipeY=y;globalSwipeAt=Date.now();globalSwipeTarget=target;
     // Horizontal poster rows own their gestures in both directions, even at an end.
-    swipeActive=!target?.closest?.('input,textarea,select,[contenteditable="true"],.gallery-carousel,#discovery-view,.bottom-tabs,[data-schedule-back],.schedule-shortcut');
+    swipeActive=x>=0&&x<=28&&!target?.closest?.('input,textarea,select,[contenteditable="true"],.gallery-carousel,.home-carousel,.shows-poster-row,.library-type-dock,#discovery-view,.bottom-tabs,[data-schedule-back],.schedule-shortcut');
     swipeComplete=false;swipeVertical=false;
   }
   function handleGlobalSwipe(endX,endY,event){
@@ -65,6 +65,7 @@
   document.addEventListener("touchmove",event=>{const t=event.changedTouches?.[0];if(!t)return;const dx=t.clientX-globalSwipeX,dy=t.clientY-globalSwipeY;if(swipeActive&&!swipeVertical&&dx>12&&Math.abs(dx)>Math.abs(dy)*1.5&&event.cancelable)event.preventDefault();handleGlobalSwipe(t.clientX,t.clientY,event);},{passive:false,capture:true});
   document.addEventListener("touchend",event=>{const t=event.changedTouches?.[0];if(t)handleGlobalSwipe(t.clientX,t.clientY,event);swipeActive=false;},{passive:false,capture:true});
   document.addEventListener("touchcancel",()=>{swipeActive=false;},{passive:true,capture:true});
+  document.addEventListener("pointercancel",()=>{swipeActive=false;},{passive:true,capture:true});
   document.addEventListener("pointerdown",event=>{if(event.isPrimary===false||event.button>0)return;beginSwipe(event.clientX,event.clientY,event.target);},{passive:true,capture:true});
   document.addEventListener("pointermove",event=>{if(event.pointerType!=="touch")handleGlobalSwipe(event.clientX,event.clientY,event);},{passive:false,capture:true});
   document.addEventListener("pointerup",event=>{if(event.pointerType!=="touch"){handleGlobalSwipe(event.clientX,event.clientY,event);swipeActive=false;}},{passive:false,capture:true});

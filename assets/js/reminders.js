@@ -105,6 +105,7 @@
     if(token!==cloudSessionToken)throw new Error("Sign in again to connect reminders.");
     const confirmed=await registration.pushManager.getSubscription();
     if(!confirmed||confirmed.endpoint!==subscription.endpoint)throw new Error("iPhone did not retain the notification connection. Tap Reconnect Reminders to try again.");
+    backgroundReminderPreference('on');
     await reminderApi("subscribe",{
       subscription:subscription.toJSON(),
       timeZone:DEVICE_TIME_ZONE||"UTC",
@@ -113,9 +114,21 @@
     if(token!==cloudSessionToken)throw new Error("Sign in again to connect reminders.");
     return subscription;
   }
+  const backgroundReminderIntents=new Map();
   function backgroundReminderPreference(value){
+    const account=String(currentUser?.id||'');
     const key=`watchlog_background_reminders_${currentUser?.id||""}`;
-    try{if(value!==undefined)localStorage.setItem(key,value);return localStorage.getItem(key);}catch(_){return null;}
+    if(value!==undefined){
+      backgroundReminderIntents.set(account,value);
+      try{localStorage.setItem(key,value);}catch(_){}
+      if(account&&typeof cachePut==='function')void cachePut({key:'background-reminders',userId:account,value}).catch(()=>{});
+    }
+    try{return localStorage.getItem(key)||backgroundReminderIntents.get(account)||null;}catch(_){return backgroundReminderIntents.get(account)||null;}
+  }
+  async function restoreBackgroundReminderPreference(){
+    if(backgroundReminderPreference()!==null||typeof cacheGet!=='function')return;
+    const account=String(currentUser?.id||'');
+    try{const saved=await cacheGet('background-reminders');if(String(currentUser?.id||'')===account&&saved?.userId===account&&['on','off'].includes(saved.value))backgroundReminderIntents.set(account,saved.value);}catch(_){}
   }
   async function refreshBackgroundReminderStatus({reconnect=false}={}){
     if(backgroundReminderBusy)return false;
@@ -124,6 +137,8 @@
     const report=(message,state="",connection="off")=>{if(generation===backgroundReminderGeneration&&token===cloudSessionToken)setBackgroundReminderStatus(message,state,connection);};
     const task=(async()=>{
     if(!token){report("Sign in to manage background reminders.");return false;}
+    await restoreBackgroundReminderPreference();
+    if(generation!==backgroundReminderGeneration||token!==cloudSessionToken)return false;
     const supportError=pushSupportError();
     if(supportError){
       report(supportError,"error","blocked");
@@ -136,24 +151,27 @@
     }
     let subscription;
     try{
-    subscription=await currentPushSubscription();
     if(backgroundReminderPreference()==="off"){
       if(navigator.onLine!==false)try{await prepareBackgroundPush();}catch(_){}
       report("Background reminders are off on this device.");return false;
     }
+    subscription=await currentPushSubscription();
     if(navigator.onLine===false){
-      report(subscription?"This device's reminder connection is saved. It will be checked automatically when online.":"Go online to connect reminders on this device.","",subscription?"pending":"checking");return false;
+      const activated=subscription||backgroundReminderPreference()==='on';
+      report(activated?"This device's reminder activation is saved. It will reconnect automatically when online.":"Go online to connect reminders on this device.","",activated?"pending":"checking");return false;
     }
     // Prepare the permission-sensitive Safari tap without making the key
     // service a prerequisite for checking an already registered endpoint.
     void prepareBackgroundPush().catch(()=>{});
     if(!subscription){
       await prepareBackgroundPush();
-      const off=backgroundReminderPreference()==="off";
-      report(off?"Background reminders are off on this device.":"Notifications are allowed, but this device needs reconnecting.","",off?"off":"repair");
-      return false;
+      if(backgroundReminderPreference()!=='on'){
+        report("Enable reminders once on this device to receive release alerts.","","off");return false;
+      }
+      if(generation!==backgroundReminderGeneration||token!==cloudSessionToken)return false;
+      subscription=await ensureBackgroundPush({token});
     }
-      if(subscription.expirationTime&&subscription.expirationTime<=Date.now()){report("This device's notification connection expired. Reconnect reminders.","","repair");return false;}
+      if(subscription.expirationTime&&subscription.expirationTime<=Date.now())subscription=await ensureBackgroundPush({token});
       const result=await reminderApi("status",{endpoint:subscription.endpoint},token);
       if((!result.enabled||reconnect)&&backgroundReminderPreference()!=="off"&&generation===backgroundReminderGeneration&&token===cloudSessionToken){
         await reminderApi("subscribe",{subscription:subscription.toJSON(),timeZone:DEVICE_TIME_ZONE||"UTC",locale:typeof reminderViewingLocale==="function"?reminderViewingLocale():USER_LOCALE},token);
@@ -161,11 +179,12 @@
     }catch(error){
       if(error.code==="network"||error.code==="timeout"||error.status>=500||error.status===429){
         report(subscription?"Reminder connection saved. Temporarily unable to check the service; retrying automatically.":"Unable to reach the reminder service. Retrying when connected.","",subscription?"pending":"checking");
-      }else report(error.status===401?"Your reminder session expired. Sign in again.":error.message||"Could not check reminders.","error",error.status===401?"blocked":"repair");
+      }else if(error.name==='NotAllowedError'||error.name==='InvalidStateError')report("Reminder activation is saved. This browser needs one tap to restore its notification connection.","","repair");
+      else report(error.status===401?"Your reminder session expired. Sign in again.":error.message||"Could not check reminders.","error",error.status===401?"blocked":"repair");
       return false;
     }
     if(generation===backgroundReminderGeneration&&token===cloudSessionToken)backgroundReminderPreference("on");
-    report("Enabled — alerts can arrive when Watch Tracker is closed.","ok","on");
+    report("Enabled on this device — reconnects automatically when needed, including after reopening.","ok","on");
     return true;
     })();
     backgroundReminderRefresh=task;
@@ -194,14 +213,14 @@
     try{
       // Start permission requests in the click's user gesture, before any await.
       await action(token);
-    }catch(error){if(token===cloudSessionToken)setBackgroundReminderStatus(error.message||"Could not connect reminders. Try reconnecting.","error",pushSupportError()?"blocked":"repair");}
+    }catch(error){if(token===cloudSessionToken){const temporary=backgroundReminderPreference()==='on'&&(error.code==='network'||error.code==='timeout'||error.status>=500);setBackgroundReminderStatus(temporary?'Reminder activation is saved. Retrying the connection automatically.':error.message||"Could not connect reminders. Try reconnecting.",temporary?'':'error',temporary?'pending':pushSupportError()?"blocked":"repair");}}
     finally{backgroundReminderBusy=false;if(token===cloudSessionToken){enableBackgroundReminders.disabled=backgroundReminderConnection==="blocked";disableBackgroundReminders.disabled=false;const test=document.getElementById("test-background-reminder");if(test)test.disabled=backgroundReminderConnection!=="on";}}
   }
   enableBackgroundReminders.onclick=()=>runBackgroundReminderAction(async token=>{
     // Safari requires subscribe() in the tap itself, before network/worker
     // awaits. Reusing a valid subscription also avoids needless revocation.
     const prepared=backgroundPushPrepared;
-    const subscriptionPromise=prepared?prepared.registration.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:prepared.key}):null;
+    const subscriptionPromise=prepared&&Notification.permission==='granted'?prepared.registration.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:prepared.key}):null;
     setBackgroundReminderStatus("Connecting this device…","","checking");
     await ensureBackgroundPush({askPermission:true,token,subscriptionPromise});
     if(token!==cloudSessionToken)return;
@@ -235,7 +254,7 @@
   // A transient failure recovers even if the device never emits online again.
   function scheduleReminderStatusRetry(){
     clearTimeout(backgroundReminderRetryTimer);backgroundReminderRetryTimer=null;
-    if(backgroundReminderConnection!=='pending'||!currentUser||navigator.onLine===false||document.visibilityState==='hidden')return;
+    if(!['pending','checking'].includes(backgroundReminderConnection)||!currentUser||navigator.onLine===false||document.visibilityState==='hidden')return;
     backgroundReminderRetryTimer=setTimeout(()=>{backgroundReminderRetryTimer=null;refreshRemindersOnReturn();scheduleReminderStatusRetry();},60000);
   }
   window.addEventListener('pagehide',()=>{clearTimeout(backgroundReminderRetryTimer);backgroundReminderRetryTimer=null;});
@@ -251,7 +270,7 @@
   async function pinApi(action,payload={},token=cloudSessionToken,preparedBody="",externalSignal=null){
     const headers={"Content-Type":"application/json"};
     if(token)headers["X-WatchLog-Session"]=token;
-    const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),["uk_availability","catalog_details"].includes(action)?20000:CLOUD_REQUEST_TIMEOUT_MS);
+    const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),["uk_availability","catalog_details","recommendations"].includes(action)?20000:CLOUD_REQUEST_TIMEOUT_MS);
     const abortFromExternal=()=>controller.abort();
     if(externalSignal){if(externalSignal.aborted)controller.abort();else externalSignal.addEventListener("abort",abortFromExternal,{once:true});}
     try{

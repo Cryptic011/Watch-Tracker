@@ -1,3 +1,13 @@
+## 2026-11-05 — Home recommendations, navigation and reminder continuity
+- Base recommendations on saved library interests, with favourites and watched shows weighted more strongly; include matching current shows and exclude saved titles.
+- Load Home posters through the verified artwork loader, including legacy poster fields, and retain resolved covers across reopening.
+- Preview descriptions in three lines with More and Less controls for the full text.
+- Restrict Back gestures to the left edge and preserve horizontal scrolling through shows and Home rows.
+- Add the matching sliding selection animation to Shows and Films and animate their content separately from the dock.
+- Keep Episode Queue for unstarted shows only, removing any show with watched episode progress.
+- Move Recurring shows out of Library to a dedicated calendar-style page, reached from a small badge beside the calendar timezone.
+- Remember reminder activation on each device in local storage and IndexedDB, repair missing connections automatically, and preserve explicit device turn-off choices.
+
 ## 2026-11-04 — Episode description positioning
 - Centre the description box within the screen and keep it clear of device safe areas.
 - Separate the episode heading and close button from the scrollable description text.

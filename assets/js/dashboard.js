@@ -77,22 +77,20 @@ const DASHBOARD_TIME_FORMATTER=new Intl.DateTimeFormat(USER_LOCALE,{timeZone:"UT
 const DASHBOARD_PRIOR_DATE_FORMATTER=new Intl.DateTimeFormat(USER_LOCALE,{timeZone:"UTC",weekday:"short",day:"numeric",month:"short"});
 let selectedCalendarRange='upcoming',selectedScheduleView='';
 function homeSchedulesVisible(){
-  return Boolean(currentUser&&currentTab==='library'&&(typeof calendarOnlyPage==='undefined'||calendarOnlyPage||libraryOnlyPage));
+  return Boolean(currentUser&&currentTab==='library'&&(typeof calendarOnlyPage==='undefined'||calendarOnlyPage));
 }
 function openScheduleView(view){
   if(!['recurring','calendar'].includes(view))return;
-  goToTabHome(view==='calendar'?'calendar':'collection');
-  selectedScheduleView='';render();
-  const panel=document.querySelector('[data-home-section="'+view+'"]');
-  if(panel){panel.open=true;panel.querySelector('summary')?.focus({preventScroll:true});}
+  goToTabHome(view==='calendar'?'calendar':'recurring');
 }
-function closeScheduleView(){goToTabHome('library');}
+function closeScheduleView(){goToTabHome('calendar');}
 function renderScheduleNavigation(){
   let root=document.getElementById('library-schedule-navigation');
   if(!root){
     root=document.createElement('div');root.id='library-schedule-navigation';
     root.className='home-schedules';
     document.getElementById('library-shows').after(root);
+    root.addEventListener('click',event=>{const button=event.target.closest('[data-schedule-open]');if(button)openScheduleView(button.dataset.scheduleOpen);});
     for(const [key,label] of [['calendar','Calendar'],['recurring','Recurring shows']]){
       const panel=document.createElement('details');panel.className='home-schedule-panel';panel.dataset.homeSection=key;panel.open=key==='calendar';
       const summary=document.createElement('summary');summary.innerHTML='<h2>'+label+'</h2><span class="home-section-chevron" aria-hidden="true">⌄</span>';
@@ -101,9 +99,10 @@ function renderScheduleNavigation(){
     }
   }
   const account=String(currentUser?.id||'');
-  if(root._account!==account){root._account=account;for(const panel of root.querySelectorAll('[data-home-section]'))panel.open=panel.dataset.homeSection==='calendar';}
+  if(root._account!==account){root._account=account;for(const panel of root.querySelectorAll('[data-home-section]'))panel.open=true;}
   const visible=homeSchedulesVisible();root.classList.toggle('hidden',!visible);
-  for(const panel of root.querySelectorAll('[data-home-section]'))panel.classList.toggle('hidden',panel.dataset.homeSection==='calendar'?!calendarOnlyPage:!libraryOnlyPage||window.WatchLogGallery?.getCategory?.()==='Film');
+  const recurring=selectedScheduleView==='recurring';
+  for(const panel of root.querySelectorAll('[data-home-section]'))panel.classList.toggle('hidden',!visible||(panel.dataset.homeSection==='recurring')!==recurring);
   const calendar=document.getElementById('library-dashboard');
   const calendarPanel=root.querySelector('[data-home-section="calendar"]');
   if(calendar&&calendar.parentElement!==calendarPanel)calendarPanel.append(calendar);
@@ -270,14 +269,14 @@ function renderRecurringWeeklySchedule(){
       const button=event.target.closest("[data-recurring-open]");if(button)openMediaRow(button.dataset.recurringOpen,button);
     });
   }
-  const available=Boolean(currentUser&&currentTab==='library'&&libraryOnlyPage&&window.WatchLogGallery?.getCategory?.()!=='Film');
+  const available=Boolean(currentUser&&currentTab==='library'&&calendarOnlyPage&&selectedScheduleView==='recurring');
   root.classList.toggle("hidden",!available);
   if(!available){if(!currentUser){root.replaceChildren();root._dashboardMarkup=null;}return;}
-  const now=new Date(),items=mediaItems.filter(isEpisodeTrackable),schedule=calendarWindowEvents(items,'upcoming',now);
+  const now=new Date(),items=mediaItems.filter(item=>isEpisodeTrackable(item)&&item.hideFromWeeklyReleases!==true),schedule=calendarWindowEvents(items,'upcoming',now);
   const rows=recurringWeeklyShows(items,now);
   const progressMarkers=new Map();
   const days=releaseAgendaDays(schedule,'data-recurring-open',progressMarkers);
-  updateDashboardMarkup(root,`<section class="dashboard-section weekly-releases recurring-weekly-releases calendar-agenda" aria-label="Recurring release calendar"><p class="calendar-period">Next 14 days · GMT</p><div class="release-week-list">${days}</div>${releaseAgendaPrior(schedule.priorEvents,'data-recurring-open',progressMarkers)}</section>`);
+  updateDashboardMarkup(root,`<section class="dashboard-section weekly-releases recurring-weekly-releases calendar-agenda" aria-label="Recurring release calendar"><p class="calendar-period"><span>Next 14 days · GMT</span><button type="button" class="schedule-status-button" data-schedule-open="calendar">‹ Calendar</button></p><div class="release-week-list">${days}</div>${releaseAgendaPrior(schedule.priorEvents,'data-recurring-open',progressMarkers)}</section>`);
   window.WatchLogGallery?.observeScheduleArtwork?.(root,items);
 
   if(document.visibilityState==="visible"){
@@ -364,11 +363,11 @@ function renderDashboard(){
   renderRecurringWeeklySchedule();
   const root=document.getElementById('library-dashboard');if(!root)return;
   renderWatchStatistics();
-  const visible=Boolean(currentUser&&currentTab==='library'&&calendarOnlyPage);
+  const visible=Boolean(currentUser&&currentTab==='library'&&calendarOnlyPage&&selectedScheduleView!=='recurring');
   root.classList.toggle('hidden',!visible);if(!visible){if(!currentUser){root.replaceChildren();root._dashboardMarkup=null;}return;}
   const progressMarkers=new Map();
   const schedule=calendarWindowEvents(mediaItems,'upcoming',new Date());
-  updateDashboardMarkup(root,`<section class="dashboard-section weekly-releases calendar-agenda" aria-label="Release calendar"><p class="calendar-period">Next 14 days · GMT</p><div class="release-week-list">${releaseAgendaDays(schedule,'data-dashboard-open',progressMarkers)}</div>${releaseAgendaPrior(schedule.priorEvents,'data-dashboard-open',progressMarkers)}</section>`);
+  updateDashboardMarkup(root,`<section class="dashboard-section weekly-releases calendar-agenda" aria-label="Release calendar"><p class="calendar-period"><span>Next 14 days · GMT</span><button type="button" class="schedule-status-button" data-schedule-open="recurring">Recurring shows</button></p><div class="release-week-list">${releaseAgendaDays(schedule,'data-dashboard-open',progressMarkers)}</div>${releaseAgendaPrior(schedule.priorEvents,'data-dashboard-open',progressMarkers)}</section>`);
   window.WatchLogGallery?.observeScheduleArtwork?.(root,mediaItems);
   if(!recurringWeeklyTimer&&document.visibilityState==='visible')recurringWeeklyTimer=setTimeout(renderDashboard,recurringScheduleDelay([],new Date(),mediaItems));
 }
