@@ -1,3 +1,6 @@
+## 2026-11-05 — Recent shows above Watchlist
+- Add a matching poster-card Recents row above Watchlist, showing the latest 15 shows by their added date.
+
 ## 2026-11-05 — Release date in reminder brackets
 - Replace advance reminder countdowns with the release date in DD/MM brackets, keeping the day and airtime.
 

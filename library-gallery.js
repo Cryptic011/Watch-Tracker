@@ -474,11 +474,12 @@ window.WatchLogGallery=(()=>{
   }
   let showsFilter='All',showsFavourites=false,showsFiltersOpen=false;
   function showSections(items,callbacks,now=Date.now()){
-    const rows=items.filter(item=>!isFilm(item)),watchlist=[],queue=[],seasons=[];
+    const rows=items.filter(item=>!isFilm(item)),recent=[],watchlist=[],queue=[],seasons=[];
     for(const item of rows){
       const event=callbacks.upcoming(item,now);
       if(event.rank>0)watchlist.push({item,event});
       const releases=callbacks.released(item),watched=callbacks.watched(item),next=callbacks.next(item,releases,watched);
+      recent.push({item,event:event.rank>0?event:next?{kind:'episode',season:next.season,number:next.episode}:{},recent:true});
       const started=Object.values(watched).some(episodes=>Array.isArray(episodes)&&episodes.length>0)||Number(item.curEp)>0||Number(item.watchedSeasons)>0||Number(item.curSeason)>1;
       if(next&&!started)queue.push({item,event:{kind:'episode',season:next.season,number:next.episode}});
       const date=String(item.nextSeasonDate||''),time=date?Date.parse(/^\d{4}-\d{2}-\d{2}$/.test(date)?date+'T12:00:00Z':date):Infinity;
@@ -487,7 +488,8 @@ window.WatchLogGallery=(()=>{
     }
     const upcoming=(callbacks.showEvents?.(rows)?.events||[]).filter(event=>!event.dateOnly&&event.date.getTime()>now&&event.date.getTime()<=now+7*86400000).map(event=>({item:event.item,event:{kind:'episode',season:event.season,number:event.episode||event.number,time:event.date.getTime(),rank:2}}));
     const order=(a,b)=>(a.event.time||Infinity)-(b.event.time||Infinity)||String(a.item.title).localeCompare(String(b.item.title));
-    return {watchlist:watchlist.sort(order),queue,upcoming:upcoming.sort(order),seasons:seasons.sort(order)};
+    recent.sort((a,b)=>(callbacks.added?.(b.item)||0)-(callbacks.added?.(a.item)||0)||String(a.item.title||'').localeCompare(String(b.item.title||'')));
+    return {recent:recent.slice(0,15),watchlist:watchlist.sort(order),queue,upcoming:upcoming.sort(order),seasons:seasons.sort(order)};
   }
   function showCountdown(event,now){
     if(!Number.isFinite(event.time))return 'Date TBA';
@@ -495,9 +497,10 @@ window.WatchLogGallery=(()=>{
     const days=Math.max(0,Math.ceil((event.time-now)/86400000));
     return days===0?'Today':days===1?'1 day':days<28?days+' days':Math.max(1,Math.round(days/30))+' months';
   }
-  function showPoster({item,event},now,queued=false){
-    const label=event.kind==='season'?'Season '+String(event.number).padStart(2,'0'):'S'+String(event.season||'?').padStart(2,'0')+' · E'+String(event.number||'?').padStart(2,'0');
-    return `<button type="button" class="shows-poster-card" data-shows-item="${esc(item.id)}" aria-label="Open ${esc(item.title)} ${esc(label)}">${art(item)}<span class="shows-poster-copy"><strong>${esc(item.title)}</strong><span>${esc(label)}</span><small>${queued?'Ready to watch':esc(showCountdown(event,now))}</small></span></button>`;
+  function showPoster({item,event,recent=false},now,queued=false){
+    const label=event.kind==='season'?'Season '+String(event.number).padStart(2,'0'):event.kind==='episode'?'S'+String(event.season||'?').padStart(2,'0')+' · E'+String(event.number||'?').padStart(2,'0'):item.type||'Series';
+    const caption=recent?(item.status==='Saved'?'Planned':item.status||'Planned'):queued?'Ready to watch':showCountdown(event,now);
+    return `<button type="button" class="shows-poster-card" data-shows-item="${esc(item.id)}" aria-label="Open ${esc(item.title)} ${esc(label)}">${art(item)}<span class="shows-poster-copy"><strong>${esc(item.title)}</strong><span>${esc(label)}</span><small>${esc(caption)}</small></span></button>`;
   }
   function showsSection(label,rows,now,empty,queued=false){
     return `<section class="shows-section" data-shows-section="${esc(label)}"><h3><span aria-hidden="true">◈</span> ${esc(label)}</h3>${rows.length?`<div class="shows-poster-row">${rows.map(row=>showPoster(row,now,queued)).join('')}</div>`:`<div class="shows-empty"><strong><span aria-hidden="true">✓</span> ${esc(empty[0])}</strong><p>${esc(empty[1])}</p></div>`}</section>`;
@@ -507,7 +510,7 @@ window.WatchLogGallery=(()=>{
     const groups=showSections(items,api,now);
     const years=new Map();
     for(const row of groups.seasons){const year=Number.isFinite(row.event.time)?new Date(row.event.time).getUTCFullYear():null,current=new Date(now).getUTCFullYear(),label=year===null?'Date to be announced':year===current?'This year':year===current+1?'Next year':String(year);if(!years.has(label))years.set(label,[]);years.get(label).push(row);}
-    const markup=`<header class="shows-controls"><select data-shows-status aria-label="Show status">${['All','Watching','Planned','Watched'].map(value=>`<option value="${value}"${showsFilter===value?' selected':''}>${value==='All'?'All Shows':value}</option>`).join('')}</select><button type="button" data-shows-filter aria-label="Filter shows" aria-expanded="${showsFiltersOpen}">☷</button></header>${showsFiltersOpen?`<div class="shows-filter-options"><label><input type="checkbox" data-shows-favourites${showsFavourites?' checked':''}> Favourites only</label></div>`:''}${showsSection('Watchlist',groups.watchlist,now,['No shows on your watchlist.','Your saved shows with upcoming releases will appear here.'])}${showsSection('Episode Queue',groups.queue,now,["You're all caught up!",'Unstarted shows with released episodes will appear here.'],true)}${showsSection('Upcoming Episodes',groups.upcoming,now,['No upcoming episodes.','Episodes airing in the next 7 days will show up here when available.'])}<section class="shows-section upcoming-seasons" data-shows-section="Upcoming Seasons"><h3><span aria-hidden="true">◈</span> Upcoming Seasons</h3>${years.size?[...years].map(([label,rows])=>`<h4 class="shows-year">${esc(label)}</h4><div class="shows-poster-row">${rows.map(row=>showPoster(row,now)).join('')}</div>`).join(''):'<div class="shows-empty"><strong>No upcoming seasons.</strong><p>Announced seasons will appear here.</p></div>'}</section><button type="button" class="view-full-library" data-full-library>View all shows &amp; films</button>`;
+    const markup=`<header class="shows-controls"><select data-shows-status aria-label="Show status">${['All','Watching','Planned','Watched'].map(value=>`<option value="${value}"${showsFilter===value?' selected':''}>${value==='All'?'All Shows':value}</option>`).join('')}</select><button type="button" data-shows-filter aria-label="Filter shows" aria-expanded="${showsFiltersOpen}">☷</button></header>${showsFiltersOpen?`<div class="shows-filter-options"><label><input type="checkbox" data-shows-favourites${showsFavourites?' checked':''}> Favourites only</label></div>`:''}${showsSection('Recents',groups.recent,now,['No recently added shows.','Shows you add to your library will appear here.'])}${showsSection('Watchlist',groups.watchlist,now,['No shows on your watchlist.','Your saved shows with upcoming releases will appear here.'])}${showsSection('Episode Queue',groups.queue,now,["You're all caught up!",'Unstarted shows with released episodes will appear here.'],true)}${showsSection('Upcoming Episodes',groups.upcoming,now,['No upcoming episodes.','Episodes airing in the next 7 days will show up here when available.'])}<section class="shows-section upcoming-seasons" data-shows-section="Upcoming Seasons"><h3><span aria-hidden="true">◈</span> Upcoming Seasons</h3>${years.size?[...years].map(([label,rows])=>`<h4 class="shows-year">${esc(label)}</h4><div class="shows-poster-row">${rows.map(row=>showPoster(row,now)).join('')}</div>`).join(''):'<div class="shows-empty"><strong>No upcoming seasons.</strong><p>Announced seasons will appear here.</p></div>'}</section><button type="button" class="view-full-library" data-full-library>View all shows &amp; films</button>`;
     if(root._galleryMarkup!==markup||!root.firstChild){root.innerHTML=markup;root._galleryMarkup=markup;}
     observe(root,items);
   }

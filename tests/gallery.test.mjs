@@ -56,3 +56,13 @@ test('Shows countdown calls a release later on the current day Today',()=>{
 });
 
 test('Episode queue contains only unstarted shows, including legacy progress',()=>{const next=()=>({season:1,episode:1}),callbacks={upcoming:()=>({rank:0}),released:()=>({1:[1,2]}),watched:item=>item.watchedEpisodes||{},next};const rows=[{id:'new',type:'Series'},{id:'tick',type:'Series',watchedEpisodes:{1:[1]}},{id:'legacy',type:'Series',curSeason:1,curEp:2},{id:'seasons',type:'Series',watchedSeasons:1},{id:'later',type:'Series',curSeason:2}];assert.equal(context.window.WatchLogGallery.showSections(rows,callbacks).queue.map(row=>row.item.id).join(','),'new');});
+
+test('Recents keeps the latest fifteen added shows and ignores later edits and films',()=>{
+ const callbacks={upcoming:()=>({rank:0}),released:()=>({}),watched:()=>({}),next:()=>null,added:item=>Date.parse(item.createdAt)||0};
+ const rows=Array.from({length:18},(_,index)=>({id:String(index),type:'Series',title:'Show '+index,createdAt:new Date(Date.UTC(2026,0,index+1)).toISOString(),updatedAt:new Date(Date.UTC(2027,0,18-index)).toISOString()}));
+ rows.push({id:'film',type:'Film',createdAt:'2028-01-01T00:00:00Z'},{id:'legacy',type:'Series',title:'Legacy',updatedAt:'2029-01-01T00:00:00Z'});
+ const result=context.window.WatchLogGallery.showSections(rows,callbacks).recent;
+ assert.equal(result.length,15);
+ assert.equal(result.map(row=>row.item.id).join(','),Array.from({length:15},(_,index)=>String(17-index)).join(','));
+ assert.equal(rows[0].id,'0','sorting does not mutate the library');
+});

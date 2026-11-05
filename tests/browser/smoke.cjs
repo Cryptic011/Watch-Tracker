@@ -181,7 +181,23 @@ const server=http.createServer((req,res)=>{
   await page.getByRole('button',{name:'Back to Shows',exact:true}).click();
   assert.equal(await page.getByRole('combobox',{name:'Show status'}).inputValue(),'All');
   assert.equal(await page.locator('.shows-controls').getByRole('button').count(),1,'Shows has only its filter button in the toolbar');
-  for(const section of ['Watchlist','Episode Queue','Upcoming Episodes','Upcoming Seasons'])assert.equal(await page.locator('[data-shows-section="'+section+'"]').count(),1);
+  for(const section of ['Recents','Watchlist','Episode Queue','Upcoming Episodes','Upcoming Seasons'])assert.equal(await page.locator('[data-shows-section="'+section+'"]').count(),1);
+  const beforeRecents=await page.evaluate(()=>{
+   const original=mediaItems;
+   mediaItems=Array.from({length:18},(_,index)=>({id:'recent-'+index,title:'Recent show '+index,type:'Series',status:'Planned',createdAt:new Date(Date.UTC(2026,0,index+1)).toISOString(),updatedAt:new Date(Date.UTC(2027,0,18-index)).toISOString(),posterUrl:'https://static.tvmaze.com/recent.jpg'}));
+   mediaItems.push({id:'recent-film',title:'Recent film',type:'Film',createdAt:'2028-01-01T00:00:00Z'});render();return original;
+  });
+  try{
+   const recent=page.locator('[data-shows-section="Recents"]');
+   assert.deepEqual(await recent.locator('[data-shows-item]').evaluateAll(nodes=>nodes.map(node=>node.dataset.showsItem)),Array.from({length:15},(_,index)=>'recent-'+(17-index)),'Recents shows the newest fifteen additions, ignoring edit dates and films');
+   assert.equal(await recent.evaluate(node=>node.nextElementSibling.dataset.showsSection),'Watchlist','Recents sits immediately above Watchlist');
+   await recent.locator('.shows-poster-card').first().scrollIntoViewIfNeeded();
+   await recent.locator('img').first().evaluate(img=>new Promise((resolve,reject)=>{
+    const start=Date.now();const check=()=>{if(!img.hidden&&img.naturalWidth>0)return resolve();if(Date.now()-start>5000)return reject(Error('Recents poster did not load'));setTimeout(check,25);};check();
+   }));
+   assert.equal(await recent.locator('.shows-poster-copy strong').first().textContent(),'Recent show 17');
+   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,'the Recents carousel fits the page');
+  }finally{await page.evaluate(original=>{mediaItems=original;render();},beforeRecents);}
   const showsBefore=await page.evaluate(()=>{
    const original=mediaItems,now=Date.now();
    mediaItems=[{id:'shows-layout',title:'Test Series',type:'Series',status:'Watching',tvmazeShowId:'12',imdbId:'tt1234568',releaseYear:'2020',episodeScheduleVerified:true,metadataUpdatedAt:new Date(now).toISOString(),releasedEpisodes:{1:[1]},watchedEpisodes:{},episodeCounts:{1:2},airingSeason:1,nextEpisodeNum:2,nextEpisodeDate:new Date(now+2*86400000).toISOString(),nextSeasonNum:2,nextSeasonDate:new Date(now+70*86400000).toISOString(),scheduledEpisodeReleases:[{season:1,number:2,raw:new Date(now+2*86400000).toISOString(),title:'Upcoming test'}]}];render();return original;
