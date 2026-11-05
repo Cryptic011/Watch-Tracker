@@ -39,7 +39,7 @@ Watched-Tracker/
 └── tests/
 ```
 
-Every tracked file is part of the running app, its deployment, or the reproducible backend. There are no generated build folders, dependency folders, or obsolete duplicate files committed to the repository.
+This repository contains the website/PWA, its tests and deployment tooling, and the reproducible backend. The unused native iOS project and its bundled copies of the website have been removed. Installing the website on an iPhone uses Add to Home Screen; it does not require Xcode, Capacitor, or a separate native app.
 
 ## Deployment
 
@@ -73,12 +73,12 @@ The files in `assets/js/` are ordered classic scripts sharing the existing app s
 - `sync.js`: persistence queues, conflict handling, account sessions, metadata refresh and sorting.
 - `library.js`: released/watched episode rules, episode tracker, library rendering and filters.
 - `catalogue.js`: title identity, search providers and release verification.
-- `dashboard.js`: next released episode, seven-day calendar and private reminder activity.
+- `dashboard.js`: next released episode, next-14-days calendar, Monday–Sunday recurring shows and private reminder activity.
 - `discovery.js` and `assets/css/discovery.css`: the Search tab and Add show/film entry point, with poster results, format filters, expandable descriptions, title details and duplicate labels. Search reuses the authenticated catalogue and opens the existing editor before saving; manual entry remains available.
 - `editor.js`: title search interaction, editing and startup.
 - `assets/css/`: base app styles and dashboard styles.
 
-The dashboard uses the tracker's released-episode map and never treats announced episode totals as released. The calendar shows today plus six days, preserves unknown times and labels saved platforms separately from confirmed UK availability. Private reminder activity is authorized by the existing owner hash in the reminder function, after session validation; every query is scoped to that session account. No schema change is required. Send success means accepted by the push service, not confirmed phone delivery.
+The dashboard uses the tracker's released-episode map and never treats announced episode totals as released. Calendar shows the next 14 days; Recurring Shows groups confirmed recurring releases from Monday to Sunday. Cards require confirmed times and label saved platforms separately from confirmed UK availability. Private reminder activity is authorized by the existing owner hash in the reminder function, after session validation; every query is scoped to that session account. Send success means accepted by the push service, not confirmed phone delivery.
 
 ## Browser regression checks
 
@@ -130,7 +130,7 @@ On the phone, full regional schedule downloads start when a schedule is opened. 
 
 The backend independently refreshes episode metadata and regional streaming listings, then checks and sends due reminders every minute for accounts with enabled push subscriptions. It does not require an open app or calendar screen. The shared schedule engine has no browser visibility condition on the server. Closing the app therefore stops its display work while the backend continues. Notification permission and an enabled subscription are still required. The scheduler HTTP deadline is 60 seconds so a normal rate-limited scan can return its result; the one-minute job frequency is unchanged.
 
-Foreground sync remains at ten seconds while a tracker is open, after interaction, or with pending edits. Unchanged idle libraries gradually back off to one minute and check again on return. Hidden schedule pages are not rebuilt. Poster cards use provider thumbnails where available, retain lazy visibility-based loading, and release observers for replaced grids. Native notification links are handled by events rather than a repeating timer. Release notifications remain managed by Web Push or iOS local notifications.
+Foreground sync remains at ten seconds while a tracker is open, after interaction, or with pending edits. Unchanged idle libraries gradually back off to one minute and check again on return. Hidden schedule pages are not rebuilt. Poster cards use provider thumbnails where available, retain lazy visibility-based loading, and release observers for replaced grids. Release notifications use Web Push, including on supported iPhone Home Screen installations.
 
 ### Code-review reliability fixes (29 October 2026)
 
@@ -140,6 +140,6 @@ Explicit removals carry the exact confirmed title IDs in the durable device queu
 
 Reminder claims and completion are atomic RPCs with two-minute leases and per-claim tokens. Concurrent scans cannot claim an active event; stale senders cannot complete a replacement claim. Database acknowledgement failures are reported instead of being counted as successful delivery. Push-service acceptance still does not prove phone delivery or provide an exactly-once delivery guarantee.
 
-Planned films can use an optional confirmed GMT release time in the editor. A date alone never acquires an invented clock time or a timed alert. The shared release resolver carries explicit film timestamps and their source into web/native reminder eligibility. Archiving changes library visibility while the explicit Weekly Releases/reminder opt-out controls alerts on both platforms. Web notification links retain the title ID and account.
+Planned films can use an optional confirmed GMT release time in the editor. A date alone never acquires an invented clock time or a timed alert. The shared release resolver carries explicit film timestamps and their source into web reminder eligibility. Archiving changes library visibility while the explicit Weekly Releases/reminder opt-out controls alerts. Web notification links retain the title ID and account.
 
 `supabase/tests/audit_reliability.sql` runs transactional regression checks for confirmed removals, recovery history, receipts, revision conflicts, delivery leases and private RPC permissions, and rolls back its disposable records. Application regressions include the full regional reminder module and cryptographically signed/invalid deployment identities.

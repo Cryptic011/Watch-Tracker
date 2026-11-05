@@ -4,7 +4,6 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import {stripTypeScriptTypes} from 'node:module';
 import {generateKeyPair,SignJWT,jwtVerify} from 'jose';
-import {reminderEvents as nativeEvents,reminderPlan} from '../native/reminder-plan.mjs';
 const root=new URL('../',import.meta.url);
 const source=fs.readFileSync(new URL('supabase/functions/watchlog-reminders/index.ts',root),'utf8');
 const stripped=stripTypeScriptTypes(source.replace(/^import[\s\S]*?from "npm:web-push-neo@0\.1\.2";\n/m,''));
@@ -27,10 +26,6 @@ test('The complete production worker sends timed Planned film reminders and reta
  c.refreshServerEpisodeSchedules=async rows=>rows;c.claimDelivery=async()=>({id:'delivery',attempts:1,leaseToken:'token'});c.finishDelivery=async()=>{};c.sendPush=async(_row,_config,payload)=>sent.push(payload);
  const result=await c.processPlannedReminders([{id:'device',account_id:'audit'}],{});
  assert.equal(result.sent,1);assert.equal(sent[0].title,'Timed film');assert.equal(sent[0].data.accountId,'audit');
- const future={...film,filmReleaseDate:new Date(now+48*3600000).toISOString()};
- const resolveEvent=(item,event)=>c.WatchLogRegionalReleases.resolveEvent(item,event,{country:'GB'});
- assert.equal(reminderPlan([future],'audit',{now,resolveEvent}).length,3);
- assert.equal(reminderPlan([{...future,filmReleaseDate:'2026-10-31'}],'audit',{now,resolveEvent}).length,0);
 });
 test('Delivery claim and completion database errors remain failures and carry the exact lease',async()=>{
  const calls=[];let fail=false;
@@ -75,10 +70,10 @@ test('Deployment status requires a valid signed job for this exact repository, w
   const accepted=await publicRun.request({action:'deployment_status',...body,status:'failure'},await sign());
   assert.equal(accepted.status,200);assert.equal(lookups,1,'signed jobs can verify this public repository without a server PAT');
 });
-test('Archiving retains the same explicit reminder preference on web and native',()=>{
+test('Archiving retains the explicit web reminder preference',()=>{
  const {c}=worker(),item={id:'show',title:'Archived',type:'Series',status:'Watching',archived:true,scheduledEpisodeReleases:[{season:1,number:2,raw:'2026-10-31T12:00:00Z'}]};
- assert.equal(c.reminderEvents(item).length,1);assert.equal(nativeEvents(item).length,1);
- assert.equal(c.reminderEvents({...item,hideFromWeeklyReleases:true}).length,0);assert.equal(nativeEvents({...item,hideFromWeeklyReleases:true}).length,0);
+ assert.equal(c.reminderEvents(item).length,1);
+ assert.equal(c.reminderEvents({...item,hideFromWeeklyReleases:true}).length,0);
 });
 test('Repeated sign-in uses the current cloud library without resurrecting legacy records',async()=>{
  const source=fs.readFileSync(new URL('assets/js/sync.js',root),'utf8');

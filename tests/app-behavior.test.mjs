@@ -10,7 +10,7 @@ process.env.TZ = "UTC";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const html = readAppSource();
 
-test("PWA and iOS home screen use the Xcode icon and Watch Tracker name", () => {
+test("PWA and iPhone Home Screen use the website icons and Watch Tracker name", () => {
   const manifest = JSON.parse(fs.readFileSync(path.join(root, "manifest.webmanifest"), "utf8"));
   const appIcon = fs.readFileSync(path.join(root, "assets/img/app-icon.png"));
   const touchIcon = fs.readFileSync(path.join(root, "assets/img/apple-touch-icon.png"));
