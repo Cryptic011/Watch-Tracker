@@ -637,7 +637,9 @@ const server=http.createServer((req,res)=>{
   assert.equal(await page.locator('.gallery-detail-body>.gallery-art img').getAttribute('src'),'https://static.tvmaze.com/series-poster.jpg','the main cover uses the show artwork');
   phase='release banner';
   try{
+   await page.waitForFunction(()=>!cloudSyncInFlight&&!cloudSaveInFlight&&!localSaveInFlight&&!metadataRefreshInFlight.size);
    await page.evaluate(()=>{
+    clearTimeout(cloudSyncTimer);cloudSyncTimer=null;
     const index=mediaItems.findIndex(item=>item.id==='show'),raw=new Date(Date.now()+3000).toISOString();
     window._releaseBarRestore={item:mediaItems[index],refresh:scheduleMetadataRefresh};
     scheduleMetadataRefresh=async()=>false;
@@ -659,7 +661,7 @@ const server=http.createServer((req,res)=>{
    await page.evaluate(()=>{
     const saved=window._releaseBarRestore;if(!saved)return;
     mediaItems[mediaItems.findIndex(item=>item.id==='show')]=saved.item;scheduleMetadataRefresh=saved.refresh;
-    delete window._releaseBarRestore;delete window._releaseBarSeason;WatchLogGallery.refreshCurrent();
+    delete window._releaseBarRestore;delete window._releaseBarSeason;WatchLogGallery.refreshCurrent();scheduleCloudSync();
    });
   }
   phase='episode artwork';
