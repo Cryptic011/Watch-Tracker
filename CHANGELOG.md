@@ -1,3 +1,9 @@
+## 2026-11-05 — Draggable Shows and Films and recurring weekdays
+- Make the Shows and Films selector follow a drag and open the selected page on release, with the same slide motion as the main dock.
+- Snap cancelled or short drags back to the selected page and preserve normal taps.
+- Keep Calendar as a chronological next-14-days view; organise Recurring Shows from Monday to Sunday with one entry per show's confirmed weekday.
+- Prefer the explicit provider schedule over stale recurring snapshots when a release time changes.
+
 ## 2026-11-05 — Episode dates and clear reminder timing
 - Show each episode's release date beside its name as DD/MM, calculated in GMT.
 - Include today, tomorrow or the release date and an accurate countdown in advance push reminders, without a timezone label.

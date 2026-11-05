@@ -12,9 +12,12 @@
 .home-mark{margin-top:8px;min-height:40px;width:100%;padding:7px;border-radius:10px;border:1px solid var(--border);background:var(--inner);color:var(--text);font-size:.75rem;font-weight:750}
 .home-empty{padding:18px;background:var(--inner);border-radius:14px;color:var(--muted);font-size:.88rem;line-height:1.5}
 #home-view.home-links{display:block}
-.library-type-dock{position:fixed;z-index:70;bottom:calc(env(safe-area-inset-bottom,0px) + 88px);left:calc(50% - 30px);transform:translateX(-50%);width:min(320px,calc(100% - 96px));display:flex;gap:0;padding:6px;border:1px solid #ffffff1c;border-radius:999px;background:#1e2026;box-shadow:0 8px 24px #0005}
+.library-type-dock{position:fixed;z-index:70;bottom:calc(env(safe-area-inset-bottom,0px) + 88px);left:calc(50% - 30px);transform:translateX(-50%);width:min(320px,calc(100% - 96px));display:flex;gap:0;padding:6px;border:1px solid #ffffff1c;border-radius:999px;background:#1e2026;box-shadow:0 8px 24px #0005;touch-action:none;user-select:none;-webkit-user-select:none}
 .library-type-dock button{position:relative;z-index:1;flex:1;min-height:44px;display:grid;place-items:center;border:0;border-radius:999px;background:transparent;color:var(--muted);font-size:.86rem;font-weight:800;cursor:pointer}
-.library-type-indicator{position:absolute;top:6px;bottom:6px;left:6px;width:calc((100% - 12px)/2);border-radius:999px;background:#07090d;pointer-events:none;will-change:transform}
+.library-type-indicator{position:absolute;top:6px;bottom:6px;left:6px;width:calc((100% - 12px)/2);border-radius:999px;background:#07090d;pointer-events:none;will-change:transform;transition:transform .65s cubic-bezier(.32,0,.18,1)}
+.library-type-dock.native-type-motion .library-type-indicator,.library-type-dock.is-dragging .library-type-indicator{transition:none}
+.library-type-dock.is-dragging button{color:var(--muted)}
+.library-type-dock.is-dragging button.drag-preview{color:var(--blue2)}
 .library-type-dock button.active{background:transparent;color:var(--blue2)}
 .library-type-dock button span{display:none}
 .library-only-page{padding-bottom:190px}
@@ -38,8 +41,12 @@ button.gallery-episode-copy{min-width:0;align-self:stretch;text-align:left;backg
 .description-toggle[hidden]{display:none}
 .schedule-status-button{display:inline-flex;align-items:center;flex-shrink:0;min-height:25px;padding:4px 9px;border:1px solid var(--border);border-radius:999px;background:var(--card);color:var(--muted);font-size:.68rem;font-weight:750;line-height:1;cursor:pointer}
 .calendar-period{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.recurring-empty-label{font-size:.75rem;color:var(--muted);font-weight:500}
+.calendar-only-page .recurring-weekday:not(.has-releases){margin:8px 0;padding:9px 0;border-bottom:1px solid var(--border)}
+.calendar-only-page .recurring-weekday:not(.has-releases) .release-day-heading{margin:0;align-items:center;gap:12px}
 .calendar-only-page [data-home-section="recurring"]>summary{display:none}
 .home-carousel,.shows-poster-row{touch-action:pan-x pan-y;overscroll-behavior-x:contain}
+@media(prefers-reduced-motion:reduce){.library-type-indicator{transition:none}}
 @media(prefers-reduced-motion:no-preference){
   dialog[open]{animation:review-dialog-in .18s ease-out}
   @keyframes review-dialog-in{from{opacity:0;transform:translateY(8px) scale(.985)}to{opacity:1;transform:none}}

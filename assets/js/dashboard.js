@@ -214,10 +214,11 @@ function recurringWeeklyShows(items,now=new Date()){
     const activeSeason=Number(item.airingSeason||item.curSeason||0);
     const nextMatch=scheduled.find(row=>Number(row.number)===Number(item.nextEpisodeNum)&&row.raw===item.nextEpisodeDate);
     const nextSeason=Number(nextMatch?.season||(Number(item.nextEpisodeNum)===1?item.nextSeasonNum:activeSeason)||activeSeason);
-    const rows=[...(Array.isArray(stored?.episodes)?stored.episodes:[]),...scheduled,
+    const rows=[
       {season:activeSeason,number:item.latestEpisodeNum,raw:item.latestEpisodeDate},
       {season:nextSeason,number:item.nextEpisodeNum,raw:item.nextEpisodeDate},
-      {season:Number(item.nextSeasonNum),number:1,raw:item.nextSeasonDate}];
+      {season:Number(item.nextSeasonNum),number:1,raw:item.nextSeasonDate},
+      ...(Array.isArray(stored?.episodes)?stored.episodes:[]),...scheduled];
     const pattern=weeklyReleasePattern(rows);
     const days=[...new Set((Array.isArray(stored?.days)?stored.days:pattern?.days||[]).filter(day=>Number.isInteger(day)&&day>=0&&day<7))];
     const episodes=[...new Map((pattern?.episodes||rows).filter(row=>row&&Number.isInteger(Number(row.season))&&Number(row.season)>0&&Number.isInteger(Number(row.number))&&Number(row.number)>0).map(row=>[row.season+":"+row.number,row])).values()];
@@ -257,6 +258,18 @@ function recurringWeeklyShows(items,now=new Date()){
     left.date.getTime()-right.date.getTime()||
     String(left.item.title).localeCompare(String(right.item.title)));
 }
+function recurringWeekMarkup(rows,progressMarkers=new Map()){
+  const weekdays=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  return [1,2,3,4,5,6,0].map(day=>{
+    const shows=rows.filter(row=>row.day===day&&!/^\d{4}-\d{2}-\d{2}$/.test(String(row.episodes[0]?.raw||'')));
+    const cards=shows.map(row=>{
+      const item=row.item,episodes=row.episodes.map(ep=>`S${ep.season} E${ep.number}${ep.title||item.episodeTitles?.[ep.season]?.[ep.number]?' · '+(ep.title||item.episodeTitles[ep.season][ep.number]):''}`).join(' / ');
+      const key=`${item.type}:${item.imdbId||item.tvmazeShowId||item.id}`;
+      return `<button type="button" class="release-card" data-recurring-open="${esc(item.id)}" data-release-at="${esc(row.episodes[0]?.raw||'')}"><span class="calendar-poster"><span class="calendar-poster-fallback" aria-hidden="true">${esc(item.title.slice(0,1))}</span><img hidden alt="" data-art="${esc(key)}" decoding="async"></span><span class="release-card-copy"><strong class="release-show-title"><span>${esc(item.title)}</span>${scheduleProgressMarker(item,progressMarkers)}</strong><span class="release-episode">${esc(episodes)}</span><span class="release-time">${esc(DASHBOARD_TIME_FORMATTER.format(row.date))}${item.platform?' on '+esc(item.platform):''}</span></span></button>`;
+    }).join('');
+    return `<section class="recurring-weekday release-day${shows.length?' has-releases':''}" data-recurring-day="${day}" aria-label="${weekdays[day]}"><header class="release-day-heading"><span class="release-day-name">${weekdays[day]}</span>${!shows.length?'<span class="recurring-empty-label">No recurring shows</span>':''}</header>${cards}</section>`;
+  }).join('');
+}
 function renderRecurringWeeklySchedule(){
   clearTimeout(recurringWeeklyTimer);recurringWeeklyTimer=null;
   if(document.visibilityState==="hidden")return;
@@ -272,11 +285,11 @@ function renderRecurringWeeklySchedule(){
   const available=Boolean(currentUser&&currentTab==='library'&&calendarOnlyPage&&selectedScheduleView==='recurring');
   root.classList.toggle("hidden",!available);
   if(!available){if(!currentUser){root.replaceChildren();root._dashboardMarkup=null;}return;}
-  const now=new Date(),items=mediaItems.filter(item=>isEpisodeTrackable(item)&&item.hideFromWeeklyReleases!==true),schedule=calendarWindowEvents(items,'upcoming',now);
+  const now=new Date(),items=mediaItems.filter(item=>isEpisodeTrackable(item)&&item.hideFromWeeklyReleases!==true);
   const rows=recurringWeeklyShows(items,now);
   const progressMarkers=new Map();
-  const days=releaseAgendaDays(schedule,'data-recurring-open',progressMarkers);
-  updateDashboardMarkup(root,`<section class="dashboard-section weekly-releases recurring-weekly-releases calendar-agenda" aria-label="Recurring release calendar"><p class="calendar-period"><span>Next 14 days · GMT</span><button type="button" class="schedule-status-button" data-schedule-open="calendar">‹ Calendar</button></p><div class="release-week-list">${days}</div>${releaseAgendaPrior(schedule.priorEvents,'data-recurring-open',progressMarkers)}</section>`);
+  const days=recurringWeekMarkup(rows,progressMarkers);
+  updateDashboardMarkup(root,`<section class="dashboard-section weekly-releases recurring-weekly-releases calendar-agenda" aria-label="Recurring weekly shows"><p class="calendar-period"><span>Monday–Sunday · GMT</span><button type="button" class="schedule-status-button" data-schedule-open="calendar">‹ Calendar</button></p><div class="release-week-list">${days}</div></section>`);
   window.WatchLogGallery?.observeScheduleArtwork?.(root,items);
 
   if(document.visibilityState==="visible"){

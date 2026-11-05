@@ -478,3 +478,18 @@ test('A corrected schedule produces one card per episode and keeps its title',()
  const moved={...show,scheduledEpisodeReleases:[{season:2,number:6,raw:'2026-11-12T02:00:00Z',title:'Legacy'}]};
  assert.equal(c.calendarEvents([moved],new Date('2026-11-10T00:00:00Z'),1).events.length,0,'an old snapshot cannot resurrect a rescheduled episode');
 });
+
+test('Recurring layout folds confirmed releases into Monday–Sunday while Calendar retains both weeks',()=>{
+ const c=app();c.esc=String;c.DASHBOARD_TIME_FORMATTER=new Intl.DateTimeFormat('en-GB',{timeZone:'UTC',hour:'2-digit',minute:'2-digit'});
+ vm.runInContext(extractFunction(html,'recurringWeekMarkup'),c);
+ const now=new Date('2026-11-01T12:00:00Z'),item={id:'weekly',type:'Series',title:'Weekly show',platform:'Streaming',scheduledEpisodeReleases:[{season:1,number:1,raw:'2026-11-02T20:00:00Z'},{season:1,number:2,raw:'2026-11-09T20:00:00Z'}]};
+ const weekly=c.recurringWeekMarkup(c.recurringWeeklyShows([item],now));
+ assert.deepEqual([...weekly.matchAll(/data-recurring-day="(\d)"/g)].map(match=>Number(match[1])),[1,2,3,4,5,6,0]);
+ assert.equal([...weekly.matchAll(/data-recurring-open="weekly"/g)].length,1);assert.match(weekly,/20:00 on Streaming/);assert.doesNotMatch(weekly,/Nov 2026/);
+ assert.equal(c.calendarWindowEvents([item],'upcoming',now).events.length,2,'Calendar retains separate dates across the next fourteen days');
+});
+test('Recurring weekday cards prefer a corrected explicit schedule over stale next pointers',()=>{
+ const c=app(),raw='2026-11-02T02:00:00Z',old='2026-11-02T02:01:00Z';
+ const item={id:'corrected',type:'Series',title:'Corrected',airingSeason:2,nextEpisodeNum:6,nextEpisodeDate:old,recurringWeeklySchedule:{episodes:[{season:2,number:6,raw:old}]},scheduledEpisodeReleases:[{season:2,number:6,raw}]};
+ const rows=c.recurringWeeklyShows([item],new Date('2026-11-01T12:00:00Z'));assert.equal(rows.length,1);assert.equal(rows[0].episodes[0].raw,raw);
+});

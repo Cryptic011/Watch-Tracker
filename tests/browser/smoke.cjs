@@ -131,6 +131,37 @@ const server=http.createServer((req,res)=>{
   assert.equal(await page.locator('#library-entry').isVisible(),true,'The type dock stays available within Library');
   assert.equal(await page.locator('#library-shows').isVisible(),false,'Films has its own page');
   assert.equal(await page.locator('[data-home-section="recurring"]').isVisible(),false);
+  const typeAligned=()=>page.waitForFunction(()=>{const box=document.querySelector('.library-type-indicator').getBoundingClientRect(),button=document.querySelector('#library-entry button.active').getBoundingClientRect();return Math.abs(box.left-button.left)<1;});
+  for(const type of ['Series','Film']){
+   await category(type).click();
+   const motion=await page.locator('.library-type-indicator').evaluate(node=>{
+    const animation=node.getAnimations().find(value=>value.playState==='running');if(!animation)return {running:false};
+    animation.pause();animation.currentTime=Number(animation.effect.getTiming().duration)/2;
+    const x=node.getBoundingClientRect().left,buttons=[...document.querySelectorAll('#library-entry button')].map(button=>button.getBoundingClientRect().left);
+    animation.finish();return {running:true,between:x>Math.min(...buttons)+1&&x<Math.max(...buttons)-1};
+   });
+   assert.deepEqual(motion,{running:true,between:true},'a tap visibly slides the selector towards '+type);
+   await typeAligned();
+  }
+  for(const type of ['Series','Film']){
+   const from=await page.locator('#library-entry button.active').boundingBox(),to=await category(type).boundingBox();
+   await page.mouse.move(from.x+from.width/2,from.y+from.height/2);await page.mouse.down();
+   await page.mouse.move((from.x+to.x)/2+from.width/2,from.y+from.height/2,{steps:4});
+   const follow=await page.locator('.library-type-indicator').boundingBox();
+   assert.ok(follow.x>Math.min(from.x,to.x)+1&&follow.x<Math.max(from.x,to.x)-1,'the selector follows the pointer before release');
+   await page.mouse.move(to.x+to.width/2,to.y+to.height/2,{steps:4});await page.mouse.up();
+   assert.equal(await category(type).getAttribute('aria-current'),'page','dragging commits the selected page');
+   assert.equal(await page.getByRole('heading',{name:type==='Film'?'Films':'Shows',exact:true}).isVisible(),true);
+   await typeAligned();
+  }
+  const selectedType=await category('Film').boundingBox();
+  await page.mouse.move(selectedType.x+selectedType.width/2,selectedType.y+selectedType.height/2);await page.mouse.down();
+  await page.mouse.move(selectedType.x+selectedType.width/2-20,selectedType.y+selectedType.height/2,{steps:3});await page.mouse.up();
+  await typeAligned();assert.equal(await category('Film').getAttribute('aria-current'),'page','short drags snap back without switching pages');
+  await page.mouse.move(selectedType.x+selectedType.width/2,selectedType.y+selectedType.height/2);await page.mouse.down();
+  await page.mouse.move(selectedType.x-selectedType.width/2,selectedType.y+selectedType.height/2,{steps:4});
+  await page.evaluate(()=>document.querySelector('#library-entry').dispatchEvent(new PointerEvent('pointercancel',{bubbles:true,pointerId:libraryTypeDrag.id})));
+  await page.mouse.up();await typeAligned();assert.equal(await category('Film').getAttribute('aria-current'),'page','a cancelled drag keeps the current page');
   await page.locator('[data-library-back]').click();
   assert.equal(await category('Film').evaluate(node=>document.activeElement===node),true);
   await page.locator('[data-tab="library"]').click();
@@ -315,11 +346,11 @@ const server=http.createServer((req,res)=>{
     noHorizontalOverflow:document.documentElement.scrollWidth<=window.innerWidth};
    }finally{mediaItems=original;switchTab('collection');selectedScheduleView=previousSchedule;renderRecurringWeeklySchedule();}
   });
-  assert.deepEqual(weeklyScreen.cards.map(card=>card.title),['17:00 programme','01:00 programme'],'recurring cards follow actual release dates across both weeks');
+  assert.deepEqual(weeklyScreen.cards.map(card=>card.title),['01:00 programme','17:00 programme'],'recurring shows sort by weekday and clock rather than a fourteen-day timeline');
   assert.ok(weeklyScreen.cards.every(card=>!card.time.includes('TBA')),'dated cards require confirmed times');
-  assert.ok(Date.parse(weeklyScreen.cards[0].date)<Date.parse(weeklyScreen.cards[1].date),'a later clock time this week comes before next week');
+  assert.ok(Date.parse(weeklyScreen.cards[0].date)>Date.parse(weeklyScreen.cards[1].date),'the weekly view folds different weeks into one weekday');
   assert.equal(weeklyScreen.posters,2,'every recurring release has a cover');
-  assert.equal(weeklyScreen.legacyDays,0,'the old Monday–Sunday buckets are replaced');
+  assert.equal(weeklyScreen.legacyDays,7,'recurring shows use seven Monday–Sunday weekday groups');
   assert.equal(weeklyScreen.unannouncedPresent,false,'past release patterns cannot assign a weekday to an unannounced return');
   assert.equal(weeklyScreen.distantReturns,0,'confirmed and cached returns beyond two weeks do not appear in the weekly calendar');
   assert.equal(weeklyScreen.counters,0,'the clean calendar has no dashboard totals');
@@ -979,9 +1010,11 @@ const server=http.createServer((req,res)=>{
   await page.locator('[data-tab="calendar"]').click();await page.goBack();await page.waitForFunction(()=>calendarOnlyPage&&selectedScheduleView==='recurring'&&currentTab==='library');
   assert.equal(await recurring.isVisible(),true);assert.equal(await calendarView.isVisible(),false);
   assert.equal(await recurring.locator('.release-week-list [data-recurring-open="show"]').first().isVisible(),true);
-  assert.equal(await recurring.locator('[data-recurring-day]').count(),0,'the whole calendar uses real dates rather than weekday buckets');
-  const recurringDates=await recurring.locator('[data-release-day]').evaluateAll(nodes=>nodes.map(node=>node.dataset.releaseDay));
-  assert.deepEqual(recurringDates,[...recurringDates].sort(),'the calendar date groups are chronological');
+  assert.equal(await recurring.locator('[data-recurring-day]').count(),7,'recurring shows have their own Monday–Sunday layout');
+  const recurringDays=await recurring.locator('[data-recurring-day]').evaluateAll(nodes=>nodes.map(node=>Number(node.dataset.recurringDay)));
+  assert.deepEqual(recurringDays,[1,2,3,4,5,6,0],'weekdays run Monday to Sunday');
+  assert.match(await recurring.locator('.calendar-period').textContent(),/Monday–Sunday/);
+  assert.equal(await recurring.locator('[data-release-day]').count(),0,'the recurring view does not repeat calendar dates');
   const releaseKeys=await recurring.locator('.release-week-list [data-recurring-open="show"]').evaluateAll(nodes=>nodes.map(node=>node.dataset.releaseAt));
   assert.ok(releaseKeys.length>0);assert.equal(new Set(releaseKeys).size,releaseKeys.length,'each actual release occurs once');
   assert.match(await recurring.textContent(),/S2 E2/);

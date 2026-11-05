@@ -318,7 +318,7 @@
   bottomTabs.classList.toggle("native-tab-motion",nativeTabMotion);
   let tabSlideAnimation=null;
   let libraryTypeAnimation=null;
-  function updateLibraryTypeSelection(category){
+  function updateLibraryTypeSelection(category,forceMotion=false){
     const dock=$('library-entry'),indicator=dock.querySelector('.library-type-indicator');
     const index=category==='Series'?0:category==='Film'?1:-1;
     indicator.hidden=index<0;
@@ -326,11 +326,51 @@
       const selected=button.dataset.galleryCategory===category;button.classList.toggle('active',selected);
       if(selected)button.setAttribute('aria-current','page');else button.removeAttribute('aria-current');
     }
-    if(index<0||dock.dataset.selection===String(index))return;
+    if(index<0||(!forceMotion&&dock.dataset.selection===String(index)))return;
     const from=getComputedStyle(indicator).transform,prior=dock.dataset.selection;
     libraryTypeAnimation?.cancel();indicator.style.transform=`translateX(${index*100}%)`;dock.dataset.selection=String(index);
-    if(prior!==undefined&&!navigationMotionPreference.matches&&typeof indicator.animate==='function')libraryTypeAnimation=indicator.animate([{transform:from==='none'?'translateX(0)':from},{transform:`translateX(${index*100}%)`}],{duration:650,easing:'cubic-bezier(.32,0,.18,1)'});
+    if((prior!==undefined||forceMotion)&&!navigationMotionPreference.matches&&typeof indicator.animate==='function')libraryTypeAnimation=indicator.animate([{transform:from==='none'?'translateX(0)':from},{transform:`translateX(${index*100}%)`}],{duration:650,easing:'cubic-bezier(.32,0,.18,1)'});
   }
+  const libraryTypeDock=$('library-entry'),libraryTypeIndicator=libraryTypeDock.querySelector('.library-type-indicator');
+  const libraryTypeButtons=[...libraryTypeDock.querySelectorAll('[data-gallery-category]')];
+  libraryTypeDock.classList.toggle('native-type-motion',typeof libraryTypeIndicator.animate==='function');
+  let libraryTypeDrag=null,suppressLibraryTypeClick=false,libraryTypeClickTimer=null;
+  libraryTypeDock.addEventListener('pointerdown',event=>{
+    const button=event.target.closest('[data-gallery-category]');
+    if(libraryTypeDrag||event.isPrimary===false||event.button!==0||!button)return;
+    const first=libraryTypeButtons[0].getBoundingClientRect(),selected=libraryTypeIndicator.hidden?libraryTypeButtons.indexOf(button):Number(libraryTypeDock.dataset.selection)||0;
+    libraryTypeDrag={id:event.pointerId,x:event.clientX,y:event.clientY,step:first.width,offset:libraryTypeIndicator.hidden?selected*first.width:libraryTypeIndicator.getBoundingClientRect().left-first.left,moved:false};
+  });
+  libraryTypeDock.addEventListener('pointermove',event=>{
+    const drag=libraryTypeDrag;if(!drag||drag.id!==event.pointerId)return;
+    const dx=event.clientX-drag.x,dy=event.clientY-drag.y;
+    if(!drag.moved){
+      if(Math.abs(dy)>Math.abs(dx)&&Math.abs(dy)>8){libraryTypeDrag=null;return;}
+      if(Math.abs(dx)<6)return;
+      drag.moved=true;libraryTypeAnimation?.cancel();libraryTypeIndicator.hidden=false;
+      libraryTypeDock.classList.add('is-dragging');libraryTypeDock.setPointerCapture(event.pointerId);
+    }
+    event.preventDefault();
+    drag.position=Math.max(0,Math.min(drag.step,drag.offset+dx));
+    libraryTypeIndicator.style.transform=`translateX(${drag.position}px)`;
+    libraryTypeButtons.forEach((button,index)=>button.classList.toggle('drag-preview',index===Math.round(drag.position/drag.step)));
+  });
+  function finishLibraryTypeDrag(event,cancelled=false){
+    const drag=libraryTypeDrag;if(!drag||drag.id!==event.pointerId)return;
+    libraryTypeDrag=null;if(!drag.moved)return;
+    suppressLibraryTypeClick=true;clearTimeout(libraryTypeClickTimer);
+    libraryTypeClickTimer=setTimeout(()=>{suppressLibraryTypeClick=false;},250);
+    libraryTypeDock.classList.remove('is-dragging');libraryTypeButtons.forEach(button=>button.classList.remove('drag-preview'));
+    const current=window.WatchLogGallery?.getCategory?.()||'';
+    const destination=cancelled?current:libraryTypeButtons[Math.round((drag.position??drag.offset)/drag.step)].dataset.galleryCategory;
+    updateLibraryTypeSelection(destination,true);
+    if(!cancelled&&destination!==current){goToTabHome('collection',destination);$('library-category-title').focus({preventScroll:true});}
+    if(libraryTypeDock.hasPointerCapture(event.pointerId))libraryTypeDock.releasePointerCapture(event.pointerId);
+  }
+  libraryTypeDock.addEventListener('pointerup',event=>finishLibraryTypeDrag(event));
+  libraryTypeDock.addEventListener('pointercancel',event=>finishLibraryTypeDrag(event,true));
+  libraryTypeDock.addEventListener('lostpointercapture',event=>{if(event.target===libraryTypeDock&&!libraryTypeDock.hasPointerCapture(event.pointerId))finishLibraryTypeDrag(event,true);});
+  libraryTypeDock.addEventListener('click',event=>{if(suppressLibraryTypeClick){suppressLibraryTypeClick=false;event.preventDefault();event.stopImmediatePropagation();}},true);
   navigationMotionPreference.addEventListener("change",()=>{tabSlideAnimation?.cancel();libraryTypeAnimation?.cancel();});
 
   function updateTabSelection(tab,forceMotion=false){
