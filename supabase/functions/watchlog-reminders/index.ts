@@ -465,10 +465,7 @@ function reminderCopy(
     const days = Math.floor(eventTime! / 86400000) - Math.floor(now / 86400000);
     const date = `${String(release.getUTCDate()).padStart(2, "0")}/${String(release.getUTCMonth() + 1).padStart(2, "0")}`;
     const day = days === 0 ? "today" : days === 1 ? "tomorrow" : `on ${date}`;
-    const minutes = Math.max(0, Math.ceil((eventTime! - now) / 60000));
-    const hours = Math.floor(minutes / 60), remainder = minutes % 60;
-    const duration = [hours ? `${hours} hour${hours === 1 ? "" : "s"}` : "", remainder ? `${remainder} minute${remainder === 1 ? "" : "s"}` : ""].filter(Boolean).join(" ");
-    message = eventTime! <= now ? `${label} is available` : `${label} airs ${day} at ${release.toISOString().slice(11, 16)} (in ${duration})`;
+    message = eventTime! <= now ? `${label} is available` : `${label} airs ${day} at ${release.toISOString().slice(11, 16)} (${date})`;
   } else if (leadHours === 0) {
     message = `${label} is available`;
   }
