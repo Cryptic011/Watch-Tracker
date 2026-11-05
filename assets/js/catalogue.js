@@ -189,11 +189,13 @@
       }};
       if(results[0].status==="fulfilled"&&Array.isArray(results[0].value)){
         artwork.episodeImages=officialEpisodeImageMap(results[0].value,show.image);
-        artwork.episodeTitles={};artwork.episodeDescriptions={};
+        artwork.episodeTitles={};artwork.episodeDescriptions={};artwork.episodeReleaseDates={};
         for(const episode of results[0].value){
           const season=Number(episode?.season),number=Number(episode?.number),name=typeof episode?.name==="string"?episode.name.trim():"";
           if(Number.isInteger(season)&&season>0&&Number.isInteger(number)&&number>0){
             if(name)(artwork.episodeTitles[season]||(artwork.episodeTitles[season]={}))[number]=name;
+            const release=episode.airstamp||episode.airdate;
+            if(release)(artwork.episodeReleaseDates[season]||(artwork.episodeReleaseDates[season]={}))[number]=String(release);
             if(episode.summary)(artwork.episodeDescriptions[season]||(artwork.episodeDescriptions[season]={}))[number]=String(episode.summary);
           }
         }

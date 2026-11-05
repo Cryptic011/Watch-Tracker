@@ -40,7 +40,7 @@ const server=http.createServer((req,res)=>{
    if(url.hostname==='api.tvmaze.com'&&url.pathname==='/shows/13')return route.fulfill({headers,json:{id:13,name:'Later poster',image:{original:'https://static.tvmaze.com/later-poster.jpg'}}});
    if(url.hostname==='api.tvmaze.com'&&url.pathname==='/shows/12/episodes')return route.fulfill({headers,json:[
     {season:1,number:1,summary:'<p>'+('The team investigates a difficult case. '.repeat(8))+'</p>',image:{original:'https://static.tvmaze.com/episode-one.jpg'}},
-    {season:1,number:2,name:'Crossing Lines',image:null},
+    {season:1,number:2,name:'Crossing Lines',airstamp:'2020-01-02T00:30:00+01:00',image:null},
     {season:1,number:3,image:{original:'https://static.tvmaze.com/series-poster.jpg'}}
    ]});
    if(url.hostname==='api.tvmaze.com'&&url.pathname==='/shows/12/seasons')return route.fulfill({headers,json:[
@@ -652,6 +652,10 @@ const server=http.createServer((req,res)=>{
 
   assert.equal(await page.locator('[data-gallery-episode="1:2"] .gallery-episode-title').textContent(),'Crossing Lines','episode titles load even when absent from the saved item');
   assert.equal(await page.locator('[data-gallery-episode="1:2"] .gallery-episode-title').isVisible(),true);
+  const episodeDate=page.locator('[data-gallery-episode="1:2"] .gallery-episode-date');
+  assert.equal(await episodeDate.textContent(),' · 01/01','episode dates use the UTC date even when the source offset crosses midnight');
+  assert.equal(await episodeDate.isVisible(),true);
+  assert.equal(await episodeDate.evaluate(node=>node.previousElementSibling.classList.contains('gallery-episode-title')),true,'the date sits directly beside its episode name');
   assert.doesNotMatch(await page.locator('.gallery-season-episodes').allTextContents().then(rows=>rows.join(' ')),/\d+\. Episode \d+/);
   const firstSeason=page.locator('.gallery-season[data-season="1"]');
   await firstSeason.locator('summary').press('Enter');

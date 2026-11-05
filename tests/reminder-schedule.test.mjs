@@ -88,7 +88,7 @@ test('Release processing sends at-release alerts for Planned seasons, films and 
  const result=await c.processPlannedReminders([{account_id:'account',time_zone:'Europe/London'}],{});
  assert.equal(result.sent,3);assert.equal(result.failed,0);
  assert.deepEqual(sent.map(p=>p.title),['Season premiere','Film premiere','Returning series']);
- assert.ok(sent.every(p=>/out now/i.test(p.body)),'release alerts must not be replaced with late advance reminders');
+ assert.ok(sent.every(p=>/is available/i.test(p.body)),'release alerts must not be replaced with late advance reminders');
 });
 
 test('Worker sends Marshals and other shows at their source airtime without availability delays',async()=>{
@@ -102,7 +102,7 @@ test('Worker sends Marshals and other shows at their source airtime without avai
  c.claimDelivery=async(row,account,id,key)=>{if(claimed.has(key))return null;claimed.add(key);return{id:'delivery',attempts:1};};c.finishDelivery=async()=>{};c.sendPush=async(row,config,payload)=>sent.push(payload);
  const subscriptions=[{account_id:'account',locale:'en-GB',time_zone:'Europe/London'}];
  await c.processPlannedReminders(subscriptions,{});
- assert.equal(sent.length,2);assert.ok(sent.every(p=>/out now/i.test(p.body)));
+ assert.equal(sent.length,2);assert.ok(sent.every(p=>/is available/i.test(p.body)));
  assert.ok(sent.every(p=>/2026-10-26T00:00:00Z:lead-0h$/.test(p.data.eventKey)));
  sent.length=0;clock=Date.parse('2026-10-26T04:00:00Z');
  await c.processPlannedReminders(subscriptions,{});assert.equal(sent.length,0,'no second alert at the removed four-hour offset');
@@ -139,9 +139,9 @@ test('FBI and CIA advance reminders retain their 61-minute gap and expire instea
  c.readLibraries=async()=>[{account_id:'account',items}];c.refreshServerEpisodeSchedules=async rows=>rows;
  c.claimDelivery=async()=>({id:'delivery',attempts:1});c.finishDelivery=async()=>{};c.sendPush=async(_row,_config,payload)=>sent.push(payload);
  const subscriptions=[{account_id:'account'}];
- await c.processPlannedReminders(subscriptions,{});assert.deepEqual(sent.map(p=>p.title),['FBI']);assert.equal(sent[0].body,'New episode airs at 01:00 (S9 E5)');
+ await c.processPlannedReminders(subscriptions,{});assert.deepEqual(sent.map(p=>p.title),['FBI']);assert.equal(sent[0].body,'New episode airs tomorrow at 01:00 (in 6 hours) · S9 E5');
  sent.length=0;clock=Date.parse('2026-11-02T20:01:00Z');
- await c.processPlannedReminders(subscriptions,{});assert.deepEqual(sent.map(p=>p.title),['CIA']);assert.equal(sent[0].body,'New episode airs at 02:01 (S2 E5)');
+ await c.processPlannedReminders(subscriptions,{});assert.deepEqual(sent.map(p=>p.title),['CIA']);assert.equal(sent[0].body,'New episode airs tomorrow at 02:01 (in 6 hours) · S2 E5');
  assert.equal(sent[0].expiresAt-clock,15*60000);
  sent.length=0;clock=Date.parse('2026-11-02T23:00:00Z');await c.processPlannedReminders(subscriptions,{});assert.equal(sent.length,0,'missed advance reminders are never replayed hours late');
 });

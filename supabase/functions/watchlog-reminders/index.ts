@@ -450,6 +450,7 @@ function reminderCopy(
   event: { kind: string; number: unknown; season?: unknown },
   leadHours: number,
   eventTime?: number,
+  now = Date.now(),
 ) {
   const title = String(item.title || "").replace(/\s+/g, " ").trim() || "Untitled";
   const timing = leadHours === 24 ? "in 1 day" : leadHours === 1 ? "in 1 hour" : `in ${leadHours} hours`;
@@ -457,9 +458,20 @@ function reminderCopy(
   const episode = Number(event.kind === "season" ? 1 : event.number);
   const premiere = event.kind === "film" || (season === 1 && episode === 1);
   const label = premiere ? "New show" : "New episode";
-  const numbers = !premiere && Number.isInteger(season) && season > 0 && Number.isInteger(episode) && episode > 0 ? ` (S${season} E${episode})` : "";
-  const airtime = Number.isFinite(eventTime) ? new Date(eventTime!).toISOString().slice(11,16) : '';
-  const message = leadHours === 0 ? `${label} out now` : airtime ? `${label} airs at ${airtime}` : `${label} out ${timing}`;
+  const numbers = !premiere && Number.isInteger(season) && season > 0 && Number.isInteger(episode) && episode > 0 ? ` · S${season} E${episode}` : "";
+  let message = `${label} airs ${timing}`;
+  if (Number.isFinite(eventTime)) {
+    const release = new Date(eventTime!);
+    const days = Math.floor(eventTime! / 86400000) - Math.floor(now / 86400000);
+    const date = `${String(release.getUTCDate()).padStart(2, "0")}/${String(release.getUTCMonth() + 1).padStart(2, "0")}`;
+    const day = days === 0 ? "today" : days === 1 ? "tomorrow" : `on ${date}`;
+    const minutes = Math.max(0, Math.ceil((eventTime! - now) / 60000));
+    const hours = Math.floor(minutes / 60), remainder = minutes % 60;
+    const duration = [hours ? `${hours} hour${hours === 1 ? "" : "s"}` : "", remainder ? `${remainder} minute${remainder === 1 ? "" : "s"}` : ""].filter(Boolean).join(" ");
+    message = eventTime! <= now ? `${label} is available` : `${label} airs ${day} at ${release.toISOString().slice(11, 16)} (in ${duration})`;
+  } else if (leadHours === 0) {
+    message = `${label} is available`;
+  }
   const body = `${message}${numbers}`;
   return { title, body };
 }
@@ -603,7 +615,7 @@ async function processPlannedReminders(
         );
         if (!delivery) continue;
 
-        const copy = reminderCopy(item, event, leadHours, eventTime);
+        const copy = reminderCopy(item, event, leadHours, eventTime, now);
         const payload = {
           title: copy.title,
           body: copy.body,

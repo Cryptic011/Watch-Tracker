@@ -1,3 +1,8 @@
+## 2026-11-05 — Episode dates and clear reminder timing
+- Show each episode's release date beside its name as DD/MM, calculated in GMT.
+- Include today, tomorrow or the release date and an accurate countdown in advance push reminders, without a timezone label.
+- Use “New episode is available” for release notifications.
+
 ## 2026-11-05 — Home recommendations, navigation and reminder continuity
 - Base recommendations on saved library interests, with favourites and watched shows weighted more strongly; include matching current shows and exclude saved titles.
 - Load Home posters through the verified artwork loader, including legacy poster fields, and retain resolved covers across reopening.

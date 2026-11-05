@@ -156,12 +156,22 @@ window.WatchLogGallery=(()=>{
     const title=String(value||'').trim();
     return /^(?:episode|ep\.?)\s*\d+$/i.test(title)?'':title;
   }
+  function episodeDate(value){
+    const date=new Date(value);
+    return value&&Number.isFinite(date.getTime())?`${String(date.getUTCDate()).padStart(2,'0')}/${String(date.getUTCMonth()+1).padStart(2,'0')}`:'';
+  }
   function paintTrackerArtwork(section,artwork){
     for(const row of section.querySelectorAll('[data-gallery-episode]')){
       const [season,episode]=row.dataset.galleryEpisode.split(':').map(Number);
       paintTrackerImage(row.querySelector('.gallery-episode-art'),artwork.episodeImages?.[season]?.[episode]||'',`E${episode}`);
       const subtitle=row.querySelector('.gallery-episode-title'),title=episodeTitle(artwork.episodeTitles?.[season]?.[episode]);
       if(subtitle&&title){subtitle.textContent=title;subtitle.hidden=false;}
+      const date=row.querySelector('.gallery-episode-date'),raw=artwork.episodeReleaseDates?.[season]?.[episode];
+      if(date){
+        const text=episodeDate(raw||date.dateTime);
+        date.textContent=text?`${subtitle?.textContent?' · ':''}${text}`:'';date.hidden=!text;
+        if(raw)date.dateTime=raw;
+      }
     }
     for(const poster of section.querySelectorAll('[data-gallery-season-art]')){
       paintTrackerImage(poster,artwork.seasonImages?.[poster.dataset.gallerySeasonArt]||artwork.posterUrl||'',`S${poster.dataset.gallerySeasonArt}`,artwork.posterUrl||'');
@@ -170,7 +180,7 @@ window.WatchLogGallery=(()=>{
   async function loadTrackerArtwork(item){
     const section=dialog.querySelector('.gallery-season-list'),callbacks=api;
     if(!section)return;
-    dialog._trackerArtwork={posterUrl:savedArt(item)||freshArt(key(item))?.url||'',episodeTitles:item.episodeTitles||{},episodeDescriptions:item.episodeDescriptions||{},episodeImages:item.episodeImagesSource==='TVMaze'?item.episodeImages||{}:{},seasonImages:item.seasonImagesSource==='TVMaze'?item.seasonImages||{}:{}};
+    dialog._trackerArtwork={posterUrl:savedArt(item)||freshArt(key(item))?.url||'',episodeReleaseDates:item.episodeReleaseDates||{},episodeTitles:item.episodeTitles||{},episodeDescriptions:item.episodeDescriptions||{},episodeImages:item.episodeImagesSource==='TVMaze'?item.episodeImages||{}:{},seasonImages:item.seasonImagesSource==='TVMaze'?item.seasonImages||{}:{}};
     paintTrackerArtwork(section,dialog._trackerArtwork);
     if(!callbacks.trackerArtwork)return;
     try{
@@ -180,10 +190,11 @@ window.WatchLogGallery=(()=>{
   }
   function episodeRow(item,season,episode,watched){
     const complete=watched.has(episode),title=episodeTitle(item.episodeTitles?.[season]?.[episode]);
-    const date=item.episodeReleaseDates?.[season]?.[episode]||'',dateText=date?api.date(new Date(/^\d{4}-\d{2}-\d{2}$/.test(date)?date+'T12:00:00Z':date)):'';
+    const scheduled=item.scheduledEpisodeReleases?.find(row=>Number(row.season)===season&&Number(row.number)===episode);
+    const date=scheduled?.raw||item.episodeReleaseDates?.[season]?.[episode]||'',dateText=episodeDate(date);
     return `<div class="gallery-episode-row" data-gallery-episode="${season}:${episode}">
       <span class="gallery-episode-art"><span class="gallery-artwork-placeholder">E${episode}</span></span>
-      <button type="button" class="gallery-episode-copy" data-episode-description="${season}:${episode}" aria-label="Description for Episode ${episode}"><strong>Episode ${episode}</strong><small class="gallery-episode-title"${title?'':' hidden'}>${esc(title)}</small>${dateText?`<small>${esc(dateText)}</small>`:''}</button>
+      <button type="button" class="gallery-episode-copy" data-episode-description="${season}:${episode}" aria-label="Description for Episode ${episode}"><strong>Episode ${episode}</strong><small><span class="gallery-episode-title"${title?'':' hidden'}>${esc(title)}</span><time class="gallery-episode-date" datetime="${esc(date)}"${dateText?'':' hidden'}>${dateText?`${title?' · ':''}${esc(dateText)}`:''}</time></small></button>
       <button type="button" class="gallery-episode-toggle" data-gallery-toggle-episode="${season}:${episode}" aria-pressed="${complete}" aria-label="Mark S${season} E${episode} ${complete?'unwatched':'watched'}"><span class="gallery-episode-check" aria-hidden="true">${complete?'✓':''}</span></button>
     </div>`;
   }
