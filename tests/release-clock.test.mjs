@@ -71,3 +71,19 @@ test('Regional streaming listings cannot override source airtimes anywhere in th
  assert.equal(input.value,'2026-10-30T01:00');
  assert.equal(c.storedReleaseInput(input),broadcast);
 });
+
+test('The episode bar turns green at the confirmed release instant and labels Chicago Fire as released',()=>{
+ const c=app();c.esc=String;c.formatLocalDateTime=date=>date.toISOString();c.formatLocalWeekdayDate=date=>date.toISOString().slice(0,10);
+ vm.runInContext(extractFunction(html,'reminderMarkup'),c);
+ const raw='2026-11-05T02:00:00Z',show={type:'Series',title:'Chicago Fire',airingSeason:15,nextEpisodeNum:5,nextEpisodeDate:raw,scheduledEpisodeReleases:[{season:15,number:5,raw}]};
+ const before=c.reminderMarkup(show,false,Date.parse(raw)-1);
+ assert.match(before,/S15 E5 Next Episode/);assert.doesNotMatch(before,/class="reminder released"/);
+ for(const now of [Date.parse(raw),Date.parse('2026-11-05T17:26:00Z')]){
+  const released=c.reminderMarkup(show,false,now);
+  assert.match(released,/class="reminder released"/);assert.match(released,/S15 E5 Released/);assert.match(released,/2026-11-05T02:00:00\.000Z/);assert.doesNotMatch(released,/Next Episode/);
+ }
+ const uncertain=c.reminderMarkup({...show,nextEpisodeDate:'2026-11-05',scheduledEpisodeReleases:[]},false,Date.parse('2026-11-05T17:26:00Z'));
+ assert.doesNotMatch(uncertain,/class="reminder released"|data-reminder-release-at/);
+ const offset={...show,nextEpisodeDate:'2026-11-05T03:00:00+01:00',scheduledEpisodeReleases:[]};
+ assert.match(c.reminderMarkup(offset,false,Date.parse(raw)),/S15 E5 Released/,'offset airtimes use the same UTC instant');
+});

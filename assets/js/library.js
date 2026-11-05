@@ -581,16 +581,18 @@
     if(query&&(typeof activeFilter==='undefined'||activeFilter!=='Recent'))result.rows.sort((a,b)=>(scoreById.get(String(b.id))||0)-(scoreById.get(String(a.id))||0));
     return result;
   }
-  function reminderMarkup(item,isFilm){
-    const upcoming=upcomingSortInfo(item);
+  function reminderMarkup(item,isFilm,now=Date.now()){
+    const upcoming=upcomingSortInfo(item,now);
     if(upcoming.rank===0)return"";
+    const timed=upcoming.rank===2&&!upcoming.dateOnly&&Number.isFinite(upcoming.time),released=timed&&upcoming.time<=now;
+    const attributes=`class="reminder${released?' released':''}"${timed?` data-reminder-release-at="${upcoming.time}"`:''} role="status"`;
     const text=upcoming.rank===2?(upcoming.dateOnly?formatLocalWeekdayDate(new Date(upcoming.time)):formatLocalDateTime(new Date(upcoming.time))):"Date TBA";
-    if(isFilm&&upcoming.kind==="film")return`<div class="reminder"><span>🎬 Film Release</span><small>${esc(text)}</small></div>`;
+    if(isFilm&&upcoming.kind==="film")return`<div ${attributes}><span>🎬 Film ${released?'Released':'Release'}</span><small>${esc(text)}</small></div>`;
     if(upcoming.kind==="episode"){
       const season=upcoming.season||item.nextSeasonNum||item.airingSeason||item.curSeason||"",label=`${season?`S${season} `:""}E${upcoming.number||"Next"}`;
-      return`<div class="reminder"><span>📺 ${esc(label)} Next Episode</span><small>${esc(text)}</small></div>`;
+      return`<div ${attributes}><span>📺 ${esc(label)} ${released?'Released':'Next Episode'}</span><small>${esc(text)}</small></div>`;
     }
-    if(upcoming.kind==="season")return`<div class="reminder"><span>🔔 Season ${esc(upcoming.number||"Next")} Premiere</span><small>${esc(text)}</small></div>`;
+    if(upcoming.kind==="season")return`<div ${attributes}><span>🔔 Season ${esc(upcoming.number||"Next")} ${released?'Released':'Premiere'}</span><small>${esc(text)}</small></div>`;
     return"";
   }
   function titleCardMarkup(item){

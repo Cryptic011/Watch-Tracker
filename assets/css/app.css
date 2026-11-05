@@ -1,5 +1,6 @@
 
     :root{--bg:#000;--card:#15181e;--inner:#1e222a;--blue:#2563eb;--blue2:#60a5fa;--text:#fff;--muted:#8e95a2;--border:#232730;--green:#34d399;--red:#ef4444;--amber:#fbbf24;--radius:20px}
+    .reminder.released{background:rgba(52,211,153,.12);border-color:rgba(52,211,153,.3);color:var(--green)}
     *{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text",sans-serif;-webkit-tap-highlight-color:transparent}
     html,body{background:var(--bg);color:var(--text);min-height:100%}body{min-height:100vh;padding-bottom:110px}button,input,select{font:inherit}.hidden{display:none!important}
     .auth-overlay{position:fixed;inset:0;background:#000;z-index:500;display:flex;align-items:center;justify-content:center;padding:max(24px,env(safe-area-inset-top)) 24px max(24px,env(safe-area-inset-bottom))}

@@ -635,6 +635,34 @@ const server=http.createServer((req,res)=>{
   assert.equal(await page.locator('.gallery-detail-body>.gallery-art').count(),1,'series retain their main cover above the episode list');
   await page.locator('.gallery-detail-body>.gallery-art img').waitFor({state:'visible'});
   assert.equal(await page.locator('.gallery-detail-body>.gallery-art img').getAttribute('src'),'https://static.tvmaze.com/series-poster.jpg','the main cover uses the show artwork');
+  phase='release banner';
+  try{
+   await page.evaluate(()=>{
+    const index=mediaItems.findIndex(item=>item.id==='show'),raw=new Date(Date.now()+3000).toISOString();
+    window._releaseBarRestore={item:mediaItems[index],refresh:scheduleMetadataRefresh};
+    scheduleMetadataRefresh=async()=>false;
+    mediaItems[index]={...mediaItems[index],airingSeason:15,nextSeasonNum:null,nextSeasonDate:'',nextEpisodeNum:5,nextEpisodeDate:raw,scheduledEpisodeReleases:[{season:15,number:5,raw}]};
+    WatchLogGallery.refreshCurrent();window._releaseBarSeason=document.querySelector('.gallery-season');
+   });
+   const bar=page.locator('.gallery-detail .reminder');
+   assert.match(await bar.textContent(),/S15 E5 Next Episode/);
+   assert.equal(await bar.evaluate(node=>node.classList.contains('released')),false);
+   await page.waitForFunction(()=>document.querySelector('.gallery-detail .reminder')?.classList.contains('released'));
+   assert.match(await bar.textContent(),/S15 E5 Released/);
+   const state=await bar.evaluate(node=>{
+    const reference=document.createElement('span');reference.style.color='var(--green)';document.body.append(reference);
+    const green=getComputedStyle(node).color===getComputedStyle(reference).color;reference.remove();
+    return {green,seasonRetained:document.querySelector('.gallery-season')===window._releaseBarSeason};
+   });
+   assert.deepEqual(state,{green:true,seasonRetained:true},'release changes the bar without rebuilding season controls');
+  }finally{
+   await page.evaluate(()=>{
+    const saved=window._releaseBarRestore;if(!saved)return;
+    mediaItems[mediaItems.findIndex(item=>item.id==='show')]=saved.item;scheduleMetadataRefresh=saved.refresh;
+    delete window._releaseBarRestore;delete window._releaseBarSeason;WatchLogGallery.refreshCurrent();
+   });
+  }
+  phase='episode artwork';
   assert.equal(await page.locator('.gallery-season-label small').first().isVisible(),false,'collapsed season cards keep progress copy out of the way');
   assert.match(await page.locator('.gallery-episodes-progress').getAttribute('aria-label'),/\d+ of \d+ released episodes watched/,'overall progress remains accessible');
   assert.equal(await page.locator('[data-gallery-notes-preview]').isVisible(),false);

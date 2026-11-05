@@ -1,6 +1,7 @@
 /* Library presentation only. All progress, edits and reminders use the existing app. */
 window.WatchLogGallery=(()=>{
   let category='',api=null,host=null,observer=null,dialog=null,returnFocus=null,active=0;
+  let reminderTimer=null;
   const cache=new Map(),pending=new Set(),queue=[],artTargets=new Map();
   const ARTWORK_CACHE_MS=6*60*60*1000;
   const ARTWORK_STORAGE_KEY='watchlog_verified_posters_v2';
@@ -335,6 +336,16 @@ window.WatchLogGallery=(()=>{
     if(editing&&notes.value.trim()!==dialog._savedNotes&&!confirm('Discard unsaved notes?'))return false;
     dialog?.close();return true;
   }
+  function refreshDetailReminder(){
+    clearTimeout(reminderTimer);reminderTimer=null;
+    if(!dialog?.open||document.visibilityState==='hidden')return;
+    const item=api.items().find(row=>String(row.id)===dialog.dataset.item),bar=dialog.querySelector('.gallery-watch-panel>.reminder');
+    if(!item||!bar)return;
+    const markup=api.reminder(item,isFilm(item));
+    if(bar.outerHTML!==markup)bar.outerHTML=markup;
+    const release=Number(dialog.querySelector('.reminder[data-reminder-release-at]')?.dataset.reminderReleaseAt),now=Date.now();
+    if(release>now)reminderTimer=setTimeout(refreshDetailReminder,Math.min(2147483647,release-now+10));
+  }
   function refreshCurrent(){
     if(!dialog?.open||dialog.querySelector('[data-gallery-notes-editor]:not(.hidden)')||dialog.querySelector('[data-gallery-toggle-episode]:disabled,[data-gallery-season]:disabled'))return false;
     const fresh=api.items().find(row=>String(row.id)===dialog.dataset.item);
@@ -351,7 +362,9 @@ window.WatchLogGallery=(()=>{
       dialog.addEventListener('click',event=>{if(event.target===dialog||event.target.closest('[data-gallery-close]'))closeDetail();});
       dialog.addEventListener('scroll',()=>{if(typeof saveNavigationPosition==='function')saveNavigationPosition();},{passive:true});
       dialog.addEventListener('cancel',event=>{event.preventDefault();closeDetail();});
-      dialog.addEventListener('close',()=>{if(dialog._authPaused)return;if(typeof applyPendingAppUpdate==='function')setTimeout(applyPendingAppUpdate,0);window.WatchLogNavigation?.titleClosed?.();const target=returnFocus?.isConnected?returnFocus:host?.querySelector(`[data-gallery-item="${CSS.escape(dialog.dataset.item||'')}"]`);target?.focus({preventScroll:true});});
+      dialog.addEventListener('close',()=>{clearTimeout(reminderTimer);reminderTimer=null;if(dialog._authPaused)return;if(typeof applyPendingAppUpdate==='function')setTimeout(applyPendingAppUpdate,0);window.WatchLogNavigation?.titleClosed?.();const target=returnFocus?.isConnected?returnFocus:host?.querySelector(`[data-gallery-item="${CSS.escape(dialog.dataset.item||'')}"]`);target?.focus({preventScroll:true});});
+      document.addEventListener('visibilitychange',refreshDetailReminder);
+      window.addEventListener('focus',refreshDetailReminder);
     }
     dialog.dataset.item=String(item.id);
     const show=!isFilm(item),last=api.last(item);
@@ -459,7 +472,7 @@ window.WatchLogGallery=(()=>{
       button.onclick=async()=>{const current=api.items().find(row=>String(row.id)===String(item.id));if(!current)return;button.disabled=true;const value=!current[field];try{if(await api.organise?.(item.id,{[field]:value}))button.textContent=value?on:off;}finally{button.disabled=false;}};
     }
     dialog.querySelector('[data-gallery-lists]').onclick=()=>api.lists?.(item.id);
-    observe(dialog,[item]);if(!dialog.open)dialog.showModal();void loadTrackerArtwork(item);void loadTitleDetails(item);
+    observe(dialog,[item]);if(!dialog.open)dialog.showModal();refreshDetailReminder();void loadTrackerArtwork(item);void loadTitleDetails(item);
     if(show)void api.refreshEpisodes?.(item);
   }
   function open(id,trigger=document.activeElement){

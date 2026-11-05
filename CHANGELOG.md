@@ -1,3 +1,8 @@
+## 2026-11-05 — Green released-episode bar
+- Turn the shared episode release bar green and label it Released once its confirmed airtime has passed.
+- Keep future and unconfirmed release dates amber, using the same UTC release instant as the calendar and reminders.
+- Update an open show's release bar at airtime and on return to the app without rebuilding season controls or notes.
+
 ## 2026-11-05 — Stop late release alerts and retain phone activation
 - Expire release alerts after 15 minutes instead of replaying them for 24 hours; use the same expiry in push-service delivery.
 - Start new notification registrations with upcoming reminders, without replaying alerts from before registration.
