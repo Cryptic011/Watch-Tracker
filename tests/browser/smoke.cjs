@@ -690,11 +690,14 @@ const server=http.createServer((req,res)=>{
   assert.equal(await page.locator('.gallery-season-label small').first().isVisible(),true,'opening a season reveals its exact progress');
   await page.locator('[data-gallery-toggle-episode="1:1"]').click();await page.waitForFunction(()=>!episodeLogBusy.size&&!cloudSaveInFlight);
   await page.locator('[data-gallery-episode="1:1"] img').waitFor({state:'visible'});
-  assert.equal(await page.locator('[data-gallery-episode="1:1"] img').getAttribute('src'),'https://wwwimage-us.pplusstatic.com/episode-poster.jpg','only a classified episode poster is rendered');
+  assert.equal(await page.locator('[data-gallery-episode="1:1"] img').getAttribute('src'),'https://wwwimage-us.pplusstatic.com/episode-poster.jpg','a classified episode poster takes priority over its frame');
   await page.waitForFunction(()=>{const img=document.querySelector('[data-gallery-episode="1:1"] img');return img?.complete&&img.naturalWidth>0;});
   await page.locator('[data-gallery-episode="1:1"] img').dispatchEvent('error');
-  assert.equal(await page.locator('[data-gallery-episode="1:1"] img').count(),0,'a broken poster cannot fall back to a screenshot');
-  assert.equal(await page.locator('[data-gallery-episode="1:1"] .gallery-artwork-placeholder').isVisible(),true,'a broken poster leaves an episode placeholder');
+  await page.locator('[data-gallery-episode="1:1"] img').waitFor({state:'visible'});
+  assert.equal(await page.locator('[data-gallery-episode="1:1"] img').getAttribute('src'),'https://static.tvmaze.com/episode-one.jpg','a broken poster uses the verified frame for that episode');
+  await page.locator('[data-gallery-episode="1:1"] img').dispatchEvent('error');
+  assert.equal(await page.locator('[data-gallery-episode="1:1"] .gallery-artwork-placeholder').isVisible(),true,'a placeholder is used only when both episode images fail');
+  assert.equal(await page.locator('[data-gallery-episode="1:3"] img').count(),0,'the series cover cannot be substituted for an episode image');
   await page.locator('[data-gallery-season-art="1"] img').waitFor({state:'visible'});
   assert.equal(await page.locator('[data-gallery-season-art="1"] img').getAttribute('src'),'https://static.tvmaze.com/season-one.jpg');
   await page.locator('[data-gallery-season-art="1"] img').evaluate(image=>image.dispatchEvent(new Event('error')));

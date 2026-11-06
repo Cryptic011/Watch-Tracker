@@ -157,19 +157,24 @@
 
   const trackerArtworkCache=new Map();
   function fetchOfficialTrackerArtwork(item,onPartial){
-    const policy="publisher-labelled-posters-v2",storageKey="watchlog_tracker_posters_v2";
+    const policy="posters-with-verified-episode-stills-v3",publisherPolicy="publisher-labelled-posters-v2",storageKey="watchlog_tracker_artwork_v3";
+    const publisherPoster=url=>typeof url==="string"&&/^https:\/\/(?:static\.nbc\.com|www\.nbc\.com|wwwimage-us\.pplusstatic\.com|wwwimage-intl\.pplusstatic\.com|ichef\.bbci\.co\.uk|[^./:@]+\.mzstatic\.com)\//.test(url);
+    const episodeStill=url=>typeof url==="string"&&/^https:\/\/static\.tvmaze\.com\//.test(url);
     const key=JSON.stringify([item.tvmazeShowId||"",item.imdbId||"",item.title,item.releaseYear||""]);
     const cleanArtwork=value=>{
-      const images={};
+      const images={},fallbacks={};
       if(value?.episodePosterPolicy===policy)for(const [season,rows] of Object.entries(value.episodeImages||{}))for(const [episode,url] of Object.entries(rows||{})){
-        if(typeof url==="string"&&/^https:\/\/(?:static\.nbc\.com|www\.nbc\.com|wwwimage-us\.pplusstatic\.com|wwwimage-intl\.pplusstatic\.com|ichef\.bbci\.co\.uk|[^./:@]+\.mzstatic\.com)\//.test(url))(images[season]||(images[season]={}))[episode]=url;
+        if(!value.episodeTitles?.[season]?.[episode])continue;
+        const fallback=value.episodeImageFallbacks?.[season]?.[episode];
+        if(episodeStill(fallback))(fallbacks[season]||(fallbacks[season]={}))[episode]=fallback;
+        if(publisherPoster(url)||(episodeStill(url)&&url===fallback))(images[season]||(images[season]={}))[episode]=url;
       }
-      return {...value,episodePosterPolicy:policy,episodeImages:images,episodeImageFallbacks:{}};
+      return {...value,episodePosterPolicy:policy,episodeImages:images,episodeImageFallbacks:fallbacks};
     };
     return cachedMetadataRequest(trackerArtworkCache,key,async()=>{
       let savedTrackerArtwork=[];
       try{const saved=JSON.parse(localStorage.getItem(storageKey)||"[]");if(Array.isArray(saved))savedTrackerArtwork=saved;}catch(_){}
-      // Old tracker caches contain stills and unclassified publisher images.
+      // Old caches predate the identity-checked poster/frame fallback policy.
       try{localStorage.removeItem?.("watchlog_tracker_details_v1");}catch(_){}
       const offlineArtwork=savedTrackerArtwork.find(row=>row?.key===key);
       if(typeof navigator!=="undefined"&&navigator.onLine===false)return cleanArtwork(offlineArtwork?.artwork);
@@ -200,6 +205,8 @@
       }};
       if(results[0].status==="fulfilled"&&Array.isArray(results[0].value)){
         artwork.episodeTitles={};artwork.episodeDescriptions={};artwork.episodeReleaseDates={};
+        artwork.episodeImageFallbacks=officialEpisodeImageMap(results[0].value,show.image);
+        artwork.episodeImages=Object.fromEntries(Object.entries(artwork.episodeImageFallbacks).map(([season,images])=>[season,{...images}]));
         for(const episode of results[0].value){
           const season=Number(episode?.season),number=Number(episode?.number),name=typeof episode?.name==="string"?episode.name.trim():"";
           if(Number.isInteger(season)&&season>0&&Number.isInteger(number)&&number>0){
@@ -217,15 +224,15 @@
       // Episode metadata is usable before the optional publisher lookup finishes.
       if(typeof onPartial==="function")onPartial(artwork);
       const publisher=await publisherTask;
-      // Only the new backend policy establishes poster classification. A URL on
-      // an official host alone is insufficient, including in saved offline data.
-      const publisherImages=publisher?.state==="ready"&&publisher.artworkPolicy===policy?publisher.episodeImages:
+      // Only labelled publisher posters replace the matching episode frame.
+      // Keep the frame separately so a broken poster can fall back immediately.
+      const publisherImages=publisher?.state==="ready"&&publisher.artworkPolicy===publisherPolicy?publisher.episodeImages:
         cleanArtwork(offlineArtwork?.artwork).episodeImages;
       for(const [season,images] of Object.entries(publisherImages||{}))for(const [episode,url] of Object.entries(images||{})){
-        if(!artwork.episodeTitles?.[season]?.[episode]||typeof url!=="string"||!/^https:\/\/(?:static\.nbc\.com|www\.nbc\.com|wwwimage-us\.pplusstatic\.com|wwwimage-intl\.pplusstatic\.com|ichef\.bbci\.co\.uk|[^./:@]+\.mzstatic\.com)\//.test(url))continue;
+        if(!artwork.episodeTitles?.[season]?.[episode]||!publisherPoster(url))continue;
         (artwork.episodeImages[season]||(artwork.episodeImages[season]={}))[episode]=url;
       }
-      if(results.some(result=>result.status==="rejected")||(publisherTask&&(publisher?.state!=="ready"||publisher.artworkPolicy!==policy)))trackerArtworkCache.delete(key);
+      if(results.some(result=>result.status==="rejected")||(publisherTask&&(publisher?.state!=="ready"||publisher.artworkPolicy!==publisherPolicy)))trackerArtworkCache.delete(key);
       // Optional publisher failures must not prevent storing usable offline details.
       if(results.every(result=>result.status==="fulfilled")){
         try{

@@ -78,19 +78,20 @@ The files in `assets/js/` are ordered classic scripts sharing the existing app s
 - `editor.js`: title search interaction, editing and startup.
 - `assets/css/`: base app styles and dashboard styles.
 
-Episode rows show only publisher-labelled episode posters. The authenticated
+Episode rows prefer publisher-labelled episode posters. The authenticated
 `episode_artwork` gateway verifies the show, season, episode number and title,
 then requires an explicit poster label on the publisher's image metadata.
-A generic `TVEpisode.image`, official image host, video thumbnail or TVMaze image
-is insufficient. Shared series/season covers and images reused across episodes
-are rejected. Missing or broken episode posters show the episode-number
-placeholder; show and season cover artwork remain available.
+A generic publisher image is not classified as a poster. When a poster is missing
+or fails to load, the row uses the matching episode image/frame from the verified
+TVMaze episode record. Series covers are excluded from episode frames. The
+episode-number placeholder is used when neither episode source has usable art;
+show and season cover artwork remain available in their own locations.
 
-The tracker uses a separate versioned poster cache. Old cached stills and
-unclassified publisher images are not reused, including offline. Coverage is
-limited to publishers exposing positively labelled episode posters; this is a
-metadata check, not visual classification, and cannot guarantee every episode
-has a poster. The website requires the matching updated `watchlog-pin` backend.
+The tracker uses a new versioned artwork cache, retaining both the preferred
+poster and its verified episode-frame fallback offline. Older unvalidated artwork
+caches and the poster-only cache are not reused. Poster classification still
+requires explicit publisher metadata, and image availability depends on each
+provider. Matching frames appear while the optional publisher lookup is pending.
 
 The dashboard uses the tracker's released-episode map and never treats announced episode totals as released. Calendar shows the next 14 days; Recurring Shows groups confirmed recurring releases from Monday to Sunday. Cards require confirmed times and label saved platforms separately from confirmed UK availability. Private reminder activity is authorized by the existing owner hash in the reminder function, after session validation; every query is scoped to that session account. Send success means accepted by the push service, not confirmed phone delivery.
 

@@ -165,7 +165,8 @@ window.WatchLogGallery=(()=>{
   function paintTrackerArtwork(section,artwork){
     for(const row of section.querySelectorAll('[data-gallery-episode]')){
       const [season,episode]=row.dataset.galleryEpisode.split(':').map(Number);
-      paintTrackerImage(row.querySelector('.gallery-episode-art'),artwork.episodePosterPolicy==='publisher-labelled-posters-v2'?artwork.episodeImages?.[season]?.[episode]||'':'',`E${episode}`);
+      const verified=artwork.episodePosterPolicy==='posters-with-verified-episode-stills-v3';
+      paintTrackerImage(row.querySelector('.gallery-episode-art'),verified?artwork.episodeImages?.[season]?.[episode]||'':'',`E${episode}`,verified?artwork.episodeImageFallbacks?.[season]?.[episode]||'':'');
       const subtitle=row.querySelector('.gallery-episode-title'),title=episodeTitle(artwork.episodeTitles?.[season]?.[episode]);
       if(subtitle&&title){subtitle.textContent=title;subtitle.hidden=false;}
       const date=row.querySelector('.gallery-episode-date'),raw=artwork.episodeReleaseDates?.[season]?.[episode];
@@ -182,7 +183,7 @@ window.WatchLogGallery=(()=>{
   async function loadTrackerArtwork(item){
     const section=dialog.querySelector('.gallery-season-list'),callbacks=api;
     if(!section)return;
-    dialog._trackerArtwork={posterUrl:savedArt(item)||freshArt(key(item))?.url||'',episodeReleaseDates:item.episodeReleaseDates||{},episodeTitles:item.episodeTitles||{},episodeDescriptions:item.episodeDescriptions||{},episodePosterPolicy:'publisher-labelled-posters-v2',episodeImages:{},seasonImages:item.seasonImagesSource==='TVMaze'?item.seasonImages||{}:{}};
+    dialog._trackerArtwork={posterUrl:savedArt(item)||freshArt(key(item))?.url||'',episodeReleaseDates:item.episodeReleaseDates||{},episodeTitles:item.episodeTitles||{},episodeDescriptions:item.episodeDescriptions||{},episodePosterPolicy:'posters-with-verified-episode-stills-v3',episodeImages:{},episodeImageFallbacks:{},seasonImages:item.seasonImagesSource==='TVMaze'?item.seasonImages||{}:{}};
     paintTrackerArtwork(section,dialog._trackerArtwork);
     if(!callbacks.trackerArtwork)return;
     const applyArtwork=artwork=>{

@@ -1,3 +1,9 @@
+## 2026-11-06 — Episode posters with verified frame fallbacks
+- Prefer a genuine publisher-labelled episode poster, then the verified image/frame for that same episode.
+- Show matched episode frames immediately while optional publisher artwork loads, and retain them if a poster fails.
+- Refresh the poster-only cache and preserve the poster/frame preference offline.
+- Keep episode placeholders only when neither source has usable artwork; do not substitute season or show covers.
+
 ## 2026-11-06 — Episode posters only
 - Require a publisher poster label and exact episode match; an official-host screenshot is not enough.
 - Remove TVMaze stills, generic publisher images and screenshot fallbacks from episode rows.

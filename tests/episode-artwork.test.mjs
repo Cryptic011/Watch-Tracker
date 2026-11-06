@@ -81,44 +81,45 @@ function tracker(publisher,storage=new Map(),offline=false,onPartial){
   vm.runInNewContext(catalogue.slice(catalogue.indexOf('  function officialEpisodeImageMap('),catalogue.indexOf('  function completeTitleSynopsis(')),context);
   return context.fetchOfficialTrackerArtwork(selected,onPartial);
 }
-test('Only classified episode posters are cached for offline use',async()=>{
+test('Classified posters remain preferred and their matching episode frames are cached offline',async()=>{
   const storage=new Map(),publisher=verified({1:{1:poster,2:poster+'?next',99:poster}});
   const art=await tracker(publisher,storage);
-  assert.equal(art.episodeImages[1][1],poster);assert.equal(art.episodeImageFallbacks,undefined);
+  assert.equal(art.episodeImages[1][1],poster);assert.equal(art.episodeImageFallbacks[1][1],still);
   assert.equal(art.episodeImages[1][2],poster+'?next');assert.equal(art.episodeImages[1][99],undefined);
   const offline=await tracker(null,storage,true);
-  assert.equal(offline.episodeImages[1][1],poster);assert.deepEqual(JSON.parse(JSON.stringify(offline.episodeImageFallbacks)),{});
+  assert.equal(offline.episodeImages[1][1],poster);assert.equal(offline.episodeImageFallbacks[1][1],still);
 });
-test('Missing, failed, unclassified and unsafe artwork never falls back to a TVMaze still',async()=>{
+test('Missing, failed, unclassified and unsafe posters use the matching verified episode frame',async()=>{
   for(const publisher of [null,{state:'unavailable'},{state:'ready',episodeImages:{}},verified({1:{1:'https://www.nbc.com.evil.test/wrong.jpg'}}),{state:'ready',episodeImages:{1:{1:poster}}}]){
-    const art=await tracker(publisher);assert.deepEqual(JSON.parse(JSON.stringify(art.episodeImages)),{});
+    const art=await tracker(publisher);assert.deepEqual(JSON.parse(JSON.stringify(art.episodeImages)),{1:{1:still}});assert.equal(art.episodeImageFallbacks[1][1],still);
   }
 });
-test('A publisher outage preserves classified posters and saves metadata without introducing stills',async()=>{
+test('A publisher outage preserves classified posters while retaining the verified frame fallback',async()=>{
   const storage=new Map();
   await tracker(verified({1:{1:poster}}),storage);
   const refreshed=await tracker(null,storage);
   assert.equal(refreshed.episodeImages[1][1],poster);
-  assert.equal(refreshed.episodeImageFallbacks,undefined);
+  assert.equal(refreshed.episodeImageFallbacks[1][1],still);
   const emptyStorage=new Map();await tracker(null,emptyStorage);
   const offline=await tracker(null,emptyStorage,true);
-  assert.deepEqual(JSON.parse(JSON.stringify(offline.episodeImages)),{});
+  assert.deepEqual(JSON.parse(JSON.stringify(offline.episodeImages)),{1:{1:still}});
 });
 
-test('A broken episode poster uses a placeholder without loading a still',()=>{
+test('A broken episode poster falls back to its own frame, then a placeholder if both fail',()=>{
   const gallery=fs.readFileSync(new URL('../library-gallery.js',import.meta.url),'utf8');
   const context={esc:value=>String(value)};
   vm.runInNewContext(gallery.slice(gallery.indexOf('  function paintTrackerImage('),gallery.indexOf('  function episodeTitle(')),context);
   let image;
   const container={set innerHTML(value){this.html=value;image=value.startsWith('<img')?{}:null;},querySelector:()=>image};
-  context.paintTrackerImage(container,poster,'E1');
+  context.paintTrackerImage(container,poster,'E1',still);
   assert.ok(container.html.includes(poster));image.onerror();
+  assert.ok(container.html.includes(still));image.onerror();
   assert.match(container.html,/No artwork available/);assert.match(container.html,/>E1</);
   assert.doesNotMatch(container.html,/<img/);
 });
 
 
-test('Slow poster lookup shows metadata immediately without displaying a still',async()=>{
+test('Slow poster lookup shows the matching episode frame immediately and upgrades to a verified poster',async()=>{
   let finishPublisher,metadata;
   const publisher=new Promise(resolve=>{finishPublisher=resolve;});
   let received;
@@ -126,13 +127,13 @@ test('Slow poster lookup shows metadata immediately without displaying a still',
   const complete=tracker(publisher,new Map(),false,artwork=>{metadata=artwork;received();});
   try{
     await early;
-    assert.deepEqual(JSON.parse(JSON.stringify(metadata.episodeImages)),{});
+    assert.deepEqual(JSON.parse(JSON.stringify(metadata.episodeImages)),{1:{1:still}});
     assert.equal(metadata.details.source,'TVMaze');
     assert.ok(metadata.episodeTitles[1]);
   }finally{finishPublisher(verified({1:{1:poster}}));}
   const result=await complete;
   assert.equal(result.episodeImages[1][1],poster);
-  assert.equal(result.episodeImageFallbacks,undefined);
+  assert.equal(result.episodeImageFallbacks[1][1],still);
 });
 
 test('A late image error cannot replace the current image',()=>{
