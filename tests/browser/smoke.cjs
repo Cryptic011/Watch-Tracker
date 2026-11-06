@@ -796,12 +796,20 @@ const server=http.createServer((req,res)=>{
   assert.deepEqual(items.find(x=>x.id==='show').watchedEpisodes,{'1':[1,2]});
   assert.equal(await page.locator('.gallery-season[data-season="1"]').getAttribute('open'),'','Watch next preserves expanded seasons');
   await page.locator('[data-gallery-season="2"]').scrollIntoViewIfNeeded();
-  const trackerScroll=await page.locator('.gallery-detail').evaluate(dialog=>dialog.scrollTop);
+   // Clicking may scroll the control away from a sticky header. Capture the
+   // user's actual position at pointer-down, after Playwright's actionability scroll.
+   await page.locator('[data-gallery-season="2"]').evaluate(button=>{
+    button.addEventListener('pointerdown',()=>{button.closest('dialog').dataset.progressScrollStart=String(button.closest('dialog').scrollTop);},{once:true});
+   });
   await page.locator('[data-gallery-season="2"]').click();
+   const trackerScroll=await page.locator('.gallery-detail').evaluate(dialog=>Number(dialog.dataset.progressScrollStart));
+   assert.ok(Number.isFinite(trackerScroll)&&trackerScroll>0,'season save starts from a measured, scrolled position');
   await page.waitForFunction(()=>!episodeLogBusy.size&&!cloudSaveInFlight);
   assert.deepEqual(items.find(x=>x.id==='show').watchedEpisodes,{'1':[1,2],'2':[1,2,3]});
   assert.equal(await page.locator('.gallery-season[data-season="2"]').getAttribute('open'),null);
-  assert.ok(Math.abs(await page.locator('.gallery-detail').evaluate(dialog=>dialog.scrollTop)-trackerScroll)<=2,'saving season progress preserves the scroll position');
+   await page.waitForFunction(expected=>Math.abs(document.querySelector('.gallery-detail').scrollTop-expected)<=2,trackerScroll,{timeout:5000});
+   const trackerScrollAfter=await page.locator('.gallery-detail').evaluate(dialog=>dialog.scrollTop);
+   assert.ok(Math.abs(trackerScrollAfter-trackerScroll)<=2,`saving season progress preserves the scroll position (${trackerScroll} -> ${trackerScrollAfter})`);
   await page.locator('[data-gallery-season="2"]').click();
   await page.waitForFunction(()=>!episodeLogBusy.size&&!cloudSaveInFlight);
   assert.deepEqual(items.find(x=>x.id==='show').watchedEpisodes,{'1':[1,2]});
