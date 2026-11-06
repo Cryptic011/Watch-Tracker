@@ -164,7 +164,7 @@ window.WatchLogGallery=(()=>{
   function paintTrackerArtwork(section,artwork){
     for(const row of section.querySelectorAll('[data-gallery-episode]')){
       const [season,episode]=row.dataset.galleryEpisode.split(':').map(Number);
-      paintTrackerImage(row.querySelector('.gallery-episode-art'),artwork.episodeImages?.[season]?.[episode]||'',`E${episode}`);
+      paintTrackerImage(row.querySelector('.gallery-episode-art'),artwork.episodeImages?.[season]?.[episode]||'',`E${episode}`,artwork.episodeImageFallbacks?.[season]?.[episode]||'');
       const subtitle=row.querySelector('.gallery-episode-title'),title=episodeTitle(artwork.episodeTitles?.[season]?.[episode]);
       if(subtitle&&title){subtitle.textContent=title;subtitle.hidden=false;}
       const date=row.querySelector('.gallery-episode-date'),raw=artwork.episodeReleaseDates?.[season]?.[episode];

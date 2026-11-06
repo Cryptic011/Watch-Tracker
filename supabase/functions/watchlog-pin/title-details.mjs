@@ -157,7 +157,7 @@ function distributorDescription(markup,site,title){
  const description=paragraphs.join("\n\n");
  return isWholeTitleSynopsis(description)?description:"";
 }
-function firstPartyURL(value){
+export function firstPartyURL(value){
  try{
    const u=new URL(String(value||""));
    if(u.protocol!=="https:"||u.username||u.password||u.port)return null;

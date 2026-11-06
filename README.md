@@ -78,6 +78,23 @@ The files in `assets/js/` are ordered classic scripts sharing the existing app s
 - `editor.js`: title search interaction, editing and startup.
 - `assets/css/`: base app styles and dashboard styles.
 
+Episode artwork prefers the matching broadcaster/streamer's `TVEpisode.image`
+metadata over TVMaze's main episode image. The authenticated `episode_artwork`
+gateway discovers the official site from a verified TVMaze show, matches the
+series name, season/episode numbers and episode title, and accepts only the
+publisher image hosts listed in the CSP. It does not reuse series/season covers
+or video thumbnails. Missing or broken publisher artwork falls back to the same
+episode's TVMaze image, then the episode-number placeholder. Resolved artwork
+and its fallback are retained for offline use.
+
+Coverage depends on the official show page exposing structured episode metadata
+and a supported image host (NBC, Paramount/CBS, BBC or Apple). Publisher images
+can themselves be stills: this is a provenance priority, not visual image
+classification. TVMaze does not expose a promotional-art/screenshot distinction
+in its [episode image API](https://www.tvmaze.com/api). The publisher adapter uses
+[Schema.org TVEpisode](https://schema.org/TVEpisode) fields. This path requires the
+updated `watchlog-pin` function; older backends retain the TVMaze fallback.
+
 The dashboard uses the tracker's released-episode map and never treats announced episode totals as released. Calendar shows the next 14 days; Recurring Shows groups confirmed recurring releases from Monday to Sunday. Cards require confirmed times and label saved platforms separately from confirmed UK availability. Private reminder activity is authorized by the existing owner hash in the reminder function, after session validation; every query is scoped to that session account. Send success means accepted by the push service, not confirmed phone delivery.
 
 ## Browser regression checks

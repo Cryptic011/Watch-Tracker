@@ -1,3 +1,9 @@
+## 2026-11-05 — Prefer publisher episode artwork
+- Prefer episode-specific images published in the verified broadcaster's structured metadata over TVMaze episode stills.
+- Match series, season, episode number and episode title; reject shared covers, conflicting images and unsupported image hosts.
+- Keep the matching TVMaze image as a broken/missing-artwork fallback, followed by the episode-number placeholder, and retain both sources offline.
+- Bound and cache publisher lookups through the authenticated catalogue gateway. Coverage depends on publisher metadata; images are not visually classified.
+
 ## 2026-11-05 — Green released-episode bar
 - Turn the shared episode release bar green and label it Released once its confirmed airtime has passed.
 - Keep future and unconfirmed release dates amber, using the same UTC release instant as the calendar and reminders.

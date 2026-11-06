@@ -39,7 +39,7 @@ const server=http.createServer((req,res)=>{
    if(url.hostname==='api.tvmaze.com'&&url.pathname==='/shows/12')return route.fulfill({headers,json:{id:12,name:'Test Series',premiered:'2020-01-01',externals:{imdb:'tt1234568'},image:{original:'https://static.tvmaze.com/series-poster.jpg'},summary:'<p>An official series description &amp; a second detail.</p>',genres:['Drama','Action'],status:'Running',rating:{average:8.4},runtime:42,language:'English'}});
    if(url.hostname==='api.tvmaze.com'&&url.pathname==='/shows/13')return route.fulfill({headers,json:{id:13,name:'Later poster',image:{original:'https://static.tvmaze.com/later-poster.jpg'}}});
    if(url.hostname==='api.tvmaze.com'&&url.pathname==='/shows/12/episodes')return route.fulfill({headers,json:[
-    {season:1,number:1,summary:'<p>'+('The team investigates a difficult case. '.repeat(8))+'</p>',image:{original:'https://static.tvmaze.com/episode-one.jpg'}},
+    {season:1,number:1,name:'Pilot',summary:'<p>'+('The team investigates a difficult case. '.repeat(8))+'</p>',image:{original:'https://static.tvmaze.com/episode-one.jpg'}},
     {season:1,number:2,name:'Crossing Lines',airstamp:'2020-01-02T00:30:00+01:00',image:null},
     {season:1,number:3,image:{original:'https://static.tvmaze.com/series-poster.jpg'}}
    ]});
@@ -47,7 +47,7 @@ const server=http.createServer((req,res)=>{
     {number:1,image:{original:'https://static.tvmaze.com/season-one.jpg'}},
     {number:2,image:null}
    ]});
-   if(url.hostname==='static.tvmaze.com')return route.fulfill({headers,contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="320" height="180"><rect width="320" height="180" fill="#334b68"/><path d="M0 150L110 40L210 120L270 70L320 140V180H0Z" fill="#87a5c5"/><circle cx="245" cy="40" r="18" fill="#e5bf7e"/></svg>'});
+   if(['static.tvmaze.com','wwwimage-us.pplusstatic.com'].includes(url.hostname))return route.fulfill({headers,contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="320" height="180"><rect width="320" height="180" fill="#334b68"/><path d="M0 150L110 40L210 120L270 70L320 140V180H0Z" fill="#87a5c5"/><circle cx="245" cy="40" r="18" fill="#e5bf7e"/></svg>'});
    if(url.pathname.includes('/functions/v1/watchlog-reminders')){
     const body=req.postDataJSON();let data={ok:true,history:[],upcoming:[],suppressed:[]};
     if(body.action==='public_key')data.publicKey='AQID';
@@ -62,6 +62,7 @@ const server=http.createServer((req,res)=>{
    }
    if(req.url().includes('/functions/v1/watchlog-pin')){
     const body=req.postDataJSON();let data={ok:true};
+    if(body.action==='episode_artwork')data={ok:true,state:'ready',episodeImages:body.tvmazeShowId==='12'?{1:{1:'https://wwwimage-us.pplusstatic.com/episode-poster.jpg'}}:{}};
     if(body.action==='recommendations'){recommendationRequests.push(body);data={ok:true,results:[{title:'Library recommendation',format:'Series',source:'tvmaze',tvmazeId:'14',posterUrl:'https://static.tvmaze.com/recommendation.jpg',reason:'Like Test Series'}]};}
     if(['login','load'].includes(body.action)){loads++;data={ok:true,account,items,revision,sessionToken:'test-token'};}
     if(body.action==='catalog_search'){catalogQueries.push(String(body.query||'').toLowerCase());data={ok:true,results:[
@@ -689,7 +690,12 @@ const server=http.createServer((req,res)=>{
   assert.equal(await page.locator('.gallery-season-label small').first().isVisible(),true,'opening a season reveals its exact progress');
   await page.locator('[data-gallery-toggle-episode="1:1"]').click();await page.waitForFunction(()=>!episodeLogBusy.size&&!cloudSaveInFlight);
   await page.locator('[data-gallery-episode="1:1"] img').waitFor({state:'visible'});
-  assert.equal(await page.locator('[data-gallery-episode="1:1"] img').getAttribute('src'),'https://static.tvmaze.com/episode-one.jpg');
+  assert.equal(await page.locator('[data-gallery-episode="1:1"] img').getAttribute('src'),'https://wwwimage-us.pplusstatic.com/episode-poster.jpg','publisher episode artwork takes priority over the TVMaze still');
+  await page.waitForFunction(()=>{const img=document.querySelector('[data-gallery-episode="1:1"] img');return img?.complete&&img.naturalWidth>0;});
+  await page.locator('[data-gallery-episode="1:1"] img').dispatchEvent('error');
+  assert.equal(await page.locator('[data-gallery-episode="1:1"] img').getAttribute('src'),'https://static.tvmaze.com/episode-one.jpg','broken publisher artwork falls back to the same episode still');
+  await page.locator('[data-gallery-episode="1:1"] img').dispatchEvent('error');
+  assert.equal(await page.locator('[data-gallery-episode="1:1"] .gallery-artwork-placeholder').isVisible(),true,'two broken sources leave an episode placeholder');
   await page.locator('[data-gallery-season-art="1"] img').waitFor({state:'visible'});
   assert.equal(await page.locator('[data-gallery-season-art="1"] img').getAttribute('src'),'https://static.tvmaze.com/season-one.jpg');
   await page.locator('[data-gallery-season-art="1"] img').evaluate(image=>image.dispatchEvent(new Event('error')));

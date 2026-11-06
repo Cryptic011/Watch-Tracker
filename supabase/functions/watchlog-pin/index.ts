@@ -2,6 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.112.4";
 import { getUKAvailability } from "./uk-availability.mjs";
 import { getTitleDetails } from "./title-details.mjs";
+import { getEpisodeArtwork } from "./episode-artwork.mjs";
 import { passkeyAction } from "./passkeys.mjs";
 import { getRecommendations } from "./recommendations.mjs";
 import { introducedDuplicate, mayChangeTitleIdentity } from "./duplicate-titles.mjs";
@@ -427,6 +428,10 @@ Deno.serve(async (req: Request) => {
       } catch (_) {
         return json({ error: "UK availability could not be checked. Try again shortly.", code: "availability_unavailable" }, 503);
       }
+    }
+
+    if (action === "episode_artwork") {
+      return json({ ok: true, ...await getEpisodeArtwork(body) });
     }
 
     if (action === "catalog_details") {

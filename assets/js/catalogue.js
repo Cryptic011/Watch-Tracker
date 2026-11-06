@@ -178,6 +178,7 @@
         String(show?.premiered||"").slice(0,4)===String(item.releaseYear)&&
         normalizeTitle(show?.name)===normalizeTitle(item.title));
       if(!show?.id||(showId&&String(show.id)!==showId)||(imdbId&&show.externals?.imdb!==imdbId&&!anchored)){trackerArtworkCache.delete(key);return {};}
+      const publisherTask=typeof pinApi==="function"?pinApi("episode_artwork",{tvmazeShowId:String(show.id),imdbId:show.externals?.imdb||"",title:show.name},undefined,"",AbortSignal.timeout(5500)).catch(()=>null):null;
       const results=await Promise.allSettled([
         fetchJSONWithTimeout(`https://api.tvmaze.com/shows/${encodeURIComponent(show.id)}/episodes`,{credentials:"omit"}),
         fetchJSONWithTimeout(`https://api.tvmaze.com/shows/${encodeURIComponent(show.id)}/seasons`,{credentials:"omit"})
@@ -204,8 +205,22 @@
         artwork.seasonImages=officialSeasonImageMap(results[1].value);
         artwork.details.seasons=results[1].value.filter(season=>Number(season.number)>0).length;
       }
-      if(results.some(result=>result.status==="rejected"))trackerArtworkCache.delete(key);
-      else{
+      const publisher=await publisherTask;
+      // Retain previously verified publisher images through a transient outage.
+      const publisherImages=publisher?.state==="ready"?publisher.episodeImages:
+        offlineArtwork?.artwork?.episodeImageFallbacks?offlineArtwork.artwork.episodeImages:{};
+      if(artwork.episodeImages){
+        artwork.episodeImageFallbacks=artwork.episodeImages;
+        artwork.episodeImages=Object.fromEntries(Object.entries(artwork.episodeImages).map(([season,images])=>[season,{...images}]));
+        for(const [season,images] of Object.entries(publisherImages||{}))for(const [episode,url] of Object.entries(images||{})){
+          // Require a known matching episode and an allowed publisher image host.
+          if(!artwork.episodeTitles?.[season]?.[episode]||typeof url!=="string"||!/^https:\/\/(?:static\.nbc\.com|www\.nbc\.com|wwwimage-us\.pplusstatic\.com|wwwimage-intl\.pplusstatic\.com|ichef\.bbci\.co\.uk|[^./:@]+\.mzstatic\.com)\//.test(url))continue;
+          (artwork.episodeImages[season]||(artwork.episodeImages[season]={}))[episode]=url;
+        }
+      }
+      if(results.some(result=>result.status==="rejected")||(publisherTask&&publisher?.state!=="ready"))trackerArtworkCache.delete(key);
+      // Optional publisher failures must not prevent storing usable offline details.
+      if(results.every(result=>result.status==="fulfilled")){
         try{
           const saved=savedTrackerArtwork.filter(row=>row?.key!==key);
           localStorage.setItem("watchlog_tracker_details_v1",JSON.stringify([...saved,{key,artwork}].slice(-40)));
