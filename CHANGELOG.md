@@ -1,3 +1,8 @@
+## 2026-11-06 — Complete episode artwork rollout
+- Show episode titles, release dates and matching stills immediately while optional publisher artwork loads.
+- Ignore delayed image errors from replaced images so they cannot erase current artwork.
+- Publish the episode-artwork backend required by the earlier website update.
+
 ## 2026-11-05 — Prefer publisher episode artwork
 - Prefer episode-specific images published in the verified broadcaster's structured metadata over TVMaze episode stills.
 - Match series, season, episode number and episode title; reject shared covers, conflicting images and unsupported image hosts.

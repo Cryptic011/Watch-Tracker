@@ -149,6 +149,7 @@ window.WatchLogGallery=(()=>{
     container.innerHTML=url?`<img src="${esc(url)}" alt="" loading="lazy" decoding="async">`:placeholder;
     const image=container.querySelector('img');
     if(image)image.onerror=()=>{
+      if(container.querySelector('img')!==image)return;
       if(fallback&&fallback!==url){container._trackerImage=null;paintTrackerImage(container,fallback,label);}
       else container.innerHTML=placeholder;
     };
@@ -184,10 +185,10 @@ window.WatchLogGallery=(()=>{
     dialog._trackerArtwork={posterUrl:savedArt(item)||freshArt(key(item))?.url||'',episodeReleaseDates:item.episodeReleaseDates||{},episodeTitles:item.episodeTitles||{},episodeDescriptions:item.episodeDescriptions||{},episodeImages:item.episodeImagesSource==='TVMaze'?item.episodeImages||{}:{},seasonImages:item.seasonImagesSource==='TVMaze'?item.seasonImages||{}:{}};
     paintTrackerArtwork(section,dialog._trackerArtwork);
     if(!callbacks.trackerArtwork)return;
-    try{
-      const artwork=await callbacks.trackerArtwork(item);
+    const applyArtwork=artwork=>{
       if(section===dialog.querySelector('.gallery-season-list')&&dialog.dataset.item===String(item.id)){dialog._trackerArtwork={...dialog._trackerArtwork,...artwork};paintTrackerArtwork(section,dialog._trackerArtwork);}
-    }catch(_){}
+    };
+    try{applyArtwork(await callbacks.trackerArtwork(item,applyArtwork));}catch(_){}
   }
   function episodeRow(item,season,episode,watched){
     const complete=watched.has(episode),title=episodeTitle(item.episodeTitles?.[season]?.[episode]);

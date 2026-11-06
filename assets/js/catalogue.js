@@ -156,7 +156,7 @@
   }
 
   const trackerArtworkCache=new Map();
-  function fetchOfficialTrackerArtwork(item){
+  function fetchOfficialTrackerArtwork(item,onPartial){
     const key=JSON.stringify([item.tvmazeShowId||"",item.imdbId||"",item.title,item.releaseYear||""]);
     return cachedMetadataRequest(trackerArtworkCache,key,async()=>{
       let savedTrackerArtwork=[];
@@ -205,6 +205,8 @@
         artwork.seasonImages=officialSeasonImageMap(results[1].value);
         artwork.details.seasons=results[1].value.filter(season=>Number(season.number)>0).length;
       }
+      // Episode metadata is usable before the optional publisher lookup finishes.
+      if(typeof onPartial==="function")onPartial(artwork);
       const publisher=await publisherTask;
       // Retain previously verified publisher images through a transient outage.
       const publisherImages=publisher?.state==="ready"?publisher.episodeImages:

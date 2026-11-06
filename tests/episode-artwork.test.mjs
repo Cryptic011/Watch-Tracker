@@ -71,12 +71,12 @@ test('Outages and stalled requests are bounded, aborted and remain retryable',as
 });
 
 const catalogue=fs.readFileSync(new URL('../assets/js/catalogue.js',import.meta.url),'utf8');
-function tracker(publisher,storage=new Map(),offline=false){
+function tracker(publisher,storage=new Map(),offline=false,onPartial){
   const context={AbortSignal,navigator:{onLine:!offline},localStorage:{getItem:key=>storage.get(key),setItem:(key,value)=>storage.set(key,value)},cachedMetadataRequest:(_cache,_key,task)=>task(),
     pinApi:async(action,payload)=>{assert.equal(action,'episode_artwork');assert.equal(payload.tvmazeShowId,'12');return publisher;},
     fetchJSONWithTimeout:async url=>{assert.equal(offline,false,'offline must not request metadata');return url.endsWith('/episodes')?episodes:url.endsWith('/seasons')?[]:show;}};
   vm.runInNewContext(catalogue.slice(catalogue.indexOf('  function officialEpisodeImageMap('),catalogue.indexOf('  function completeTitleSynopsis(')),context);
-  return context.fetchOfficialTrackerArtwork(selected);
+  return context.fetchOfficialTrackerArtwork(selected,onPartial);
 }
 test('Tracker prefers publisher artwork, retains still fallback, and caches both for offline use',async()=>{
   const storage=new Map(),publisher={state:'ready',episodeImages:{1:{1:poster,2:poster+'?next',99:poster}}};
@@ -113,4 +113,37 @@ test('Rendered episode images fall back to the matching still, then an episode p
   assert.ok(container.html.includes(still));image.onerror();
   assert.match(container.html,/No artwork available/);assert.match(container.html,/>E1</);
   assert.doesNotMatch(container.html,/<img/);
+});
+
+
+test('Slow publisher lookup does not hold back episode titles, dates or stills',async()=>{
+  let finishPublisher,metadata;
+  const publisher=new Promise(resolve=>{finishPublisher=resolve;});
+  let received;
+  const early=new Promise(resolve=>{received=resolve;});
+  const complete=tracker(publisher,new Map(),false,artwork=>{metadata=artwork;received();});
+  try{
+    await early;
+    assert.equal(metadata.episodeImages[1][1],still);
+    assert.equal(metadata.details.source,'TVMaze');
+    assert.ok(metadata.episodeTitles[1]);
+  }finally{finishPublisher({state:'ready',episodeImages:{1:{1:poster}}});}
+  const result=await complete;
+  assert.equal(result.episodeImages[1][1],poster);
+  assert.equal(result.episodeImageFallbacks[1][1],still);
+});
+
+test('A late error from an old image cannot replace the current publisher artwork',()=>{
+  const gallery=fs.readFileSync(new URL('../library-gallery.js',import.meta.url),'utf8');
+  const context={esc:value=>String(value)};
+  vm.runInNewContext(gallery.slice(gallery.indexOf('  function paintTrackerImage('),gallery.indexOf('  function episodeTitle(')),context);
+  let image;
+  const container={set innerHTML(value){this.html=value;image=value.startsWith('<img')?{}:null;},querySelector:()=>image};
+  context.paintTrackerImage(container,still,'E1');
+  const oldImage=image;
+  context.paintTrackerImage(container,poster,'E1',still);
+  oldImage.onerror();
+  assert.ok(container.html.includes(poster));
+  image.onerror();
+  assert.ok(container.html.includes(still));
 });
