@@ -239,15 +239,48 @@ window.WatchLogGallery=(()=>{
     });
   }
   async function changeProgress(item,button,save){
-    const section=dialog.querySelector('.gallery-season-list'),expanded=[...dialog.querySelectorAll('.gallery-season')].filter(node=>node._seasonDesired??node.open).map(node=>node.dataset.season),scrollTop=dialog.scrollTop;
+    const section=dialog.querySelector('.gallery-season-list'),scrollTop=dialog.scrollTop;
     const selector=button.hasAttribute('data-gallery-watch-next')?'[data-gallery-watch-next]':button.hasAttribute('data-gallery-season')?`[data-gallery-season="${button.dataset.gallerySeason}"]`:`[data-gallery-toggle-episode="${button.dataset.galleryToggleEpisode}"]`;
     dialog.querySelectorAll('[data-gallery-season],[data-gallery-toggle-episode],[data-gallery-watch-next]').forEach(control=>{control.disabled=true;});
     try{await save();}
     finally{
       const fresh=api.items().find(row=>String(row.id)===String(item.id));
       if(fresh&&dialog.open&&section===dialog.querySelector('.gallery-season-list')&&dialog.dataset.item===String(item.id)){
-        detail(fresh);
-        for(const node of dialog.querySelectorAll('.gallery-season')){node.open=expanded.includes(node.dataset.season);if(node.open)dialog._populateSeason(node);}
+        // Keep the existing list, artwork and focused control mounted while saving.
+        // Rebuilding the dialog briefly collapses every season and clamps its scroll.
+        const releases=api.released?.(fresh)||fresh.releasedEpisodes||{},watched=api.watched?.(fresh)||fresh.watchedEpisodes||{};
+        let total=0,done=0;
+        dialog._populateSeason=node=>populateSeason(node,fresh,releases,watched);
+        for(const node of section.querySelectorAll('.gallery-season')){
+          const season=Number(node.dataset.season),episodes=releases[season]||[],seen=new Set(watched[season]||[]),count=episodes.filter(episode=>seen.has(episode)).length;
+          total+=episodes.length;done+=count;
+          node.querySelector('.gallery-season-label small').textContent=`${count} of ${episodes.length} episodes watched`;
+          const control=node.querySelector('[data-gallery-season]'),complete=episodes.length>0&&count===episodes.length;
+          control.setAttribute('aria-pressed',String(complete));control.setAttribute('aria-label',`Mark all Season ${season} episodes ${complete?'unwatched':'watched'}`);
+          control.querySelector('.gallery-season-check').textContent=complete?'✓':'';
+          for(const control of node.querySelectorAll('[data-gallery-toggle-episode]')){
+            const episode=Number(control.dataset.galleryToggleEpisode.split(':')[1]),complete=seen.has(episode);
+            control.setAttribute('aria-pressed',String(complete));control.setAttribute('aria-label',`Mark S${season} E${episode} ${complete?'unwatched':'watched'}`);
+            control.querySelector('.gallery-episode-check').textContent=complete?'✓':'';
+          }
+        }
+        const progress=section.querySelector('.gallery-episodes-progress');
+        if(progress){progress.setAttribute('aria-label',`${done} of ${total} released episodes watched`);progress.style.setProperty('--watched-progress',`${total?Math.round(done/total*100):0}%`);}
+        const summary=dialog.querySelector('[data-gallery-watch-summary]'),last=api.last(fresh),next=api.next?.(fresh);
+        summary.querySelector('strong').textContent=fresh.status||'Planned';
+        summary.querySelector('p:not(.gallery-caught-up)').textContent=`Watched to - ${last?`S${last.season} E${last.episode}`:'Not started'}`;
+        let nextButton=summary.querySelector('[data-gallery-watch-next]');
+        if(next){
+          summary.querySelector('.gallery-caught-up')?.remove();
+          if(!nextButton){nextButton=document.createElement('button');nextButton.type='button';nextButton.className='btn btn-primary gallery-watch-next';nextButton.dataset.galleryWatchNext='';summary.prepend(nextButton);}
+          nextButton.textContent=`Watch next · S${next.season} E${next.episode}`;
+          nextButton.onclick=()=>{const current=api.items().find(row=>String(row.id)===String(fresh.id)),candidate=current&&api.next?.(current);if(candidate)return changeProgress(current,nextButton,()=>api.toggleEpisode?.(current.id,candidate.season,candidate.episode));};
+        }else{
+          nextButton?.remove();
+          if(Object.keys(releases).length&&!summary.querySelector('.gallery-caught-up')){const caughtUp=document.createElement('p');caughtUp.className='gallery-caught-up';caughtUp.setAttribute('role','status');caughtUp.textContent='All released episodes watched';summary.prepend(caughtUp);}
+        }
+        dialog.querySelectorAll('[data-gallery-season],[data-gallery-toggle-episode],[data-gallery-watch-next]').forEach(control=>{control.disabled=false;});
+        refreshDetailReminder();
         dialog.scrollTop=scrollTop;
         (dialog.querySelector(selector)||dialog.querySelector('[data-gallery-view="watch"]'))?.focus({preventScroll:true});
       }
