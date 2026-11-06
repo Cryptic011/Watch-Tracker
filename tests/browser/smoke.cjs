@@ -62,7 +62,7 @@ const server=http.createServer((req,res)=>{
    }
    if(req.url().includes('/functions/v1/watchlog-pin')){
     const body=req.postDataJSON();let data={ok:true};
-    if(body.action==='episode_artwork')data={ok:true,state:'ready',episodeImages:body.tvmazeShowId==='12'?{1:{1:'https://wwwimage-us.pplusstatic.com/episode-poster.jpg'}}:{}};
+    if(body.action==='episode_artwork')data={ok:true,state:'ready',artworkPolicy:'publisher-labelled-posters-v2',episodeImages:body.tvmazeShowId==='12'?{1:{1:'https://wwwimage-us.pplusstatic.com/episode-poster.jpg'}}:{}};
     if(body.action==='recommendations'){recommendationRequests.push(body);data={ok:true,results:[{title:'Library recommendation',format:'Series',source:'tvmaze',tvmazeId:'14',posterUrl:'https://static.tvmaze.com/recommendation.jpg',reason:'Like Test Series'}]};}
     if(['login','load'].includes(body.action)){loads++;data={ok:true,account,items,revision,sessionToken:'test-token'};}
     if(body.action==='catalog_search'){catalogQueries.push(String(body.query||'').toLowerCase());data={ok:true,results:[
@@ -566,7 +566,7 @@ const server=http.createServer((req,res)=>{
   // Seed a verified schedule through the same persistence code used by imports.
   phase='episode tracking';
   await page.evaluate(async()=>{
-   mediaItems.push({id:'show',title:'Test Series',type:'Series',status:'Planned',platform:'Netflix',tvmazeShowId:'12',imdbId:'tt1234568',episodeImages:{1:{1:'https://static.tvmaze.com/series-poster.jpg'}},episodeScheduleVerified:true,releasedEpisodes:{1:[1,2,3]},airedEpisodeCounts:{1:3},episodeCounts:{1:4},watchedEpisodes:{},metadataUpdatedAt:new Date().toISOString(),seriesReleaseDate:'2020-01-01'});
+   mediaItems.push({id:'show',title:'Test Series',type:'Series',status:'Planned',platform:'Netflix',tvmazeShowId:'12',imdbId:'tt1234568',episodeImages:{1:{1:'https://static.tvmaze.com/episode-one.jpg'}},episodeImagesSource:'TVMaze',episodeScheduleVerified:true,releasedEpisodes:{1:[1,2,3]},airedEpisodeCounts:{1:3},episodeCounts:{1:4},watchedEpisodes:{},metadataUpdatedAt:new Date().toISOString(),seriesReleaseDate:'2020-01-01'});
    await persistLibrary(mediaItems);render();openEpisodeTracker('show');
   });
   await page.locator('#episode-watch-next').click();await page.getByRole('button',{name:'Undo',exact:true}).click();
@@ -690,12 +690,11 @@ const server=http.createServer((req,res)=>{
   assert.equal(await page.locator('.gallery-season-label small').first().isVisible(),true,'opening a season reveals its exact progress');
   await page.locator('[data-gallery-toggle-episode="1:1"]').click();await page.waitForFunction(()=>!episodeLogBusy.size&&!cloudSaveInFlight);
   await page.locator('[data-gallery-episode="1:1"] img').waitFor({state:'visible'});
-  assert.equal(await page.locator('[data-gallery-episode="1:1"] img').getAttribute('src'),'https://wwwimage-us.pplusstatic.com/episode-poster.jpg','publisher episode artwork takes priority over the TVMaze still');
+  assert.equal(await page.locator('[data-gallery-episode="1:1"] img').getAttribute('src'),'https://wwwimage-us.pplusstatic.com/episode-poster.jpg','only a classified episode poster is rendered');
   await page.waitForFunction(()=>{const img=document.querySelector('[data-gallery-episode="1:1"] img');return img?.complete&&img.naturalWidth>0;});
   await page.locator('[data-gallery-episode="1:1"] img').dispatchEvent('error');
-  assert.equal(await page.locator('[data-gallery-episode="1:1"] img').getAttribute('src'),'https://static.tvmaze.com/episode-one.jpg','broken publisher artwork falls back to the same episode still');
-  await page.locator('[data-gallery-episode="1:1"] img').dispatchEvent('error');
-  assert.equal(await page.locator('[data-gallery-episode="1:1"] .gallery-artwork-placeholder').isVisible(),true,'two broken sources leave an episode placeholder');
+  assert.equal(await page.locator('[data-gallery-episode="1:1"] img').count(),0,'a broken poster cannot fall back to a screenshot');
+  assert.equal(await page.locator('[data-gallery-episode="1:1"] .gallery-artwork-placeholder').isVisible(),true,'a broken poster leaves an episode placeholder');
   await page.locator('[data-gallery-season-art="1"] img').waitFor({state:'visible'});
   assert.equal(await page.locator('[data-gallery-season-art="1"] img').getAttribute('src'),'https://static.tvmaze.com/season-one.jpg');
   await page.locator('[data-gallery-season-art="1"] img').evaluate(image=>image.dispatchEvent(new Event('error')));

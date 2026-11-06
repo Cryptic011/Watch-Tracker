@@ -1,3 +1,9 @@
+## 2026-11-06 — Episode posters only
+- Require a publisher poster label and exact episode match; an official-host screenshot is not enough.
+- Remove TVMaze stills, generic publisher images and screenshot fallbacks from episode rows.
+- Discard legacy cached stills and unclassified images, including offline; use an episode placeholder when no poster is verified.
+- Preserve series/season covers, episode descriptions, dates and watch controls.
+
 ## 2026-11-06 — Complete episode artwork rollout
 - Show episode titles, release dates and matching stills immediately while optional publisher artwork loads.
 - Ignore delayed image errors from replaced images so they cannot erase current artwork.

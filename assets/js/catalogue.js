@@ -157,12 +157,22 @@
 
   const trackerArtworkCache=new Map();
   function fetchOfficialTrackerArtwork(item,onPartial){
+    const policy="publisher-labelled-posters-v2",storageKey="watchlog_tracker_posters_v2";
     const key=JSON.stringify([item.tvmazeShowId||"",item.imdbId||"",item.title,item.releaseYear||""]);
+    const cleanArtwork=value=>{
+      const images={};
+      if(value?.episodePosterPolicy===policy)for(const [season,rows] of Object.entries(value.episodeImages||{}))for(const [episode,url] of Object.entries(rows||{})){
+        if(typeof url==="string"&&/^https:\/\/(?:static\.nbc\.com|www\.nbc\.com|wwwimage-us\.pplusstatic\.com|wwwimage-intl\.pplusstatic\.com|ichef\.bbci\.co\.uk|[^./:@]+\.mzstatic\.com)\//.test(url))(images[season]||(images[season]={}))[episode]=url;
+      }
+      return {...value,episodePosterPolicy:policy,episodeImages:images,episodeImageFallbacks:{}};
+    };
     return cachedMetadataRequest(trackerArtworkCache,key,async()=>{
       let savedTrackerArtwork=[];
-      try{const saved=JSON.parse(localStorage.getItem("watchlog_tracker_details_v1")||"[]");if(Array.isArray(saved))savedTrackerArtwork=saved;}catch(_){}
+      try{const saved=JSON.parse(localStorage.getItem(storageKey)||"[]");if(Array.isArray(saved))savedTrackerArtwork=saved;}catch(_){}
+      // Old tracker caches contain stills and unclassified publisher images.
+      try{localStorage.removeItem?.("watchlog_tracker_details_v1");}catch(_){}
       const offlineArtwork=savedTrackerArtwork.find(row=>row?.key===key);
-      if(typeof navigator!=="undefined"&&navigator.onLine===false&&offlineArtwork)return offlineArtwork.artwork;
+      if(typeof navigator!=="undefined"&&navigator.onLine===false)return cleanArtwork(offlineArtwork?.artwork);
       const showId=String(item.tvmazeShowId||"").trim(),imdbId=String(item.imdbId||"").trim();
       let show=null;
       if(/^\d+$/.test(showId))show=await fetchJSONWithTimeout(`https://api.tvmaze.com/shows/${encodeURIComponent(showId)}`,{credentials:"omit"});
@@ -183,13 +193,12 @@
         fetchJSONWithTimeout(`https://api.tvmaze.com/shows/${encodeURIComponent(show.id)}/episodes`,{credentials:"omit"}),
         fetchJSONWithTimeout(`https://api.tvmaze.com/shows/${encodeURIComponent(show.id)}/seasons`,{credentials:"omit"})
       ]);
-      const artwork={posterUrl:show.image?.original||show.image?.medium||"",details:{
+      const artwork={episodePosterPolicy:policy,episodeImages:{},posterUrl:show.image?.original||show.image?.medium||"",details:{
         description:String(show.summary||""),premiered:show.premiered||"",genres:Array.isArray(show.genres)?show.genres:[],
         status:show.status||"",rating:Number.isFinite(show.rating?.average)?show.rating.average:null,
         runtime:show.averageRuntime||show.runtime||null,language:show.language||"",source:"TVMaze",sourceUrl:`https://www.tvmaze.com/shows/${show.id}`,sources:[{name:"TVMaze",url:`https://www.tvmaze.com/shows/${show.id}`}],ratingSource:"TVMaze"
       }};
       if(results[0].status==="fulfilled"&&Array.isArray(results[0].value)){
-        artwork.episodeImages=officialEpisodeImageMap(results[0].value,show.image);
         artwork.episodeTitles={};artwork.episodeDescriptions={};artwork.episodeReleaseDates={};
         for(const episode of results[0].value){
           const season=Number(episode?.season),number=Number(episode?.number),name=typeof episode?.name==="string"?episode.name.trim():"";
@@ -208,24 +217,20 @@
       // Episode metadata is usable before the optional publisher lookup finishes.
       if(typeof onPartial==="function")onPartial(artwork);
       const publisher=await publisherTask;
-      // Retain previously verified publisher images through a transient outage.
-      const publisherImages=publisher?.state==="ready"?publisher.episodeImages:
-        offlineArtwork?.artwork?.episodeImageFallbacks?offlineArtwork.artwork.episodeImages:{};
-      if(artwork.episodeImages){
-        artwork.episodeImageFallbacks=artwork.episodeImages;
-        artwork.episodeImages=Object.fromEntries(Object.entries(artwork.episodeImages).map(([season,images])=>[season,{...images}]));
-        for(const [season,images] of Object.entries(publisherImages||{}))for(const [episode,url] of Object.entries(images||{})){
-          // Require a known matching episode and an allowed publisher image host.
-          if(!artwork.episodeTitles?.[season]?.[episode]||typeof url!=="string"||!/^https:\/\/(?:static\.nbc\.com|www\.nbc\.com|wwwimage-us\.pplusstatic\.com|wwwimage-intl\.pplusstatic\.com|ichef\.bbci\.co\.uk|[^./:@]+\.mzstatic\.com)\//.test(url))continue;
-          (artwork.episodeImages[season]||(artwork.episodeImages[season]={}))[episode]=url;
-        }
+      // Only the new backend policy establishes poster classification. A URL on
+      // an official host alone is insufficient, including in saved offline data.
+      const publisherImages=publisher?.state==="ready"&&publisher.artworkPolicy===policy?publisher.episodeImages:
+        cleanArtwork(offlineArtwork?.artwork).episodeImages;
+      for(const [season,images] of Object.entries(publisherImages||{}))for(const [episode,url] of Object.entries(images||{})){
+        if(!artwork.episodeTitles?.[season]?.[episode]||typeof url!=="string"||!/^https:\/\/(?:static\.nbc\.com|www\.nbc\.com|wwwimage-us\.pplusstatic\.com|wwwimage-intl\.pplusstatic\.com|ichef\.bbci\.co\.uk|[^./:@]+\.mzstatic\.com)\//.test(url))continue;
+        (artwork.episodeImages[season]||(artwork.episodeImages[season]={}))[episode]=url;
       }
-      if(results.some(result=>result.status==="rejected")||(publisherTask&&publisher?.state!=="ready"))trackerArtworkCache.delete(key);
+      if(results.some(result=>result.status==="rejected")||(publisherTask&&(publisher?.state!=="ready"||publisher.artworkPolicy!==policy)))trackerArtworkCache.delete(key);
       // Optional publisher failures must not prevent storing usable offline details.
       if(results.every(result=>result.status==="fulfilled")){
         try{
           const saved=savedTrackerArtwork.filter(row=>row?.key!==key);
-          localStorage.setItem("watchlog_tracker_details_v1",JSON.stringify([...saved,{key,artwork}].slice(-40)));
+          localStorage.setItem(storageKey,JSON.stringify([...saved,{key,artwork}].slice(-40)));
         }catch(_){}
       }
       return artwork;

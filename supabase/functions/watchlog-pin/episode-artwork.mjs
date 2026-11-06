@@ -12,8 +12,15 @@ export function publisherImageURL(value){
   }catch{return '';}
 }
 
-// Read only explicit TVEpisode images, never page/series covers or video thumbnails.
-// Publisher provenance is the preference signal; we cannot classify image pixels.
+// A broadcaster-hosted episode image may still be a frame grab. Require the
+// publisher to explicitly identify the image as a poster, then match its episode.
+function labelledPoster(value){
+  if(!value||typeof value!=='object')return false;
+  const labels=[value.caption,value.name,value.description,...[value.additionalType].flat()].filter(label=>typeof label==='string');
+  if(labels.some(label=>/\b(?:screen[ -]?(?:shot|grab)|frame[ -]?grab|still(?:[ -]?(?:image|frame|photo))?|video thumbnail)\b/i.test(label)))return false;
+  return labels.some(label=>/^(?:(?:official|promotional|episode)\s+)*poster(?:\s+(?:for|of)\b.*)?[.!]?$/i.test(label.trim())||/^https?:\/\/[^ ]+[\/#](?:EpisodePoster|Poster)$/i.test(label.trim()));
+}
+
 export function parsePublisherEpisodeArtwork(markup,show,episodes){
   const images={},sources=new Map(),nodes=[],byId=new Map();
   if(typeof markup!=='string'||markup.length>2000000)return images;
@@ -37,14 +44,16 @@ export function parsePublisherEpisodeArtwork(markup,show,episodes){
     if(published&&published!==String(show.premiered||'').slice(0,4))continue;
     const imageURL=value=>{value=resolve(value);return publisherImageURL(typeof value==='string'?value:value?.contentUrl||value?.url);};
     const covers=new Set([series?.image,season?.image].flat().map(imageURL).filter(Boolean));
-    const candidates=[node.image].flat().map(imageURL).filter(url=>url&&!covers.has(url));
+    const candidates=[node.image].flat().map(resolve).filter(labelledPoster).map(imageURL).filter(url=>url&&!covers.has(url));
     if(candidates[0]){
       if(!sources.has(key))sources.set(key,new Set());
       sources.get(key).add(candidates[0]);
     }
   }
+  const uses=new Map();
+  for(const [key,urls] of sources)for(const url of urls){if(!uses.has(url))uses.set(url,new Set());uses.get(url).add(key);}
   for(const [key,urls] of sources){
-    if(urls.size!==1)continue; // Conflicting records must not pick a random image.
+    if(urls.size!==1||uses.get([...urls][0]).size!==1)continue; // Conflicting records must not pick a random image.
     const [s,e]=key.split(':');(images[s]||(images[s]={}))[e]=[...urls][0];
   }
   return images;
@@ -76,7 +85,7 @@ export async function getEpisodeArtwork(input,request=fetch,{useCache=true,timeo
     return {state:'ready',episodeImages:parsePublisherEpisodeArtwork(markup,show,episodes),source:site.name,sourceUrl:site.url};
   })();
   const bounded=Promise.race([task,new Promise(resolve=>{timer=setTimeout(()=>{controller.abort();resolve({state:'unavailable',episodeImages:{}});},timeoutMs);})])
-    .catch(()=>({state:'unavailable',episodeImages:{}})).finally(()=>{clearTimeout(timer);controller.abort();});
+    .catch(()=>({state:'unavailable',episodeImages:{}})).then(value=>({...value,artworkPolicy:'publisher-labelled-posters-v2'})).finally(()=>{clearTimeout(timer);controller.abort();});
   if(useCache)pending.set(key,bounded);
   try{
     const value=await bounded;
