@@ -1,3 +1,6 @@
+## 2026-11-10 — Countdown first in release reminders
+- Start advance reminders with the remaining hours or minutes, followed by the release day, airtime and DD/MM date.
+
 ## 2026-11-06 — Episode posters with verified frame fallbacks
 - Prefer a genuine publisher-labelled episode poster, then the verified image/frame for that same episode.
 - Show matched episode frames immediately while optional publisher artwork loads, and retain them if a poster fails.

@@ -454,7 +454,7 @@ function reminderCopy(
   now = Date.now(),
 ) {
   const title = String(item.title || "").replace(/\s+/g, " ").trim() || "Untitled";
-  const timing = leadHours === 24 ? "in 1 day" : leadHours === 1 ? "in 1 hour" : `in ${leadHours} hours`;
+  const timing = leadHours === 1 ? "in 1 hour" : `in ${leadHours} hours`;
   const season = Number(event.kind === "season" ? event.number : event.season || item.airingSeason || item.curSeason || item.nextSeasonNum);
   const episode = Number(event.kind === "season" ? 1 : event.number);
   const premiere = event.kind === "film" || (season === 1 && episode === 1);
@@ -466,7 +466,13 @@ function reminderCopy(
     const days = Math.floor(eventTime! / 86400000) - Math.floor(now / 86400000);
     const date = `${String(release.getUTCDate()).padStart(2, "0")}/${String(release.getUTCMonth() + 1).padStart(2, "0")}`;
     const day = days === 0 ? "today" : days === 1 ? "tomorrow" : `on ${date}`;
-    message = eventTime! <= now ? `${label} is available` : `${label} airs ${day} at ${release.toISOString().slice(11, 16)} (${date})`;
+    const minutes = Math.max(1, Math.ceil((eventTime! - now) / 60000));
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = minutes % 60;
+    const duration = [];
+    if (hours) duration.push(`${hours} hour${hours === 1 ? "" : "s"}`);
+    if (remainingMinutes) duration.push(`${remainingMinutes} minute${remainingMinutes === 1 ? "" : "s"}`);
+    message = eventTime! <= now ? `${label} is available` : `${label} airs in ${duration.join(" ")} · ${day} at ${release.toISOString().slice(11, 16)} (${date})`;
   } else if (leadHours === 0) {
     message = `${label} is available`;
   }
@@ -947,3 +953,4 @@ Deno.serve(async (req: Request) => {
     return json({ error: "WatchLog reminder service error." }, 500);
   }
 });
+
