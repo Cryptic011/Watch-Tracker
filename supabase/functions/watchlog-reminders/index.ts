@@ -463,16 +463,14 @@ function reminderCopy(
   let message = `${label} airs ${timing}`;
   if (Number.isFinite(eventTime)) {
     const release = new Date(eventTime!);
-    const days = Math.floor(eventTime! / 86400000) - Math.floor(now / 86400000);
     const date = `${String(release.getUTCDate()).padStart(2, "0")}/${String(release.getUTCMonth() + 1).padStart(2, "0")}`;
-    const day = days === 0 ? "today" : days === 1 ? "tomorrow" : `on ${date}`;
     const minutes = Math.max(1, Math.ceil((eventTime! - now) / 60000));
     const hours = Math.floor(minutes / 60);
     const remainingMinutes = minutes % 60;
     const duration = [];
     if (hours) duration.push(`${hours} hour${hours === 1 ? "" : "s"}`);
     if (remainingMinutes) duration.push(`${remainingMinutes} minute${remainingMinutes === 1 ? "" : "s"}`);
-    message = eventTime! <= now ? `${label} is available` : `${label} airs in ${duration.join(" ")} · ${day} at ${release.toISOString().slice(11, 16)} (${date})`;
+    message = eventTime! <= now ? `${label} is available` : `${label} airs in ${duration.join(" ")} · ${release.toISOString().slice(11, 16)} (${date})`;
   } else if (leadHours === 0) {
     message = `${label} is available`;
   }

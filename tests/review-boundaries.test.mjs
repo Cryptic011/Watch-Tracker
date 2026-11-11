@@ -128,8 +128,8 @@ test('Background scans catch up only the current reminder stage',async()=>{
   const release='2026-09-06T12:00:00Z';
   for(const [clock,expected] of [
     ['2026-09-05T11:59:59Z',[]],
-    ['2026-09-05T12:00:00Z',['New episode airs in 24 hours · tomorrow at 12:00 (06/09)']],
-    ['2026-09-06T06:00:00Z',['New episode airs in 6 hours · today at 12:00 (06/09)']],
+    ['2026-09-05T12:00:00Z',['New episode airs in 24 hours · 12:00 (06/09)']],
+    ['2026-09-06T06:00:00Z',['New episode airs in 6 hours · 12:00 (06/09)']],
     ['2026-09-06T12:00:00Z',['New episode is available']],
     ['2026-09-06T12:14:59Z',['New episode is available']],
     ['2026-09-06T12:15:00Z',[]],
@@ -163,9 +163,9 @@ test("UTC instants schedule identically across subscription time zones",()=>{
 test('Reminder notifications use the show title and numbered episode message',()=>{
  const c=vm.createContext({});vm.runInContext(extractFunction(backend,'reminderCopy'),c);
  for(const [item,event,lead,body] of [
-  [{title:'NCIS'},{kind:'episode',season:23,number:2},6,'New episode airs in 6 hours · today at 12:00 (03/11) · S23 E2'],
-  [{title:'Doomsday'},{kind:'film'},24,'New show airs in 24 hours · tomorrow at 12:00 (03/11)'],
-  [{title:'Reacher'},{kind:'season',number:4},6,'New episode airs in 6 hours · today at 12:00 (03/11) · S4 E1'],
+  [{title:'NCIS'},{kind:'episode',season:23,number:2},6,'New episode airs in 6 hours · 12:00 (03/11) · S23 E2'],
+  [{title:'Doomsday'},{kind:'film'},24,'New show airs in 24 hours · 12:00 (03/11)'],
+  [{title:'Reacher'},{kind:'season',number:4},6,'New episode airs in 6 hours · 12:00 (03/11) · S4 E1'],
   [{title:'Ted Lasso'},{kind:'episode',season:3,number:2},0,'New episode is available · S3 E2'],
   [{title:'Reacher'},{kind:'season',number:4},0,'New episode is available · S4 E1'],
   [{title:'Doomsday'},{kind:'film'},0,'New show is available'],
@@ -175,20 +175,20 @@ test('Reminder notifications use the show title and numbered episode message',()
  ]){const copy=c.reminderCopy(item,event,lead,Date.parse('2026-11-03T12:00:00Z'),Date.parse('2026-11-03T12:00:00Z')-lead*3600000);assert.equal(copy.title,item.title);assert.equal(copy.body,body);}
 });
 
-test('Reminder wording uses the actual UTC day and bracketed release date across midnight and year boundaries',()=>{
+test('Reminder wording keeps countdown, UTC time and bracketed date across midnight and year boundaries',()=>{
  const c=vm.createContext({});vm.runInContext(extractFunction(backend,'reminderCopy'),c);
  const event={kind:'episode',season:10,number:4};
  for(const [now,release,expected] of [
-  ['2026-11-05T13:00:00Z','2026-11-06T01:00:00Z','in 12 hours · tomorrow at 01:00 (06/11)'],
-  ['2026-11-05T01:00:00Z','2026-11-06T01:00:00Z','in 24 hours · tomorrow at 01:00 (06/11)'],
-  ['2026-11-05T01:08:00Z','2026-11-06T01:00:00Z','in 23 hours 52 minutes · tomorrow at 01:00 (06/11)'],
-  ['2026-12-31T23:00:00Z','2027-01-01T01:00:00Z','in 2 hours · tomorrow at 01:00 (01/01)'],
+  ['2026-11-05T13:00:00Z','2026-11-06T01:00:00Z','in 12 hours · 01:00 (06/11)'],
+  ['2026-11-05T01:00:00Z','2026-11-06T01:00:00Z','in 24 hours · 01:00 (06/11)'],
+  ['2026-11-05T01:08:00Z','2026-11-06T01:00:00Z','in 23 hours 52 minutes · 01:00 (06/11)'],
+  ['2026-12-31T23:00:00Z','2027-01-01T01:00:00Z','in 2 hours · 01:00 (01/01)'],
   ['2026-06-01T23:00:00Z','2026-06-02T01:00:00+02:00','is available'],
-  ['2026-11-05T01:00:00Z','2026-11-07T01:00:00Z','in 48 hours · on 07/11 at 01:00 (07/11)'],
+  ['2026-11-05T01:00:00Z','2026-11-07T01:00:00Z','in 48 hours · 01:00 (07/11)'],
  ]){
   const body=c.reminderCopy({title:'9-1-1'},event,24,Date.parse(release),Date.parse(now)).body;
   assert.equal(body,`New episode ${expected==='is available'?'':'airs '}${expected} · S10 E4`);
-  assert.doesNotMatch(body,/GMT|UTC/);
+  assert.doesNotMatch(body,/GMT|UTC|today|tomorrow/);
  }
 });
 

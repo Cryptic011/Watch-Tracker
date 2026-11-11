@@ -1,3 +1,6 @@
+## 2026-11-11 — Simplify release reminder text
+- Show the countdown, airtime, DD/MM date and episode number, removing today and tomorrow wording.
+
 ## 2026-11-10 — Countdown first in release reminders
 - Start advance reminders with the remaining hours or minutes, followed by the release day, airtime and DD/MM date.
 
