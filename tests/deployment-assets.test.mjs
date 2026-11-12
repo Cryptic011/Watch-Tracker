@@ -44,5 +44,14 @@ test('Each deployed script and stylesheet uses the current commit URL',()=>{
     assert.equal(older.title,'First build');
     assert.deepEqual(older.changes,['First commit only']);
     assert.notEqual(older.number,999);assert.notEqual(older.date,'1900-01-01');
+    const noteId='c'.repeat(40),notes=JSON.parse(fs.readFileSync(path.join(dir,'release-notes.json'),'utf8'));
+    notes[noteId]={changes:['One consolidated change']};
+    fs.writeFileSync(path.join(dir,'release-notes.json'),JSON.stringify(notes));
+    git('-c','user.name=Test','-c','user.email=test@example.test','commit','--allow-empty','-m','Third build','-m','Release-Notes: '+noteId);
+    run();
+    const third=JSON.parse(fs.readFileSync(path.join(dir,'build-info.js'),'utf8').slice('window.WATCHLOG_BUILD='.length).trim().replace(/;$/,''));
+    assert.equal(third.commits[0].commit,git('rev-parse','HEAD'));
+    assert.deepEqual(third.commits[0].changes,['One consolidated change']);
+    assert.deepEqual(third.commits[1].changes,['Second build']);
   }finally{fs.rmSync(dir,{recursive:true,force:true});}
 });

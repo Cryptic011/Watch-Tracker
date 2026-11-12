@@ -269,6 +269,8 @@ function buildServerEpisodeSchedule(item, episodesRaw, now = Date.now()) {
     }
   }
   for (const season of Object.keys(releasedEpisodes)) releasedEpisodes[season] = [...new Set(releasedEpisodes[season])].sort((a, b) => a - b);
+  const previousReleases=item?.releasedEpisodes||{};
+  if(Object.entries(previousReleases).some(([season,numbers])=>Array.isArray(numbers)&&numbers.some(number=>!(releasedEpisodes[season]||[]).includes(Number(number)))))return item;
   const released = episodes.filter((episode) => episodeReleaseTime(episode) > 0 && episodeReleaseTime(episode) <= now).sort((a, b) => episodeReleaseTime(a) - episodeReleaseTime(b));
   const future = episodes.filter((episode) => episodeReleaseTime(episode) > now).sort((a, b) => episodeReleaseTime(a) - episodeReleaseTime(b) || a.season - b.season || a.number - b.number);
   const latest = released.at(-1) || null, next = future[0] || null;

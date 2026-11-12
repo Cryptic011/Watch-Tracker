@@ -583,7 +583,10 @@
           metadataUpdatedAt:nowISO()
         };
       }else{
-        const scheduleVerified=result?.episodeScheduleAvailable===true;
+        const incomingReleases=normalizeReleasedEpisodeMap(result?.releasedEpisodes||{});
+        const previousReleases=normalizeReleasedEpisodeMap(current.releasedEpisodes||{});
+        const scheduleContracted=Object.entries(previousReleases).some(([season,episodes])=>episodes.some(episode=>!incomingReleases[season]?.includes(episode)));
+        const scheduleVerified=result?.episodeScheduleAvailable===true&&!scheduleContracted;
         const episodeCounts=positiveEpisodeMap(scheduleVerified?result.episodeCounts:(current.episodeCounts||{}));
         const airedEpisodeCounts=positiveEpisodeMap(scheduleVerified?result.airedEpisodeCounts:(current.airedEpisodeCounts||{}));
         const releasedEpisodes=scheduleVerified?normalizeReleasedEpisodeMap(result.releasedEpisodes||{}):normalizeReleasedEpisodeMap(current.releasedEpisodes||{});
@@ -861,6 +864,9 @@
   });
   document.getElementById("import-library-backup")?.addEventListener("change",async event=>{
     const input=event.currentTarget,status=document.getElementById("library-backup-status"),files=[...input.files||[]],file=files[0];input.value="";if(!file)return;
+    const owner=String(currentUser?.id||""),generation=persistenceGeneration;
+    const active=()=>Boolean(owner)&&String(currentUser?.id||"")===owner&&persistenceGeneration===generation;
+    if(!active())return;
     const beforeItems=cloneLibrarySnapshot(mediaItems);
     try{
       if(files.reduce((size,row)=>size+row.size,0)>20*1024*1024)throw new Error("Choose import files totalling under 20 MB.");
@@ -868,6 +874,7 @@
       if(files.length===1&&!/\.(?:csv|zip)$/i.test(file.name)){
         try{backup=JSON.parse(await file.text());}catch(_){}
       }
+      if(!active())return;
       if(backup?.format!=="watchlog-library-backup"){
         if(window.WatchLogTrakt?.previewFiles){await window.WatchLogTrakt.previewFiles(files);return;}
         throw new Error("The import reader is unavailable. Refresh the app and try again.");
@@ -877,8 +884,9 @@
       mediaItems=cleanLibraryRecords(mergeLibraries(mediaItems,backup.items)).items;
       render();
       await persistLibrary(mediaItems,{background:true,precleaned:true});
+      if(!active())return;
       if(status)status.textContent=`Imported and checked duplicates from ${backup.items.length} imported item(s); ${mediaItems.length} unique titles are saved on this device and queued to sync (previously ${before}).`;
-    }catch(error){mediaItems=beforeItems;render();if(status)status.textContent=error.message||"Could not import this file.";}
+    }catch(error){if(active()){mediaItems=beforeItems;render();if(status)status.textContent=error.message||"Could not import this file.";}}
   });
 
   changePinBtn.onclick=async()=>{

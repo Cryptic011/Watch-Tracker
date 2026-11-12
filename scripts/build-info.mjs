@@ -1,10 +1,10 @@
 import {execFileSync} from 'node:child_process';
 import {readFileSync,writeFileSync,existsSync} from 'node:fs';
-const rows=execFileSync('git',['log','--topo-order','--format=%H%x09%cs%x09%s'],{encoding:'utf8'}).trim().split('\n');
+const rows=execFileSync('git',['log','--topo-order','--format=%H%x09%cs%x09%s%x09%(trailers:key=Release-Notes,valueonly,separator=%x2C)'],{encoding:'utf8'}).trim().split('\n');
 const notes=JSON.parse(readFileSync('release-notes.json','utf8'));
 // Release notes belong to an exact commit, never whichever commit is newest.
 // Identity and chronology always come from Git, even for curated notes.
-const commits=rows.map((row,index)=>{const [commit,date,...subject]=row.split('\t');const title=subject.join('\t');const note=notes[commit];return {number:rows.length-index+7,commit,date,title,changes:Array.isArray(note?.changes)&&note.changes.length?note.changes:[title]};});
+const commits=rows.map((row,index)=>{const [commit,date,title,noteId]=row.split('\t');const note=notes[commit]||(/^[a-f0-9]{40}$/.test(noteId||'')?notes[noteId]:null);return {number:rows.length-index+7,commit,date,title,changes:Array.isArray(note?.changes)&&note.changes.length?note.changes:[title]};});
 const releaseNumber=commits.length+7;
 const repository=process.env.GITHUB_REPOSITORY||'Cryptic011/Watch-Tracker';
 const runNumber=Number(process.env.GITHUB_RUN_NUMBER)||null;

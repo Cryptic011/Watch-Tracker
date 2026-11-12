@@ -945,3 +945,11 @@
 
 - Correct Changelog run labels to use the overall All workflows history position, not the individual workflow's run_number. Display only `Run N (short-commit)` before the change title.
 
+## 2026-11-12 — Protect watched progress, PIN changes and library imports
+- Retain saved watched episodes and history when a provider returns a shortened schedule, including editor previews and server reminder refreshes.
+- Change the PIN and revoke other sessions in one database transaction; a failure leaves the old credential and sessions unchanged.
+- Cancel pending imports after sign-out, account switching or session replacement, including error recovery.
+- Preserve native backup fields across multiple files and mixed ZIP imports, and distinguish Trakt IDs from TVDB IDs.
+- Add regression coverage and a local PostgreSQL test for transaction rollback, passkey revocation and backend-only permissions.
+- Bind this release's detailed notes through an explicit commit trailer so the complete fix can ship in one commit.
+

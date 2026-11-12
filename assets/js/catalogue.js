@@ -521,6 +521,9 @@
   }
 
   function applySeasonDataResult(r,{preserveProgress=false,remember=false}={}){
+    const previous=typeof mediaItems==='undefined'?null:mediaItems.find(item=>String(item.id)===String($("item-id")?.value||""));
+    const previousReleases=normalizeReleasedEpisodeMap(previous?.releasedEpisodes||{}),incomingReleases=normalizeReleasedEpisodeMap(r.releasedEpisodes||{});
+    if(preserveProgress&&r.episodeScheduleAvailable&&Object.entries(previousReleases).some(([season,episodes])=>episodes.some(episode=>!incomingReleases[season]?.includes(episode))))return null;
     if(r.resolvedShowId)$("tvmaze-id").value=r.resolvedShowId;
     if(r.imdbId)$("imdb-id").value=r.imdbId;
     updateSeasonVerifyNote(r);

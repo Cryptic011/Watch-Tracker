@@ -530,10 +530,9 @@ Deno.serve(async (req: Request) => {
       if (!validPin(pin)) return json({ error: "PIN must be exactly 4 digits." }, 400);
       const salt = crypto.getRandomValues(new Uint8Array(16));
       const pinHash = await derivePin(pin, salt);
-      const { error } = await db.from("watchlog_pin_accounts").update({ pin_hash: pinHash, pin_salt: b64(salt), failed_attempts: 0, locked_until: null, updated_at: new Date().toISOString() }).eq("id", session.accountId);
+      const { data: changed, error } = await db.rpc("watchlog_change_pin", { p_account: session.accountId, p_token_hash: session.tokenHash, p_pin_hash: pinHash, p_pin_salt: b64(salt) });
       if (error) throw error;
-      const { error: revokeError } = await db.from("watchlog_pin_sessions").delete().eq("account_id", session.accountId).neq("token_hash", session.tokenHash);
-      if (revokeError) throw revokeError;
+      if (!changed) return json({ error: "Session expired. Sign in again." }, 401);
       return json({ ok: true });
     }
 

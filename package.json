@@ -8,6 +8,7 @@
     "test:browser": "node tests/browser/smoke.cjs && node tests/browser/upgrade.cjs && node tests/browser/sync.cjs"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "0.5.16",
     "jose": "6.1.3",
     "playwright": "1.62.1"
   }

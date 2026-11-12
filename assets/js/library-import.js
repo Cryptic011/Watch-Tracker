@@ -29,6 +29,10 @@
   }
   function parse(text,filename='export.json'){
     const input=/\.csv$/i.test(filename)?csvRows(text):JSON.parse(text);
+    if(input?.format==='watchlog-library-backup'){
+      if(input.version!==1||!Array.isArray(input.items)||input.items.some(item=>!item||typeof item.title!=='string'||!item.title.trim()))throw Error('This is not a supported Watch Tracker backup.');
+      return {items:input.items,skipped:0};
+    }
     const groups=new Map();let skipped=0;
     for(const {row,label}of rowsFrom(input,filename)){
       const series=row.show&&typeof row.show==="object"?row.show:row.series&&typeof row.series==="object"?row.series:null,film=row.movie&&typeof row.movie==="object"?row.movie:null;
@@ -38,7 +42,7 @@
       const ids=titleRow.ids||{},imdb=String(ids.imdb||row.imdb_id||row.imdb||''),tvdb=Number(ids.tvdb||row.tvdb_id||0),trakt=Number(ids.trakt||row.trakt_id||0);
       const year=String(titleRow.year||row.year||'').slice(0,4);
       if(!title||title.length>300){skipped++;continue;}
-      const key=kind+':'+(imdb||tvdb||trakt||title.toLowerCase()+':'+year);
+      const key=kind+':'+(imdb?'imdb:'+imdb:tvdb?'tvdb:'+tvdb:trakt?'trakt:'+trakt:'title:'+title.toLowerCase()+':'+year);
       let item=groups.get(key);
       if(!item){item={id:'trakt:'+key,title,type:kind,status:'Planned',imdbId:/^tt\d{5,12}$/.test(imdb)?imdb:'',tvdbId:tvdb||null,traktId:trakt||null,releaseYear:year,createdAt:row.listed_at||row.collected_at||new Date().toISOString(),watchedEpisodes:{},episodeHistory:[],lists:[]};groups.set(key,item);}
       const date=row.watched_at||row.last_watched_at||row.completed_at||'';
@@ -113,30 +117,36 @@
   const dialog=document.createElement('dialog');dialog.className='changelog-dialog feature-dialog';dialog.dataset.blockRefresh='';dialog.setAttribute('aria-label','Import Trakt history');
   dialog.innerHTML='<header class="changelog-heading"><h2>Import Trakt history</h2><button class="close-btn" data-trakt-cancel aria-label="Cancel import">×</button></header><div class="changelog-body"><p data-trakt-summary></p><div data-trakt-preview></div><p data-trakt-status role="status"></p><button class="btn btn-primary btn-full" data-trakt-confirm>Import titles and watched history</button></div>';
   document.body.append(dialog);
-  let pending=[],owner='';
+  let pending=[],owner='',generation=0,previewSequence=0;
   root.WatchLogTrakt.previewFiles=async files=>{
+    const account=String(currentUser?.id||''),sessionGeneration=persistenceGeneration,sequence=++previewSequence;
+    const active=()=>Boolean(account)&&String(currentUser?.id||'')===account&&persistenceGeneration===sessionGeneration&&sequence===previewSequence;
     try{
+      if(!active())return;
       if(files.reduce((total,file)=>total+file.size,0)>20*1024*1024)throw Error('Choose export files totalling under 20 MB.');
-      pending=[];owner=String(currentUser?.id||'');
+      const imported=[];
       for(const file of await readFiles(files)){
-        try{pending.push(...parse(await file.text(),file.name).items);}
+        if(!active())return;
+        try{const text=await file.text();if(!active())return;imported.push(...parse(text,file.name).items);}
         catch(error){if(!/No titles|No supported|not a Trakt export/.test(error.message))throw error;}
       }
-      if(!pending.length)throw Error('No supported shows or films were found in these exports.');
-      if(!pending.length)return;
-      pending=deduplicateLibrary(pending).items;
+      if(!active())return;
+      if(!imported.length)throw Error('No supported shows or films were found in these exports.');
+      pending=deduplicateLibrary(imported).items;owner=account;generation=sessionGeneration;
       dialog.querySelector('[data-trakt-summary]').textContent=pending.length+' titles found. Existing watch progress is merged, and matching titles are kept together.';
       dialog.querySelector('[data-trakt-preview]').textContent=pending.slice(0,12).map(item=>item.title+' · '+item.type).join(' • ');
       dialog.querySelector('[data-trakt-status]').textContent='';
       dialog.showModal();
-    }catch(error){$('library-backup-status').textContent=error.message;}
+    }catch(error){if(active())$('library-backup-status').textContent=error.message;}
   };
   dialog.querySelector('[data-trakt-cancel]').onclick=()=>dialog.close();
   dialog.querySelector('[data-trakt-confirm]').onclick=async event=>{
     const button=event.currentTarget;button.disabled=true;
+    const account=owner,sessionGeneration=generation;
+    const active=()=>Boolean(account)&&String(currentUser?.id||'')===account&&persistenceGeneration===sessionGeneration;
     const before=cloneLibrarySnapshot(mediaItems);
     try{
-      if(!currentUser||String(currentUser.id)!==owner)throw Error('Sign in to the account that started this import.');
+      if(!active())throw Error('Sign in to the account that started this import.');
       // Match identity before merging so imported rows never replace saved IDs.
       const merged=cloneLibrarySnapshot(mediaItems);
       for(const item of pending){
@@ -147,9 +157,10 @@
       }
       mediaItems=deduplicateLibrary(merged).items;
       await persistLibrary(mediaItems,{background:true,precleaned:true});
+      if(!active())return;
       render();dialog.close();$('library-backup-status').textContent='Imported '+pending.length+' titles and merged watched history. Changes are saved on this device and queued to sync.';
       pending=[];
-    }catch(error){mediaItems=before;render();dialog.querySelector('[data-trakt-status]').textContent=error.message||'Import could not be saved. Retry when storage is available.';}
+    }catch(error){if(active()){mediaItems=before;render();dialog.querySelector('[data-trakt-status]').textContent=error.message||'Import could not be saved. Retry when storage is available.';}}
     finally{button.disabled=false;}
   };
   dialog.addEventListener('close',()=>{pending=[];setTimeout(applyPendingAppUpdate,0);});

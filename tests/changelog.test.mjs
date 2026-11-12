@@ -17,7 +17,7 @@ test('Workflow refresh joins deployment results by exact commit without replacin
   for(let i=0;i<entries.length;i++){assert.equal(actual[i].title,entries[i].title);assert.deepEqual(actual[i].changes,entries[i].changes);}
 });
 
-test('Every curated release note is pinned to an exact commit',()=>{
+test('Curated release notes use commit hashes or explicit release-note trailer identifiers',()=>{
   const notes=JSON.parse(fs.readFileSync(new URL('../release-notes.json',import.meta.url),'utf8'));
   for(const sha of Object.keys(notes))assert.match(sha,/^[a-f0-9]{40}$/);
 });

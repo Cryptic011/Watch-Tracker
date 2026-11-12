@@ -1,4 +1,15 @@
 {
+  "bfe02e466af042fba65d40d0414555f62042d7ec": {
+    "title": "Protect watched progress, PIN changes and library imports",
+    "changes": [
+      "Keep saved watched episodes and history when an episode provider returns an incomplete schedule, including editor previews and background reminder refreshes.",
+      "Change the PIN and revoke other sessions together, rolling everything back if either operation fails.",
+      "Cancel library imports after signing out, switching accounts or renewing the account session.",
+      "Preserve notes, identifiers, dates and watched history when importing multiple Watch Tracker backups or backups inside ZIP files.",
+      "Keep unrelated shows separate when different catalogue providers use the same numeric identifier.",
+      "Add regression tests and a local PostgreSQL check for PIN-change rollback and access permissions."
+    ]
+  },
   "f2b07bbf6c593374ffb52856491b232f1f46304e": {
     "title": "Reminder backend deployment (PR #1)",
     "changes": [
