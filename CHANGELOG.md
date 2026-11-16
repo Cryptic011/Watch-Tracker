@@ -1,3 +1,7 @@
+## 2026-11-16 — Preserve the selected release platform
+- Default verified UK catalogue entries for Marshals and Sheriff Country to Paramount+ while preserving broadcast choices for existing titles.
+- Keep a streaming episode upcoming until platform availability even when the broadcast feed has advanced to next week.
+
 ## 2026-11-16 — Paramount+ UK episode availability
 - Use Monday 08:00 for Marshals and Saturday 08:00 for Sheriff Country when Paramount+ is the saved platform, using the requested streaming clock.
 - Share the release time across calendars, episode dates, availability status and background reminders while preserving source timestamps and watched history.

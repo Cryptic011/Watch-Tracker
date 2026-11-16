@@ -4,6 +4,14 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 const source=fs.readFileSync(new URL('../assets/js/regional-releases.js',import.meta.url),'utf8');
 function engine(){const c=vm.createContext({Intl,Date,URL,AbortSignal});vm.runInContext(source,c);return c.WatchLogRegionalReleases;}
+test('Catalogue defaults match verified UK streaming identities and preserve explicit choices and other regions',()=>{
+ const api=engine(),item={title:'Marshals',format:'Series',tvmazeId:'84526',platform:'CBS'};
+ assert.equal(api.catalogueItem(item,{country:'GB'}).platform,'Paramount+');
+ assert.equal(item.platform,'CBS');
+ for(const row of [{...item,tvmazeId:'1'},{...item,imdbId:'tt0000000'},{...item,format:'Film'},{...item,platform:'Prime Video'}])assert.equal(api.catalogueItem(row,{country:'GB'}),row);
+ assert.equal(api.catalogueItem(item,{country:'US'}),item);
+ assert.equal(api.resolve(item,{country:'GB'}).platform,'CBS','saved broadcast entries are never silently reassigned');
+});
 test('Airtimes stay unchanged across titles, countries and daylight-saving dates',()=>{
  const api=engine();
  for(const title of ['FBI','CIA','Marshals'])for(const region of ['GB','US','CA'])for(const raw of ['2026-11-03T01:00:00Z','2026-11-03T02:01:00Z','2026-03-30T00:30:00+01:00']){

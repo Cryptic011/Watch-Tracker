@@ -107,3 +107,14 @@ test('Paramount+ release status, sorting and episode availability wait until 08:
  const input={value:'',dataset:{}};c.setReleaseInput(input,show,raw,{kind:'episode',season:2,number:3});
  assert.equal(input.value,'2026-11-16T08:00');assert.equal(c.storedReleaseInput(input),raw);
 });
+test('A provider advancing to next week still keeps the latest streaming episode upcoming until availability',()=>{
+ const c=app();c.esc=String;c.formatLocalDateTime=date=>date.toISOString();c.formatLocalWeekdayDate=date=>date.toISOString().slice(0,10);
+ vm.runInContext(extractFunction(html,'reminderMarkup'),c);
+ const show={type:'Series',title:'Marshals',tvmazeShowId:'84526',platform:'Paramount+',airingSeason:2,latestEpisodeNum:6,latestEpisodeDate:'2026-11-16T01:00:00Z',nextEpisodeNum:7,nextEpisodeDate:'2026-11-23T01:30:00Z'};
+ const early=Date.parse('2026-11-16T02:24:00Z'),next=c.upcomingSortInfo(show,early);
+ assert.equal(next.time,Date.parse('2026-11-16T08:00:00Z'));assert.equal(next.number,6);
+ assert.doesNotMatch(c.reminderMarkup(show,false,early),/class="reminder released"/);
+ assert.deepEqual(Array.from(c.releaseAvailableEpisodeMap(show,{2:[1,2,3,4,5,6]},early)[2]),[1,2,3,4,5]);
+ assert.equal(c.currentSortInfo(show,early).time,next.time);
+ const aired=c.currentSortInfo({...show,platform:'CBS'},early);assert.equal(aired.kind,'airing');
+});

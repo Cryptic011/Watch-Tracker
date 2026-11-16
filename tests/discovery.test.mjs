@@ -98,6 +98,18 @@ function quickHarness(){
  c.render=()=>{};c.persistLibrary=async()=>true;c.scheduleMetadataRefresh=async()=>true;c.showAppToast=()=>{};
  return h;
 }
+test('Adding verified UK Paramount titles saves their streaming platform; broadcast shows keep their network',async()=>{
+ const {c}=quickHarness();c.releaseViewingCountry=()=> 'GB';
+ vm.runInContext(fs.readFileSync(new URL('../assets/js/regional-releases.js',import.meta.url),'utf8'),c);
+ for(const item of [
+  {title:'Marshals',format:'Series',tvmazeId:'84526',platform:'CBS'},
+  {title:'Sheriff Country',format:'Series',tvmazeId:'76568',platform:'CBS'},
+  {title:'FBI',format:'Series',tvmazeId:'33628',platform:'CBS'}
+ ])assert.equal(await c.addDiscoveryTitle(item),true);
+ assert.deepEqual(Array.from(c.mediaItems,row=>row.platform),['CBS','Paramount+','Paramount+']);
+ assert.equal(c.mediaItems.find(row=>row.title==='Marshals').broadcastPlatform,'CBS');
+ assert.equal(c.mediaItems.find(row=>row.title==='Sheriff Country').broadcastPlatform,'CBS');
+});
 test('Add saves a Planned show immediately without opening the editor; duplicates open the saved title',async()=>{
  const {c,calls,$}=quickHarness();let writes=0;c.persistLibrary=async()=>{writes++;return true;};
  const item={title:'Reacher',format:'Series',tvmazeId:'12',imdbId:'tt1234568',year:'2022'};

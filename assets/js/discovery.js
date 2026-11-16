@@ -162,6 +162,7 @@
 
   async function addDiscoveryTitle(item){
     if(!item||!currentUser)return false;
+    item=globalThis.WatchLogRegionalReleases?.catalogueItem(item,{country:releaseViewingCountry()})||item;
     dismissTitleSearchKeyboard();
     if(discoveryDialog.open)discoveryDialog.close();
     const duplicate=discoveryDuplicate(item);
@@ -172,7 +173,7 @@
     const saved={id:uuid(),title,type,status:'Planned',createdAt:stamp,updatedAt:stamp,date:localISODate(),
       imdbId:item.imdbId||(item.source==='imdb'?item.externalId:'')||'',
       tvmazeShowId:type==='Film'?'':String(item.tvmazeId||item.tvmazeShowId||(item.source==='tvmaze'?item.externalId:'')||''),
-      releaseYear:String(item.year||item.releaseYear||''),platform:item.platform||'',posterUrl:discoveryImage(item.posterUrl),
+      releaseYear:String(item.year||item.releaseYear||''),platform:item.platform||'',...(item.broadcastPlatform?{broadcastPlatform:item.broadcastPlatform}:{}),posterUrl:discoveryImage(item.posterUrl),
       filmReleaseDate:type==='Film'?(item.releaseDate||''):'',filmReleaseSource:type==='Film'&&item.releaseDate?(item.releaseSource||item.source||'Catalogue'):'',
       watchedSeasons:type==='Film'?null:0,curSeason:type==='Film'?null:0,curEp:type==='Film'?null:0,
       watchedEpisodes:{},episodeHistory:[],episodeCounts:{},airedEpisodeCounts:{},releasedEpisodes:{},episodeScheduleVerified:false};

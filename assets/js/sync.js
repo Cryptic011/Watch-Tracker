@@ -1012,7 +1012,7 @@
       // After recent releases, show the next dated episode/season in true
       // chronological order. Date-only events remain current for their whole
       // local calendar day instead of falling below TBA titles after noon.
-      const future=[nextEpisode,nextSeason]
+      const future=[latestEpisode,nextEpisode,nextSeason]
         .filter(event=>event.time>0&&(event.dateOnly?event.validThrough>=now:event.time>now))
         .map(event=>event.time)
         .sort((a,b)=>a-b);
@@ -1083,6 +1083,12 @@
         .filter(entry=>entry.time.time>0&&entry.time.time>=graceStart)
         .map(entry=>({kind:"episode",...entry.time,number:entry.ep?.number||null,season:Number(entry.ep?.season)||null}));
       events.push(...scheduledEvents);
+      // Broadcast providers may already have advanced to next week's episode
+      // while the latest episode is still pending on the selected platform.
+      const latestTime=eventTime(item?.latestEpisodeDate);
+      if(latestTime.time>now&&Number(item?.latestEpisodeNum)>0){
+        events.push({kind:"episode",...latestTime,number:item.latestEpisodeNum,season:Number(item?.airingSeason||item?.curSeason||item?.nextSeasonNum)||null});
+      }
       if(episodeTime.time>0&&(episodeTime.dateOnly?episodeTime.validThrough>=now:episodeTime.time>=graceStart)){
         const scheduled=(Array.isArray(item?.scheduledEpisodeReleases)?item.scheduledEpisodeReleases:[]).find(ep=>Number(ep.number)===Number(item.nextEpisodeNum)&&String(ep.raw||"")===episodeDate);
         const season=Number(scheduled?.season||item?.nextSeasonNum||item?.airingSeason||item?.curSeason||0)||null;

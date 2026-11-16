@@ -250,6 +250,7 @@
 
   async function selectSuggestion(item){
     if(!item)return;
+    item=globalThis.WatchLogRegionalReleases?.catalogueItem(item,{country:releaseViewingCountry()})||item;
     const duplicate=findTrackedDuplicate({title:item.title,type:item.format,imdbId:item.imdbId,tvmazeShowId:item.tvmazeId,releaseYear:item.year},mediaItems,$("item-id").value);
     if(duplicate){
       if(!$("item-id").value){closeEditor();openMediaRow(duplicate.id);return;}

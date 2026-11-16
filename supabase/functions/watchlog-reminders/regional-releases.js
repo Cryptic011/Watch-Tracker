@@ -20,16 +20,27 @@
     {name:'marshals',aliases:['marshals','the marshals'],showId:'84526',imdbId:'tt36849871',weekday:1},
     {name:'sheriff-country',aliases:['sheriff country'],showId:'76568',imdbId:'tt32268630',weekday:6}
   ];
-  function streamingRule(item,options){
-    if(!['Series','Anime'].includes(item.type)||(country(options)||'GB')!=='GB')return null;
-    const platform=String(item.platform||'').toLowerCase().replace(/[^a-z0-9+]/g,'');
-    if(!['paramount+','paramountplus'].includes(platform))return null;
+  function paramountUKTitle(item){
+    if(!['Series','Anime'].includes(item.type||item.format))return null;
+    const showId=item.tvmazeShowId||item.tvmazeId||(item.source==='tvmaze'?item.externalId:'');
+    const imdbId=item.imdbId||(item.source==='imdb'?item.externalId:'');
     const title=String(item.title||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
     return paramountUKReleases.find(rule=>{
-      if(item.tvmazeShowId&&String(item.tvmazeShowId)!==rule.showId)return false;
-      if(item.imdbId&&String(item.imdbId)!==rule.imdbId)return false;
-      return Boolean(item.tvmazeShowId||item.imdbId)||rule.aliases.includes(title);
+      if(showId&&String(showId)!==rule.showId)return false;
+      if(imdbId&&String(imdbId)!==rule.imdbId)return false;
+      return Boolean(showId||imdbId)||rule.aliases.includes(title);
     })||null;
+  }
+  function streamingRule(item,options){
+    if((country(options)||'GB')!=='GB')return null;
+    const platform=String(item.platform||'').toLowerCase().replace(/[^a-z0-9+]/g,'');
+    return ['paramount+','paramountplus'].includes(platform)?paramountUKTitle(item):null;
+  }
+  function catalogueItem(item,options={}){
+    if(!item||(country(options)||'GB')!=='GB')return item;
+    const platform=String(item.platform||'').trim().toLowerCase();
+    if(!['','cbs'].includes(platform)||!paramountUKTitle(item))return item;
+    return {...item,platform:'Paramount+',broadcastPlatform:item.broadcastPlatform||item.platform||'CBS'};
   }
   function platformReleaseTime(raw,rule){
     const source=new Date(raw),release=new Date(source);
@@ -67,5 +78,5 @@
       scheduledEpisodeReleases:Array.isArray(item.scheduledEpisodeReleases)?item.scheduledEpisodeReleases.map(restore):item.scheduledEpisodeReleases,
       recurringWeeklySchedule:item.recurringWeeklySchedule?{...item.recurringWeeklySchedule,episodes:(item.recurringWeeklySchedule.episodes||[]).map(restore)}:item.recurringWeeklySchedule};
   }
-  root.WatchLogRegionalReleases={country,localTime,resolve,refresh,resolveEvent};
+  root.WatchLogRegionalReleases={country,localTime,resolve,refresh,resolveEvent,catalogueItem};
 })(globalThis);
