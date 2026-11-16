@@ -50,14 +50,17 @@
     return release<source?source.toISOString():release.toISOString();
   }
   async function refresh(){}
+  const platformKey=value=>String(value||'').toLowerCase().replace(/[^a-z0-9+]/g,'').replace(/^paramountplus$/,'paramount+');
   function resolveEvent(item,event,options={}){
     const raw=event.broadcastRaw||event.raw;
     const timed=(item.type!=='Film'||Boolean(String(item.filmReleaseSource||'').trim()))&&/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(String(raw||''))&&Number.isFinite(Date.parse(raw));
     const rule=timed?streamingRule(item,options):null;
-    if(rule)return {...event,raw:platformReleaseTime(raw,rule),broadcastRaw:raw,platform:item.platform,streamingUnconfirmed:false,
+    if(rule)return {...event,raw:platformReleaseTime(raw,rule),broadcastRaw:raw,platform:item.platform,streamingUnconfirmed:false,releaseSourceMismatch:false,
       releaseSchedule:{key:`${rule.name}-gb-paramount-0800`,platform:item.platform,country:'GB'}};
-    return {...event,raw,platform:item.broadcastPlatform||item.platform,streamingUnconfirmed:!timed,
-      releaseSchedule:timed?{key:'provider-airtime',platform:item.broadcastPlatform||item.platform||''}:null};
+    // An original broadcast is not evidence of availability on another service.
+    const mismatch=item.type!=='Film'&&item.platform&&item.broadcastPlatform&&platformKey(item.platform)!==platformKey(item.broadcastPlatform);
+    return {...event,raw,platform:item.platform||item.broadcastPlatform,streamingUnconfirmed:!timed||Boolean(mismatch),releaseSourceMismatch:Boolean(mismatch),
+      releaseSchedule:timed&&!mismatch?{key:'provider-airtime',platform:item.platform||item.broadcastPlatform||''}:null};
   }
   function resolve(item,options={}){
     if(!item)return item;
@@ -73,7 +76,7 @@
     }
     const restore=row=>row?{...row,raw:row.broadcastRaw||row.raw,releaseSchedule:null}:row;
     if(!item.releaseSchedule&&!item.broadcastPlatform&&!rows.some(row=>row.broadcastRaw))return item;
-    return {...item,platform:item.broadcastPlatform||item.platform,releaseSchedule:null,
+    return {...item,platform:item.platform||item.broadcastPlatform,releaseSchedule:null,
       nextEpisodeDate:original(item.nextEpisodeDate),latestEpisodeDate:original(item.latestEpisodeDate),nextSeasonDate:original(item.nextSeasonDate),
       scheduledEpisodeReleases:Array.isArray(item.scheduledEpisodeReleases)?item.scheduledEpisodeReleases.map(restore):item.scheduledEpisodeReleases,
       recurringWeeklySchedule:item.recurringWeeklySchedule?{...item.recurringWeeklySchedule,episodes:(item.recurringWeeklySchedule.episodes||[]).map(restore)}:item.recurringWeeklySchedule};

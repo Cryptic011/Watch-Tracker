@@ -968,6 +968,7 @@
   }
   function currentSortInfo(item,now=Date.now()){
     if(typeof releaseTimelineItem==='function')item=releaseTimelineItem(item);
+    if(typeof regionalScheduleEvent==='function'&&regionalScheduleEvent(item,{raw:item.latestEpisodeDate||item.nextEpisodeDate}).releaseSourceMismatch)return{current:false,phase:0,time:0,kind:"tba"};
     const day=24*60*60*1000;
     const eventInfo=value=>{
       const raw=String(value||"").trim();
@@ -1065,10 +1066,11 @@
     if(typeof regionalScheduleItem==='function')item=regionalScheduleItem(item);
     const events=[],announcements=[],releaseRetentionMs=24*60*60*1000,graceStart=now-releaseRetentionMs;
     const eventTime=value=>{
-      const raw=String(value||""),dateOnly=/^\d{4}-\d{2}-\d{2}$/.test(raw)||/^\d{4}-\d{2}-\d{2}T12:00(?::00)?$/.test(raw);
+      const resolved=typeof regionalScheduleEvent==='function'?regionalScheduleEvent(item,{raw:value}):{raw:value};
+      const raw=String(resolved.raw||""),dateOnly=/^\d{4}-\d{2}-\d{2}$/.test(raw)||/^\d{4}-\d{2}-\d{2}T12:00(?::00)?$/.test(raw);
       const day=raw.slice(0,10),time=raw?new Date(dateOnly?`${day}T12:00:00Z`:raw).getTime():0;
       const validThrough=time+releaseRetentionMs;
-      return{time:Number.isFinite(time)?time:0,dateOnly,validThrough:Number.isFinite(validThrough)?validThrough:0};
+      return{time:Number.isFinite(time)?time:0,dateOnly,validThrough:Number.isFinite(validThrough)?validThrough:0,streamingUnconfirmed:resolved.streamingUnconfirmed===true,releaseSourceMismatch:resolved.releaseSourceMismatch===true};
     };
     if(item?.type==="Film"){
       if(item.filmReleaseDate){

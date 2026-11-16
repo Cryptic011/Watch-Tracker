@@ -45,10 +45,11 @@ function releaseTimelineItem(original){
 function releaseAvailableEpisodeMap(item,map,now=Date.now()){
   const timeline=releaseTimelineItem(item),pending=new Set();
   for(const row of timeline.scheduledEpisodeReleases||[]){
-    if(Date.parse(row.raw)>now)pending.add(Number(row.season)+':'+Number(row.number));
+    if(row.streamingUnconfirmed||Date.parse(row.raw)>now)pending.add(Number(row.season)+':'+Number(row.number));
   }
   for(const prefix of ['latest','next']){
-    if(Date.parse(timeline[prefix+'EpisodeDate'])>now){
+    const event=regionalScheduleEvent(item,{raw:item[prefix+'EpisodeDate']});
+    if(event.streamingUnconfirmed||Date.parse(timeline[prefix+'EpisodeDate'])>now){
       const number=Number(item[prefix+'EpisodeNum']);
       const row=(item.scheduledEpisodeReleases||[]).find(row=>Number(row.number)===number&&row.raw===item[prefix+'EpisodeDate']);
       pending.add(Number(row?.season||item.airingSeason||item.curSeason||item.nextSeasonNum)+':'+number);

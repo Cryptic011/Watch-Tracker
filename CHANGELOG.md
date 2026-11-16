@@ -1,3 +1,7 @@
+## 2026-11-16 — Keep release sources tied to the selected platform
+- Preserve the selected service when older broadcast metadata remains on a show.
+- Do not reuse a different broadcaster's clock for streaming release status, calendar cards, episode dates or notifications. Keep watched history intact while streaming availability is unconfirmed.
+
 ## 2026-11-16 — Preserve the selected release platform
 - Default verified UK catalogue entries for Marshals and Sheriff Country to Paramount+ while preserving broadcast choices for existing titles.
 - Keep a streaming episode upcoming until platform availability even when the broadcast feed has advanced to next week.

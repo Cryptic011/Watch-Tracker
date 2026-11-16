@@ -584,9 +584,9 @@
   function reminderMarkup(item,isFilm,now=Date.now()){
     const upcoming=upcomingSortInfo(item,now);
     if(upcoming.rank===0)return"";
-    const timed=upcoming.rank===2&&!upcoming.dateOnly&&Number.isFinite(upcoming.time),released=timed&&upcoming.time<=now;
+    const timed=upcoming.rank===2&&!upcoming.dateOnly&&!upcoming.streamingUnconfirmed&&Number.isFinite(upcoming.time),released=timed&&upcoming.time<=now;
     const attributes=`class="reminder${released?' released':''}"${timed?` data-reminder-release-at="${upcoming.time}"`:''} role="status"`;
-    const text=upcoming.rank===2?(upcoming.dateOnly?formatLocalWeekdayDate(new Date(upcoming.time)):formatLocalDateTime(new Date(upcoming.time))):"Date TBA";
+    const text=upcoming.releaseSourceMismatch?"Availability to be confirmed":upcoming.rank===2?(upcoming.dateOnly?formatLocalWeekdayDate(new Date(upcoming.time)):formatLocalDateTime(new Date(upcoming.time))):"Date TBA";
     if(isFilm&&upcoming.kind==="film")return`<div ${attributes}><span>🎬 Film ${released?'Released':'Release'}</span><small>${esc(text)}</small></div>`;
     if(upcoming.kind==="episode"){
       const season=upcoming.season||item.nextSeasonNum||item.airingSeason||item.curSeason||"",label=`${season?`S${season} `:""}E${upcoming.number||"Next"}`;

@@ -41,4 +41,8 @@ test('Episode dates use the selected streaming platform before and after artwork
  assert.match(context.episodeRow(item,2,3,new Set()),/14\/11/);
  context.paintTrackerArtwork({querySelectorAll:selector=>selector==='[data-gallery-episode]'?[row]:[]},{releaseItem:item,episodeReleaseDates:item.episodeReleaseDates,episodeTitles:item.episodeTitles});
  assert.equal(date.textContent,' · 14/11');assert.equal(date.dateTime,'2026-11-14T08:00:00.000Z');
+ const changed={...item,platform:'Prime Video',broadcastPlatform:'CBS'};
+ assert.match(context.episodeRow(changed,2,3,new Set()),/datetime="" hidden/);
+ context.paintTrackerArtwork({querySelectorAll:selector=>selector==='[data-gallery-episode]'?[row]:[]},{releaseItem:changed,episodeReleaseDates:changed.episodeReleaseDates,episodeTitles:changed.episodeTitles});
+ assert.equal(date.hidden,true);assert.equal(date.textContent,'','late artwork metadata cannot restore a broadcast date as a streaming date');
 });

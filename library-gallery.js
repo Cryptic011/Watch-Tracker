@@ -172,7 +172,8 @@ window.WatchLogGallery=(()=>{
       const date=row.querySelector('.gallery-episode-date'),raw=artwork.episodeReleaseDates?.[season]?.[episode];
       if(date){
         const value=raw||date.dateTime;
-        const release=artwork.releaseItem&&typeof regionalScheduleEvent==='function'?regionalScheduleEvent(artwork.releaseItem,{kind:'episode',season,number:episode,raw:value}).raw:value;
+        const event=artwork.releaseItem&&typeof regionalScheduleEvent==='function'?regionalScheduleEvent(artwork.releaseItem,{kind:'episode',season,number:episode,raw:value}):{raw:value};
+        const release=event.releaseSourceMismatch?'':event.raw;
         const text=episodeDate(release);
         date.textContent=text?`${subtitle?.textContent?' · ':''}${text}`:'';date.hidden=!text;
         if(release)date.dateTime=release;
@@ -197,7 +198,8 @@ window.WatchLogGallery=(()=>{
     const complete=watched.has(episode),title=episodeTitle(item.episodeTitles?.[season]?.[episode]);
     const scheduled=item.scheduledEpisodeReleases?.find(row=>Number(row.season)===season&&Number(row.number)===episode);
     const raw=scheduled?.raw||item.episodeReleaseDates?.[season]?.[episode]||'';
-    const date=typeof regionalScheduleEvent==='function'?regionalScheduleEvent(item,{...scheduled,kind:'episode',season,number:episode,raw}).raw:raw,dateText=episodeDate(date);
+    const event=typeof regionalScheduleEvent==='function'?regionalScheduleEvent(item,{...scheduled,kind:'episode',season,number:episode,raw}):{raw};
+    const date=event.releaseSourceMismatch?'':event.raw,dateText=episodeDate(date);
     return `<div class="gallery-episode-row" data-gallery-episode="${season}:${episode}">
       <span class="gallery-episode-art"><span class="gallery-artwork-placeholder">E${episode}</span></span>
       <button type="button" class="gallery-episode-copy" data-episode-description="${season}:${episode}" aria-label="Description for Episode ${episode}"><strong>Episode ${episode}</strong><small><span class="gallery-episode-title"${title?'':' hidden'}>${esc(title)}</span><time class="gallery-episode-date" datetime="${esc(date)}"${dateText?'':' hidden'}>${dateText?`${title?' · ':''}${esc(dateText)}`:''}</time></small></button>

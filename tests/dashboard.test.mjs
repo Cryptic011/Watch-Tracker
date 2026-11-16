@@ -13,6 +13,18 @@ function app(){
  const c=vm.createContext({Date,console});
  vm.runInContext(['toMillis','isEpisodeTrackable','normalizeReleasedEpisodeMap','positiveEpisodeMap','releasedEpisodeMap','normalizeWatchedEpisodeMap','legacyWatchedEpisodeMap','watchedEpisodeMap','nextWatchEpisode','calendarRange','calendarEvents','calendarWindowEvents','localISODate','weeklyReleasePattern','recurringWeeklyShows','scheduleEpisodeAirTimes','recurringScheduleDelay','scheduleBehindLevel','scheduleProgressMarker'].map(n=>extractFunction(html,n)).join('\n'),c);return c;
 }
+test('The real release resolver excludes a broadcast from an unmatched selected streaming platform',()=>{
+ const c=app();vm.runInContext(fs.readFileSync(new URL('../assets/js/regional-releases.js',import.meta.url),'utf8'),c);
+ c.regionalScheduleItem=item=>c.WatchLogRegionalReleases.resolve(item,{country:'GB'});
+ c.regionalScheduleEvent=(item,event)=>c.WatchLogRegionalReleases.resolveEvent(item,event,{country:'GB'});
+ const item={id:'show',title:'Marshals',type:'Series',tvmazeShowId:'84526',platform:'Prime Video',broadcastPlatform:'CBS',scheduledEpisodeReleases:[{season:2,number:6,raw:'2026-11-16T01:00:00Z'}]};
+ const now=new Date('2026-11-16T02:00:00Z'),result=c.calendarEvents([item],now,14);
+ assert.equal(result.events.length,0);assert.equal(result.unknown[0].platform,'Prime Video');assert.equal(result.unknown[0].streamingPending,true);
+ const broadcast=c.calendarEvents([{...item,platform:'CBS'}],now,14);
+ assert.equal(broadcast.events[0].date.toISOString(),'2026-11-16T01:00:00.000Z');
+ const streaming=c.calendarEvents([{...item,platform:'Paramount+'}],now,14);
+ assert.equal(streaming.events[0].date.toISOString(),'2026-11-16T08:00:00.000Z');
+});
 test('Unconfirmed streaming shows remain visible separately from genuinely unknown dates',()=>{
  const c=app();c.regionalScheduleEvent=(_item,event)=>({...event,streamingUnconfirmed:true});
  const result=c.calendarEvents([{id:'fire',title:'Chicago Fire',type:'Series',scheduledEpisodeReleases:[{season:15,number:3,raw:'2026-10-28T22:00:00Z'}]}],new Date('2026-10-26T12:00:00Z'),14);

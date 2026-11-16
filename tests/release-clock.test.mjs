@@ -118,3 +118,15 @@ test('A provider advancing to next week still keeps the latest streaming episode
  assert.equal(c.currentSortInfo(show,early).time,next.time);
  const aired=c.currentSortInfo({...show,platform:'CBS'},early);assert.equal(aired.kind,'airing');
 });
+test('A different selected service cannot turn a broadcast into a released streaming episode',()=>{
+ const c=app();c.esc=String;c.formatLocalDateTime=date=>date.toISOString();c.formatLocalWeekdayDate=date=>date.toISOString().slice(0,10);
+ vm.runInContext(extractFunction(html,'reminderMarkup'),c);
+ const show={title:'Marshals',type:'Series',tvmazeShowId:'84526',platform:'Prime Video',broadcastPlatform:'CBS',airingSeason:2,nextEpisodeNum:6,latestEpisodeNum:6,nextEpisodeDate:'2026-11-16T01:00:00Z',latestEpisodeDate:'2026-11-16T01:00:00Z'};
+ const now=Date.parse('2026-11-16T02:24:00Z'),before=JSON.stringify(show);
+ const markup=c.reminderMarkup(show,false,now);
+ assert.match(markup,/Availability to be confirmed/);assert.doesNotMatch(markup,/class="reminder released"|data-reminder-release-at|01:00/);
+ assert.equal(c.currentSortInfo(show,now).kind,'tba');
+ assert.deepEqual(Array.from(c.releaseAvailableEpisodeMap(show,{2:[1,2,3,4,5,6]},now)[2]),[1,2,3,4,5]);
+ assert.deepEqual(Array.from(c.releaseAvailableEpisodeMap({...show,watchedEpisodes:{2:[6]}},{2:[1,2,3,4,5,6]},now)[2]),[1,2,3,4,5,6]);
+ assert.equal(JSON.stringify(show),before);
+});

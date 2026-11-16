@@ -139,6 +139,21 @@ test('Paramount+ reminders use the 08:00 streaming release for Marshals and Sher
   assert.equal(JSON.stringify(item),before);
  }
 });
+test('Changing the selected platform suppresses broadcasts as streaming alerts while retaining broadcast reminders',async()=>{
+ const clock=Date.parse('2026-11-16T01:00:00Z'),sent=[];
+ class Clock extends Date {static now(){return clock;}}
+ const c=vm.createContext({Date:Clock,Number,Array,Set,String,Object,Map,Intl,TextEncoder,crypto,Response,URL,AbortSignal,console,Deno:{env:{get:()=>''},serve(){}},createClient:()=>({})});
+ vm.runInContext(fs.readFileSync(path.join(root,'assets/js/regional-releases.js'),'utf8'),c);
+ vm.runInContext(stripTypeScriptTypes(source.replace(/^import[\s\S]*?from "npm:web-push-neo@0\.1\.2";\n/m,'')),c);
+ const item={id:'show',title:'Marshals',tvmazeShowId:'84526',type:'Series',platform:'Prime Video',broadcastPlatform:'CBS',status:'Watching',scheduledEpisodeReleases:[{season:2,number:6,raw:'2026-11-16T01:00:00Z'}]};
+ c.readLibraries=async()=>[{account_id:'account',items:[item]}];c.refreshServerEpisodeSchedules=async rows=>rows;
+ c.claimDelivery=async()=>({id:'delivery',attempts:1});c.finishDelivery=async()=>{};c.sendPush=async(_row,_config,payload)=>sent.push(payload);
+ assert.equal((await c.processPlannedReminders([{account_id:'account'}],{})).sent,0);
+ assert.equal(sent.length,0,'a broadcast cannot confirm availability on the new streaming platform');
+ item.platform='CBS';
+ assert.equal((await c.processPlannedReminders([{account_id:'account'}],{})).sent,1);
+ assert.equal(sent[0].body,'New episode is available · S2 E6');
+});
 
 test('Server resolves legacy show identity before refreshing its missing episode schedule',async()=>{
  const now=Date.parse('2026-10-27T12:00:00Z'),calls=[],writes=[];

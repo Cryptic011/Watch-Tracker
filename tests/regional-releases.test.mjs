@@ -28,11 +28,23 @@ test('A regional refresh never requests or substitutes a different streaming tim
 test('Previously adjusted events recover their original source time without modifying saved history',()=>{
  const api=engine(),item={type:'Series',platform:'Paramount+',broadcastPlatform:'CBS',releaseSchedule:{key:'marshals-gb-paramount-8'},nextEpisodeDate:'2026-11-02T08:00:00Z',scheduledEpisodeReleases:[{season:2,number:4,raw:'2026-11-02T08:00:00Z',broadcastRaw:'2026-11-02T01:00:00Z'}]};
  const before=JSON.stringify(item),result=api.resolve(item);
- assert.equal(result.nextEpisodeDate,'2026-11-02T01:00:00Z');assert.equal(result.platform,'CBS');assert.equal(result.releaseSchedule,null);assert.equal(JSON.stringify(item),before);
+ assert.equal(result.nextEpisodeDate,'2026-11-02T01:00:00Z');assert.equal(result.platform,'Paramount+');assert.equal(result.releaseSchedule,null);assert.equal(JSON.stringify(item),before);
+ assert.equal(api.resolveEvent(result,result.scheduledEpisodeReleases[0]).streamingUnconfirmed,true);
  assert.equal(api.resolveEvent(item,item.scheduledEpisodeReleases[0]).raw,'2026-11-02T01:00:00Z');
 });
 test('A date without an airtime never gains an invented clock',()=>{
  const event=engine().resolveEvent({type:'Series'},{raw:'2026-11-03',season:1,number:2});assert.equal(event.raw,'2026-11-03');assert.equal(event.streamingUnconfirmed,true);
+});
+test('Changing a streaming platform never silently selects the old broadcaster or confirms its clock',()=>{
+ const api=engine(),raw='2026-11-16T01:00:00Z';
+ const item={type:'Series',title:'Marshals',tvmazeShowId:'84526',platform:'Prime Video',broadcastPlatform:'CBS',nextEpisodeDate:raw};
+ const result=api.resolve(item,{country:'GB'}),event=api.resolveEvent(result,{raw},{country:'GB'});
+ assert.equal(result.platform,'Prime Video');assert.equal(event.platform,'Prime Video');
+ assert.equal(event.streamingUnconfirmed,true);assert.equal(event.releaseSchedule,null);
+ const broadcast=api.resolveEvent({...item,platform:'CBS'},{raw},{country:'GB'});
+ assert.equal(broadcast.raw,raw);assert.equal(broadcast.streamingUnconfirmed,false);
+ const streaming=api.resolveEvent({...item,platform:'Paramount+'},event,{country:'GB'});
+ assert.equal(streaming.raw,'2026-11-16T08:00:00.000Z');assert.equal(streaming.releaseSourceMismatch,false);
 });
 test('Device language does not turn France or Ireland into the UK and an explicit viewing region wins',()=>{
  const api=engine();assert.equal(api.country({timeZone:'Europe/Paris',locale:'en-GB'}),'FR');assert.equal(api.country({timeZone:'Europe/Dublin',locale:'en-GB'}),'IE');assert.equal(api.country({timeZone:'Europe/London',locale:'en-US'}),'GB');assert.equal(api.country({country:'US',timeZone:'Europe/London'}),'US');
