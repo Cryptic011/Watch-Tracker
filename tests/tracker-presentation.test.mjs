@@ -26,3 +26,19 @@ test('A failed season lookup still returns episode titles and the verified show 
 test('A failed episode lookup keeps both the season and show cover',async()=>{
  const art=await tracker('episodes');assert.equal(art.episodeTitles,undefined);assert.equal(art.seasonImages[7],'https://static.tvmaze.com/season7.jpg');assert.equal(art.posterUrl,'https://static.tvmaze.com/show.jpg');
 });
+
+test('Episode dates use the selected streaming platform before and after artwork metadata loads',()=>{
+ const gallery=fs.readFileSync(new URL('../library-gallery.js',import.meta.url),'utf8');
+ const date={dateTime:'2026-11-13T20:00:00Z'},title={textContent:''};
+ const row={dataset:{galleryEpisode:'2:3'},querySelector:selector=>selector==='.gallery-episode-date'?date:selector==='.gallery-episode-title'?title:{}};
+ const context={Date,Intl,paintTrackerImage(){},esc:String};
+ vm.createContext(context);
+ vm.runInContext(fs.readFileSync(new URL('../assets/js/regional-releases.js',import.meta.url),'utf8'),context);
+ context.regionalScheduleEvent=(item,event)=>context.WatchLogRegionalReleases.resolveEvent(item,event,{country:'GB'});
+ vm.runInContext(gallery.slice(gallery.indexOf('  function episodeTitle('),gallery.indexOf('  async function loadTrackerArtwork(')),context);
+ vm.runInContext(gallery.slice(gallery.indexOf('  function episodeRow('),gallery.indexOf('  function seasonRow(')),context);
+ const item={title:'Sheriff Country',type:'Series',platform:'Paramount+',tvmazeShowId:'76568',episodeTitles:{2:{3:'The Crossing'}},episodeReleaseDates:{2:{3:date.dateTime}}};
+ assert.match(context.episodeRow(item,2,3,new Set()),/14\/11/);
+ context.paintTrackerArtwork({querySelectorAll:selector=>selector==='[data-gallery-episode]'?[row]:[]},{releaseItem:item,episodeReleaseDates:item.episodeReleaseDates,episodeTitles:item.episodeTitles});
+ assert.equal(date.textContent,' · 14/11');assert.equal(date.dateTime,'2026-11-14T08:00:00.000Z');
+});

@@ -112,6 +112,34 @@ test('Worker sends Marshals and other shows at their source airtime without avai
 });
 
 
+test('Paramount+ reminders use the 08:00 streaming release for Marshals and Sheriff Country',async()=>{
+ for(const [title,tvmazeShowId,raw,release] of [
+  ['Marshals','84526','2026-11-16T01:00:00Z','2026-11-16T08:00:00Z'],
+  ['Sheriff Country','76568','2026-11-14T01:00:00Z','2026-11-14T08:00:00Z']
+ ]){
+  let clock=Date.parse(raw);const sent=[],claimed=new Set();
+  class Clock extends Date {static now(){return clock;}}
+  const c=vm.createContext({Date:Clock,Number,Array,Set,String,Object,Map,Intl,TextEncoder,crypto,Response,URL,AbortSignal,console,Deno:{env:{get:()=>''},serve(){}},createClient:()=>({})});
+  vm.runInContext(fs.readFileSync(path.join(root,'assets/js/regional-releases.js'),'utf8'),c);
+  vm.runInContext(stripTypeScriptTypes(source.replace(/^import[\s\S]*?from "npm:web-push-neo@0\.1\.2";\n/m,'')),c);
+  const item={id:'show',title,tvmazeShowId,type:'Series',platform:'Paramount+',status:'Watching',airingSeason:2,nextEpisodeNum:4,nextEpisodeDate:raw,scheduledEpisodeReleases:[{season:2,number:4,raw}]};
+  const before=JSON.stringify(item);
+  c.readLibraries=async()=>[{account_id:'account',items:[item]}];c.refreshServerEpisodeSchedules=async rows=>rows;
+  c.claimDelivery=async(_row,_account,_id,key)=>{if(claimed.has(key))return null;claimed.add(key);return{id:'delivery',attempts:1};};
+  c.finishDelivery=async()=>{};c.sendPush=async(_row,_config,payload)=>sent.push(payload);
+  const subscriptions=[{account_id:'account'}];
+  await c.processPlannedReminders(subscriptions,{});assert.equal(sent.length,0,'the broadcast does not trigger an early streaming notification');
+  clock=Date.parse(release)-6*3600000;await c.processPlannedReminders(subscriptions,{});
+  assert.equal(sent.length,1);assert.match(sent[0].body,/airs in 6 hours · 08:00/);
+  sent.length=0;clock=Date.parse(release)-1;await c.processPlannedReminders(subscriptions,{});assert.equal(sent.length,0);
+  clock=Date.parse(release);await c.processPlannedReminders(subscriptions,{});
+  assert.equal(sent.length,1);assert.equal(sent[0].body,'New episode is available · S2 E4');
+  assert.match(sent[0].data.eventKey,/08:00:00\.000Z:lead-0h$/);
+  assert.equal((await c.processPlannedReminders(subscriptions,{})).sent,0);
+  assert.equal(JSON.stringify(item),before);
+ }
+});
+
 test('Server resolves legacy show identity before refreshing its missing episode schedule',async()=>{
  const now=Date.parse('2026-10-27T12:00:00Z'),calls=[],writes=[];
  const c=vm.createContext({Date,Number,Array,Set,String,Object,Map,TextEncoder,crypto,Response,URL,AbortSignal,console,Deno:{env:{get:()=>''},serve(){}},createClient:()=>({rpc:async(name,args)=>{writes.push(args);return {data:{ok:true,revision:2}};}}),fetch:async url=>{

@@ -171,9 +171,11 @@ window.WatchLogGallery=(()=>{
       if(subtitle&&title){subtitle.textContent=title;subtitle.hidden=false;}
       const date=row.querySelector('.gallery-episode-date'),raw=artwork.episodeReleaseDates?.[season]?.[episode];
       if(date){
-        const text=episodeDate(raw||date.dateTime);
+        const value=raw||date.dateTime;
+        const release=artwork.releaseItem&&typeof regionalScheduleEvent==='function'?regionalScheduleEvent(artwork.releaseItem,{kind:'episode',season,number:episode,raw:value}).raw:value;
+        const text=episodeDate(release);
         date.textContent=text?`${subtitle?.textContent?' · ':''}${text}`:'';date.hidden=!text;
-        if(raw)date.dateTime=raw;
+        if(release)date.dateTime=release;
       }
     }
     for(const poster of section.querySelectorAll('[data-gallery-season-art]')){
@@ -183,7 +185,7 @@ window.WatchLogGallery=(()=>{
   async function loadTrackerArtwork(item){
     const section=dialog.querySelector('.gallery-season-list'),callbacks=api;
     if(!section)return;
-    dialog._trackerArtwork={posterUrl:savedArt(item)||freshArt(key(item))?.url||'',episodeReleaseDates:item.episodeReleaseDates||{},episodeTitles:item.episodeTitles||{},episodeDescriptions:item.episodeDescriptions||{},episodePosterPolicy:'posters-with-verified-episode-stills-v3',episodeImages:{},episodeImageFallbacks:{},seasonImages:item.seasonImagesSource==='TVMaze'?item.seasonImages||{}:{}};
+    dialog._trackerArtwork={releaseItem:item,posterUrl:savedArt(item)||freshArt(key(item))?.url||'',episodeReleaseDates:item.episodeReleaseDates||{},episodeTitles:item.episodeTitles||{},episodeDescriptions:item.episodeDescriptions||{},episodePosterPolicy:'posters-with-verified-episode-stills-v3',episodeImages:{},episodeImageFallbacks:{},seasonImages:item.seasonImagesSource==='TVMaze'?item.seasonImages||{}:{}};
     paintTrackerArtwork(section,dialog._trackerArtwork);
     if(!callbacks.trackerArtwork)return;
     const applyArtwork=artwork=>{
@@ -194,7 +196,8 @@ window.WatchLogGallery=(()=>{
   function episodeRow(item,season,episode,watched){
     const complete=watched.has(episode),title=episodeTitle(item.episodeTitles?.[season]?.[episode]);
     const scheduled=item.scheduledEpisodeReleases?.find(row=>Number(row.season)===season&&Number(row.number)===episode);
-    const date=scheduled?.raw||item.episodeReleaseDates?.[season]?.[episode]||'',dateText=episodeDate(date);
+    const raw=scheduled?.raw||item.episodeReleaseDates?.[season]?.[episode]||'';
+    const date=typeof regionalScheduleEvent==='function'?regionalScheduleEvent(item,{...scheduled,kind:'episode',season,number:episode,raw}).raw:raw,dateText=episodeDate(date);
     return `<div class="gallery-episode-row" data-gallery-episode="${season}:${episode}">
       <span class="gallery-episode-art"><span class="gallery-artwork-placeholder">E${episode}</span></span>
       <button type="button" class="gallery-episode-copy" data-episode-description="${season}:${episode}" aria-label="Description for Episode ${episode}"><strong>Episode ${episode}</strong><small><span class="gallery-episode-title"${title?'':' hidden'}>${esc(title)}</span><time class="gallery-episode-date" datetime="${esc(date)}"${dateText?'':' hidden'}>${dateText?`${title?' · ':''}${esc(dateText)}`:''}</time></small></button>

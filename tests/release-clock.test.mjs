@@ -87,3 +87,23 @@ test('The episode bar turns green at the confirmed release instant and labels Ch
  const offset={...show,nextEpisodeDate:'2026-11-05T03:00:00+01:00',scheduledEpisodeReleases:[]};
  assert.match(c.reminderMarkup(offset,false,Date.parse(raw)),/S15 E5 Released/,'offset airtimes use the same UTC instant');
 });
+
+test('Paramount+ release status, sorting and episode availability wait until 08:00',()=>{
+ const c=app();c.esc=String;c.formatLocalDateTime=date=>date.toISOString();c.formatLocalWeekdayDate=date=>date.toISOString().slice(0,10);
+ vm.runInContext(extractFunction(html,'reminderMarkup'),c);
+ const raw='2026-11-16T01:00:00Z',release=Date.parse('2026-11-16T08:00:00Z');
+ const show={type:'Series',title:'Marshals',tvmazeShowId:'84526',platform:'Paramount+',airingSeason:2,latestEpisodeNum:3,latestEpisodeDate:raw,nextEpisodeNum:3,nextEpisodeDate:raw,scheduledEpisodeReleases:[{season:2,number:3,raw}]};
+ const early=Date.parse('2026-11-16T07:59:59Z');
+ assert.equal(c.upcomingSortInfo(show,early).time,release);
+ assert.equal(c.releaseSortInfo(show,early).time,release);
+ assert.notEqual(c.currentSortInfo(show,early).kind,'aired');
+ assert.match(c.reminderMarkup(show,false,early),/Next Episode/);
+ assert.doesNotMatch(c.reminderMarkup(show,false,early),/class="reminder released"/);
+ assert.match(c.reminderMarkup(show,false,release),/class="reminder released"/);
+ assert.deepEqual(Array.from(c.releaseAvailableEpisodeMap(show,{2:[1,2,3]},early)[2]),[1,2]);
+ assert.deepEqual(Array.from(c.releaseAvailableEpisodeMap({...show,watchedEpisodes:{2:[3]}},{2:[1,2,3]},early)[2]),[1,2,3]);
+ assert.deepEqual(Array.from(c.releaseAvailableEpisodeMap({...show,watchedSeasons:2},{2:[1,2,3]},early)[2]),[1,2,3],'legacy completed seasons retain their watched episodes');
+ assert.deepEqual(Array.from(c.releaseAvailableEpisodeMap(show,{2:[1,2,3]},release)[2]),[1,2,3]);
+ const input={value:'',dataset:{}};c.setReleaseInput(input,show,raw,{kind:'episode',season:2,number:3});
+ assert.equal(input.value,'2026-11-16T08:00');assert.equal(c.storedReleaseInput(input),raw);
+});

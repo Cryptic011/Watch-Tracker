@@ -1,3 +1,7 @@
+## 2026-11-16 — Paramount+ UK episode availability
+- Use Monday 08:00 for Marshals and Saturday 08:00 for Sheriff Country when Paramount+ is the saved platform, using the requested streaming clock.
+- Share the release time across calendars, episode dates, availability status and background reminders while preserving source timestamps and watched history.
+
 ## 2026-11-11 — Simplify release reminder text
 - Show the countdown, airtime, DD/MM date and episode number, removing today and tomorrow wording.
 
@@ -952,4 +956,3 @@
 - Preserve native backup fields across multiple files and mixed ZIP imports, and distinguish Trakt IDs from TVDB IDs.
 - Add regression coverage and a local PostgreSQL test for transaction rollback, passkey revocation and backend-only permissions.
 - Bind this release's detailed notes through an explicit commit trailer so the complete fix can ship in one commit.
-
