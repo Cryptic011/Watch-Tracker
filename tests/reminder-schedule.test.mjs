@@ -97,7 +97,7 @@ test('Worker sends Marshals and other shows at their source airtime without avai
  const c=vm.createContext({Date:Clock,Number,Array,Set,String,Object,Map,Intl,TextEncoder,crypto,Response,URL,AbortSignal,console,Deno:{env:{get:()=>''},serve(){}},createClient:()=>({})});
  vm.runInContext(fs.readFileSync(path.join(root,'assets/js/regional-releases.js'),'utf8'),c);
  vm.runInContext(stripTypeScriptTypes(source.replace(/^import[\s\S]*?from "npm:web-push-neo@0\.1\.2";\n/m,'')),c);
- const item={id:'marshals',title:'Marshals',type:'Series',status:'Watching',tvmazeShowId:'84526',imdbId:'tt36849871',platform:'CBS',airingSeason:2,nextEpisodeNum:4,nextEpisodeDate:'2026-10-26T00:00:00Z',scheduledEpisodeReleases:[{season:2,number:4,raw:'2026-10-26T00:00:00Z'}]};
+ const item={id:'marshals',title:'Marshals',type:'Series',status:'Watching',tvmazeShowId:'84526',imdbId:'tt36849871',platform:'CBS',broadcastPlatform:'CBS',airingSeason:2,nextEpisodeNum:4,nextEpisodeDate:'2026-10-26T00:00:00Z',scheduledEpisodeReleases:[{season:2,number:4,raw:'2026-10-26T00:00:00Z'}]};
  c.readLibraries=async()=>[{account_id:'account',items:[item,{...item,id:'unverified',tvmazeShowId:'99999',imdbId:'tt9999999',title:'Unverified streaming'}]}];c.refreshServerEpisodeSchedules=async rows=>rows;
  c.claimDelivery=async(row,account,id,key)=>{if(claimed.has(key))return null;claimed.add(key);return{id:'delivery',attempts:1};};c.finishDelivery=async()=>{};c.sendPush=async(row,config,payload)=>sent.push(payload);
  const subscriptions=[{account_id:'account',locale:'en-GB',time_zone:'Europe/London'}];

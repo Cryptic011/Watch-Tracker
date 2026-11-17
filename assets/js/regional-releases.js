@@ -58,7 +58,8 @@
     if(rule)return {...event,raw:platformReleaseTime(raw,rule),broadcastRaw:raw,platform:item.platform,streamingUnconfirmed:false,releaseSourceMismatch:false,
       releaseSchedule:{key:`${rule.name}-gb-paramount-0800`,platform:item.platform,country:'GB'}};
     // An original broadcast is not evidence of availability on another service.
-    const mismatch=item.type!=='Film'&&item.platform&&item.broadcastPlatform&&platformKey(item.platform)!==platformKey(item.broadcastPlatform);
+    const selected=platformKey(item.platform),source=platformKey(event.broadcastPlatform||item.broadcastPlatform);
+    const mismatch=item.type!=='Film'&&selected&&selected!=='other'&&selected!==source;
     return {...event,raw,platform:item.platform||item.broadcastPlatform,streamingUnconfirmed:!timed||Boolean(mismatch),releaseSourceMismatch:Boolean(mismatch),
       releaseSchedule:timed&&!mismatch?{key:'provider-airtime',platform:item.platform||item.broadcastPlatform||''}:null};
   }

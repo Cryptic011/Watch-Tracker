@@ -9,6 +9,7 @@ set search_path = ''
 as $function$
 declare
   request_id bigint;
+  project_url text := nullif(current_setting('app.settings.supabase_url', true), '');
   secret_value text;
 begin
   select cron_secret
@@ -20,8 +21,10 @@ begin
     raise exception 'WatchLog reminder cron secret is missing';
   end if;
 
+  if project_url is null then return null; end if;
+
   select net.http_post(
-    url := 'https://okkwteywtgfsnlrjdyhv.supabase.co/functions/v1/watchlog-reminders',
+    url := rtrim(project_url, '/') || '/functions/v1/watchlog-reminders',
     headers := jsonb_build_object(
       'Content-Type', 'application/json',
       'X-WatchLog-Cron', secret_value

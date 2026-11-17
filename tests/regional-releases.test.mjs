@@ -15,7 +15,7 @@ test('Catalogue defaults match verified UK streaming identities and preserve exp
 test('Airtimes stay unchanged across titles, countries and daylight-saving dates',()=>{
  const api=engine();
  for(const title of ['FBI','CIA','Marshals'])for(const region of ['GB','US','CA'])for(const raw of ['2026-11-03T01:00:00Z','2026-11-03T02:01:00Z','2026-03-30T00:30:00+01:00']){
-  const item={title,type:'Series',platform:'CBS',nextEpisodeDate:raw},event={season:2,number:5,raw};
+  const item={title,type:'Series',platform:'CBS',broadcastPlatform:'CBS',nextEpisodeDate:raw},event={season:2,number:5,raw};
   assert.equal(api.resolve(item,{country:region}).nextEpisodeDate,raw);
   const result=api.resolveEvent(item,event,{country:region});
   assert.equal(result.raw,raw);assert.equal(result.streamingUnconfirmed,false);assert.equal(result.releaseSchedule.key,'provider-airtime');

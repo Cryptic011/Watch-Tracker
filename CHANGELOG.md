@@ -1,3 +1,9 @@
+## 2026-11-17 — Protect imported progress and verify release sources
+- Keep recorded episode ticks and notes through incomplete schedules, episode corrections, and backup restores.
+- Preserve newer library edits when an import fails, and distinguish same-name titles with conflicting catalogue IDs.
+- Require matching source information before confirming a selected streaming service’s release time.
+- Route background reminder scans to the configured Supabase environment.
+
 ## 2026-11-16 — Keep release sources tied to the selected platform
 - Preserve the selected service when older broadcast metadata remains on a show.
 - Do not reuse a different broadcaster's clock for streaming release status, calendar cards, episode dates or notifications. Keep watched history intact while streaming availability is unconfirmed.

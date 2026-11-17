@@ -497,6 +497,7 @@ test("Duplicate cleanup merges released episodes and watched progress without dr
     function upcomingSortInfo(){return {rank:0,time:Infinity};}
     function watchedEpisodeMap(item){return item.watchedEpisodes||{};}
     function normalizeWatchedEpisodeMap(map,releases){
+      if(!releases)return map||{};
       const output={};
       for(const [season,episodes] of Object.entries(map||{})){
         const available=new Set(Array.isArray(releases?.[season])?releases[season]:Array.from({length:Number(releases?.[season]||0)},(_,i)=>i+1));

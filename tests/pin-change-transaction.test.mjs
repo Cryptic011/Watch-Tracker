@@ -39,3 +39,20 @@ test('PIN changes atomically revoke other sessions and passkeys, and roll back o
  }finally{await db.close();}
 });
 
+
+test('Reminder scheduler is inert until configured, and sends only to the configured project',async()=>{
+ const db=new PGlite();
+ try{
+  await db.exec(`create role anon; create role authenticated;
+   create table public.watchlog_push_config(singleton boolean,cron_secret text);
+   insert into public.watchlog_push_config values(true,'synthetic-only');
+   create schema net; create table net.audit_capture(target text);
+   create function net.http_post(url text,headers jsonb,body jsonb,timeout_milliseconds integer)
+   returns bigint language plpgsql as $$begin insert into net.audit_capture values(url); return 1; end$$;`);
+  await db.exec(read('migrations/20261117214704_environment_reminder_target.sql'));
+  assert.equal((await db.query('select public.watchlog_trigger_reminder_scan() as request')).rows[0].request,null);
+  await db.exec("update public.watchlog_push_config set reminder_project_url='https://staging.example.test'");
+  await db.query('select public.watchlog_trigger_reminder_scan()');
+  assert.deepEqual((await db.query('select target from net.audit_capture')).rows,[{target:'https://staging.example.test/functions/v1/watchlog-reminders'}]);
+ }finally{await db.close();}
+});

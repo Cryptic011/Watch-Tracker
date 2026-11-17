@@ -586,14 +586,21 @@
         const incomingReleases=normalizeReleasedEpisodeMap(result?.releasedEpisodes||{});
         const previousReleases=normalizeReleasedEpisodeMap(current.releasedEpisodes||{});
         const scheduleContracted=Object.entries(previousReleases).some(([season,episodes])=>episodes.some(episode=>!incomingReleases[season]?.includes(episode)));
-        const scheduleVerified=result?.episodeScheduleAvailable===true&&!scheduleContracted;
+        const highestKnownSeason=Math.max(0,...Object.keys(previousReleases).map(Number));
+        const hasNewReleases=Object.entries(incomingReleases).some(([season,episodes])=>
+          Number(season)>=highestKnownSeason&&episodes.some(episode=>previousReleases[season]?.includes(episode))&&
+          episodes.some(episode=>episode>Math.max(0,...previousReleases[season])));
+        const nextTime=Date.parse(episodeReleaseTimestamp(result?.nextEpisode||result?.airing?.nextEpisode));
+        const knownTime=Math.max(Date.parse(current.latestEpisodeDate)||0,Date.parse(current.nextEpisodeDate)||0);
+        const newerSchedule=nextTime>Date.now()&&nextTime>knownTime;
+        const scheduleVerified=result?.episodeScheduleAvailable===true&&(!scheduleContracted||hasNewReleases||newerSchedule);
         const episodeCounts=positiveEpisodeMap(scheduleVerified?result.episodeCounts:(current.episodeCounts||{}));
         const airedEpisodeCounts=positiveEpisodeMap(scheduleVerified?result.airedEpisodeCounts:(current.airedEpisodeCounts||{}));
         const releasedEpisodes=scheduleVerified?normalizeReleasedEpisodeMap(result.releasedEpisodes||{}):normalizeReleasedEpisodeMap(current.releasedEpisodes||{});
         let watchedSeasons=Math.max(0,Number(current.watchedSeasons||0));
         let curSeason=Math.max(0,Number(current.curSeason||0));
         let curEp=Math.max(0,Number(current.curEp||0));
-        if(scheduleVerified){
+        if(scheduleVerified&&!Object.keys(current.watchedEpisodes||{}).length){
           const completedMax=Math.max(0,Number(result.completedSeasons||0)),latestMax=Math.max(0,Number(result.latestAired||0));
           watchedSeasons=Math.min(watchedSeasons,completedMax);
           if(curSeason>latestMax){curSeason=Math.min(latestMax,watchedSeasons);curEp=curSeason?Math.max(0,...(releasedEpisodes[curSeason]||[])):0;}
@@ -614,6 +621,7 @@
           recurringWeeklySchedule:scheduleVerified?(result.recurringWeeklySchedule||null):(current.recurringWeeklySchedule||null),
           airingSeason:scheduleVerified?(airing?.season??null):current.airingSeason,
           latestEpisodeNum:scheduleVerified?(airing?.latestEpisode??null):current.latestEpisodeNum,
+          broadcastPlatform:scheduleVerified?(result?.broadcastPlatform||current.broadcastPlatform||""):current.broadcastPlatform,
           latestEpisodeTitle:scheduleVerified?(airing?.latestEpisodeTitle||""):(current.latestEpisodeTitle||""),
           latestEpisodeDate:scheduleVerified?(result?.latestEpisodeDate||""):(current.latestEpisodeDate||""),
           seriesReleaseDate:result?.seriesReleaseDate||current.seriesReleaseDate||"",
@@ -623,7 +631,6 @@
           nextSeasonNum:upcoming?.number??(scheduleVerified?"":current.nextSeasonNum),
           nextSeasonDate:upcoming?(result?.nextEpisode&&Number(result.nextEpisode.season)===Number(upcoming.number)?episodeReleaseTimestamp(result.nextEpisode):(upcoming.premiereDate||"")):(scheduleVerified?"":(current.nextSeasonDate||"")),
           verifiedCompletedSeasons:scheduleVerified&&Number.isFinite(Number(result?.completedSeasons))?Number(result.completedSeasons):current.verifiedCompletedSeasons,
-          ...(Object.prototype.hasOwnProperty.call(current,"watchedEpisodes")?{watchedEpisodes:scheduleVerified?normalizeWatchedEpisodeMap(current.watchedEpisodes,releasedEpisodes):current.watchedEpisodes}:{}),
           metadataUpdatedAt:scheduleVerified?nowISO():(current.metadataUpdatedAt||"")
         };
       }
@@ -862,12 +869,31 @@
     const link=document.createElement("a");link.href=url;link.download=`watched-logger-backup-${new Date().toISOString().slice(0,10)}.json`;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
     const status=document.getElementById("library-backup-status");if(status)status.textContent=`Exported library with ${backup.items.length} library item(s).`;
   });
+  function mergeImportedLibrary(savedItems, importedItems){
+    const merged=[...savedItems];
+    for(const item of importedItems){
+      const index=merged.findIndex(saved=>(item.id&&String(saved.id)===String(item.id))||itemsAreDuplicate(saved,item));
+      if(index<0){
+        merged.push({...item,id:item.id||uuid(),updatedAt:item.updatedAt||nowISO()});
+        continue;
+      }
+      const saved=merged[index];
+      const explicit=Object.hasOwn(saved,"watchedEpisodes")||Object.hasOwn(item,"watchedEpisodes");
+      const watchedEpisodes=explicit?mergeEpisodeSetChanges({},
+        item.watchedEpisodes??legacyWatchedEpisodeMap(item),saved.watchedEpisodes??legacyWatchedEpisodeMap(saved)):null;
+      const status=saved.status==="Watched"||item.status==="Watched"?"Watched":Object.keys(watchedEpisodes||{}).length?"Watching":saved.status||item.status;
+      const notes=typeof saved.notes==="string"&&saved.notes.trim()?saved.notes:item.notes??saved.notes;
+      merged[index]={...item,...saved,notes,...(explicit?{watchedEpisodes}:{}),status,
+        episodeHistory:mergeEpisodeHistory([],item.episodeHistory,saved.episodeHistory)};
+    }
+    return merged;
+  }
+
   document.getElementById("import-library-backup")?.addEventListener("change",async event=>{
     const input=event.currentTarget,status=document.getElementById("library-backup-status"),files=[...input.files||[]],file=files[0];input.value="";if(!file)return;
     const owner=String(currentUser?.id||""),generation=persistenceGeneration;
     const active=()=>Boolean(owner)&&String(currentUser?.id||"")===owner&&persistenceGeneration===generation;
     if(!active())return;
-    const beforeItems=cloneLibrarySnapshot(mediaItems);
     try{
       if(files.reduce((size,row)=>size+row.size,0)>20*1024*1024)throw new Error("Choose import files totalling under 20 MB.");
       let backup=null;
@@ -881,12 +907,12 @@
       }
       if(backup?.format!=="watchlog-library-backup"||backup.version!==1||!Array.isArray(backup.items)||backup.items.some(item=>!item||typeof item.title!=="string"||!item.title.trim()))throw new Error("This is not a supported Watch Tracker backup.");
       const before=mediaItems.length;
-      mediaItems=cleanLibraryRecords(mergeLibraries(mediaItems,backup.items)).items;
+      mediaItems=cleanLibraryRecords(mergeImportedLibrary(mediaItems,backup.items)).items;
       render();
       await persistLibrary(mediaItems,{background:true,precleaned:true});
       if(!active())return;
       if(status)status.textContent=`Imported and checked duplicates from ${backup.items.length} imported item(s); ${mediaItems.length} unique titles are saved on this device and queued to sync (previously ${before}).`;
-    }catch(error){if(active()){mediaItems=beforeItems;render();if(status)status.textContent=error.message||"Could not import this file.";}}
+    }catch(error){if(active()&&status)status.textContent=error.message||"Could not import this file.";}
   });
 
   changePinBtn.onclick=async()=>{

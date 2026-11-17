@@ -259,7 +259,7 @@ const server=http.createServer((req,res)=>{
    const saved=mediaItems;
    try{
     const day=new Date(Date.now()+2*86400000).toISOString().slice(0,10),raw=day+'T02:00:00Z',old=day+'T02:01:00Z';
-    mediaItems=[{id:'corrected-cia',title:'CIA',type:'Series',platform:'CBS',airingSeason:2,nextEpisodeNum:6,nextEpisodeDate:old,nextEpisodeTitle:'Legacy',scheduledEpisodeReleases:[{season:2,number:6,raw,title:'Legacy'}],recurringWeeklySchedule:{episodes:[{season:2,number:6,raw:old}]}}];
+    mediaItems=[{id:'corrected-cia',title:'CIA',type:'Series',platform:'CBS',broadcastPlatform:'CBS',airingSeason:2,nextEpisodeNum:6,nextEpisodeDate:old,nextEpisodeTitle:'Legacy',scheduledEpisodeReleases:[{season:2,number:6,raw,title:'Legacy'}],recurringWeeklySchedule:{episodes:[{season:2,number:6,raw:old}]}}];
     renderDashboard();
     return ['#library-dashboard','#recurring-weekly-dashboard'].map(id=>{switchTab(id.includes('recurring')?'recurring':'calendar');renderDashboard();return {count:document.querySelector(id).querySelectorAll('.release-card').length,copy:document.querySelector(id).querySelector('.release-card-copy').textContent};});
    }finally{mediaItems=saved;switchTab('calendar');renderDashboard();}
@@ -270,7 +270,7 @@ const server=http.createServer((req,res)=>{
    const original=mediaItems;
    mediaItems=Array.from({length:8},(_,index)=>({id:'poster-proof-'+index,type:'Series',title:index===0?'Test Series':index===7?'Later poster':'Saved poster '+index,
     ...(index===0?{tvmazeShowId:'12',imdbId:'tt1234568'}:index===7?{tvmazeShowId:'13'}:{posterUrl:'https://static.tvmaze.com/saved-poster-'+index+'.jpg'}),
-    platform:'Poster test network',scheduledEpisodeReleases:[{season:1,number:1,raw:new Date(Date.now()+(index+1)*86400000).toISOString()}]}));
+    platform:'Poster test network',broadcastPlatform:'Poster test network',scheduledEpisodeReleases:[{season:1,number:1,raw:new Date(Date.now()+(index+1)*86400000).toISOString()}]}));
    WatchLogGallery.clearArtwork();render();return original;
   });
   try{
@@ -293,8 +293,8 @@ const server=http.createServer((req,res)=>{
   const pendingSchedule=await page.evaluate(()=>{
    const saved=mediaItems,view=selectedScheduleView,range=selectedCalendarRange;
    try{
-    mediaItems=[{id:'regional-pending',title:'Chicago Fire pending streaming',type:'Series',tvmazeShowId:'999999',platform:'Saved service',scheduledEpisodeReleases:[{season:15,number:3,raw:new Date(Date.now()+2*86400000).toISOString().slice(0,10)}]}];
-    mediaItems.push({id:'four-hour',title:'Timed episode',type:'Series',platform:'Saved service',scheduledEpisodeReleases:[{season:1,number:2,raw:new Date(Date.now()+2*86400000).toISOString()}]});
+    mediaItems=[{id:'regional-pending',title:'Chicago Fire pending streaming',type:'Series',tvmazeShowId:'999999',platform:'Saved service',broadcastPlatform:'Saved service',scheduledEpisodeReleases:[{season:15,number:3,raw:new Date(Date.now()+2*86400000).toISOString().slice(0,10)}]}];
+    mediaItems.push({id:'four-hour',title:'Timed episode',type:'Series',platform:'Saved service',broadcastPlatform:'Saved service',scheduledEpisodeReleases:[{season:1,number:2,raw:new Date(Date.now()+2*86400000).toISOString()}]});
     switchTab('recurring');renderDashboard();
     const recurring=document.querySelector('#recurring-weekly-dashboard'),name=recurring.querySelector('.release-pending')?.textContent,
      timedRelease=recurring.querySelector('[data-recurring-open="four-hour"]')?.textContent,
@@ -335,7 +335,7 @@ const server=http.createServer((req,res)=>{
     return [date.getFullYear(),String(date.getMonth()+1).padStart(2,'0'),String(date.getDate()).padStart(2,'0')].join('-');
    };
    let showSerial=90000;
-   const make=(id,title,weeks,hour)=>({id,title,tvmazeShowId:String(++showSerial),platform:'Verified network',type:'Series',status:'Watching',
+   const make=(id,title,weeks,hour)=>({id,title,tvmazeShowId:String(++showSerial),platform:'Verified network',broadcastPlatform:'Verified network',type:'Series',status:'Watching',
     scheduledEpisodeReleases:weeks.map((week,i)=>({season:1,number:i+1,raw:hour===null?dateOnly(week):stamp(week,hour)}))});
    const evening=make('later-clock','17:00 programme',[-2,-1,0],17);
    const overnight=make('earlier-clock','01:00 programme',[-4,-3,1],1);
@@ -566,7 +566,7 @@ const server=http.createServer((req,res)=>{
   // Seed a verified schedule through the same persistence code used by imports.
   phase='episode tracking';
   await page.evaluate(async()=>{
-   mediaItems.push({id:'show',title:'Test Series',type:'Series',status:'Planned',platform:'Netflix',tvmazeShowId:'12',imdbId:'tt1234568',episodeImages:{1:{1:'https://static.tvmaze.com/episode-one.jpg'}},episodeImagesSource:'TVMaze',episodeScheduleVerified:true,releasedEpisodes:{1:[1,2,3]},airedEpisodeCounts:{1:3},episodeCounts:{1:4},watchedEpisodes:{},metadataUpdatedAt:new Date().toISOString(),seriesReleaseDate:'2020-01-01'});
+   mediaItems.push({id:'show',title:'Test Series',type:'Series',status:'Planned',platform:'Netflix',broadcastPlatform:'Netflix',tvmazeShowId:'12',imdbId:'tt1234568',episodeImages:{1:{1:'https://static.tvmaze.com/episode-one.jpg'}},episodeImagesSource:'TVMaze',episodeScheduleVerified:true,releasedEpisodes:{1:[1,2,3]},airedEpisodeCounts:{1:3},episodeCounts:{1:4},watchedEpisodes:{},metadataUpdatedAt:new Date().toISOString(),seriesReleaseDate:'2020-01-01'});
    await persistLibrary(mediaItems);render();openEpisodeTracker('show');
   });
   await page.locator('#episode-watch-next').click();await page.getByRole('button',{name:'Undo',exact:true}).click();
@@ -1194,7 +1194,7 @@ const server=http.createServer((req,res)=>{
   await page.locator('#open-duplicate').click();await page.locator('.gallery-detail[open]').waitFor();
   await page.locator('[data-gallery-close]').click();
   phase='refresh';
-  const refreshItemId=await page.evaluate(()=>{const item=mediaItems.find(item=>item.id==='show');item.platform='Saved before refresh';return item.id;});
+  const refreshItemId=await page.evaluate(()=>{const item=mediaItems.find(item=>item.id==='show');item.platform='Saved before refresh';item.broadcastPlatform=item.platform;return item.id;});
   const before=loads;const reload=page.waitForEvent('load');await page.locator('#refresh-app').click();await reload;
   // The same browser context retains the PIN session across a document reload.
   // Wait for session restoration to finish before inspecting or interacting with

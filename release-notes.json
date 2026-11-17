@@ -1,4 +1,13 @@
 {
+  "4eee412e28b546b4ae1ffe0c171f19a52dc1f88b": {
+    "title": "Protect imported progress and verify release sources",
+    "changes": [
+      "Keep recorded episode ticks and notes through incomplete schedules, episode corrections, and backup restores.",
+      "Preserve newer library edits when an import fails, and distinguish same-name titles with conflicting catalogue IDs.",
+      "Require matching source information before confirming a selected streaming service’s release time.",
+      "Route background reminder scans to the configured Supabase environment."
+    ]
+  },
   "bfe02e466af042fba65d40d0414555f62042d7ec": {
     "title": "Protect watched progress, PIN changes and library imports",
     "changes": [

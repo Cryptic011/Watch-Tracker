@@ -427,6 +427,7 @@
         id,title,type,status,hideFromWeeklyReleases:type==="Film"?false:$("hide-from-weekly-releases").checked,tvmazeShowId:type==="Film"?"":(sid||""),imdbId:$("imdb-id").value||requestedImdbId,releaseYear,
         totalSeasons:total,watchedSeasons:type==="Film"?null:numOrNull("watched-seasons"),curSeason,curEp:type==="Film"?null:numOrNull("cur-ep"),
         currentSeasonEpisodeCount:type==="Film"?null:Number(airedEpisodeCounts?.[curSeason]||0)||null,currentSeasonTotalEpisodes:type==="Film"?null:Number(episodeCounts?.[curSeason]||0)||null,episodeCounts:type==="Film"?{}:episodeCounts,airedEpisodeCounts:type==="Film"?{}:airedEpisodeCounts,releasedEpisodes:type==="Film"?{}:(verified?.episodeScheduleAvailable===true?(verified.releasedEpisodes||{}):(previous?.releasedEpisodes||releasedEpisodeMap({type,airedEpisodeCounts,episodeScheduleVerified:true}))),episodeImages:type==="Film"?{}:(verified?.episodeScheduleAvailable===true?(verified.episodeImages||{}):(previous?.episodeImages||{})),episodeImagesSource:type==="Film"?"":(verified?.episodeScheduleAvailable===true?"TVMaze":previous?.episodeImagesSource||""),
+        broadcastPlatform:type==="Film"?"":(verified?.broadcastPlatform||previous?.broadcastPlatform||""),
         seasonImages:type==="Film"?{}:(verified?.episodeScheduleAvailable===true?(verified.seasonImages||{}):(previous?.seasonImages||{})),seasonImagesSource:type==="Film"?"":(verified?.episodeScheduleAvailable===true?"TVMaze":previous?.seasonImagesSource||""),
         scheduledEpisodeReleases:type==="Film"?[]:(verified?.scheduledEpisodeReleases||previous?.scheduledEpisodeReleases||[]),
         recurringWeeklySchedule:type==="Film"?null:(verified?.episodeScheduleAvailable===true
@@ -439,7 +440,7 @@
         nextSeasonNum:type==="Film"?"":($("next-season-num").value?Number($("next-season-num").value):""),nextSeasonDate:type==="Film"?"":storedReleaseInput($("next-season-date"),verified?.upcoming?(verified.nextEpisode&&Number(verified.nextEpisode.season)===Number(verified.upcoming.number)?episodeReleaseTimestamp(verified.nextEpisode):(verified.upcoming.premiereDate||"")):(previous?.nextSeasonDate||"")),
         filmReleaseDate:type==="Film"?storedFilmRelease():"",filmReleaseSource:type==="Film"?(filmReleaseDate.value?(filmReleaseSource.value||"Manual"):""):"",
         verifiedCompletedSeasons:type==="Film"?null:(Number.isFinite(Number(verified?.completedSeasons))?Number(verified.completedSeasons):Number(previous?.verifiedCompletedSeasons||0)),
-        episodeHistory:type==="Film"?[]:episodeHistory,...(type==="Film"?{watchedEpisodes:{}}:(Object.prototype.hasOwnProperty.call(previous||{},"watchedEpisodes")?{watchedEpisodes:Object.keys(airedEpisodeCounts).length?normalizeWatchedEpisodeMap(previous.watchedEpisodes,airedEpisodeCounts):previous.watchedEpisodes}:{})),lastEpisodeWatchedAt:type==="Film"?"":(previous?.lastEpisodeWatchedAt||""),
+        episodeHistory:type==="Film"?[]:episodeHistory,...(type==="Film"?{watchedEpisodes:{}}:(Object.prototype.hasOwnProperty.call(previous||{},"watchedEpisodes")?{watchedEpisodes:normalizeWatchedEpisodeMap(previous.watchedEpisodes)}:{})),lastEpisodeWatchedAt:type==="Film"?"":(previous?.lastEpisodeWatchedAt||""),
         lastWatchedSeason:type==="Film"?null:(previous?.lastWatchedSeason??null),lastWatchedEpisode:type==="Film"?null:(previous?.lastWatchedEpisode??null),
         platform,date:watchedDate,createdAt:previous?.createdAt||(previous?"":nowISO()),updatedAt:previous?.updatedAt||nowISO()
       };
@@ -447,9 +448,15 @@
         const releases=releasedEpisodeMap(item),progressChanged=!previous||Number(previous.watchedSeasons||0)!==Number(item.watchedSeasons||0)||Number(previous.curSeason||0)!==Number(item.curSeason||0)||Number(previous.curEp||0)!==Number(item.curEp||0);
         if(progressChanged){
           const available=releases[Number(item.curSeason||0)]||[],requested=Number(item.curEp||0),validEpisode=available.length?Math.max(0,...available.filter(episode=>episode<=requested)):requested;
-          item.curEp=validEpisode||null;item.watchedEpisodes=progressWatchedEpisodeMap(releases,Number(item.watchedSeasons||0),Number(item.curSeason||0),validEpisode);
+          item.curEp=validEpisode||null;
+          const next=progressWatchedEpisodeMap(releases,Number(item.watchedSeasons||0),Number(item.curSeason||0),validEpisode);
+          for(const [season,numbers] of Object.entries(item.watchedEpisodes||{})){
+            const unavailable=numbers.filter(number=>!releases[season]?.includes(number));
+            if(unavailable.length)next[season]=[...(next[season]||[]),...unavailable].sort((a,b)=>a-b);
+          }
+          item.watchedEpisodes=next;
           const highest=highestWatchedEpisode(item.watchedEpisodes);item.curSeason=highest?.season||null;item.curEp=highest?.episode||null;item.lastWatchedSeason=highest?.season||null;item.lastWatchedEpisode=highest?.episode||null;item.lastEpisodeWatchedAt=highest?nowISO():"";
-        }else if(Object.prototype.hasOwnProperty.call(previous||{},"watchedEpisodes"))item.watchedEpisodes=normalizeWatchedEpisodeMap(previous.watchedEpisodes,releases);
+        }
       }
       item=migratePlannedStatuses([item]).rows[0];
       const duplicate=findTrackedDuplicate(item,mediaItems,id);

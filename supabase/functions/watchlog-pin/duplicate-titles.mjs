@@ -8,14 +8,17 @@ export function sameTitleIdentity(a,b){
  const ai=imdb(a),bi=imdb(b),am=maze(a),bm=maze(b);
  if(ai&&bi&&ai===bi||am&&bm&&am===bm)return true;
  if(ai&&bi||am&&bm)return false;
+ const providerPairs=['tvdbId','traktId'].map(key=>[String(a[key]||''),String(b[key]||'')]).filter(([left,right])=>left&&right);
+ if(providerPairs.some(([left,right])=>left!==right))return false;
+ if(providerPairs.length)return true;
  return title(a.title)===title(b.title)&&!(year(a)&&year(b)&&year(a)!==year(b));
 }
 export function mayChangeTitleIdentity(changes){
- const fields=new Set(['title','type','imdbId','tvmazeShowId','releaseYear','filmReleaseDate']);
+ const fields=new Set(['title','type','imdbId','tvmazeShowId','tvdbId','traktId','releaseYear','filmReleaseDate']);
  return changes.some(change=>change.create||Object.keys(change.set||{}).some(key=>fields.has(key))||(change.unset||[]).some(key=>fields.has(key)));
 }
 export function introducedDuplicate(items,changes){
- const identityFields=new Set(['title','type','imdbId','tvmazeShowId','releaseYear','filmReleaseDate']);
+ const identityFields=new Set(['title','type','imdbId','tvmazeShowId','tvdbId','traktId','releaseYear','filmReleaseDate']);
  const candidates=new Set(),rows=new Map((items||[]).map(item=>[String(item.id),item]));
  for(const change of changes){
   const id=String(change.id);

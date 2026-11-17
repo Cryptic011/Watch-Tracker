@@ -46,13 +46,13 @@
   function releasedEpisodeCounts(item){
     return Object.fromEntries(Object.entries(releasedEpisodeMap(item)).map(([season,episodes])=>[season,Math.max(0,...episodes)]));
   }
-  function normalizeWatchedEpisodeMap(value,counts={}){
+  function normalizeWatchedEpisodeMap(value,counts){
     const result={};
     for(const [seasonValue,episodeValue] of Object.entries(value||{})){
       const season=Number(seasonValue);if(!Number.isInteger(season)||season<=0)continue;
       const source=Array.isArray(episodeValue)?episodeValue:Object.entries(episodeValue||{}).filter(([,watched])=>Boolean(watched)).map(([episode])=>episode);
-      const allowed=Array.isArray(counts[season])?new Set(counts[season].map(Number)):null,maximum=allowed?0:Math.max(0,Number(counts[season]||0));
-      const episodes=[...new Set(source.map(Number).filter(episode=>Number.isInteger(episode)&&episode>0&&(allowed?allowed.has(episode):(maximum>0&&episode<=maximum))))].sort((a,b)=>a-b);
+      const allowed=Array.isArray(counts?.[season])?new Set(counts[season].map(Number)):null,maximum=allowed?0:Math.max(0,Number(counts?.[season]||0));
+      const episodes=[...new Set(source.map(Number).filter(episode=>Number.isInteger(episode)&&episode>0&&(!counts||(allowed?allowed.has(episode):(maximum>0&&episode<=maximum)))))].sort((a,b)=>a-b);
       if(episodes.length)result[season]=episodes;
     }
     return result;
@@ -105,11 +105,11 @@
     return total;
   }
   function applyEpisodeToggle(item,season,episode,markWatched,event,includeEarlier=true){
-    const releases=releasedEpisodeMap(item),counts=releasedEpisodeCounts(item),map=watchedEpisodeMap(item,releases),episodes=new Set(map[season]||[]);
+    const releases=releasedEpisodeMap(item),counts=releasedEpisodeCounts(item),map=Object.hasOwn(item,"watchedEpisodes")?normalizeWatchedEpisodeMap(item.watchedEpisodes):watchedEpisodeMap(item,releases),episodes=new Set(map[season]||[]);
     if(!releases[season]?.includes(episode))return item;
     if(markWatched){for(const number of releases[season])if(number===episode||(includeEarlier&&number<episode))episodes.add(number);}else episodes.delete(episode);
     if(episodes.size)map[season]=[...episodes].sort((a,b)=>a-b);else delete map[season];
-    const watchedEpisodes=normalizeWatchedEpisodeMap(map,releases),highest=highestWatchedEpisode(watchedEpisodes);
+    const watchedEpisodes=normalizeWatchedEpisodeMap(map),highest=highestWatchedEpisode(watchedEpisodes);
     let curSeason=Math.max(0,Number(item.curSeason||0)),curEp=Math.max(0,Number(item.curEp||0));
     const currentOrder=curSeason*10000+curEp,targetOrder=season*10000+episode;
     if(markWatched&&targetOrder>currentOrder){curSeason=season;curEp=episode;}
@@ -128,8 +128,10 @@
   function applySeasonToggle(item,season,markWatched,events){
     const releases=releasedEpisodeMap(item),available=releases[season]||[];
     if(!available.length||events.length!==available.length)return item;
-    const watched=watchedEpisodeMap(item,releases);
-    if(markWatched)watched[season]=[...available];else delete watched[season];
+    const watched=Object.hasOwn(item,"watchedEpisodes")?normalizeWatchedEpisodeMap(item.watchedEpisodes):watchedEpisodeMap(item,releases);
+    const other=(watched[season]||[]).filter(number=>!available.includes(number));
+    const next=markWatched?[...other,...available]:other;
+    if(next.length)watched[season]=next;else delete watched[season];
     const base={...item,watchedEpisodes:watched,episodeHistory:[...(Array.isArray(item.episodeHistory)?item.episodeHistory:[]),...events.slice(0,-1)].slice(-500)};
     if(!markWatched&&Number(item.curSeason)===season&&available.includes(Number(item.curEp))){
       const highest=highestWatchedEpisode(watched);

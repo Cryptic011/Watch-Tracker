@@ -144,23 +144,15 @@
     const button=event.currentTarget;button.disabled=true;
     const account=owner,sessionGeneration=generation;
     const active=()=>Boolean(account)&&String(currentUser?.id||'')===account&&persistenceGeneration===sessionGeneration;
-    const before=cloneLibrarySnapshot(mediaItems);
     try{
-      if(!active())throw Error('Sign in to the account that started this import.');
-      // Match identity before merging so imported rows never replace saved IDs.
-      const merged=cloneLibrarySnapshot(mediaItems);
-      for(const item of pending){
-        const index=merged.findIndex(saved=>saved.type===item.type&&((saved.imdbId&&saved.imdbId===item.imdbId)||(saved.traktId&&saved.traktId===item.traktId)||(saved.tvdbId&&saved.tvdbId===item.tvdbId)||((!saved.imdbId||!item.imdbId||saved.imdbId===item.imdbId)&&normalizeTitle(saved.title)===normalizeTitle(item.title)&&(!saved.releaseYear||!item.releaseYear||String(saved.releaseYear)===item.releaseYear))));
-        if(index<0){merged.push(item);continue;}
-        const saved=merged[index],watched=mergeEpisodeSetChanges({},item.watchedEpisodes,saved.watchedEpisodes);
-        merged[index]={...item,...saved,watchedEpisodes:watched,episodeHistory:mergeEpisodeHistory([],item.episodeHistory,saved.episodeHistory),status:Object.keys(watched).length?'Watching':saved.status==='Watched'||item.status==='Watched'?'Watched':saved.status};
-      }
-      mediaItems=deduplicateLibrary(merged).items;
+      if(!active()){dialog.close();return;}
+      const importedCount=pending.length;
+      mediaItems=deduplicateLibrary(mergeImportedLibrary(mediaItems,pending)).items;
       await persistLibrary(mediaItems,{background:true,precleaned:true});
       if(!active())return;
-      render();dialog.close();$('library-backup-status').textContent='Imported '+pending.length+' titles and merged watched history. Changes are saved on this device and queued to sync.';
+      render();dialog.close();$('library-backup-status').textContent='Imported '+importedCount+' titles and merged watched history. Changes are saved on this device and queued to sync.';
       pending=[];
-    }catch(error){if(active()){mediaItems=before;render();dialog.querySelector('[data-trakt-status]').textContent=error.message||'Import could not be saved. Retry when storage is available.';}}
+    }catch(error){if(active())dialog.querySelector('[data-trakt-status]').textContent=error.message||'Import could not be saved. Retry when storage is available.';}
     finally{button.disabled=false;}
   };
   dialog.addEventListener('close',()=>{pending=[];setTimeout(applyPendingAppUpdate,0);});

@@ -110,7 +110,7 @@ test('Equal numeric identifiers from different providers do not merge titles',()
 test('Native import cancels after logout, account switching or same-account reauthentication',async()=>{
  for(const next of [null,{id:'B'},{id:'A'}]){
   let finishRead,saves=0;const read=new Promise(resolve=>finishRead=resolve),replacement=[{id:'b',title:'Replacement library'}];
-  const c=load(['mergeLibraries','toMillis'],{currentUser:{id:'A'},persistenceGeneration:1,mediaItems:[],cloneLibrarySnapshot:structuredClone,cleanLibraryRecords:items=>({items}),uuid:()=> 'id',nowISO:()=>new Date().toISOString(),render(){},persistLibrary:async()=>saves++});
+  const c=load(['mergeImportedLibrary','mergeEpisodeSetChanges','mergeEpisodeHistory','toMillis'],{currentUser:{id:'A'},persistenceGeneration:1,mediaItems:[],cloneLibrarySnapshot:structuredClone,cleanLibraryRecords:items=>({items}),uuid:()=> 'id',nowISO:()=>new Date().toISOString(),render(){},persistLibrary:async()=>saves++});
   const handle=registerImport(c),task=handle({currentTarget:{files:[{name:'backup.json',size:100,text:()=>read}],value:'selected'}});
   c.currentUser=next;c.persistenceGeneration=2;c.mediaItems=replacement;finishRead(JSON.stringify(backup));await task;
   assert.equal(saves,0);assert.deepEqual(copy(c.mediaItems),replacement);
@@ -119,7 +119,7 @@ test('Native import cancels after logout, account switching or same-account reau
 
 test('A failed import save cannot roll back a replacement account library',async()=>{
  let rejectSave;const saving=new Promise((_resolve,reject)=>rejectSave=reject),replacement=[{id:'b',title:'Replacement library'}];
- const c=load(['mergeLibraries','toMillis'],{currentUser:{id:'A'},persistenceGeneration:1,mediaItems:[],cloneLibrarySnapshot:structuredClone,cleanLibraryRecords:items=>({items}),uuid:()=> 'id',nowISO:()=>new Date().toISOString(),render(){},persistLibrary:()=>saving});
+ const c=load(['mergeImportedLibrary','mergeEpisodeSetChanges','mergeEpisodeHistory','toMillis'],{currentUser:{id:'A'},persistenceGeneration:1,mediaItems:[],cloneLibrarySnapshot:structuredClone,cleanLibraryRecords:items=>({items}),uuid:()=> 'id',nowISO:()=>new Date().toISOString(),render(){},persistLibrary:()=>saving});
  const handle=registerImport(c),task=handle({currentTarget:{files:[{name:'backup.json',size:100,text:async()=>JSON.stringify(backup)}],value:'selected'}});
  await new Promise(resolve=>setImmediate(resolve));
  c.currentUser={id:'B'};c.persistenceGeneration=2;c.mediaItems=replacement;rejectSave(Error('Injected save error'));await task;
@@ -128,9 +128,72 @@ test('A failed import save cannot roll back a replacement account library',async
 
 test('An uninterrupted native backup import preserves the complete saved record',async()=>{
  let saved;
- const c=load(['mergeLibraries','toMillis'],{currentUser:{id:'A'},persistenceGeneration:1,mediaItems:[],cloneLibrarySnapshot:structuredClone,cleanLibraryRecords:items=>({items}),uuid:()=> 'id',nowISO:()=>new Date().toISOString(),render(){},persistLibrary:async items=>saved=copy(items)});
+ const c=load(['mergeImportedLibrary','mergeEpisodeSetChanges','mergeEpisodeHistory','toMillis'],{currentUser:{id:'A'},persistenceGeneration:1,mediaItems:[],cloneLibrarySnapshot:structuredClone,cleanLibraryRecords:items=>({items}),uuid:()=> 'id',nowISO:()=>new Date().toISOString(),render(){},persistLibrary:async items=>saved=copy(items)});
  const handle=registerImport(c);await handle({currentTarget:{files:[{name:'backup.json',size:100,text:async()=>JSON.stringify(backup)}],value:'selected'}});
  assert.equal(typeof saved[0].updatedAt,'string');
  const {updatedAt,...record}=saved[0];assert.deepEqual(record,backup.items[0]);
 });
 
+test('A rejected backup read preserves a later same-account edit',async()=>{
+ let finish;
+ const c=load([], {currentUser:{id:'A'},persistenceGeneration:1,mediaItems:[{id:'old',title:'Before'}],cloneLibrarySnapshot:structuredClone,render(){}});
+ const handle=registerImport(c);
+ const run=handle({currentTarget:{files:[{name:'invalid.json',size:32,text:()=>new Promise(resolve=>finish=resolve)}],value:'selected'}});
+ c.mediaItems=[{id:'old',title:'Edited while file read was pending'}];
+ finish(JSON.stringify({...backup,version:2}));
+ await run;
+ assert.equal(c.mediaItems[0].title,'Edited while file read was pending');
+});
+test('First incomplete refresh retains imported watch history without a prior release map',async()=>{
+ const item={...backup.items[0],tvmazeShowId:'12',episodeScheduleVerified:false,watchedEpisodes:{1:[1,2,3]},episodeHistory:[{id:'event',season:1,episode:3,kind:'mark'}]};
+ let saved;
+ const c=load(['scheduleMetadataRefresh','isEpisodeTrackable','positiveEpisodeMap','normalizeReleasedEpisodeMap','normalizeWatchedEpisodeMap','migratePlannedStatuses','knownSeasonTotal','sanitizeUnreleasedEpisodeProgress','releasedEpisodeMap','highestWatchedEpisode'],{
+   mediaItems:[item],metadataRefreshInFlight:new Map(),metadataRefreshAttemptAt:new Map(),activeEpisodeTrackerId:'',
+   cloneLibrarySnapshot:structuredClone,mediaVerificationIdentity:row=>row.tvmazeShowId,
+   verifiedSeasonData:async()=>({episodeScheduleAvailable:true,resolvedShowId:'12',releasedEpisodes:{1:[1,2]},episodeCounts:{1:2},airedEpisodeCounts:{1:2},latestAired:1,completedSeasons:0}),
+   episodeReleaseTimestamp:()=>'',nowISO:()=>new Date().toISOString(),console,
+   commitRefreshedLibrary(){saved=c.sanitizeUnreleasedEpisodeProgress(c.mediaItems[0]);},updateEpisodeTracker(){}
+ });
+ await c.scheduleMetadataRefresh(item);
+ assert.deepEqual(copy(saved.watchedEpisodes),{1:[1,2,3]});
+ assert.deepEqual(copy(saved.episodeHistory),item.episodeHistory);
+});
+test('A provider numbering correction accepts newer valid episodes in the reminder schedule',()=>{
+ const worker=fs.readFileSync(new URL('../supabase/functions/watchlog-reminders/index.ts',import.meta.url),'utf8');
+ const c=vm.createContext({});
+ vm.runInContext(worker.slice(worker.indexOf('function episodeUtcValue('),worker.indexOf('function serverScheduleRefreshDue(')),c);
+ const item={id:'show',releasedEpisodes:{1:[1,2,3]},nextEpisodeNum:4};
+ const rows=[1,2,4,5].map(number=>({season:1,number,airdate:'2020-01-01'}));
+ assert.deepEqual(copy(c.buildServerEpisodeSchedule(item,rows).releasedEpisodes),{1:[1,2,4,5]});
+});
+test('A streaming platform without provenance remains unconfirmed',()=>{
+ const c=vm.createContext({});
+ vm.runInContext(fs.readFileSync(new URL('../assets/js/regional-releases.js',import.meta.url),'utf8'),c);
+ const item={type:'Series',platform:'Netflix',title:'Example'};
+ const event=c.WatchLogRegionalReleases.resolveEvent(item,{kind:'episode',raw:'2026-11-18T02:00:00Z'},{country:'GB'});
+ assert.equal(event.streamingUnconfirmed,true);
+ assert.equal(event.releaseSchedule,null);
+});
+test('Preview matching separates distinct TVDB and Trakt IDs when titles match',()=>{
+ const c=load(['itemsAreDuplicate','mediaIdentityKind','identityReleaseYear','normalizeTitle']);
+ const [a,b]=copy(parser.WatchLogTrakt.parse(JSON.stringify([
+  {show:{title:'Example',ids:{tvdb:17,trakt:91}}},
+  {show:{title:'Example',ids:{tvdb:18,trakt:92}}}
+ ]),'watchlist.json')).items;
+ assert.notEqual(a.id,b.id);
+ assert.equal(c.itemsAreDuplicate(a,b),false);
+});
+test('Importing into a completed series preserves its status and fills missing notes',async()=>{
+ const nodes=new Map();
+ const node=key=>{if(!nodes.has(key))nodes.set(key,{dataset:{},textContent:''});return nodes.get(key);};
+ const dialog={dataset:{},setAttribute(){},querySelector:node,showModal(){},close(){},addEventListener(){}};
+ const watched={...backup.items[0],status:'Watched',notes:'',watchedEpisodes:{1:[1,2,3]}};
+ const c=load(['mergeEpisodeSetChanges','mergeEpisodeHistory','itemsAreDuplicate','mediaIdentityKind','identityReleaseYear','mergeImportedLibrary'],{document:{createElement:()=>dialog,body:{append(){}}},$:node,
+  currentUser:{id:'A'},persistenceGeneration:1,mediaItems:[watched],cloneLibrarySnapshot:structuredClone,
+  render(){},persistLibrary:async()=>{},deduplicateLibrary:items=>({items}),normalizeTitle:s=>s.toLowerCase(),toMillis:s=>Date.parse(s)||0,setTimeout});
+ vm.runInContext(fs.readFileSync(new URL('../assets/js/library-import.js',import.meta.url),'utf8'),c);
+ await c.WatchLogTrakt.previewFiles([{name:'example.json',size:100,text:async()=>JSON.stringify(backup)}]);
+ await node('[data-trakt-confirm]').onclick({currentTarget:{}});
+ assert.equal(c.mediaItems[0].status,'Watched');
+ assert.equal(c.mediaItems[0].notes,'Keep me');
+});

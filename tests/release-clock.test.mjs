@@ -116,7 +116,7 @@ test('A provider advancing to next week still keeps the latest streaming episode
  assert.doesNotMatch(c.reminderMarkup(show,false,early),/class="reminder released"/);
  assert.deepEqual(Array.from(c.releaseAvailableEpisodeMap(show,{2:[1,2,3,4,5,6]},early)[2]),[1,2,3,4,5]);
  assert.equal(c.currentSortInfo(show,early).time,next.time);
- const aired=c.currentSortInfo({...show,platform:'CBS'},early);assert.equal(aired.kind,'airing');
+ const aired=c.currentSortInfo({...show,platform:'CBS',broadcastPlatform:'CBS'},early);assert.equal(aired.kind,'airing');
 });
 test('A different selected service cannot turn a broadcast into a released streaming episode',()=>{
  const c=app();c.esc=String;c.formatLocalDateTime=date=>date.toISOString();c.formatLocalWeekdayDate=date=>date.toISOString().slice(0,10);
