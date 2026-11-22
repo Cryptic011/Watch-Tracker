@@ -28,8 +28,7 @@
   }
 
   function setSync(text,state="ok"){
-    const visibleText=/^(Syncing|Saving)/i.test(text)?`Syncing · ${text}`:state==="warn"?`Needs attention · ${text}`:`Synced · ${text}`;
-    syncStatus.textContent=visibleText;syncDot.className=`sync-dot ${state==="ok"?"ok":state==="warn"?"warn":""}`;
+    syncStatus.textContent=text;syncDot.className=`sync-dot ${state==="ok"?"ok":state==="warn"?"warn":""}`;
     const quick=document.getElementById("quick-sync-status");
     const quickLabel=quick?.querySelector?.("span");
     if(quick&&quickLabel){const pending=/^(Syncing|Saving)/i.test(text),attention=state==="warn"&&!pending;quick.dataset.state=pending?"syncing":attention?"attention":"ok";quickLabel.textContent=pending?"Syncing":attention?"Needs attention":"Synced";}
@@ -183,21 +182,55 @@
     return conflicts;
   }
 
-  function replayLocalChanges(baseItems,localItems,remoteItems){
+  function replayLocalChanges(baseItems,localItems,remoteItems,onRemovedEdit){
     const base=new Map((Array.isArray(baseItems)?baseItems:[]).filter(item=>item?.id).map(item=>[String(item.id),item]));
     const local=new Map((Array.isArray(localItems)?localItems:[]).filter(item=>item?.id).map(item=>[String(item.id),item]));
     const remote=new Map((Array.isArray(remoteItems)?remoteItems:[]).filter(item=>item?.id).map(item=>[String(item.id),item]));
     for(const [id,baseItem] of base){
       if(!local.has(id)){remote.delete(id);continue;}
       const localItem=local.get(id);
-      if(!remote.has(id)){if(!sameSyncValue(localItem,baseItem))remote.set(id,localItem);continue;}
-      if(remote.has(id)&&!sameSyncValue(localItem,baseItem))remote.set(id,mergeRecordChanges(baseItem,localItem,remote.get(id)));
+      if(sameSyncValue(localItem,baseItem))continue;
+      if(!remote.has(id)){onRemovedEdit?.(localItem);continue;}
+      remote.set(id,mergeRecordChanges(baseItem,localItem,remote.get(id)));
     }
     for(const [id,localItem] of local)if(!base.has(id))remote.set(id,localItem);
     return Array.from(remote.values());
   }
 
+  function storeRemovedEdits(store,accountId,drafts){
+    if(!drafts.length)return;
+    const request=store.get("removed-title-edits");
+    request.onsuccess=()=>{
+      const previous=request.result?.userId===accountId?request.result.items:[];
+      const items=new Map((previous||[]).map(item=>[String(item.id),item]));
+      for(const draft of drafts){
+        const id=String(draft.id),saved=items.get(id);
+        if(!saved||toMillis(draft.updatedAt)>=toMillis(saved.updatedAt))items.set(id,draft);
+      }
+      store.put({key:"removed-title-edits",userId:accountId,items:[...items.values()]});
+    };
+  }
+
+  async function rebaseAndSaveRemovedEdits(base,local,remote,context){
+    const drafts=[];
+    const items=replayLocalChanges(base,local,remote,item=>drafts.push(item));
+    if(!drafts.length)return items;
+    const {db,accountId}=context;
+    if(!db)throw new Error("On-device storage is needed to preserve edits to removed titles.");
+    await new Promise((resolve,reject)=>{
+      const tx=db.transaction("data","readwrite");
+      storeRemovedEdits(tx.objectStore("data"),accountId,drafts);
+      tx.oncomplete=resolve;
+      tx.onerror=()=>reject(tx.error);
+      tx.onabort=()=>reject(tx.error||new Error("Could not save edits to removed titles."));
+    });
+    if(activePersistenceContext(context)&&typeof document!=="undefined")notifyRemovedEdits();
+    return items;
+  }
+
   async function acknowledgeCloudSnapshot(originalSnapshot,savedSnapshot,result){
+    const drafts=[];
+    const keepDraft=item=>drafts.push(item);
     let revision=Math.max(0,Number(result?.revision)||0);
     if(activePersistenceContext(originalSnapshot)&&cloudRevision>revision){
       revision=cloudRevision;
@@ -209,19 +242,20 @@
          resurrect a title removed remotely. Do this before yielding to IDB. */
       for(const pending of new Set([latestLocalSnapshot,queuedLocalSnapshot,queuedCloudSnapshot])){
         if(!pending||!activePersistenceContext(pending)||pending.sequence<=originalSnapshot.sequence)continue;
-        pending.items=replayLocalChanges(originalSnapshot.items,pending.items,savedSnapshot.items);
+        pending.items=replayLocalChanges(originalSnapshot.items,pending.items,savedSnapshot.items,keepDraft);
         pending.json=JSON.stringify(pending.items);
         pending.baseItems=savedSnapshot.items;pending.expectedRevision=revision;
       }
       mediaItems=localSaveSequence>originalSnapshot.sequence
-        ? replayLocalChanges(originalSnapshot.items,mediaItems,savedSnapshot.items)
+        ? replayLocalChanges(originalSnapshot.items,mediaItems,savedSnapshot.items,keepDraft)
         : cloneLibrarySnapshot(savedSnapshot.items);
       setCloudBaseline(savedSnapshot.items,revision,originalSnapshot.accountId);
       if(typeof confirmedLibraryDeletes!=='undefined')for(const id of originalSnapshot.confirmedDeletes||[])if(!savedSnapshot.items.some(item=>String(item.id)===id)&&!(latestLocalSnapshot?.sequence>originalSnapshot.sequence&&latestLocalSnapshot.confirmedDeletes?.includes(id)))confirmedLibraryDeletes.delete(id);
       render();
       if(!sameSyncValue(originalSnapshot.items,savedSnapshot.items))window.WatchLogGallery?.refreshCurrent?.();
     }
-    await acknowledgeCachedSnapshot(originalSnapshot,savedSnapshot,revision);
+    await acknowledgeCachedSnapshot(originalSnapshot,savedSnapshot,revision,drafts);
+    if(drafts.length&&activePersistenceContext(originalSnapshot)&&typeof document!=="undefined")notifyRemovedEdits();
     /* A delayed callback can enqueue this same snapshot again. Its accepted
        baseline must now describe the accepted revision, including remote edits. */
     originalSnapshot.items=cloneLibrarySnapshot(savedSnapshot.items);
@@ -229,8 +263,9 @@
     originalSnapshot.baseItems=originalSnapshot.items;originalSnapshot.expectedRevision=revision;
   }
 
-  function acknowledgeCachedSnapshot(originalSnapshot,savedSnapshot,revision){
-    const db=originalSnapshot.db;if(!db)return Promise.resolve(false);
+  function acknowledgeCachedSnapshot(originalSnapshot,savedSnapshot,revision,drafts=[]){
+    const db=originalSnapshot.db;
+    if(!db)return drafts.length?Promise.reject(new Error("Could not save edits to removed titles on this device.")):Promise.resolve(false);
     return new Promise((resolve,reject)=>{
       /* Read and update in one transaction: a newer device save cannot land
          between the sequence check and the acknowledgement. */
@@ -238,14 +273,18 @@
       let acknowledged=null;
       request.onsuccess=()=>{
         const record=request.result;
-        if(record?.userId!==originalSnapshot.accountId||Number(record.cloudRevision||0)>revision)return;
+        if(record?.userId!==originalSnapshot.accountId||Number(record.cloudRevision||0)>revision){
+          storeRemovedEdits(store,originalSnapshot.accountId,drafts);
+          return;
+        }
         const sequence=Math.max(Number(record.localSequence)||0,originalSnapshot.sequence);
         const items=Number(record.localSequence||0)>originalSnapshot.sequence
-          ? replayLocalChanges(originalSnapshot.items,record.items,savedSnapshot.items)
+          ? replayLocalChanges(originalSnapshot.items,record.items,savedSnapshot.items,item=>drafts.push(item))
           : savedSnapshot.items;
         const json=JSON.stringify(items);
         const acceptedDeletes=new Set(Number(record.localSequence||0)>originalSnapshot.sequence?[]:originalSnapshot.confirmedDeletes||[]);
         acknowledged={...record,items,json,dirty:json!==savedSnapshot.json,cloudItems:savedSnapshot.items,cloudRevision:revision,localSequence:sequence,confirmedDeletes:(record.confirmedDeletes||[]).filter(id=>!acceptedDeletes.has(id)),updatedAt:nowISO()};
+        storeRemovedEdits(store,originalSnapshot.accountId,drafts);
         store.put(acknowledged);
       };
       tx.oncomplete=()=>{
@@ -298,14 +337,14 @@
           // and merge against the server library protected by its revision lock.
           const retained=new Map(outgoing.items.map(item=>[String(item.id),item]));
           for(const item of error.items)if(!retained.has(String(item.id)))retained.set(String(item.id),item);
-          const merged=replayLocalChanges(outgoing.baseItems,[...retained.values()],error.items);
+          const merged=await rebaseAndSaveRemovedEdits(outgoing.baseItems,[...retained.values()],error.items,outgoing);
           outgoing=createLibrarySnapshot(merged,{...outgoing,sequence:snapshot.sequence,baseItems:error.items,expectedRevision:Number(error.revision)});
           showAppToast("Protected your library: unexpected removals were blocked and your saved titles restored.","warn",8000);
           continue;
         }
         if(!["revision_conflict","duplicate_title"].includes(error?.code)||!Array.isArray(error.items)||!Number.isSafeInteger(Number(error.revision))||attempt===2)throw error;
         detectedSyncConflictCount+=detectSyncConflicts(outgoing.baseItems,outgoing.items,error.items).length;
-        const merged=deduplicateLibrary(replayLocalChanges(outgoing.baseItems,outgoing.items,error.items)).items;
+        const merged=deduplicateLibrary(await rebaseAndSaveRemovedEdits(outgoing.baseItems,outgoing.items,error.items,outgoing)).items;
         outgoing=createLibrarySnapshot(merged,{...outgoing,sequence:snapshot.sequence,baseItems:error.items,expectedRevision:Number(error.revision)});
       }
     }
@@ -463,7 +502,7 @@
   function pauseDialogsForAuth(){
     for(const dialog of document.querySelectorAll('dialog[open]')){
       if(dialog.id==='recovery-code-dialog'&&!document.getElementById('recovery-code-saved')?.checked)continue;
-      if(dialog.classList.contains('gallery-detail')||dialog.id==='title-lists-dialog'){
+      if(dialog===modal||dialog.classList.contains('gallery-detail')||dialog.id==='title-lists-dialog'){
         dialog._authPaused=true;authPausedDialogs.push({dialog,accountId:String(currentUser.id),scroll:dialog.scrollTop});
       }
       dialog.close();
@@ -473,7 +512,10 @@
     const paused=authPausedDialogs;authPausedDialogs=[];
     for(const saved of paused){
       saved.dialog._authPaused=false;
-      if(saved.accountId!==String(currentUser?.id||'')||!saved.dialog.isConnected)continue;
+      if(saved.accountId!==String(currentUser?.id||'')||!saved.dialog.isConnected){
+        if(saved.dialog===modal)closeEditor();
+        continue;
+      }
       saved.dialog.showModal();saved.dialog.scrollTop=saved.scroll;
     }
     window.WatchLogGallery?.refreshCurrent?.();
@@ -509,7 +551,14 @@
         if(Number(result.revision)<cloudRevision)return true;
         const conflicts=detectSyncConflicts(cloudBaseItems,mediaItems,result.items);
         cloudSyncIdleRounds=0;
-        const merged=replayLocalChanges(cloudBaseItems,mediaItems,result.items);
+        let merged;
+        // A save started while preserving drafts must also be included in the rebase.
+        let latest;
+        do{
+          latest=localSaveSequence;
+          merged=await rebaseAndSaveRemovedEdits(cloudBaseItems,mediaItems,result.items,{...context,db:cacheDB});
+          if(!activePersistenceContext(context)||Number(result.revision)<cloudRevision)return false;
+        }while(latest!==localSaveSequence);
         const migration=migratePlannedStatuses(merged),cleanup=cleanLibraryRecords(migration.rows);
         applyAccount(result.account);setCloudBaseline(result.items,result.revision,context.accountId);
         mediaItems=cleanup.items;render();window.WatchLogGallery?.refreshCurrent?.();
@@ -725,7 +774,7 @@
     profileName.textContent=currentProfile.display_name;profileEmail.textContent=currentProfile.email;navName.textContent=currentProfile.display_name||currentProfile.email;avatar.textContent=String(currentProfile.display_name||currentProfile.email||"U").charAt(0).toUpperCase();
   }
   async function enterAccount(items,{syncText="Synced. This library is available on your other devices.",syncState="ok"}={}){
-    hideMessage();authScreen.classList.add("hidden");
+    hideMessage();setAuthScreenVisible(false);void refreshRemovedEditExport();
     if(typeof preferenceKeys==='function'){
       const keys=preferenceKeys();
       if(keys)applyAccountPreferences({...safeReadJSON(keys.saved,{}),...safeReadJSON(keys.pending,{})});
@@ -743,10 +792,10 @@
     cloudSyncAuthBlocked=false;cloudSyncFailures=0;resumeDialogsAfterAuth();scheduleCloudSync(0);
   }
 
-  function mergePendingCache(cached,remoteItems,accountId=String(currentUser?.id||"")){
+  async function mergePendingCache(cached,remoteItems,accountId=String(currentUser?.id||"")){
     if(cached?.userId!==accountId||!Array.isArray(cached.items)||!(cached.dirty===true||hasPending(accountId)))return remoteItems;
     return Array.isArray(cached.cloudItems)
-      ? replayLocalChanges(cached.cloudItems,cached.items,remoteItems)
+      ? rebaseAndSaveRemovedEdits(cached.cloudItems,cached.items,remoteItems,{accountId,db:cacheDB,token:cloudSessionToken,generation:persistenceGeneration})
       : mergeLibraries(remoteItems,cached.items);
   }
 
@@ -758,7 +807,7 @@
     const cached=await loadCacheRecord();
     localSaveSequence=Math.max(localSaveSequence,Number(cached?.localSequence)||0);
     for(const id of cached?.confirmedDeletes||[])confirmedLibraryDeletes.add(id);
-    mediaItems=mergePendingCache(cached,Array.isArray(items)?items:[]);
+    mediaItems=await mergePendingCache(cached,Array.isArray(items)?items:[]);
     await saveProfile(currentProfile);
     const pending=JSON.stringify(mediaItems)!==lastCloudLibraryJSON;
     if(pending){
@@ -805,7 +854,7 @@
       /* Rebase any on-device edits against the latest cloud snapshot.  This
          keeps deletions and edits made while offline instead of letting a
          later session silently replace them with the remote library. */
-      mediaItems=mergePendingCache(cached,remoteItems,currentUser.id);
+      mediaItems=await mergePendingCache(cached,remoteItems,currentUser.id);
       const pending=JSON.stringify(mediaItems)!==JSON.stringify(remoteItems);
       if(pending){
         const snapshot=createLibrarySnapshot(mediaItems,{baseItems:remoteItems,expectedRevision:cloudRevision});
@@ -822,13 +871,17 @@
   }
 
   async function clearUserState(){confirmedLibraryDeletes.clear();clearTimeout(cloudSyncTimer);cloudSyncTimer=null;cloudSyncAuthBlocked=false;persistenceGeneration++;mediaItems=[];currentProfile=null;currentUser=null;scheduleMetadataMaintenance();cloudSyncIdleRounds=0;cloudSyncLastActivity=0;cloudSessionToken="";queuedLocalSnapshot=null;queuedCloudSnapshot=null;latestLocalSnapshot=null;lastLocalLibraryJSON="";lastCloudLibraryJSON="";lastLocalAccountId="";lastCloudAccountId="";cloudBaseItems=[];cloudRevision=0;localSaveSequence=0;notificationTestSettings?.classList.add("hidden");document.getElementById("private-reminder-history")?.classList.add("hidden");document.getElementById("reminder-history-body")?.replaceChildren();document.getElementById("library-save-status")?.classList.add("hidden");setBackgroundReminderStatus("Sign in to manage background reminders.");if(cacheDB){try{cacheDB.close();}catch(_){}}cacheDB=null;render();}
-  function showAuth(){authScreen.classList.remove("hidden");}
+  function setAuthScreenVisible(visible){
+    authScreen.classList.toggle("hidden",!visible);
+    document.querySelectorAll("body > .top-nav, body > main, body > .bottom-tabs, #add-btn").forEach(area=>{area.inert=visible;});
+  }
+  function showAuth(){setAuthScreenVisible(true);}
   function updateAuthMode(){
     hideMessage();authNameGroup.classList.toggle("hidden",!isSignUp);
-    authTitle.textContent=isSignUp?"Create PIN Account":"Welcome Back";
-    authSub.textContent=isSignUp?"Create one email + 4-digit PIN account. Your existing on-device titles can be carried into cloud sync.":"Use the same email and 4-digit PIN to load your library on any device.";
-    authSubmit.textContent=isSignUp?"Create PIN Account":"Log In";
-    authToggle.textContent=isSignUp?"Already have a PIN account? Log In":"Don't have an account? Create PIN Account";
+    authTitle.textContent=isSignUp?"Create an account":"Sign in";
+    authSub.textContent=isSignUp?"Create an account with your email and a 4-digit PIN. You can keep titles already saved on this device.":"Use the same email and 4-digit PIN to load your library on any device.";
+    authSubmit.textContent=isSignUp?"Create account":"Sign in";
+    authToggle.textContent=isSignUp?"Already have an account? Sign in":"Create an account";
     renderAuthMaintenance();
   }
   authToggle.onclick=()=>{isSignUp=!isSignUp;authPin.value="";updateAuthMode();if(isSignUp)prefillLegacyAccount().catch(console.warn);};
@@ -839,10 +892,10 @@
     const email=normalizeEmail(authEmail.value),pin=authPin.value;
     if(!isEmail(email)){showMessage("Enter a valid email address.");return;}
     if(!validPin(pin)){showMessage("PIN must be exactly 4 digits.");return;}
-    authSubmit.disabled=true;authSubmit.textContent=isSignUp?"Creating…":"Logging In…";
+    authSubmit.disabled=true;authSubmit.textContent=isSignUp?"Creating account…":"Signing in…";
     try{if(isSignUp)await registerPinAccount(authName.value.trim()||"User",email,pin);else await loginPinAccount(email,pin);}
     catch(err){console.error(err);if(err.code==="maintenance"||err.maintenance){maintenanceOwnerAccess=false;publicMaintenance={enabled:true,message:err.message||publicMaintenance.message};updateAuthMode();}else showMessage(err.message||"PIN account operation failed.","error");}
-    finally{authSubmit.disabled=false;authSubmit.textContent=isSignUp?"Create PIN Account":"Log In";}
+    finally{authSubmit.disabled=false;authSubmit.textContent=isSignUp?"Create account":"Sign in";}
   };
 
   logoutBtn.onclick=async()=>{
@@ -858,17 +911,57 @@
   };
 
   syncNowBtn.onclick=async()=>{
+    const shortcut=$("settings-sync-shortcut"),hint=$("settings-sync-hint");
+    if(navigator.onLine===false){
+      const message="Connect to the internet to sync.";
+      setSync(message,"warn");
+      if(hint)hint.textContent=message;
+      return;
+    }
     syncNowBtn.disabled=true;
-    try{await synchronizeCloudLibrary({manual:true});}
-    finally{syncNowBtn.disabled=false;}
+    if(shortcut)shortcut.disabled=true;
+    if(hint)hint.textContent="Syncing…";
+    try{
+      const synced=await synchronizeCloudLibrary({manual:true});
+      if(hint)hint.textContent=synced?"Library synced.":"Sync unavailable. Open Account & Sync for details.";
+    }finally{
+      syncNowBtn.disabled=false;
+      if(shortcut)shortcut.disabled=false;
+    }
   };
 
   document.getElementById("export-library-backup")?.addEventListener("click",()=>{
     const backup={format:"watchlog-library-backup",version:1,exportedAt:new Date().toISOString(),items:cloneLibrarySnapshot(mediaItems)};
     const url=URL.createObjectURL(new Blob([JSON.stringify(backup,null,2)],{type:"application/json"}));
-    const link=document.createElement("a");link.href=url;link.download=`watched-logger-backup-${new Date().toISOString().slice(0,10)}.json`;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+    const link=document.createElement("a");link.href=url;link.download=`watch-tracker-backup-${new Date().toISOString().slice(0,10)}.json`;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
     const status=document.getElementById("library-backup-status");if(status)status.textContent=`Exported library with ${backup.items.length} library item(s).`;
   });
+  async function refreshRemovedEditExport(){
+    const button=$("export-removed-edits");
+    if(!button)return;
+    button.classList.add("hidden");
+    const context={accountId:String(currentUser?.id||""),token:cloudSessionToken,generation:persistenceGeneration};
+    if(!context.accountId)return;
+    try{
+      const record=await cacheGet("removed-title-edits");
+      if(activePersistenceContext(context)&&record?.userId===context.accountId&&record.items?.length)button.classList.remove("hidden");
+    }catch(error){console.warn("Could not check saved edits to removed titles",error);}
+  }
+  function notifyRemovedEdits(){
+    void refreshRemovedEditExport();
+    showAppToast("A title was removed on another device. Export your unsynced edits from Account & Sync.","warn",8000);
+  }
+  $("export-removed-edits").onclick=async()=>{
+    const context={accountId:String(currentUser?.id||""),token:cloudSessionToken,generation:persistenceGeneration};
+    try{
+      const record=await cacheGet("removed-title-edits");
+      if(!activePersistenceContext(context)||record?.userId!==context.accountId||!record.items?.length)return;
+      const backup={format:"watchlog-library-backup",version:1,exportedAt:nowISO(),items:record.items};
+      const url=URL.createObjectURL(new Blob([JSON.stringify(backup,null,2)],{type:"application/json"}));
+      const link=document.createElement("a");link.href=url;link.download="watch-tracker-removed-title-edits.json";link.click();
+      setTimeout(()=>URL.revokeObjectURL(url),1000);
+    }catch(error){if(activePersistenceContext(context))showAppToast("Could not export edits to removed titles.","warn");}
+  };
   function mergeImportedLibrary(savedItems, importedItems){
     const merged=[...savedItems];
     for(const item of importedItems){
@@ -923,12 +1016,12 @@
     finally{changePinBtn.disabled=false;}
   };
 
-  userPill.onclick=()=>switchTab("settings");
+  userPill.onclick=()=>{goToTabHome("settings");showSettingsCategory("account",{focus:true});};
   $("appearance-mode").onchange=e=>{const mode=e.target.value;safeWriteJSON(APPEARANCE_KEY,mode);applyAppearance(mode);};
 
   const SORT_KEY="watched_logger_sort_v1";
   const titleCollator=new Intl.Collator(undefined,{sensitivity:"base",numeric:true});
-  function savedSortMode(){const value=safeReadJSON(SORT_KEY,"current");return value==="release"?"current":(["current","recent","title","platform","watched"].includes(value)?value:"current");}
+  function savedSortMode(){const value=safeReadJSON(SORT_KEY,"current");return ["current","recent","release","title","platform","watched","shows"].includes(value)?value:"current";}
   function originalTitlePrefix(title,wordCount){
     return String(title||"").replace(/\s*[:–—]\s.*$/,"").trim().split(/\s+/).slice(0,wordCount).join(" ");
   }

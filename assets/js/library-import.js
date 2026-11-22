@@ -114,8 +114,8 @@
   root.WatchLogTrakt={parse,readFiles};
 
   if(typeof document==='undefined')return;
-  const dialog=document.createElement('dialog');dialog.className='changelog-dialog feature-dialog';dialog.dataset.blockRefresh='';dialog.setAttribute('aria-label','Import Trakt history');
-  dialog.innerHTML='<header class="changelog-heading"><h2>Import Trakt history</h2><button class="close-btn" data-trakt-cancel aria-label="Cancel import">×</button></header><div class="changelog-body"><p data-trakt-summary></p><div data-trakt-preview></div><p data-trakt-status role="status"></p><button class="btn btn-primary btn-full" data-trakt-confirm>Import titles and watched history</button></div>';
+  const dialog=document.createElement('dialog');dialog.className='changelog-dialog feature-dialog';dialog.dataset.blockRefresh='';dialog.setAttribute('aria-label','Import library');
+  dialog.innerHTML='<header class="changelog-heading"><h2>Import library</h2><button class="close-btn" data-trakt-cancel aria-label="Cancel import">×</button></header><div class="changelog-body"><p data-trakt-summary></p><div data-trakt-preview></div><p data-trakt-status role="status"></p><button class="btn btn-primary btn-full" data-trakt-confirm>Import titles and watched history</button></div>';
   document.body.append(dialog);
   let pending=[],owner='',generation=0,previewSequence=0;
   root.WatchLogTrakt.previewFiles=async files=>{

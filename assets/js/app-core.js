@@ -50,6 +50,7 @@
     if(event.cancelable)event.preventDefault();
     const openDialog=document.querySelector("dialog[open]");
     if(openDialog){
+      if(openDialog===modal){closeEditor();return;}
       if(openDialog.classList?.contains?.("gallery-detail")){window.WatchLogGallery?.back?.();return;}
       if(openDialog.id==="recovery-code-dialog"&&!document.getElementById("recovery-code-saved")?.checked){showAppToast("Save your recovery code before closing.","warn");return;}
       openDialog.close();return;
@@ -194,8 +195,9 @@
   settingsView.appendChild(maintenanceAdminSection);
   const reminderActivitySection=document.getElementById("private-reminder-history");
   if(reminderActivitySection)document.querySelector('#settings-view [data-settings-panel="reminders"]')?.appendChild(reminderActivitySection);
-  const backupSection=document.createElement("section");backupSection.className="sync-box library-backup";backupSection.innerHTML='<h3>Import &amp; export</h3><p class="small-note">Import Trakt ZIP, JSON or CSV exports, or a Watch Tracker export. Export your library and watched history for safekeeping.</p><div class="notification-actions"><button id="export-library-backup" class="btn btn-secondary btn-full" type="button">Export</button><label class="btn btn-secondary btn-full backup-import-label" for="import-library-backup">Import<input id="import-library-backup" type="file" accept="application/json,text/csv,application/zip,.json,.csv,.zip" multiple hidden /></label></div><div id="library-backup-status" role="status" aria-live="polite"></div>';
+  const backupSection=document.createElement("section");backupSection.className="sync-box library-backup";backupSection.innerHTML='<h3>Import &amp; export</h3><p class="small-note">Import Trakt ZIP, JSON or CSV exports, or a Watch Tracker export. Export your library and watched history for safekeeping.</p><div class="notification-actions"><button id="export-library-backup" class="btn btn-secondary btn-full" type="button">Export</button><button id="choose-library-backup" class="btn btn-secondary btn-full" type="button">Import</button><input id="import-library-backup" type="file" accept="application/json,text/csv,application/zip,.json,.csv,.zip" multiple hidden /><button id="export-removed-edits" class="btn btn-secondary btn-full hidden" type="button">Export edits to removed titles</button></div><div id="library-backup-status" role="status" aria-live="polite"></div>';
   $("account-sync-card").appendChild(backupSection);
+  $("choose-library-backup").onclick=()=>$("import-library-backup").click();
   const whatsNewButton=document.createElement("button");
   whatsNewButton.id="whats-new-button";whatsNewButton.type="button";whatsNewButton.className="whats-new-button";
   whatsNewButton.setAttribute("aria-haspopup","dialog");whatsNewButton.setAttribute("aria-controls","changelog-dialog");
@@ -310,7 +312,7 @@
   ukPlatformGroup.innerHTML='<label for="uk-platform">Currently available in the UK</label><select id="uk-platform" aria-describedby="uk-platform-note"><option value="">Choose a title first</option></select><p id="uk-platform-note" class="small-note" role="status"></p><a id="uk-platform-link" class="small-note" target="_blank" rel="noopener noreferrer">Check on JustWatch UK</a>';
   const watchedPlatformGroup=$("platform").closest(".form-group");
   watchedPlatformGroup.before(ukPlatformGroup);
-  watchedPlatformGroup.querySelector("label").textContent="Where you watched it";
+  watchedPlatformGroup.querySelector("label").textContent="Watched on";
   $("platform").placeholder="Choose above or enter a previous platform";
   const ukPlatform=$("uk-platform"),ukPlatformNote=$("uk-platform-note"),ukPlatformLink=$("uk-platform-link");
   let ukAvailabilityRevision=0,ukAvailabilityController=null,selectedUKPlatform="";
@@ -509,8 +511,8 @@
     const statusMeta=document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');if(statusMeta)statusMeta.content="black-translucent";
   }
   appearanceQuery.addEventListener?.("change",()=>{if(savedAppearance()==="system")applyAppearance("system");});
-  // Preferences category drill-in navigation; existing controls remain authoritative.
-  function showSettingsCategory(category){
+  // Keep focus on the active Settings page.
+  function showSettingsCategory(category,{focus=false}={}){
     const menu=document.getElementById("settings-category-menu");
     const quick=document.querySelector(".settings-quick-actions");
     const heading=document.querySelector("#settings-view .preferences-heading");
@@ -521,6 +523,11 @@
     if(category==="maintenance"&&selected.dataset.authorized!=="true")return;
     menu?.classList.add("hidden");quick?.classList.add("hidden");heading?.classList.add("hidden");
     panels.forEach(panel=>panel.classList.toggle("hidden",panel!==selected));
+    if(focus){
+      const title=selected.querySelector(".section-label");
+      if(title){title.tabIndex=-1;title.focus({preventScroll:true});}
+    }
+    if(category==="account")void window.refreshAccountPasskeys?.();
     if(typeof recordAppNavigation==="function")recordAppNavigation();
     window.scrollTo?.({top:0,behavior:"auto"});
   }
@@ -533,8 +540,12 @@
     if(typeof recordAppNavigation==="function")recordAppNavigation();
     window.scrollTo?.({top:0,behavior:"auto"});
   }
-  document.querySelectorAll("#settings-view [data-settings-open]").forEach(button=>button.addEventListener("click",()=>showSettingsCategory(button.dataset.settingsOpen)));
-  document.querySelectorAll("#settings-view [data-settings-back]").forEach(button=>button.addEventListener("click",showSettingsMenu));
+  document.querySelectorAll("#settings-view [data-settings-open]").forEach(button=>button.addEventListener("click",()=>showSettingsCategory(button.dataset.settingsOpen,{focus:true})));
+  document.querySelectorAll("#settings-view [data-settings-back]").forEach(button=>button.addEventListener("click",()=>{
+    const category=button.closest("[data-settings-panel]")?.dataset.settingsPanel;
+    showSettingsMenu();
+    document.querySelector(`#settings-view [data-settings-open="${category}"]`)?.focus({preventScroll:true});
+  }));
   document.getElementById("settings-sync-shortcut")?.addEventListener("click",()=>{document.getElementById("sync-now")?.click();});
 
   async function sha256(value){const bytes=new TextEncoder().encode(String(value));const digest=await crypto.subtle.digest("SHA-256",bytes);return Array.from(new Uint8Array(digest)).map(b=>b.toString(16).padStart(2,"0")).join("");}

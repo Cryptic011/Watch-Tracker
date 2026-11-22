@@ -346,6 +346,11 @@
     if(airingNote)airingNote.textContent="Refreshing the current episode schedule…";
   }
 
+  function showEditor(){
+    modal.classList.remove("hidden");
+    if(!modal.open)modal.showModal();
+    $("modal-title").focus({preventScroll:true});
+  }
   function openAdd(){
     mediaForm._baseItem=null;
     clearTimeout(searchTimer);cancelSuggestionProgress();activeCatalogueController?.abort();activeCatalogueController=null;searchRequestId++;editorApplyRevision++;activeTitleSearchKey="";titleSuggestionsWanted=false;editorVerification=null;editorVerificationInFlight=null;hideDuplicateWarning();
@@ -357,7 +362,7 @@
     if(seasonVerifyNote)seasonVerifyNote.textContent="Series identity is checked with IMDb; episode and season data comes from TVMaze.";
     if(filmVerifyNote)filmVerifyNote.textContent="Films and series are checked through multiple sources.";
     $("modal-title").textContent="Log Title";deleteBtn.classList.add("hidden");
-    seriesSection.style.display="flex";upcomingSection.style.display="flex";filmSection.style.display="none";modal.classList.remove("hidden");
+    seriesSection.style.display="flex";upcomingSection.style.display="flex";filmSection.style.display="none";showEditor();
   }
 
   async function openEdit(id){
@@ -374,7 +379,7 @@
     configureProgressOptions({highest:item.totalSeasons,episodeCounts:item.episodeCounts||{},airedEpisodeCounts:item.airedEpisodeCounts||{[item.curSeason]:item.currentSeasonEpisodeCount||0},releasedEpisodes:item.releasedEpisodes||{},latestAired:item.curSeason,currentEpisode:item.curEp,completedSeasons:item.verifiedCompletedSeasons,episodeScheduleAvailable:item.episodeScheduleVerified===true||Boolean(Object.keys(item.airedEpisodeCounts||{}).length)},{season:item.curSeason,episode:item.curEp});
     loadStoredAiringFields(item);
     const film=item.type==="Film";seriesSection.style.display=film?"none":"flex";upcomingSection.style.display=film?"none":"flex";filmSection.style.display=film?"flex":"none";if(film)clearAiringFields();
-    $("modal-title").textContent="Edit Title";deleteBtn.classList.remove("hidden");modal.classList.remove("hidden");
+    $("modal-title").textContent="Edit Title";deleteBtn.classList.remove("hidden");showEditor();
     const metadataAge=Date.now()-toMillis(item.metadataUpdatedAt);
     const metadataFresh=toMillis(item.metadataUpdatedAt)>0&&metadataAge<SERIES_METADATA_STALE_MS;
     if((film&&(item.filmReleaseSource==="Manual"||metadataFresh))||(!film&&(item.tvmazeShowId||item.imdbId)&&!seriesMetadataRefreshCandidate(item,Date.now(),{ignoreRetry:true})))return;
@@ -392,11 +397,12 @@
     resetUKAvailability();
     hideDuplicateWarning();clearTimeout(searchTimer);activeCatalogueController?.abort();activeCatalogueController=null;cancelSuggestionProgress();searchRequestId++;
     editorApplyRevision++;editorVerificationInFlight=null;titleSuggestionsWanted=false;
-    activeTitleSearchKey="";suggestList.classList.add("hidden");modal.classList.add("hidden");
+    activeTitleSearchKey="";suggestList.classList.add("hidden");if(modal.open)modal.close();modal.classList.add("hidden");
     // Let the submit handler enqueue its save before considering a reload.
     setTimeout(()=>applyPendingAppUpdate(),0);
   }
   addBtn.onclick=()=>openTitleSearch();closeModal.onclick=closeEditor;modal.addEventListener("click",e=>{if(e.target===modal)closeEditor();});
+  modal.addEventListener("cancel",event=>{event.preventDefault();closeEditor();});
   saveBtn.addEventListener("click",event=>{event.preventDefault();mediaForm.dispatchEvent(new Event("submit",{bubbles:true,cancelable:true}));});
 
   mediaForm.onsubmit=async e=>{
@@ -413,6 +419,7 @@
         if(recentVerification){verified=recentVerification;sid=verified.resolvedShowId||sid;}
       }
       const current=mediaItems.find(x=>String(x.id)===String(id));
+      if(existingId&&!current)throw new Error("This title was removed from your library while editing.");
       const previous=String(mediaForm._baseItem?.id)===String(id)?mediaForm._baseItem:current;
       const episodeHistory=Array.isArray(previous?.episodeHistory)?previous.episodeHistory:[];
       const numOrNull=x=>$(x).value===""?null:Number.parseInt($(x).value,10);

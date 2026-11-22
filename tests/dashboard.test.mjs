@@ -505,3 +505,20 @@ test('Recurring weekday cards prefer a corrected explicit schedule over stale ne
  const item={id:'corrected',type:'Series',title:'Corrected',airingSeason:2,nextEpisodeNum:6,nextEpisodeDate:old,recurringWeeklySchedule:{episodes:[{season:2,number:6,raw:old}]},scheduledEpisodeReleases:[{season:2,number:6,raw}]};
  const rows=c.recurringWeeklyShows([item],new Date('2026-11-01T12:00:00Z'));assert.equal(rows.length,1);assert.equal(rows[0].episodes[0].raw,raw);
 });
+
+test('Announced dates stay available without appearing as confirmed release times',()=>{
+ const c=app();
+ vm.runInContext(fs.readFileSync(new URL('../assets/js/regional-releases.js',import.meta.url),'utf8'),c);
+ c.regionalScheduleEvent=(item,event)=>c.WatchLogRegionalReleases.resolveEvent(item,event,{country:'GB'});
+ const result=c.calendarWindowEvents([
+  {id:'date',title:'Date-only film',type:'Film',filmReleaseDate:'2026-11-25'},
+  {id:'mismatch',title:'Different streaming platform',type:'Series',platform:'Netflix',broadcastPlatform:'BBC One',scheduledEpisodeReleases:[{season:1,number:1,raw:'2026-11-25'}]}
+ ],'upcoming',new Date('2026-11-22T00:00:00Z'));
+ assert.equal(result.events.length,0);
+ assert.deepEqual(Array.from(result.unconfirmedTimes,event=>event.item.id),['date']);
+ assert.equal(result.unknown[0].item?.id||result.unknown[0].id,'mismatch');
+ c.esc=String;
+ c.DASHBOARD_PRIOR_DATE_FORMATTER=new Intl.DateTimeFormat('en-GB',{timeZone:'UTC',day:'numeric',month:'short'});
+ vm.runInContext(extractFunction(html,'releaseAgendaDateOnly'),c);
+ assert.match(c.releaseAgendaDateOnly(result.unconfirmedTimes),/Dates without a confirmed time[\s\S]*Date-only film[\s\S]*25 Nov/);
+});

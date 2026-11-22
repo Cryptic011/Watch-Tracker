@@ -13,7 +13,7 @@ function tracker(failed=''){
  vm.runInNewContext(source.slice(source.indexOf('  function officialEpisodeImageMap('),source.indexOf('  function completeTitleSynopsis(')),context);
  return context.fetchOfficialTrackerArtwork({tvmazeShowId:'12',imdbId:'tt1234567',title:'Example'});
 }
-test('Verified tracker metadata includes actual episode names and the show poster for missing season covers',async()=>{
+test('Verified tracker metadata keeps episode names, season covers and the show cover separate',async()=>{
  const art=await tracker();
  assert.equal(art.posterUrl,'https://static.tvmaze.com/show.jpg');
  assert.deepEqual(JSON.parse(JSON.stringify(art.episodeTitles)),{8:{2:'Crossing Lines'}});

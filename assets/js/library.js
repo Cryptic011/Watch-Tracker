@@ -671,8 +671,29 @@
     const ids=[...bulkOptions.querySelectorAll("input:checked")].map(input=>input.value);if(!ids.length){document.getElementById("bulk-manage-status").textContent="Select at least one title.";return;}
     if(action==="remove"&&!confirm(`Remove ${ids.length} selected title(s)? This cannot be undone.`))return;
     const selected=new Set(ids),updatedAt=nowISO();
-    if(action==="remove"){for(const id of ids)confirmedLibraryDeletes.add(id);mediaItems=mediaItems.filter(item=>!selected.has(String(item.id)));}
-    else for(const item of mediaItems){if(!selected.has(String(item.id)))continue;item.updatedAt=updatedAt;if(action==="planned")item.status="Planned";if(action==="hide")item.hideFromWeeklyReleases=true;if(action==="include")item.hideFromWeeklyReleases=false;if(action==="watched"){item.status="Watched";if(isEpisodeTrackable(item)){const released=releasedEpisodeMap(item);item.watchedEpisodes=Object.fromEntries(Object.entries(released).map(([season,episodes])=>[season,[...episodes]]));const latest=Object.entries(item.watchedEpisodes).flatMap(([season,episodes])=>episodes.map(episode=>[Number(season),Number(episode)])).sort((a,b)=>b[0]-a[0]||b[1]-a[1])[0];item.curSeason=latest?.[0]||null;item.curEp=latest?.[1]||null;item.lastWatchedSeason=item.curSeason;item.lastWatchedEpisode=item.curEp;item.watchedSeasons=Object.keys(released).length;item.updatedAt=nowISO();}}}
+    if(action==="remove"){
+      for(const id of ids)confirmedLibraryDeletes.add(id);
+      mediaItems=mediaItems.filter(item=>!selected.has(String(item.id)));
+    }else for(const item of mediaItems){
+      if(!selected.has(String(item.id)))continue;
+      item.updatedAt=updatedAt;
+      if(action==="planned")item.status="Planned";
+      if(action==="hide")item.hideFromWeeklyReleases=true;
+      if(action==="include")item.hideFromWeeklyReleases=false;
+      if(action!=="watched")continue;
+      item.status="Watched";
+      if(!isEpisodeTrackable(item))continue;
+      const released=releasedEpisodeMap(item);
+      if(!Object.keys(released).length)continue;
+      const saved=Object.hasOwn(item,"watchedEpisodes")?normalizeWatchedEpisodeMap(item.watchedEpisodes):legacyWatchedEpisodeMap(item);
+      item.watchedEpisodes=mergeEpisodeSetChanges({},released,saved);
+      const latest=highestWatchedEpisode(item.watchedEpisodes);
+      item.curSeason=latest?.season||null;
+      item.curEp=latest?.episode||null;
+      item.lastWatchedSeason=item.curSeason;
+      item.lastWatchedEpisode=item.curEp;
+      item.watchedSeasons=Math.max(Number(item.watchedSeasons)||0,Object.keys(released).length);
+    }
     const buttons=[...bulkDialog.querySelectorAll('[data-bulk-action]')];buttons.forEach(button=>button.disabled=true);
     render();bulkStatus.textContent='Saving changes…';
     try{await persistLibrary(mediaItems,{background:true,precleaned:true});bulkDialog.close();showAppToast(`Updated ${ids.length} title(s) on this device. Cloud sync will complete automatically.`,"success");}

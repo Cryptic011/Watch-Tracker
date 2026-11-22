@@ -1,3 +1,10 @@
+## 2026-11-22 — Improve Settings access and protect edits to removed titles
+- Keep sign-in and Settings usable on small screens and with a keyboard, with a direct Account & Sync shortcut.
+- Keep the selected Library sort and preserve recorded episodes when marking a show watched in bulk.
+- Show dates without a confirmed release time separately and standardise the import and watched progress labels.
+- Keep keyboard focus in the title editor, and show season placeholders when verified season artwork is missing.
+- Keep titles deleted across devices and make conflicting offline edits exportable from Account & Sync.
+
 ## 2026-11-17 — Protect imported progress and verify release sources
 - Keep recorded episode ticks and notes through incomplete schedules, episode corrections, and backup restores.
 - Preserve newer library edits when an import fails, and distinguish same-name titles with conflicting catalogue IDs.

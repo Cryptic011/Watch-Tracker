@@ -97,8 +97,22 @@ const server=http.createServer((req,res)=>{
    return route.fulfill({headers,json:{ok:true,enabled:false,results:[]}});
   });
   await page.goto(base);
+  const signedOut=await page.evaluate(()=>({
+   signup:document.querySelector('#auth-toggle').tagName,
+   inert:[...document.querySelectorAll('.top-nav, main, .bottom-tabs')].every(area=>area.inert)
+  }));
+  assert.deepEqual(signedOut,{signup:'BUTTON',inert:true},'the keyboard stays in the sign-in screen');
   await page.locator('#auth-email').fill(account.email);await page.locator('#auth-pin').fill('1234');await page.locator('#auth-submit').click();
   await page.waitForFunction(()=>document.querySelector('#auth-screen').classList.contains('hidden'));
+  await page.locator('#user-pill').focus();
+  await page.evaluate(()=>openAdd());
+  assert.equal(await page.locator('#modal').evaluate(editor=>editor.open),true);
+  await page.keyboard.press('Tab');
+  assert.equal(await page.evaluate(()=>Boolean(document.activeElement.closest('#modal'))),true,'editor keeps keyboard focus inside');
+  await page.keyboard.press('Escape');
+  await page.locator('#modal').waitFor({state:'hidden'});
+  assert.equal(await page.evaluate(()=>document.activeElement.id),'user-pill','closing the editor restores focus');
+
   phase='Home, dedicated Shows and Films, and Calendar';
   const category=type=>page.locator('[data-gallery-category="'+type+'"]');
   const openCategory=async type=>{await page.locator('[data-tab="collection"]').click();await category(type).click();};
@@ -701,9 +715,10 @@ const server=http.createServer((req,res)=>{
   await page.locator('[data-gallery-season-art="1"] img').waitFor({state:'visible'});
   assert.equal(await page.locator('[data-gallery-season-art="1"] img').getAttribute('src'),'https://static.tvmaze.com/season-one.jpg');
   await page.locator('[data-gallery-season-art="1"] img').evaluate(image=>image.dispatchEvent(new Event('error')));
-  assert.equal(await page.locator('[data-gallery-season-art="1"] img').getAttribute('src'),'https://static.tvmaze.com/series-poster.jpg','broken season artwork falls back to the matching show cover');
-  await page.locator('[data-gallery-season-art="2"] img').waitFor({state:'attached'});
-  assert.equal(await page.locator('[data-gallery-season-art="2"] img').getAttribute('src'),'https://static.tvmaze.com/series-poster.jpg','missing season artwork uses this show cover');
+  assert.equal(await page.locator('[data-gallery-season-art="1"] img').count(),0,'broken season artwork cannot use the show cover');
+  assert.equal(await page.locator('[data-gallery-season-art="1"] .gallery-artwork-placeholder').textContent(),'S1');
+  assert.equal(await page.locator('[data-gallery-season-art="2"] img').count(),0,'missing season artwork keeps its own placeholder');
+  assert.equal(await page.locator('[data-gallery-season-art="2"] .gallery-artwork-placeholder').textContent(),'S2');
   assert.equal(await page.locator('[data-gallery-episode="1:2"] .gallery-episode-copy strong').textContent(),'Episode 2');
   await page.locator('[data-episode-description="1:1"]').click();
   await page.getByRole('dialog',{name:/Episode 1/}).waitFor();
@@ -822,7 +837,7 @@ const server=http.createServer((req,res)=>{
   await page.locator('[data-gallery-season="2"]').click();await page.waitForFunction(()=>!episodeLogBusy.size&&!cloudSaveInFlight);
   await page.locator('.gallery-season[data-season="2"] summary').click();
   phase='title notes';
-  assert.match(await page.locator('[data-gallery-watch-summary]').textContent(),/Watched to - S1 E2/);
+  assert.match(await page.locator('[data-gallery-watch-summary]').textContent(),/Watched to: S1 E2/);
   assert.match(await page.locator('[data-gallery-watch-summary]').textContent(),/Watched on: Netflix/);
   const notesUpdatedBefore=await page.evaluate(()=>mediaItems.find(row=>row.id==='show').updatedAt);
   const savedTitleNotes='A note about this series.\nWatch again with family.';
@@ -962,11 +977,13 @@ const server=http.createServer((req,res)=>{
   await page.evaluate(()=>document.documentElement.dataset.theme='dark');
   await page.locator('[data-settings-open="general"]').click();
   assert.equal(await page.locator('#appearance-mode').isVisible(),true,'General opens appearance controls');
+  assert.equal(await page.evaluate(()=>document.activeElement.id),'general-settings-heading','Settings moves focus to the active page heading');
   await page.locator('[data-tab="settings"]').click();
   assert.equal(await page.locator('#settings-category-menu').isVisible(),true,'pressing Settings returns to Settings home');
   await page.locator('[data-settings-open="general"]').click();
   await assertSettingsOnly();
   await page.locator('[data-settings-panel="general"] [data-settings-back]').click();
+  assert.equal(await page.evaluate(()=>document.activeElement.dataset.settingsOpen),'general','Back returns focus to the category');
   await page.locator('[data-settings-open="reminders"]').click();
   assert.equal(await page.locator('#background-reminder-status').isVisible(),true,'Release Reminders opens reminder controls');
   await assertSettingsOnly();
@@ -1008,7 +1025,8 @@ const server=http.createServer((req,res)=>{
   });
   console.log(engine.name()+': reminder reconnect, missing subscription, expired endpoint and device turn-off passed');
   await page.locator('[data-settings-panel="reminders"] [data-settings-back]').click();
-  await page.locator('[data-settings-open="account"]').click();
+  await page.locator('#user-pill').click();
+  assert.equal(await page.locator('[data-settings-panel="account"]').isVisible(),true,'profile shortcut opens Account & Sync directly');
   await assertSettingsOnly();
   for(const selector of ['[data-settings-panel="account"] .profile-card','#sync-now','#logout-btn']){
     assert.ok(await page.locator(selector).count()>=1,selector+' exists in the document');
@@ -1289,8 +1307,11 @@ const server=http.createServer((req,res)=>{
     const show=mediaItems.find(item=>item.id==='show');
     return {count:mediaItems.length,id:show.id,row:{type:'episode',show:{title:show.title,year:Number(show.releaseYear),ids:{imdb:show.imdbId}},episode:{season:1,number:1},watched_at:'2026-10-01T10:00:00Z'}};
   });
-  await page.locator('#import-library-backup').setInputFiles({name:'history.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify([importFixture.row]))});
-  await page.getByRole('dialog',{name:'Import Trakt history'}).waitFor();
+  const importChooser=page.waitForEvent('filechooser');
+  await page.getByRole('button',{name:'Import',exact:true}).focus();
+  await page.keyboard.press('Enter');
+  await (await importChooser).setFiles({name:'history.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify([importFixture.row]))});
+  await page.getByRole('dialog',{name:'Import library'}).waitFor();
   await page.locator('[data-trakt-confirm]').click();
   await page.waitForFunction(()=>!cloudSaveInFlight&&!localSaveInFlight);
   assert.equal(await page.evaluate(()=>mediaItems.length),importFixture.count,'Trakt matches an existing title without adding a duplicate');

@@ -40,13 +40,13 @@ function memoryDB(initial){
   };
 }
 
-const persistenceFunctions=["toMillis","canonicalRecordJSON","sameSyncValue","mergeEpisodeSetChanges","mergeEpisodeHistory","mergeRecordChanges","detectSyncConflicts","activePersistenceContext","setCloudBaseline","saveCache","cachePut","cacheGet","cloneLibrarySnapshot","createLibrarySnapshot","replayLocalChanges","acknowledgeCloudSnapshot","acknowledgeCachedSnapshot","libraryChangeSet","uploadCloudLibrary","queueLocalLibrarySave","queueCloudLibrarySave","persistLibrary","mergePendingCache","localSyncPending"];
+const persistenceFunctions=["toMillis","canonicalRecordJSON","sameSyncValue","mergeEpisodeSetChanges","mergeEpisodeHistory","mergeRecordChanges","detectSyncConflicts","activePersistenceContext","setCloudBaseline","saveCache","cachePut","cacheGet","cloneLibrarySnapshot","createLibrarySnapshot","replayLocalChanges","storeRemovedEdits","rebaseAndSaveRemovedEdits","acknowledgeCloudSnapshot","acknowledgeCachedSnapshot","libraryChangeSet","uploadCloudLibrary","queueLocalLibrarySave","queueCloudLibrarySave","persistLibrary","mergePendingCache","localSyncPending"];
 function harness(extra={}){
   const pending=new Set();
   const context=vm.createContext({
     console:{warn(){},error(){}},structuredClone,setTimeout,clearTimeout,AbortController,window:{},
     currentUser:{id:"account"},cloudSessionToken:"token",persistenceGeneration:1,
-    localSaveSequence:0,cloudBaseItems:[],cloudRevision:0,mediaItems:[],
+    cacheDB:null,localSaveSequence:0,cloudBaseItems:[],cloudRevision:0,mediaItems:[],
     latestLocalSnapshot:null,queuedLocalSnapshot:null,queuedCloudSnapshot:null,
     localSaveInFlight:null,cloudSaveInFlight:null,lastCloudAccountId:"",lastLocalAccountId:"",
     lastCloudLibraryJSON:"",lastLocalLibraryJSON:"",CLOUD_SAVE_COALESCE_MS:0,
@@ -115,10 +115,11 @@ test("Concurrent edits to the same show field are detected without flagging merg
  assert.deepEqual(copy(conflicts),[{id:"show",key:"title"},{id:"show",key:"platform"}]);
 });
 
-test("An offline edit survives when another device deletes the same title",()=>{
+test("A remote deletion stays deleted and its local edit is available for recovery",()=>{
  const c=harness(),base=[{id:"shared-show",title:"Shared",platform:"Before"}],local=[{id:"shared-show",title:"Shared",platform:"Edited offline"}],remote=[];
- const merged=c.replayLocalChanges(base,local,remote);
- assert.equal(merged.length,1);assert.equal(merged[0].platform,"Edited offline");
+ const drafts=[];
+ const merged=c.replayLocalChanges(base,local,remote,item=>drafts.push(item));
+ assert.equal(merged.length,0);assert.equal(drafts[0].platform,"Edited offline");
  assert.deepEqual(copy(c.detectSyncConflicts(base,local,remote)),[{id:"shared-show",key:"record"}]);
 });
 
@@ -148,12 +149,12 @@ test("An unchanged cloud save clears the durable pending marker without a reques
   assert.equal(app.hasPending(),false);
 });
 
-test("Signing in again replays pending edits and deletions from that account's cache",()=>{
+test("Signing in again replays pending edits and deletions from that account's cache",async ()=>{
   const app=harness();
   const cached={userId:"account",dirty:true,cloudItems:[{id:"a",title:"A"},{id:"b",title:"B"}],items:[{id:"a",title:"A saved offline"}]};
   const remote=[{id:"a",title:"A"},{id:"b",title:"B"},{id:"c",title:"New remote title"}];
-  assert.deepEqual(copy(app.mergePendingCache(cached,remote)),[{id:"a",title:"A saved offline"},{id:"c",title:"New remote title"}]);
-  assert.deepEqual(copy(app.mergePendingCache({...cached,userId:"other"},remote)),remote);
+  assert.deepEqual(copy(await app.mergePendingCache(cached,remote)),[{id:"a",title:"A saved offline"},{id:"c",title:"New remote title"}]);
+  assert.deepEqual(copy(await app.mergePendingCache({...cached,userId:"other"},remote)),remote);
 });
 
 test("Conflict replay merges individual fields and concurrent watched episode changes",()=>{
@@ -314,4 +315,42 @@ test('Device recovery copies survive an empty overwrite and retain the five most
  assert.equal(db.records.get('library-recovery').versions.length,5);assert.equal(db.records.get('library-recovery').versions[0].items[0].title,'Version 5');
  await app.cachePut({key:'library',userId:'different-account',items:[]},db);
  assert.equal(db.records.get('library-recovery').userId,'account','another account cannot overwrite this recovery history');
+});
+
+test("A retry keeps a remote deletion and saves the offline edits in the account's device cache",async()=>{
+ const gone={id:"deleted",title:"Removed title",notes:"Original"},keep={id:"keep",title:"Keep"};
+ const edited={...gone,notes:"Offline draft",updatedAt:"2026-11-22T16:00:00Z"};
+ const base=[gone,keep],local=[edited,keep],remote=[keep],db=memoryDB({});
+ const app=harness({cacheDB:db,cloudBaseItems:base,mediaItems:local,detectedSyncConflictCount:0});
+ const snapshot=app.createLibrarySnapshot(local);
+ await app.queueLocalLibrarySave(snapshot);
+ let sends=0;
+ app.pinApi=async(_action,_payload,_token,raw)=>{
+  sends++;
+  const body=JSON.parse(raw);
+  if(sends===1){
+   assert.equal(body.changes[0].set.notes,"Offline draft");
+   throw Object.assign(new Error("Revision conflict"),{code:"revision_conflict",items:remote,revision:1});
+  }
+  assert.equal(body.expectedRevision,1);
+  assert.deepEqual(body.changes,[]);
+  assert.deepEqual(db.records.get("removed-title-edits"),{key:"removed-title-edits",userId:"account",items:[edited]});
+  return {ok:true,revision:1};
+ };
+ await app.uploadCloudLibrary(snapshot);
+ assert.equal(sends,2);
+ assert.deepEqual(copy(app.mediaItems),remote);
+ assert.deepEqual(db.records.get("library").items,remote);
+});
+
+test("A cache acknowledgement stores a newer edit to a removed title without reviving it",async()=>{
+ const gone={id:"deleted",title:"Removed title"},edited={...gone,notes:"Edited later"};
+ const db=memoryDB({library:{key:"library",userId:"account",items:[edited],dirty:true,localSequence:2,cloudItems:[gone],cloudRevision:0}});
+ const app=harness({cacheDB:db,cloudBaseItems:[gone],mediaItems:[edited]});
+ const sent=app.createLibrarySnapshot([gone]);
+ const accepted=app.createLibrarySnapshot([],{sequence:sent.sequence});
+ await app.acknowledgeCloudSnapshot(sent,accepted,{revision:1});
+ assert.deepEqual(copy(app.mediaItems),[]);
+ assert.deepEqual(db.records.get("library").items,[]);
+ assert.deepEqual(db.records.get("removed-title-edits").items,[edited]);
 });

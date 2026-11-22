@@ -180,7 +180,7 @@ window.WatchLogGallery=(()=>{
       }
     }
     for(const poster of section.querySelectorAll('[data-gallery-season-art]')){
-      paintTrackerImage(poster,artwork.seasonImages?.[poster.dataset.gallerySeasonArt]||artwork.posterUrl||'',`S${poster.dataset.gallerySeasonArt}`,artwork.posterUrl||'');
+      paintTrackerImage(poster,artwork.seasonImages?.[poster.dataset.gallerySeasonArt]||'',`S${poster.dataset.gallerySeasonArt}`);
     }
   }
   async function loadTrackerArtwork(item){
@@ -275,7 +275,7 @@ window.WatchLogGallery=(()=>{
         if(progress){progress.setAttribute('aria-label',`${done} of ${total} released episodes watched`);progress.style.setProperty('--watched-progress',`${total?Math.round(done/total*100):0}%`);}
         const summary=dialog.querySelector('[data-gallery-watch-summary]'),last=api.last(fresh),next=api.next?.(fresh);
         summary.querySelector('strong').textContent=fresh.status||'Planned';
-        summary.querySelector('p:not(.gallery-caught-up)').textContent=`Watched to - ${last?`S${last.season} E${last.episode}`:'Not started'}`;
+        summary.querySelector('[data-gallery-watched-to]').textContent=`Watched to: ${last?`S${last.season} E${last.episode}`:'Not started'}`;
         let nextButton=summary.querySelector('[data-gallery-watch-next]');
         if(next){
           summary.querySelector('.gallery-caught-up')?.remove();
@@ -409,7 +409,7 @@ window.WatchLogGallery=(()=>{
     dialog.dataset.item=String(item.id);
     const show=!isFilm(item),last=api.last(item);
     dialog.classList.toggle('gallery-series-detail',show);
-    const watchedTo=show?(last?`S${last.season} E${last.episode}`:'Not started'):(item.status==='Watched'?'Complete':'Not started');
+    const watchedTo=last?`S${last.season} E${last.episode}`:'Not started';
     let savedNotes=String(item.notes||'').trim();
     dialog._savedNotes=savedNotes;
     const releases=show?(api.released?.(item)||item.releasedEpisodes||{}):{},watched=show?(api.watched?.(item)||item.watchedEpisodes||{}):{};
@@ -431,7 +431,7 @@ window.WatchLogGallery=(()=>{
       <section id="gallery-watch-panel" class="gallery-watch-panel" role="tabpanel" aria-labelledby="gallery-watch-tab" data-gallery-panel="watch">
         ${api.reminder(item,isFilm(item))}
         ${show?`<section class="gallery-season-list"><div class="gallery-episodes-heading"><h3>All Episodes</h3>${episodeTotal?`<span class="gallery-episodes-progress" role="img" aria-label="${watchedTotal} of ${episodeTotal} released episodes watched" style="--watched-progress:${Math.round(watchedTotal/episodeTotal*100)}%"></span>`:''}</div>${seasons.map(season=>seasonRow(item,season,releases,watched)).join('')||'<p class="gallery-empty">Episode list unavailable or not yet released. Refresh verified episode data to check again.</p><button type="button" class="btn btn-secondary" data-gallery-retry-episodes>Refresh episodes</button>'}</section>`:''}
-        <div class="gallery-detail-copy" data-gallery-watch-summary>${show?(next?`<button type="button" class="btn btn-primary gallery-watch-next" data-gallery-watch-next>Watch next · S${next.season} E${next.episode}</button>`:seasons.length?'<p class="gallery-caught-up" role="status">All released episodes watched</p>':''):''}<strong>${esc(item.status||'Planned')}</strong><p>Watched to - ${esc(watchedTo)}</p><p>Watched on: ${esc(item.platform||'Not specified')}</p></div>
+        <div class="gallery-detail-copy" data-gallery-watch-summary>${show?(next?`<button type="button" class="btn btn-primary gallery-watch-next" data-gallery-watch-next>Watch next · S${next.season} E${next.episode}</button>`:seasons.length?'<p class="gallery-caught-up" role="status">All released episodes watched</p>':''):''}<strong>${esc(item.status||'Planned')}</strong>${show?`<p data-gallery-watched-to>Watched to: ${esc(watchedTo)}</p>`:''}<p>Watched on: ${esc(item.platform||'Not specified')}</p></div>
       </section>
       <section id="gallery-info-panel" class="gallery-info-panel hidden" role="tabpanel" aria-labelledby="gallery-info-tab" data-gallery-panel="details"><div data-gallery-details aria-live="polite">Loading details…</div></section>
       <div class="gallery-action-menu hidden" data-gallery-action-menu><button type="button" data-gallery-edit-menu>Edit show or film</button><button type="button" data-gallery-notes>Notes</button><button type="button" data-gallery-favourite>${item.favorite?'Remove favourite':'Add to favourites'}</button><button type="button" data-gallery-lists>Custom lists</button><button type="button" data-gallery-archive>${item.archived?'Unarchive':'Archive'}</button><button type="button" class="danger" data-gallery-delete>Delete show or film</button></div>

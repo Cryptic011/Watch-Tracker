@@ -5,7 +5,13 @@ function applyAccountPreferences(preferences){
   const keys=preferenceKeys();if(!keys)return;
   safeWriteJSON(keys.saved,preferences);
   if(preferences.appearance){safeWriteJSON(APPEARANCE_KEY,preferences.appearance);applyAppearance(preferences.appearance);}
-  if(preferences.sort&&activeFilter!=='Recent'){activeSort=preferences.sort;sortMode.value=activeSort;}
+  if(preferences.sort){
+    safeWriteJSON(SORT_KEY,preferences.sort);
+    if(activeFilter!=='Recent'&&preferences.sort!==activeSort){
+      activeSort=preferences.sort;sortMode.value=activeSort;
+      if(typeof render==='function')render();
+    }
+  }
 }
 async function syncAccountPreferences(){
   const keys=preferenceKeys();if(!keys||navigator.onLine===false||!cloudSessionToken||preferenceRequest)return;

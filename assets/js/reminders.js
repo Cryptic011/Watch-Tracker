@@ -362,19 +362,20 @@
     return publicMaintenanceInFlight;
   }
   async function refreshMaintenanceAdmin(){
+    if(currentTab==="settings"&&!maintenanceAdminSection.classList.contains("hidden"))showSettingsMenu();
     maintenanceAdminSection.classList.add("hidden");
     maintenanceAdminSection.dataset.authorized="false";
     $("maintenance-settings-button")?.classList.add("hidden");
-    if(document.querySelector('#settings-view [data-settings-panel="maintenance"]:not(.hidden)'))showSettingsMenu();
-    if(!cloudSessionToken)return false;
+    if(!currentUser||!cloudSessionToken)return false;
+    const session={accountId:String(currentUser.id),token:cloudSessionToken,generation:persistenceGeneration};
     try{
-      const result=await pinApi("maintenance_admin_status");
-      if(result.canManage!==true)return false;
+      const result=await pinApi("maintenance_admin_status",{},session.token);
+      if(!activePersistenceContext(session)||result.canManage!==true)return false;
       maintenanceEnabled.checked=result.maintenance===true;
       maintenanceMessage.value=String(result.message||publicMaintenance.message);
       publicMaintenance={enabled:result.maintenance===true,message:maintenanceMessage.value};
       renderLibraryMaintenance();
-      maintenanceAdminStatus.textContent=result.maintenance?"Maintenance is ON. New logins are blocked.":"Maintenance is OFF. Logins are open.";
+      maintenanceAdminStatus.textContent=result.maintenance?"Maintenance is on. New sign-ins are blocked.":"Maintenance is off. Users can sign in.";
       maintenanceAdminSection.dataset.authorized="true";
       $("maintenance-settings-button")?.classList.remove("hidden");
       return true;
@@ -392,7 +393,7 @@
       publicMaintenance={enabled:result.maintenance===true,message:String(result.message||message)};
       renderLibraryMaintenance();
       maintenanceEnabled.checked=publicMaintenance.enabled;maintenanceMessage.value=publicMaintenance.message;
-      maintenanceAdminStatus.textContent=publicMaintenance.enabled?"Maintenance is ON. New logins are blocked.":"Maintenance is OFF. Logins are open.";
+      maintenanceAdminStatus.textContent=publicMaintenance.enabled?"Maintenance is on. New sign-ins are blocked.":"Maintenance is off. Users can sign in.";
       showAppToast(publicMaintenance.enabled?"Maintenance mode enabled.":"Maintenance mode disabled.",publicMaintenance.enabled?"warn":"success");
     }catch(error){maintenanceAdminStatus.textContent=error.message||"Could not update maintenance mode.";}
     finally{saveMaintenance.disabled=false;}

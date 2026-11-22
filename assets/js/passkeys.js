@@ -23,10 +23,15 @@
   }
   function message(error){return ['NotAllowedError','AbortError'].includes(error?.name)?'Passkey sign-in was cancelled. You can try again or use your PIN.':error.message||'Passkey operation could not be completed.';}
   async function list(){
+    const target=$('passkey-list');
+    target.replaceChildren();
     if(!currentUser||navigator.onLine===false)return;
+    const owner=String(currentUser.id),token=cloudSessionToken,generation=persistenceGeneration;
+    const active=()=>String(currentUser?.id)===owner&&cloudSessionToken===token&&persistenceGeneration===generation;
     try{
-      const {passkeys=[]}=await pinApi('passkey_list');
-      $('passkey-list').replaceChildren();
+      const {passkeys=[]}=await pinApi('passkey_list',{},token);
+      if(!active())return;
+      target.replaceChildren();
       for(const row of passkeys){
         const line=document.createElement('div');line.className='notification-actions';
         const label=document.createElement('span');label.textContent=row.label+' · '+formatLocalDate(new Date(row.created_at));
@@ -34,7 +39,7 @@
         remove.onclick=async()=>{remove.disabled=true;try{await pinApi('passkey_remove',{id:row.id});await list();}catch(error){$('passkey-status').textContent=message(error);remove.disabled=false;}};
         line.append(label,remove);$('passkey-list').append(line);
       }
-    }catch(error){$('passkey-status').textContent=message(error);}
+    }catch(error){if(active())$('passkey-status').textContent=message(error);}
   }
   button.onclick=async()=>{
     if(navigator.onLine===false){showMessage('Passkey sign-in needs a connection. Your saved session can reopen offline.');return;}
@@ -60,6 +65,6 @@
     }catch(error){$('passkey-status').textContent=message(error);}
     finally{pin.value='';create.disabled=!supported;}
   };
-  document.querySelector('[data-settings-open="account"]').addEventListener('click',()=>void list());
+  window.refreshAccountPasskeys=list;
   newPinInput.addEventListener('input',()=>{$('passkey-status').textContent='Changing or resetting your PIN also revokes existing passkeys.';});
 })();
