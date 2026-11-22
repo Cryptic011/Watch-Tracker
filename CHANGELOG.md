@@ -1,3 +1,6 @@
+## 2026-11-22 — Make Pages deployment retries reliable
+- Give each deployment attempt its own artifact and wait for the uploaded file to be visible before publishing.
+
 ## 2026-11-22 — Improve Settings access and protect edits to removed titles
 - Keep sign-in and Settings usable on small screens and with a keyboard, with a direct Account & Sync shortcut.
 - Keep the selected Library sort and preserve recorded episodes when marking a show watched in bulk.

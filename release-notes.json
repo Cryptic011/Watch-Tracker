@@ -1,4 +1,10 @@
 {
+  "83b929ac3a7680938119d49072a149c45fbaec56": {
+    "title": "Make Pages deployment retries reliable",
+    "changes": [
+      "Give each deployment attempt its own artifact and wait for the uploaded file to be visible before publishing."
+    ]
+  },
   "be44a4bcd9934ae487feeb10e22a642330f194e6": {
     "title": "Improve Settings access and protect edits to removed titles",
     "changes": [
