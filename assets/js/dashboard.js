@@ -139,7 +139,7 @@ function calendarEvents(items,now=new Date(),days=7){
         const activeSeason=Number(item.airingSeason||item.curSeason||0);
         const episodeSeason=Number(item.nextEpisodeNum)>1&&activeSeason?activeSeason:(item.nextSeasonNum||activeSeason||item.curSeason||0);
         const nextEpisodeSeason=Number(scheduled?.season||episodeSeason);
-        candidates.push({title:item.nextEpisodeTitle||item.episodeTitles?.[nextEpisodeSeason]?.[item.nextEpisodeNum]||'',raw:item.nextEpisodeDate,label:`S${nextEpisodeSeason||'?'} E${item.nextEpisodeNum}`,season:nextEpisodeSeason,episode:Number(item.nextEpisodeNum),isNextEpisodePointer:true});
+        candidates.push({title:item.nextEpisodeTitle||item.episodeTitles?.[nextEpisodeSeason]?.[item.nextEpisodeNum]||'',raw:item.nextEpisodeDate,label:`S${nextEpisodeSeason||'?'} E${item.nextEpisodeNum}`,season:nextEpisodeSeason,episode:Number(item.nextEpisodeNum)});
       }
       const activeSeason=Number(item.airingSeason||item.curSeason||0);
       const activeSeasonContinues=activeSeason>0&&Number(item.nextSeasonNum)>activeSeason&&Number(item.nextEpisodeNum)>1&&(Boolean(item.nextEpisodeDate)||Boolean((releasedEpisodeMap(item)||{})[activeSeason]?.length));
@@ -151,13 +151,10 @@ function calendarEvents(items,now=new Date(),days=7){
     for(const candidate of candidates){
       const identity=candidate.episode?`${candidate.season}:${candidate.episode}`:candidate.kind==='season'?`${candidate.season}:1`:candidate.label;
       const previous=episodes.get(identity);
-      // The explicit next-episode pointer is also used by the show page.
-      // When it identifies the same episode as a provider schedule row, keep
-      // its date so the calendar cannot show a different release for that
-      // episode (for example, a stale Sheriff Country S2E7 date).
-      const pointerWins=candidate.isNextEpisodePointer&&Number.isFinite(Date.parse(candidate.raw))&&
-        (!previous||String(previous.raw||"")!==String(candidate.raw||""));
-      if(!previous||pointerWins||(!Number.isFinite(Date.parse(previous.raw))&&Number.isFinite(Date.parse(candidate.raw))))episodes.set(identity,candidate);
+      // Conflicting dates must be resolved by the regional official-release
+      // resolver before candidates reach the calendar. Do not let either UI
+      // pointer or a stale schedule row arbitrarily override the other.
+      if(!previous||(!Number.isFinite(Date.parse(previous.raw))&&Number.isFinite(Date.parse(candidate.raw))))episodes.set(identity,candidate);
       else if(!previous.title&&candidate.title)previous.title=candidate.title;
     }
     candidates=[...episodes.values()];
