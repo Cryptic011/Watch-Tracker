@@ -12,6 +12,7 @@ test('Catalogue defaults match verified UK streaming identities and preserve exp
  assert.equal(api.catalogueItem(item,{country:'US'}),item);
  assert.equal(api.resolve(item,{country:'GB'}).platform,'CBS','saved broadcast entries are never silently reassigned');
 });
+// Regression: stale provider rows must not override the official Paramount Press Express episode record.
 test('Official Sheriff Country episode release overrides conflicting broadcast/provider dates everywhere',()=>{
  const api=engine(),item={type:'Series',title:'Sheriff Country',tvmazeShowId:'76568',imdbId:'tt32268630',platform:'Paramount+',broadcastPlatform:'CBS',
   airingSeason:2,nextEpisodeNum:7,nextEpisodeDate:'2026-12-05T08:00:00Z',
