@@ -27,6 +27,8 @@ test('Official Sheriff Country episode release overrides conflicting broadcast/p
  const page=api.resolveEvent(result,{season:2,number:7,raw:'2026-12-05T01:00:00Z'},{country:'GB'});
  assert.equal(page.raw,result.nextEpisodeDate);
  assert.equal(page.streamingUnconfirmed,false);
+ const nextWeek=api.resolveEvent(result,{season:2,number:8,raw:'2026-12-12T01:00:00Z'},{country:'GB'});
+ assert.equal(nextWeek.raw,'2026-12-19T08:00:00Z');
 });
 test('Airtimes stay unchanged across titles, countries and daylight-saving dates',()=>{
  const api=engine();
