@@ -84,6 +84,7 @@
   function resolve(item,options={}){
     if(!item)return item;
     const rows=[...(item.scheduledEpisodeReleases||[]),...(item.recurringWeeklySchedule?.episodes||[])].filter(Boolean);
+    const original=raw=>rows.find(row=>row.raw===raw&&row.broadcastRaw)?.broadcastRaw||raw;
     const rule=streamingRule(item,options);
     if(rule){
       const project=(raw,season,episode)=>{
