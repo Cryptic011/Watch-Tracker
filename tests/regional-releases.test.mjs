@@ -23,6 +23,8 @@ test('Official Sheriff Country episode release overrides conflicting broadcast/p
  assert.equal(result.scheduledEpisodeReleases[0].broadcastRaw,'2026-12-12T01:00:00Z');
  assert.equal(result.recurringWeeklySchedule.episodes[0].raw,'2026-12-12T08:00:00Z');
  assert.equal(result.scheduledEpisodeReleases[0].officialRelease,true);
+ assert.equal(result.scheduledEpisodeReleases[0].releaseDateConfirmed,true);
+ assert.equal(result.scheduledEpisodeReleases[0].releaseTimeConfirmed,false,'the official source confirms next-day availability, not the exact UK hour');
  assert.match(result.scheduledEpisodeReleases[0].releaseSource,/paramountpressexpress\\.com/);
  const page=api.resolveEvent(result,{season:2,number:7,raw:'2026-12-05T01:00:00Z'},{country:'GB'});
  assert.equal(page.raw,result.nextEpisodeDate);
