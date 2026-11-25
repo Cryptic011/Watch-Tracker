@@ -24,9 +24,9 @@
         // The 08:00 UK clock is the app's configured platform time; the press release
         // confirms next-day timing, but does not publish an exact UK release hour.
         {season:2,episode:7,title:'Stand Your Ground',broadcastRaw:'2026-12-12T01:00:00Z',streamingRaw:'2026-12-12T08:00:00Z',
-          source:'https://www.paramountpressexpress.com/cbs-studios/shows/sheriff-country/releases'},
+          source:'https://www.paramountpressexpress.com/cbs-studios/shows/sheriff-country/releases',releaseDateConfirmed:true,releaseTimeConfirmed:false},
         {season:2,episode:8,title:'Justice Delayed',broadcastRaw:'2026-12-19T01:00:00Z',streamingRaw:'2026-12-19T08:00:00Z',
-          source:'https://www.paramountpressexpress.com/cbs-studios/shows/sheriff-country/releases'}
+          source:'https://www.paramountpressexpress.com/cbs-studios/shows/sheriff-country/releases',releaseDateConfirmed:true,releaseTimeConfirmed:false}
       ]}
   ];
   function paramountUKTitle(item){
@@ -65,7 +65,7 @@
   function resolvedOfficialEvent(event,official,item){
     return {...event,raw:official.streamingRaw,broadcastRaw:official.broadcastRaw,title:official.title||event.title||event.name||'',
       platform:item.platform,streamingUnconfirmed:false,releaseSourceMismatch:false,officialRelease:true,
-      releaseSource:official.source,releaseSchedule:{key:'sheriff-country-paramount-uk-official',platform:'Paramount+',country:'GB'}};
+      releaseSource:official.source,releaseDateConfirmed:official.releaseDateConfirmed===true,releaseTimeConfirmed:official.releaseTimeConfirmed===true,releaseSchedule:{key:'sheriff-country-paramount-uk-official',platform:'Paramount+',country:'GB'}};
   }
   function resolveEvent(item,event,options={}){
     const rule=streamingRule(item,options);
