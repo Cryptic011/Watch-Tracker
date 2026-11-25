@@ -83,7 +83,7 @@ test('Film alerts still require a verified release source as well as a clock tim
 test('Every selected Paramount+ UK series uses 08:00 UK time, with CBS dates shifted to next-day availability',()=>{
  const api=engine();
  for(const [title,showId,imdbId,raw,expected] of [
-  ['Marshals','84526','tt36849871','2026-11-16T01:00:00Z','2026-11-17T08:00:00.000Z'],
+  ['Marshals','84526','tt36849871','2026-11-16T01:00:00Z','2026-11-16T08:00:00.000Z'],
   ['Sheriff Country','76568','tt32268630','2026-11-13T20:00:00Z','2026-11-14T08:00:00.000Z'],
   ['New Paramount title','99999','tt99999999','2026-11-13T20:00:00Z','2026-11-14T08:00:00.000Z'],
  ]){
@@ -97,6 +97,6 @@ test('Every selected Paramount+ UK series uses 08:00 UK time, with CBS dates shi
   assert.equal(JSON.stringify(item),before);
   assert.equal(api.resolveEvent({...item,platform:'CBS'},{raw},{country:'GB'}).raw,raw);
   assert.equal(api.resolveEvent(item,{raw},{country:'US'}).raw,raw);
-  assert.equal(api.resolveEvent({...item,imdbId:'tt99999999'},{raw},{country:'GB'}).raw,raw);
+  assert.equal(api.resolveEvent({...item,imdbId:'tt99999999'},{raw},{country:'GB'}).raw,expected,'Paramount+ rule applies regardless of title identity');
  }
 });
