@@ -80,18 +80,18 @@ test('Film alerts still require a verified release source as well as a clock tim
  assert.equal(api.resolveEvent({type:'Film',filmReleaseSource:'Manual'},event).streamingUnconfirmed,false);
 });
 
-test('Selected Paramount+ UK shows use their streaming day at 08:00 without altering source records',()=>{
+test('Every selected Paramount+ UK series uses 08:00 UK time, with CBS dates shifted to next-day availability',()=>{
  const api=engine();
  for(const [title,showId,imdbId,raw,expected] of [
-  ['Marshals','84526','tt36849871','2026-11-16T01:00:00Z','2026-11-16T08:00:00.000Z'],
-  ['Marshals','84526','tt36849871','2026-03-29T20:00:00-04:00','2026-03-30T08:00:00.000Z'],
+  ['Marshals','84526','tt36849871','2026-11-16T01:00:00Z','2026-11-17T08:00:00.000Z'],
   ['Sheriff Country','76568','tt32268630','2026-11-13T20:00:00Z','2026-11-14T08:00:00.000Z'],
+  ['New Paramount title','99999','tt99999999','2026-11-13T20:00:00Z','2026-11-14T08:00:00.000Z'],
  ]){
   const item={title,type:'Series',tvmazeShowId:showId,imdbId,platform:'Paramount+',broadcastPlatform:'CBS',nextEpisodeDate:raw,latestEpisodeDate:raw,nextSeasonDate:raw,scheduledEpisodeReleases:[{season:2,number:3,raw}],recurringWeeklySchedule:{episodes:[{season:2,number:3,raw}]},watchedEpisodes:{1:[1]}};
   const before=JSON.stringify(item),projected=api.resolve(item,{country:'GB'});
   assert.equal(projected.platform,'Paramount+');assert.equal(projected.nextEpisodeDate,expected);assert.equal(projected.latestEpisodeDate,expected);assert.equal(projected.nextSeasonDate,expected);
   assert.equal(projected.scheduledEpisodeReleases[0].raw,expected);assert.equal(projected.recurringWeeklySchedule.episodes[0].raw,expected);
-  assert.equal(projected.scheduledEpisodeReleases[0].broadcastRaw,raw);
+  assert.equal(projected.scheduledEpisodeReleases[0].broadcastRaw,raw);assert.equal(projected.scheduledEpisodeReleases[0].releaseTimeConfirmed,false);
   assert.equal(api.resolve(projected,{country:'GB'}).nextEpisodeDate,expected);
   assert.equal(api.resolveEvent(projected,projected.scheduledEpisodeReleases[0],{country:'GB'}).raw,expected);
   assert.equal(JSON.stringify(item),before);
