@@ -18,7 +18,16 @@
   // Provider dates remain intact in storage and supply the actual episode list.
   const paramountUKReleases = [
     {name:'marshals',aliases:['marshals','the marshals'],showId:'84526',imdbId:'tt36849871',weekday:1},
-    {name:'sheriff-country',aliases:['sheriff country'],showId:'76568',imdbId:'tt32268630',weekday:6}
+    {name:'sheriff-country',aliases:['sheriff country'],showId:'76568',imdbId:'tt32268630',weekday:6,
+      officialEpisodes:[
+        // Paramount Press Express confirms the CBS airdate and next-day Paramount+ availability.
+        // The 08:00 UK clock is the app's configured platform time; the press release
+        // confirms next-day timing, but does not publish an exact UK release hour.
+        {season:2,episode:7,title:'Stand Your Ground',broadcastRaw:'2026-12-12T01:00:00Z',streamingRaw:'2026-12-12T08:00:00Z',
+          source:'https://www.paramountpressexpress.com/cbs-studios/shows/sheriff-country/releases'},
+        {season:2,episode:8,title:'Justice Delayed',broadcastRaw:'2026-12-19T01:00:00Z',streamingRaw:'2026-12-19T08:00:00Z',
+          source:'https://www.paramountpressexpress.com/cbs-studios/shows/sheriff-country/releases'}
+      ]}
   ];
   function paramountUKTitle(item){
     if(!['Series','Anime'].includes(item.type||item.format))return null;
@@ -46,18 +55,27 @@
     const source=new Date(raw),release=new Date(source);
     release.setUTCDate(release.getUTCDate()+(rule.weekday-release.getUTCDay()+7)%7);
     release.setUTCHours(8,0,0,0);
-    // A later source timestamp is stronger than an approximate platform clock.
     return release<source?source.toISOString():release.toISOString();
   }
   async function refresh(){}
   const platformKey=value=>String(value||'').toLowerCase().replace(/[^a-z0-9+]/g,'').replace(/^paramountplus$/,'paramount+');
+  function officialEpisode(rule,season,episode){
+    return (rule?.officialEpisodes||[]).find(row=>Number(row.season)===Number(season)&&Number(row.episode)===Number(episode))||null;
+  }
+  function resolvedOfficialEvent(event,official,item){
+    return {...event,raw:official.streamingRaw,broadcastRaw:official.broadcastRaw,title:official.title||event.title||event.name||'',
+      platform:item.platform,streamingUnconfirmed:false,releaseSourceMismatch:false,officialRelease:true,
+      releaseSource:official.source,releaseSchedule:{key:'sheriff-country-paramount-uk-official',platform:'Paramount+',country:'GB'}};
+  }
   function resolveEvent(item,event,options={}){
+    const rule=streamingRule(item,options);
+    const official=rule&&officialEpisode(rule,event.season,event.number);
+    if(official)return resolvedOfficialEvent(event,official,item);
     const raw=event.broadcastRaw||event.raw;
-    const timed=(item.type!=='Film'||Boolean(String(item.filmReleaseSource||'').trim()))&&/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(String(raw||''))&&Number.isFinite(Date.parse(raw));
-    const rule=timed?streamingRule(item,options):null;
-    if(rule)return {...event,raw:platformReleaseTime(raw,rule),broadcastRaw:raw,platform:item.platform,streamingUnconfirmed:false,releaseSourceMismatch:false,
+    const timed=(item.type!=='Film'||Boolean(String(item.filmReleaseSource||'').trim()))&&/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}/.test(String(raw||''))&&Number.isFinite(Date.parse(raw));
+    if(timed&&rule)return {...event,raw:platformReleaseTime(raw,rule),broadcastRaw:raw,platform:item.platform,streamingUnconfirmed:false,releaseSourceMismatch:false,
       releaseSchedule:{key:`${rule.name}-gb-paramount-0800`,platform:item.platform,country:'GB'}};
-    // An original broadcast is not evidence of availability on another service.
+    // A broadcast timestamp cannot be presented as a different service's release.
     const selected=platformKey(item.platform),source=platformKey(event.broadcastPlatform||item.broadcastPlatform);
     const mismatch=item.type!=='Film'&&selected&&selected!=='other'&&selected!==source;
     return {...event,raw,platform:item.platform||item.broadcastPlatform,streamingUnconfirmed:!timed||Boolean(mismatch),releaseSourceMismatch:Boolean(mismatch),
@@ -66,12 +84,19 @@
   function resolve(item,options={}){
     if(!item)return item;
     const rows=[...(item.scheduledEpisodeReleases||[]),...(item.recurringWeeklySchedule?.episodes||[])].filter(Boolean);
-    const original=raw=>rows.find(row=>row.raw===raw&&row.broadcastRaw)?.broadcastRaw||raw;
     const rule=streamingRule(item,options);
     if(rule){
-      const project=raw=>resolveEvent(item,{raw:original(raw)},options).raw;
+      const project=(raw,season,episode)=>{
+        const official=officialEpisode(rule,season,episode);
+        if(official)return official.streamingRaw;
+        const source=rows.find(row=>row.raw===raw&&row.broadcastRaw)?.broadcastRaw||raw;
+        return resolveEvent(item,{raw:source,season,number:episode},options).raw;
+      };
+      const nextSeason=Number(item.airingSeason||item.curSeason||item.nextSeasonNum||0);
       return {...item,releaseSchedule:{key:`${rule.name}-gb-paramount-0800`,platform:item.platform,country:'GB'},
-        nextEpisodeDate:project(item.nextEpisodeDate),latestEpisodeDate:project(item.latestEpisodeDate),nextSeasonDate:project(item.nextSeasonDate),
+        nextEpisodeDate:project(item.nextEpisodeDate,nextSeason,item.nextEpisodeNum),
+        latestEpisodeDate:project(item.latestEpisodeDate,item.airingSeason||item.curSeason,item.latestEpisodeNum),
+        nextSeasonDate:project(item.nextSeasonDate,item.nextSeasonNum,1),
         scheduledEpisodeReleases:Array.isArray(item.scheduledEpisodeReleases)?item.scheduledEpisodeReleases.map(row=>resolveEvent(item,row,options)):item.scheduledEpisodeReleases,
         recurringWeeklySchedule:item.recurringWeeklySchedule?{...item.recurringWeeklySchedule,episodes:(item.recurringWeeklySchedule.episodes||[]).map(row=>resolveEvent(item,row,options))}:item.recurringWeeklySchedule};
     }
