@@ -1,3 +1,9 @@
+## 2026-11-25 — Canonical official streaming releases
+- Added official episode-level release records for Sheriff Country S2E7 and S2E8 using Paramount Press Express episode and release listings.
+- Normalized the show-page next episode date, calendar schedule, and recurring schedule from the same official episode record; conflicting provider snapshots can no longer create different dates for the same episode.
+- Kept US CBS broadcast timestamps separate from UK Paramount+ next-day streaming timestamps and removed the calendar-only date-priority workaround.
+- Added regression coverage for stale Sheriff Country S2E7 dates.
+
 ## 2026-11-25 — Keep next-episode dates consistent across pages
 - Use the same confirmed next-episode date on the show page and calendar when a provider schedule row conflicts with the episode's next-date pointer.
 - Add a regression for Sheriff Country S2E7 so the stale 5 December entry cannot override the confirmed 12 December UK streaming date.
