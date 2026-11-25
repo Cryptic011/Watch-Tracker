@@ -12,6 +12,22 @@ test('Catalogue defaults match verified UK streaming identities and preserve exp
  assert.equal(api.catalogueItem(item,{country:'US'}),item);
  assert.equal(api.resolve(item,{country:'GB'}).platform,'CBS','saved broadcast entries are never silently reassigned');
 });
+test('Official Sheriff Country episode release overrides conflicting broadcast/provider dates everywhere',()=>{
+ const api=engine(),item={type:'Series',title:'Sheriff Country',tvmazeShowId:'76568',imdbId:'tt32268630',platform:'Paramount+',broadcastPlatform:'CBS',
+  airingSeason:2,nextEpisodeNum:7,nextEpisodeDate:'2026-12-05T08:00:00Z',
+  scheduledEpisodeReleases:[{season:2,number:7,title:'Stand Your Ground',raw:'2026-12-05T01:00:00Z'}],
+  recurringWeeklySchedule:{episodes:[{season:2,number:7,title:'Stand Your Ground',raw:'2026-12-05T01:00:00Z'}]}};
+ const result=api.resolve(item,{country:'GB'});
+ assert.equal(result.nextEpisodeDate,'2026-12-12T08:00:00Z');
+ assert.equal(result.scheduledEpisodeReleases[0].raw,'2026-12-12T08:00:00Z');
+ assert.equal(result.scheduledEpisodeReleases[0].broadcastRaw,'2026-12-12T01:00:00Z');
+ assert.equal(result.recurringWeeklySchedule.episodes[0].raw,'2026-12-12T08:00:00Z');
+ assert.equal(result.scheduledEpisodeReleases[0].officialRelease,true);
+ assert.match(result.scheduledEpisodeReleases[0].releaseSource,/paramountpressexpress\\.com/);
+ const page=api.resolveEvent(result,{season:2,number:7,raw:'2026-12-05T01:00:00Z'},{country:'GB'});
+ assert.equal(page.raw,result.nextEpisodeDate);
+ assert.equal(page.streamingUnconfirmed,false);
+});
 test('Airtimes stay unchanged across titles, countries and daylight-saving dates',()=>{
  const api=engine();
  for(const title of ['FBI','CIA','Marshals'])for(const region of ['GB','US','CA'])for(const raw of ['2026-11-03T01:00:00Z','2026-11-03T02:01:00Z','2026-03-30T00:30:00+01:00']){
