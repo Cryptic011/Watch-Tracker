@@ -25,6 +25,16 @@ test('The real release resolver excludes a broadcast from an unmatched selected 
  const streaming=c.calendarEvents([{...item,platform:'Paramount+'}],now,14);
  assert.equal(streaming.events[0].date.toISOString(),'2026-11-16T08:00:00.000Z');
 });
+test('Calendar uses the same confirmed date as the show page for its next episode',()=>{
+ const c=app();vm.runInContext(fs.readFileSync(new URL('../assets/js/regional-releases.js',import.meta.url),'utf8'),c);
+ c.regionalScheduleItem=item=>c.WatchLogRegionalReleases.resolve(item,{country:'GB'});
+ c.regionalScheduleEvent=(item,event)=>c.WatchLogRegionalReleases.resolveEvent(item,event,{country:'GB'});
+ const item={id:'sheriff-country',title:'Sheriff Country',type:'Series',tvmazeShowId:'76568',imdbId:'tt32268630',platform:'Paramount+',broadcastPlatform:'CBS',airingSeason:2,nextEpisodeNum:7,nextEpisodeDate:'2026-12-12T08:00:00Z',scheduledEpisodeReleases:[{season:2,number:7,raw:'2026-12-05T08:00:00Z',title:'Stand Your Ground'}]};
+ const result=c.calendarEvents([item],new Date('2026-11-25T12:00:00Z'),14);
+ assert.equal(result.events.length,1);
+ assert.equal(result.events[0].label,'S2 E7');
+ assert.equal(result.events[0].date.toISOString(),'2026-12-12T08:00:00.000Z');
+});
 test('Unconfirmed streaming shows remain visible separately from genuinely unknown dates',()=>{
  const c=app();c.regionalScheduleEvent=(_item,event)=>({...event,streamingUnconfirmed:true});
  const result=c.calendarEvents([{id:'fire',title:'Chicago Fire',type:'Series',scheduledEpisodeReleases:[{season:15,number:3,raw:'2026-10-28T22:00:00Z'}]}],new Date('2026-10-26T12:00:00Z'),14);
