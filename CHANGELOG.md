@@ -1,3 +1,9 @@
+## 2026-11-25 — Apply the Paramount+ UK release clock across the catalogue
+- Apply the configured 08:00 UK release time to every selected Paramount+ UK series, not only Marshals and Sheriff Country.
+- For CBS-sourced episodes, derive the next-day UK platform date from the US Eastern broadcast calendar date; do not reuse the CBS airtime or its UTC date rollover.
+- Convert 08:00 through Europe/London so GMT/BST is handled by the episode date, and keep the configured clock distinct from an officially published exact time.
+- Keep the regional resolver identical in the browser and reminder worker and add coverage for an unrelated Paramount+ title.
+
 ## 2026-11-25 — Canonical official streaming releases
 - Added official episode-level release records for Sheriff Country S2E7 and S2E8 using Paramount Press Express episode and release listings.
 - Normalized the show-page next episode date, calendar schedule, and recurring schedule from the same official episode record; conflicting provider snapshots can no longer create different dates for the same episode.
