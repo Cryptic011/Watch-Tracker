@@ -1,3 +1,7 @@
+## 2026-11-25 — Keep next-episode dates consistent across pages
+- Use the same confirmed next-episode date on the show page and calendar when a provider schedule row conflicts with the episode's next-date pointer.
+- Add a regression for Sheriff Country S2E7 so the stale 5 December entry cannot override the confirmed 12 December UK streaming date.
+
 ## 2026-11-22 — Make Pages deployment retries reliable
 - Give each deployment attempt its own artifact and wait for the uploaded file to be visible before publishing.
 
