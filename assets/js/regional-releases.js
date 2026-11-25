@@ -16,7 +16,10 @@
   }
   // Paramount+ UK uses the app's configured 08:00 UK release clock for every
   // selected series. The title catalogue is deliberately not allow-listed.
-  const paramountUKRule={name:'paramountplus',weekday:null};
+  const paramountUKRule={name:'paramountplus',weekday:null,officialEpisodes:[
+    {season:2,episode:7,title:'Stand Your Ground',broadcastRaw:'2026-12-12T01:00:00Z',streamingRaw:'2026-12-12T08:00:00Z',source:'https://www.paramountpressexpress.com/cbs-studios/shows/sheriff-country/releases',releaseDateConfirmed:true,releaseTimeConfirmed:false},
+    {season:2,episode:8,title:'Justice Delayed',broadcastRaw:'2026-12-19T01:00:00Z',streamingRaw:'2026-12-19T08:00:00Z',source:'https://www.paramountpressexpress.com/cbs-studios/shows/sheriff-country/releases',releaseDateConfirmed:true,releaseTimeConfirmed:false}
+  ]};
   function paramountUKTitle(item){
     return ['Series','Anime'].includes(item.type||item.format)?paramountUKRule:null;
   }
@@ -28,7 +31,11 @@
   function catalogueItem(item,options={}){
     if(!item||(country(options)||'GB')!=='GB')return item;
     const platform=String(item.platform||'').trim().toLowerCase();
-    if(!['','cbs'].includes(platform)||!paramountUKTitle(item))return item;
+    const id=String(item.tvmazeShowId||item.tvmazeId||(item.source==='tvmaze'?item.externalId:''));
+    const imdb=String(item.imdbId||(item.source==='imdb'?item.externalId:''));
+    const title=String(item.title||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+    const known=['84526','76568'].includes(id)||['tt36849871','tt32268630'].includes(imdb)||['marshals','the marshals','sheriff country'].includes(title);
+    if(!['','cbs'].includes(platform)||!known||!paramountUKTitle(item))return item;
     return {...item,platform:'Paramount+',broadcastPlatform:item.broadcastPlatform||item.platform||'CBS'};
   }
   function dateInZone(raw,timeZone){
@@ -80,7 +87,7 @@
     const official=rule&&officialEpisode(rule,event.season,event.number);
     if(official)return resolvedOfficialEvent(event,official,item);
     const raw=event.broadcastRaw||event.raw;
-    const timed=(item.type!=='Film'||Boolean(String(item.filmReleaseSource||'').trim()))&&/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}/.test(String(raw||''))&&Number.isFinite(Date.parse(raw));
+    const timed=(item.type!=='Film'||Boolean(String(item.filmReleaseSource||'').trim()))&&/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(String(raw||''))&&Number.isFinite(Date.parse(raw));
     if(timed&&rule)return {...event,raw:platformReleaseTime(raw,rule),broadcastRaw:raw,platform:item.platform,streamingUnconfirmed:false,releaseSourceMismatch:false,
       releaseSchedule:{key:`${rule.name}-gb-paramount-0800`,platform:item.platform,country:'GB'}};
     // A broadcast timestamp cannot be presented as a different service's release.
